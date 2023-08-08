@@ -22,3 +22,13 @@ func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
 		ctx.Status(http.StatusCreated)
 	}
 }
+
+func FindAllAccount(account account.AccountService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		accountList, err := account.FindAll(ctx)
+		if err != nil {
+			ctx.JSON(http.StatusInternalServerError, "Error Finded accounts")
+		}
+		ctx.JSON(http.StatusOK, accountList)
+	}
+}

@@ -10,10 +10,10 @@ import (
 )
 
 type AccountService struct {
-	accountRepository postgress.AccountRepository
+	accountRepository postgress.Repository
 }
 
-func NewAccountService(accountRepository postgress.AccountRepository) AccountService {
+func NewAccountService(accountRepository postgress.Repository) AccountService {
 	return AccountService{
 		accountRepository: accountRepository,
 	}
@@ -31,4 +31,12 @@ func (s AccountService) CreateAccount(ctx context.Context, id, name, bank string
 
 	return err
 
+}
+
+func (s AccountService) FindAll(ctx context.Context) ([]*account.Account, error) {
+	accounts, err := s.accountRepository.FindAll(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return accounts, nil
 }

@@ -8,6 +8,7 @@ import (
 
 func AccountRotes(s *gin.Engine, acountService account.AccountService) {
 
-	s.GET("/account", handler.CreateAccount(acountService))
+	s.POST("/account", handler.CreateAccount(acountService))
+	s.GET("/account", handler.FindAllAccount(acountService))
 
 }

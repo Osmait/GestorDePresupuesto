@@ -34,7 +34,7 @@ func Run() error {
 	}
 	runDBMigration("file:///home/osmait/Documents/WorkSpace/GestorDePresupuesto/BackEnd/src/cmd/api/db/migrations", postgresURI)
 	accountRepository := postgress.NewCourseRepository(db)
-	accountSerevice := account.NewAccountService(*accountRepository)
+	accountSerevice := account.NewAccountService(accountRepository)
 
 	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, accountSerevice)
 	return srv.Run(ctx)
