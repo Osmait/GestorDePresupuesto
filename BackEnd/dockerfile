@@ -1,0 +1,17 @@
+FROM golang:alpine AS builder
+
+
+WORKDIR /app
+
+
+COPY . .
+
+
+RUN go build -o gestorApp src/cmd/main.go
+RUN go install github.com/cosmtrek/air@latest
+
+
+WORKDIR /app/src/cmd
+
+
+CMD ["air"]
