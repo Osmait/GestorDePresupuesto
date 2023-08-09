@@ -14,6 +14,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 	"github.com/rs/zerolog/log"
 )
 
@@ -34,7 +35,6 @@ func Run() error {
 	if err != nil {
 		return err
 	}
-	fmt.Println("hola333")
 
 	currentDir, err := os.Getwd()
 	if err != nil {
@@ -46,9 +46,11 @@ func Run() error {
 
 	runDBMigration("file://api/db/migrations", postgresURI)
 	accountRepository := postgress.NewCourseRepository(db)
+	transactionRepository := postgress.NewTransactionRepository(db)
 	accountSerevice := account.NewAccountService(accountRepository)
+	transactionServices := transaction.NewTransactionService(postgress.TransactionRepository(*transactionRepository))
 
-	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, accountSerevice)
+	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, accountSerevice, transactionServices)
 	return srv.Run(ctx)
 
 }

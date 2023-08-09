@@ -24,7 +24,7 @@ func (m *MockAccountRepository) FindAll(ctx context.Context) ([]*account.Account
 	return args.Get(0).([]*account.Account), args.Error(1)
 }
 
-func (m *MockAccountRepository) DeleteAccount(ctx context.Context, id string) error {
+func (m *MockAccountRepository) Delete(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
 }

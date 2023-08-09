@@ -52,7 +52,7 @@ func (repo *AccountRepository) FindAll(ctx context.Context) ([]*account.Account,
 	return accounts, nil
 }
 
-func (repo *AccountRepository) DeleteAccount(ctx context.Context, id string) error {
+func (repo *AccountRepository) Delete(ctx context.Context, id string) error {
 	_, err := repo.db.ExecContext(ctx, "DELETE FROM account WHERE id = $1  ", id)
 	return err
 }

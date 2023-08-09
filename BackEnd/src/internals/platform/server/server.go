@@ -12,22 +12,25 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server/routes"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 )
 
 type Server struct {
-	httpAddr       string
-	Engine         *gin.Engine
-	servicesAccunt account.AccountService
+	httpAddr            string
+	Engine              *gin.Engine
+	servicesAccunt      account.AccountService
+	servicesTransaction transaction.TransactionService
 
 	shutdownTimeout time.Duration
 }
 
-func New(ctx context.Context, host string, port uint, shutdownTimeout time.Duration, servicesAccount account.AccountService) (context.Context, Server) {
+func New(ctx context.Context, host string, port uint, shutdownTimeout time.Duration, servicesAccount account.AccountService, transactionService transaction.TransactionService) (context.Context, Server) {
 	srv := Server{
-		Engine:          gin.New(),
-		httpAddr:        fmt.Sprintf("%s:%d", host, port),
-		servicesAccunt:  servicesAccount,
-		shutdownTimeout: shutdownTimeout,
+		Engine:              gin.New(),
+		httpAddr:            fmt.Sprintf("%s:%d", host, port),
+		servicesAccunt:      servicesAccount,
+		servicesTransaction: transactionService,
+		shutdownTimeout:     shutdownTimeout,
 	}
 	srv.registerRoutes()
 	return serverContext(ctx), srv
@@ -35,6 +38,7 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout time.Durat
 func (s *Server) registerRoutes() {
 	routes.HealthRoutes(s.Engine)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)
+	routes.TransactionRoutes(s.Engine, s.servicesTransaction)
 
 }
 func (s *Server) Run(ctx context.Context) error {

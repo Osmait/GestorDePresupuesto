@@ -42,6 +42,6 @@ func (s AccountService) FindAll(ctx context.Context) ([]*account.Account, error)
 }
 
 func (s AccountService) DeleteAccount(ctx context.Context, id string) error {
-	err := s.accountRepository.DeleteAccount(ctx, id)
+	err := s.accountRepository.Delete(ctx, id)
 	return err
 }
