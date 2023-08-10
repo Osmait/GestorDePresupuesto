@@ -8,6 +8,11 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 )
 
+type AccountResponse struct {
+	AccountInfo    *accountDomain.Account
+	CurrentBalance float64
+}
+
 func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var account accountDomain.Account
@@ -23,13 +28,24 @@ func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
 	}
 }
 
-func FindAllAccount(account account.AccountService) gin.HandlerFunc {
+func FindAllAccount(accountService account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		accountList, err := account.FindAll(ctx)
+		accountList, err := accountService.FindAll(ctx)
+		var accountResponse []AccountResponse
+
+		for _, account := range accountList {
+			balance, err := accountService.Balance(ctx, account.Id)
+			if err != nil {
+				ctx.Status(http.StatusInternalServerError)
+			}
+			accounts := AccountResponse{AccountInfo: account, CurrentBalance: balance + account.Balance}
+			accountResponse = append(accountResponse, accounts)
+		}
+
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, "Error Finded accounts")
 		}
-		ctx.JSON(http.StatusOK, accountList)
+		ctx.JSON(http.StatusOK, accountResponse)
 	}
 }
 

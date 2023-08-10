@@ -30,6 +30,7 @@ func FindAllTransaction(transactionService transaction.TransactionService) gin.H
 	return func(ctx *gin.Context) {
 		date1 := ctx.Query("date")
 		date2 := ctx.Query("date2")
+		id := ctx.Param("id")
 
 		if date1 == "" || date2 == "" {
 			currenTime := time.Now()
@@ -37,7 +38,7 @@ func FindAllTransaction(transactionService transaction.TransactionService) gin.H
 			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
 		}
 
-		transactionsList, err := transactionService.FindAll(ctx, date1, date2)
+		transactionsList, err := transactionService.FindAll(ctx, date1, date2, id)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, "Error Finding transantion")
 

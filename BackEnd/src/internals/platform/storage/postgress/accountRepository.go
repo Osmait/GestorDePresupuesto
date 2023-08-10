@@ -3,6 +3,7 @@ package postgress
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/account"
@@ -55,4 +56,31 @@ func (repo *AccountRepository) FindAll(ctx context.Context) ([]*account.Account,
 func (repo *AccountRepository) Delete(ctx context.Context, id string) error {
 	_, err := repo.db.ExecContext(ctx, "DELETE FROM account WHERE id = $1  ", id)
 	return err
+}
+
+func (repo *AccountRepository) Balance(ctx context.Context, id string) (float64, error) {
+	rows, err := repo.db.QueryContext(ctx, "SELECT   sum(amount)  as TOTAL  FROM  transactions   WHERE account_id = $1 ", id)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	var total float64
+	for rows.Next() {
+
+		if err = rows.Scan(&total); err == nil {
+
+			return total, nil
+		}
+	}
+	if err = rows.Err(); err != nil {
+		fmt.Println(err)
+		return 0, err
+	}
+
+	return total, nil
 }

@@ -9,6 +9,6 @@ import (
 
 func TransactionRoutes(s *gin.Engine, transactionService transaction.TransactionService) {
 	s.POST("/transaction", handler.CreateTransaction(transactionService))
-	s.GET("/transaction", handler.FindAllTransaction(transactionService))
+	s.GET("/transaction/:id", handler.FindAllTransaction(transactionService))
 	s.DELETE("/transaction/:id", handler.DeleteTransaction(transactionService))
 }
