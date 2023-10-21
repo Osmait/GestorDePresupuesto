@@ -25,13 +25,15 @@ func (s TransactionService) CreateTransaction(ctx context.Context, id, name, des
 		return err
 	}
 	id = uuid.String()
+	if typeTransaction == "bill" {
+		amount = amount * -1
+	}
 
 	transaction := transaction.NewTransaction(id, name, descrpition, typeTransaction, accountId, amount)
 
 	err = s.transactionRepository.Save(ctx, transaction)
 
 	return err
-
 }
 
 func (s TransactionService) FindAll(ctx context.Context, date string, date2 string, id string) ([]*transaction.Transaction, error) {

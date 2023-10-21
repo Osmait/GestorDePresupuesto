@@ -29,6 +29,11 @@ func (m *MockAccountRepository) Delete(ctx context.Context, id string) error {
 	return args.Error(0)
 }
 
+func (m *MockAccountRepository) Balance(ctx context.Context, id string) (float64, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(float64), args.Error(1)
+}
+
 func TestCreateAccount(t *testing.T) {
 	// Crea una instancia del MockAccountRepository
 	// Create a mock implementation of AccountRepository for testing
@@ -62,7 +67,7 @@ func TestDeleteAccount(t *testing.T) {
 
 	// Configura el comportamiento esperado del mock
 	// o algún otro error si deseas simularlo
-	mockRepo.On("DeleteAccount", mock.Anything, mock.Anything).Return(nil)
+	mockRepo.On("Delete", mock.Anything, mock.Anything).Return(nil)
 
 	// Crea una instancia de AccountService con el mock de repositorio
 	accountSvc := NewAccountService(mockRepo)
@@ -83,8 +88,8 @@ func TestFindAll(t *testing.T) {
 
 	// Configura el comportamiento esperado del mock
 	expectedAccounts := []*account.Account{
-		{Id: "1", Name: "Account 1", Bank: "Bank 1", Balance: 100.0},
-		{Id: "2", Name: "Account 2", Bank: "Bank 2", Balance: 200.0},
+		{Id: "1", Name: "Account 1", Bank: "Bank 1", InitialBalance: 100.0},
+		{Id: "2", Name: "Account 2", Bank: "Bank 2", InitialBalance: 200.0},
 	}
 	mockRepo.On("FindAll", mock.Anything).Return(expectedAccounts, nil)
 
@@ -99,5 +104,4 @@ func TestFindAll(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 	assert.NoError(t, err, "FindAll should not return an error")
 	assert.Equal(t, expectedAccounts, accounts, "Returned accounts should match expected")
-
 }

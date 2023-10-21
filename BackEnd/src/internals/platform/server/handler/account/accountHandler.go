@@ -20,7 +20,7 @@ func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
 			ctx.JSON(http.StatusBadRequest, "Error campos requeridos")
 			return
 		}
-		err := accountService.CreateAccount(ctx, account.Id, account.Name, account.Bank, account.Balance)
+		err := accountService.CreateAccount(ctx, account.Id, account.Name, account.Bank, account.InitialBalance)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, err.Error())
 		}
@@ -38,7 +38,7 @@ func FindAllAccount(accountService account.AccountService) gin.HandlerFunc {
 			if err != nil {
 				ctx.Status(http.StatusInternalServerError)
 			}
-			accounts := AccountResponse{AccountInfo: account, CurrentBalance: balance + account.Balance}
+			accounts := AccountResponse{AccountInfo: account, CurrentBalance: balance + account.InitialBalance}
 			accountResponse = append(accountResponse, accounts)
 		}
 

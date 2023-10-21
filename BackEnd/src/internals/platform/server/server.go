@@ -35,12 +35,13 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout time.Durat
 	srv.registerRoutes()
 	return serverContext(ctx), srv
 }
+
 func (s *Server) registerRoutes() {
 	routes.HealthRoutes(s.Engine)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)
 	routes.TransactionRoutes(s.Engine, s.servicesTransaction)
-
 }
+
 func (s *Server) Run(ctx context.Context) error {
 	log.Println("Server running on", s.httpAddr)
 
@@ -69,7 +70,6 @@ func serverContext(ctx context.Context) context.Context {
 	go func() {
 		<-c
 		cancel()
-
 	}()
 
 	return ctx
