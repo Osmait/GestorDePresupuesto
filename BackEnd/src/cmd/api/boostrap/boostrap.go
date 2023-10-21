@@ -39,7 +39,6 @@ func Run() error {
 	currentDir, err := os.Getwd()
 	if err != nil {
 		fmt.Println("Error:", err)
-
 	}
 
 	fmt.Println("Directorio actual:", currentDir)
@@ -48,11 +47,10 @@ func Run() error {
 	accountRepository := postgress.NewCourseRepository(db)
 	transactionRepository := postgress.NewTransactionRepository(db)
 	accountSerevice := account.NewAccountService(accountRepository)
-	transactionServices := transaction.NewTransactionService(postgress.TransactionRepository(*transactionRepository))
+	transactionServices := transaction.NewTransactionService(transactionRepository)
 
-	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, accountSerevice, transactionServices)
+	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, *accountSerevice, *transactionServices)
 	return srv.Run(ctx)
-
 }
 
 func runDBMigration(migrationURL string, dbSource string) {
@@ -70,7 +68,7 @@ func runDBMigration(migrationURL string, dbSource string) {
 }
 
 type Config struct {
-	//Server Configuration
+	// Server Configuration
 	Host            string        `default:"localhost"`
 	Port            uint          `default:"8080"`
 	shutdownTimeout time.Duration `default:"10s"`

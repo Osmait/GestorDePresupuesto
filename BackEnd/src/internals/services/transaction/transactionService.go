@@ -10,11 +10,11 @@ import (
 )
 
 type TransactionService struct {
-	transactionRepository postgress.TransactionRepository
+	transactionRepository postgress.TransactionRepsitoryinterface
 }
 
-func NewTransactionService(transactionRepository postgress.TransactionRepository) TransactionService {
-	return TransactionService{
+func NewTransactionService(transactionRepository postgress.TransactionRepsitoryinterface) *TransactionService {
+	return &TransactionService{
 		transactionRepository: transactionRepository,
 	}
 }

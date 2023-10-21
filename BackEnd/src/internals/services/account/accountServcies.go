@@ -14,8 +14,8 @@ type AccountService struct {
 	accountRepository postgress.Repository
 }
 
-func NewAccountService(accountRepository postgress.Repository) AccountService {
-	return AccountService{
+func NewAccountService(accountRepository postgress.Repository) *AccountService {
+	return &AccountService{
 		accountRepository: accountRepository,
 	}
 }

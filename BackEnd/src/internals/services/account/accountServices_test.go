@@ -65,7 +65,7 @@ func TestCreateAccount(t *testing.T) {
 func TestDeleteAccount(t *testing.T) {
 	mockRepo := &MockAccountRepository{}
 
-	// Configura el comportamiento esperado del mock
+	// Configura el comportamientosperado del mock
 	// o algún otro error si deseas simularlo
 	mockRepo.On("Delete", mock.Anything, mock.Anything).Return(nil)
 
