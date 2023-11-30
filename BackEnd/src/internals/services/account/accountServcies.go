@@ -38,6 +38,7 @@ func (s AccountService) FindAll(ctx context.Context) ([]*account.Account, error)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Println("hello")
 	return accounts, nil
 }
 

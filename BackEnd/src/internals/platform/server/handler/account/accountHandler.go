@@ -17,7 +17,7 @@ func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var account accountDomain.Account
 		if err := ctx.BindJSON(&account); err != nil {
-			ctx.JSON(http.StatusBadRequest, "Error campos requeridos")
+			ctx.JSON(http.StatusBadRequest, "Error filds required")
 			return
 		}
 		err := accountService.CreateAccount(ctx, account.Id, account.Name, account.Bank, account.InitialBalance)
@@ -57,6 +57,5 @@ func DeleteAccount(accountService account.AccountService) gin.HandlerFunc {
 			ctx.JSON(http.StatusInternalServerError, "Error deleting account")
 		}
 		ctx.JSON(http.StatusOK, "Deleted")
-
 	}
 }

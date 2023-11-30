@@ -34,14 +34,16 @@ func FindAllTransaction(transactionService transaction.TransactionService) gin.H
 
 		if date1 == "" || date2 == "" {
 			currenTime := time.Now()
-			date1 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day())
-			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
+			date1 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-1)
+			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day())
 		}
 
 		transactionsList, err := transactionService.FindAll(ctx, date1, date2, id)
+		fmt.Println(transactionsList)
 		if err != nil {
+			fmt.Println(err.Error())
 			ctx.JSON(http.StatusInternalServerError, "Error Finding transantion")
-
+			return
 		}
 
 		ctx.JSON(http.StatusOK, transactionsList)
@@ -56,6 +58,5 @@ func DeleteTransaction(transactionService transaction.TransactionService) gin.Ha
 			ctx.JSON(http.StatusInternalServerError, err.Error())
 		}
 		ctx.JSON(http.StatusOK, "Deleted")
-
 	}
 }

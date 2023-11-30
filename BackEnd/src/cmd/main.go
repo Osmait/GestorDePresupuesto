@@ -9,6 +9,5 @@ import (
 func main() {
 	if err := boostrap.Run(); err != nil {
 		log.Fatal(err)
-
 	}
 }
