@@ -43,7 +43,7 @@ func Run() error {
 
 	fmt.Println("Directorio actual:", currentDir)
 
-	runDBMigration("file://api/db/migrations", postgresURI)
+	runDBMigration("file://src/cmd/api/db/migrations", postgresURI)
 	accountRepository := postgress.NewCourseRepository(db)
 	transactionRepository := postgress.NewTransactionRepository(db)
 	accountSerevice := account.NewAccountService(accountRepository)

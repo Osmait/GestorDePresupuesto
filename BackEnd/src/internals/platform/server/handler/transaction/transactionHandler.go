@@ -14,7 +14,7 @@ func CreateTransaction(transactionservice transaction.TransactionService) gin.Ha
 	return func(ctx *gin.Context) {
 		var transaction transactionDomain.Transaction
 		if err := ctx.BindJSON(&transaction); err != nil {
-			ctx.JSON(http.StatusBadRequest, "Error campos requeridos")
+			ctx.JSON(http.StatusBadRequest, "Error fields required ")
 			return
 		}
 		err := transactionservice.CreateTransaction(ctx, transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id)
@@ -56,6 +56,7 @@ func DeleteTransaction(transactionService transaction.TransactionService) gin.Ha
 		err := transactionService.DeleteTransaction(ctx, id)
 		if err != nil {
 			ctx.JSON(http.StatusInternalServerError, err.Error())
+			return
 		}
 		ctx.JSON(http.StatusOK, "Deleted")
 	}

@@ -1,4 +1,4 @@
-version: '3.8'
+version: "3.8"
 
 services:
   postgres:
@@ -14,12 +14,12 @@ services:
       - ./postgres_data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d
 
-    
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
- 
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
+    image: cosmtrek/air
+    working_dir: /app
     ports:
       - 8080:8080
     depends_on:

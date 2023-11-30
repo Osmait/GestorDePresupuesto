@@ -14,4 +14,4 @@ RUN go install github.com/cosmtrek/air@latest
 WORKDIR /app/src/cmd
 
 
-CMD ["air"]
+CMD ["air", "-c", "/app/.air.toml"]
