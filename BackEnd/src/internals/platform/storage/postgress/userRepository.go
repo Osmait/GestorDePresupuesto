@@ -43,3 +43,8 @@ func (u *UserRepository) findUser(ctx context.Context, id string) (*user.User, e
 	}
 	return &user, nil
 }
+
+func (u *UserRepository) Delete(ctx context.Context, id string) error {
+	_, err := u.db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", id)
+	return err
+}

@@ -31,7 +31,7 @@ func (m *MockTransaction) Delete(ctx context.Context, id string) error {
 func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	s := NewTransactionService(mockRepo)
-	mockRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
+	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
 	id := "1"
