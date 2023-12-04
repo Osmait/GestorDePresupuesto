@@ -49,3 +49,12 @@ func TestFindUser(t *testing.T) {
 
 	mockRepo.AssertExpectations(t)
 }
+
+func TestDeleteUser(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	UserService := NewUserService(mockRepo)
+	mockRepo.On("Delete", context.Background(), mock.Anything).Return(nil)
+	err := UserService.userRepository.Delete(context.Background(), "1")
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
