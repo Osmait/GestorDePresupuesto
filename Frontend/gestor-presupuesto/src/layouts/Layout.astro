@@ -6,6 +6,7 @@ import HomeIcon from "../components/HomeIcon.astro"
 import SettingsIcon from "../components/SettingsIcon.astro"
 import Add from "../components/Add.astro"
 import Wallet from "../components/Wallet.astro"
+import ChartIcon  from "../components/ChartIcon.astro"
 const { title } = Astro.props;
 import { ViewTransitions } from 'astro:transitions';
 ---
@@ -38,6 +39,10 @@ import { ViewTransitions } from 'astro:transitions';
           <Wallet/>
 
             </a>
+            <a href="/charts">
+               <ChartIcon/>
+            </a>
+          
           </div>
           <div class="icons-down">
 <SettingsIcon/>
