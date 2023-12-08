@@ -2,7 +2,7 @@
 const typeTranctin = ["Expense","Income"]
 
 ---
-<h1>Last Transactions</h1>
+<h1> Transactions</h1>
 <table>
     <thead>
       <tr>
@@ -25,6 +25,31 @@ const typeTranctin = ["Expense","Income"]
         <td>$1000.00</td>
         <td  class={typeTranctin[1] == "Expense" ? "expense" :"income"}>Income</td>
       </tr>
+ <tr>
+        <td>John Doe</td>
+        <td>Expense for groceries</td>
+        <td>$50.00</td>
+        <td class={typeTranctin[0] == "Expense" ? "expense" :"income"}>Expense</td>
+      </tr>
+      <tr>
+        <td>Jane Smith</td>
+        <td>Salary payment</td>
+        <td>$1000.00</td>
+        <td  class={typeTranctin[1] == "Expense" ? "expense" :"income"}>Income</td>
+      </tr>
+ <tr>
+        <td>John Doe</td>
+        <td>Expense for groceries</td>
+        <td>$50.00</td>
+        <td class={typeTranctin[0] == "Expense" ? "expense" :"income"}>Expense</td>
+      </tr>
+      <tr>
+        <td>Jane Smith</td>
+        <td>Salary payment</td>
+        <td>$1000.00</td>
+        <td  class={typeTranctin[1] == "Expense" ? "expense" :"income"}>Income</td>
+      </tr>
+
       <!-- Agrega más filas según sea necesario -->
     </tbody>
   </table>

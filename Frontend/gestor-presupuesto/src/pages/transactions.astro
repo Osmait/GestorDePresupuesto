@@ -1,13 +1,18 @@
 ---
 
+import  LastTransaction from "../components/LastTransaction.astro";
 import Layout from '../layouts/Layout.astro';
+import BackArrowIcon from "../components/BackArrowIcon.astro" 
 ---
 <Layout title='Transactions'>
-<section>
-  <h1>Transactions</h1>
 
-</section>
-
+  <a href="/">
+    <BackArrowIcon/>
+  </a>
+    <section transition:name="transaction">
+      <LastTransaction/>
+    </section>
+ 
 </Layout>
 
 

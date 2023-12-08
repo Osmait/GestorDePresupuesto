@@ -1,22 +1,17 @@
 ---
-import { AccountRepotory} from "../repository/account.repository"
-import {type AccoutInfoInterface} from "../interface/account.interface"
-const accountRepository = new AccountRepotory()
-const accounts :AccoutInfoInterface[]= await  accountRepository.findAll()
+import Layout from '../layouts/Layout.astro';
+import ListofAccounts from "../components/ListofAccounts.astro"
+import BackArrowIcon from "../components/BackArrowIcon.astro" 
 ---
+<Layout title="Accounts">
+  <a href="/">
+    <BackArrowIcon/>
+  </a>
+  <section transition:name="accounts">
+<ListofAccounts transition:name="accounts"/>
 
-<section>
-  <h1>Accounts</h1>
-<div>
-{accounts.map(a => (
-  <h1>{a.AccountInfo.name}</h1>
-  <h2>{a.AccountInfo.bank}</h2>
-  <h2>{a.CurrentBalance}</h2>
-    ))}
-  </div>
-</section>
-
-
+  </section>
+</Layout>
 
 
 

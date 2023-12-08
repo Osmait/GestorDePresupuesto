@@ -1,0 +1,17 @@
+---
+
+import Layout from "../layouts/Layout.astro";
+import BackArrowIcon from "../components/BackArrowIcon.astro" 
+import ListOfReminders from "../components/ListOfReminders.astro"
+---
+<Layout title="Reminders">
+  <a href="/">
+    <BackArrowIcon/>
+  </a>
+
+<section transition:name="reminders">
+<ListOfReminders/>
+  </section>
+
+
+</Layout>
