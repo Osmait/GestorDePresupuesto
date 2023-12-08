@@ -1,0 +1,162 @@
+---
+interface Props {
+	title: string;
+}
+import HomeIcon from "../components/HomeIcon.astro"
+import SettingsIcon from "../components/SettingsIcon.astro"
+import Add from "../components/Add.astro"
+import Wallet from "../components/Wallet.astro"
+const { title } = Astro.props;
+import { ViewTransitions } from 'astro:transitions';
+---
+
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="Astro description" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+		<title>{title}</title>
+<ViewTransitions />
+	</head>
+	<body id="body-WallPaper" >
+    <div >
+      <div transition:persist class = "nav-bar-animation">
+      <nav  class="nav-bar">
+          <div class="icons-up">
+            <a href="/">
+          <HomeIcon/>
+
+            </a>
+            <a href="/register">
+          <Add/>
+
+            </a>
+            <a href="/transactions">
+          <Wallet/>
+
+            </a>
+          </div>
+          <div class="icons-down">
+<SettingsIcon/>
+          </div>
+      </nav>
+      </div>
+    </div>
+    <main class="container">
+		<slot />
+    </main>
+	</body>
+</html>
+<style is:global>
+
+:root {
+  --accent: 136, 58, 234;
+  --accent-light: 224, 204, 250;
+  --accent-dark: 49, 10, 101;
+  --accent-gradient: linear-gradient(
+    45deg,
+    rgb(var(--accent)),
+    rgb(var(--accent-light)) 30%,
+    white 60%
+  );
+}
+html {
+  font-family: system-ui, sans-serif;
+}
+a {
+  text-decoration: none;
+  color: inherit;
+}
+a:hover {
+
+  color: #612639; 
+
+transition: color 0.5s ease;
+}
+code {
+  font-family:
+    Menlo,
+    Monaco,
+    Lucida Console,
+    Liberation Mono,
+    DejaVu Sans Mono,
+    Bitstream Vera Sans Mono,
+    Courier New,
+    monospace;
+}
+body {
+  display: grid;
+  grid-template-columns: 3% 90%;
+  grid-template-rows: auto; /* O ajusta según tus necesidades */
+  gap: 20px; /* Espacio uentre las columnas */
+  justify-content: space-around;
+  background: url("https://github.com/antoniosarosi/Wallpapers/blob/master/05.jpg?raw=true");
+  background-repeat: no-repeat;
+}
+
+.icons-up {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  gap: 30px;
+  margin-top: 10px;
+}
+.nav-bar {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  width: 50px;
+  color: white;
+  border-radius: 20px;
+  background: linear-gradient(180deg, #13151a 0%, rgba(19, 21, 26, 0.88) 100%);
+  border: 1px solid #343841;
+  box-shadow:
+    0px 0px 0px 0px rgba(19, 21, 26, 0.3),
+    0px 1px 2px 0px rgba(19, 21, 26, 0.29),
+    0px 4px 4px 0px rgba(19, 21, 26, 0.26),
+    0px 10px 6px 0px rgba(19, 21, 26, 0.15),
+    0px 17px 7px 0px rgba(19, 21, 26, 0.04),
+    0px 26px 7px 0px rgba(19, 21, 26, 0.01);
+}
+
+.nav-bar-animation {
+  position: absolute;
+  height: 93%;
+  width: 120px;
+  transition: left 0.3s ease;
+  left: -30px;
+}
+
+.nav-bar-animation:hover {
+
+  left: 20px;
+}
+
+.container {
+  margin: auto;
+  padding: 1rem;
+  width: 100%;
+  height: 90vh;
+  border-radius: 20px;
+  max-width: calc(100% - 2rem);
+  color: white;
+  font-size: 20px;
+  line-height: 1.6;
+  background: linear-gradient(180deg, #13151a 0%, rgba(19, 21, 26, 0.88) 100%);
+  border: 1px solid #343841;
+  box-shadow:
+    0px 0px 0px 0px rgba(19, 21, 26, 0.3),
+    0px 1px 2px 0px rgba(19, 21, 26, 0.29),
+    0px 4px 4px 0px rgba(19, 21, 26, 0.26),
+    0px 10px 6px 0px rgba(19, 21, 26, 0.15),
+    0px 17px 7px 0px rgba(19, 21, 26, 0.04),
+    0px 26px 7px 0px rgba(19, 21, 26, 0.01);
+}
+
+</style>

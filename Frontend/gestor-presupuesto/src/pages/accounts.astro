@@ -1,0 +1,22 @@
+---
+import { AccountRepotory} from "../repository/account.repository"
+import {type AccoutInfoInterface} from "../interface/account.interface"
+const accountRepository = new AccountRepotory()
+const accounts :AccoutInfoInterface[]= await  accountRepository.findAll()
+---
+
+<section>
+  <h1>Accounts</h1>
+<div>
+{accounts.map(a => (
+  <h1>{a.AccountInfo.name}</h1>
+  <h2>{a.AccountInfo.bank}</h2>
+  <h2>{a.CurrentBalance}</h2>
+    ))}
+  </div>
+</section>
+
+
+
+
+

@@ -1,0 +1,35 @@
+---
+import Layout from "../layouts/Layout.astro";
+import ChartComponent from "../components/CharstComponent.astro";
+
+import  LastTransaction from "../components/LastTransaction.astro";
+---
+
+<Layout title="Inicio">
+
+  <main class="content-main">
+  <section class="chart">
+  <ChartComponent client:load />
+  </section>
+    <section>
+      <h1>Accounts</h1>
+    </section>
+    <section>
+      <LastTransaction/>
+    </section>
+    <section>
+      <h1>Recordatorio</h1>
+    </section>
+  </main>
+</Layout>
+
+<style>
+.content-main {
+  
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); 
+  grid-template-rows: repeat(2, 1fr);
+  gap: 10px;
+  
+}
+</style>
