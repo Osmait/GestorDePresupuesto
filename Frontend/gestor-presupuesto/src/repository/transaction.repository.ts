@@ -7,9 +7,15 @@ export class TrasactionRepotory {
   };
 
   async get(id: string): Promise<Transactions[]> {
-    const response = await fetch(`${this.url}/${id}`, this.headers);
-    const result = await response.json();
-    return result;
+    try {
+      const response = await fetch(`${this.url}/${id}`, this.headers);
+      console.log(response);
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.log(error);
+      return [];
+    }
   }
   async create(transaction: Transactions) {
     const options = {

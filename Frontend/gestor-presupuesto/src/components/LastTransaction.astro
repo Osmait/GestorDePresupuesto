@@ -24,7 +24,8 @@ if (Astro.request.method === "POST") {
 <form method="POST">
   <select name="account">
     {
-      accounts.map((a: AccoutInfoInterface) => (
+    accounts  &&   accounts.map((a: AccoutInfoInterface) => (
+
         <option value={a.AccountInfo.id}>
           {a.AccountInfo.bank}: {a.AccountInfo.name}
         </option>

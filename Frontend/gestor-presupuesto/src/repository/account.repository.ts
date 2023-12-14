@@ -11,10 +11,14 @@ export class AccountRepotory {
   };
 
   public async findAll(): Promise<AccoutInfoInterface[]> {
-    console.log(import.meta.env.HOST);
-    const response = await fetch(this.url, this.headers);
-    const result = await response.json();
-    return result;
+    try {
+      const response = await fetch(this.url, this.headers);
+      const result = await response.json();
+      return result;
+    } catch (error) {
+      console.log(error);
+      return [];
+    }
   }
   public async create(account: PostAccountInterface): Promise<void> {
     const options = {
