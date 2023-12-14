@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
@@ -31,6 +32,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, id, name, des
 
 	transaction := transaction.NewTransaction(id, name, descrpition, typeTransaction, accountId, amount)
 
+	fmt.Println(typeTransaction)
 	err = s.transactionRepository.Save(ctx, transaction)
 
 	return err

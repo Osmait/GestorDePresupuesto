@@ -5,11 +5,13 @@ import (
 	"database/sql"
 	"fmt"
 	"os"
+	"strconv"
 	"time"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
@@ -19,14 +21,21 @@ import (
 )
 
 func Run() error {
+	err := godotenv.Load(".env")
+	if err != nil {
+		fmt.Println("Not env")
+	}
 	var cfg Config
-	cfg.Port = 8080
-	cfg.Host = "0.0.0.0"
-	cfg.DbName = "my_store"
-	cfg.DbUser = "osmait"
-	cfg.DbPass = "admin123"
-	cfg.DbPort = 5432
-	cfg.Dbhost = "backend-postgres-1"
+	port, _ := strconv.Atoi(os.Getenv("Port"))
+
+	dbPort, _ := strconv.Atoi(os.Getenv("DbPort"))
+	cfg.Port = uint(port)
+	cfg.Host = os.Getenv("Host")
+	cfg.DbName = os.Getenv("DbName")
+	cfg.DbUser = os.Getenv("DbUser")
+	cfg.DbPass = os.Getenv("DbPass")
+	cfg.DbPort = uint(dbPort)
+	cfg.Dbhost = os.Getenv("Dbhost")
 
 	postgresURI := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.DbUser, cfg.DbPass, cfg.Dbhost, cfg.DbPort, cfg.DbName)
 

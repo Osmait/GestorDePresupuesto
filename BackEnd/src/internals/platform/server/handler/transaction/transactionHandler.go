@@ -34,8 +34,8 @@ func FindAllTransaction(transactionService transaction.TransactionService) gin.H
 
 		if date1 == "" || date2 == "" {
 			currenTime := time.Now()
-			date1 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-1)
-			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day())
+			date1 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-2)
+			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
 		}
 
 		transactionsList, err := transactionService.FindAll(ctx, date1, date2, id)
