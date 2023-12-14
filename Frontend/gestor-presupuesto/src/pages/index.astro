@@ -1,0 +1,57 @@
+---
+import Layout from "../layouts/Layout.astro";
+ export const prerender = false;
+import ListOfReminders from "../components/ListOfReminders.astro"
+import ListofAccounts from "../components/ListofAccounts.astro"
+import  LastTransaction from "../components/LastTransaction.astro";
+---
+
+<Layout title="Inicio">
+
+  <main class="content-main">
+  <section class="chart" transition:name="chart">
+
+  </section>
+    <a href="/accounts">
+    <section transition:name="accounts">
+
+    <ListofAccounts />
+    </section>
+
+    </a>
+    <a href="/transactions">
+    <section transition:name="transaction">
+      <LastTransaction/>
+    </section>
+
+    </a>
+   <a href="/reminders">
+<section transition:name="reminders">
+<ListOfReminders/>
+    </section>
+
+  </a>
+  </main>
+</Layout>
+
+<style>
+.content-main {
+  
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); 
+  grid-template-rows: repeat(2, 1fr);
+  gap: 10px;
+  
+}
+a:hover{
+  box-shadow:
+    0px 0px 0px 0px rgba(19, 21, 26, 0.3),
+    0px 1px 2px 0px rgba(19, 21, 26, 0.29),
+    0px 4px 4px 0px rgba(19, 21, 26, 0.26),
+    0px 10px 6px 0px rgba(19, 21, 26, 0.15),
+    0px 17px 7px 0px rgba(19, 21, 26, 0.04),
+    0px 26px 7px 0px rgba(19, 21, 26, 0.01);
+
+border-radius: 10px;
+}
+</style>

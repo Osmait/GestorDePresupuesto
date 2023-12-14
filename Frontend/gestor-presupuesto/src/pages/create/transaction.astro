@@ -1,0 +1,20 @@
+---
+
+export const prerender = false;
+import Layout from "../../layouts/Layout.astro"
+import BackArrowIcon from "../../components/BackArrowIcon.astro" 
+import TransactionFrom from "../../components/transactionFrom.astro";
+import  LinksofCreate from "../../components/LinksofCreate.astro"
+
+---
+<Layout title="Create Transaction">
+ <a href="/register">
+    <BackArrowIcon/>
+  </a>
+ <h1>Transaction</h1>
+ 
+<LinksofCreate/> 
+  <TransactionFrom/>
+
+
+</Layout>
