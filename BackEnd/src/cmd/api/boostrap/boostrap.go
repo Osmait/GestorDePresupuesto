@@ -26,7 +26,7 @@ func Run() error {
 		fmt.Println("Not env")
 	}
 	var cfg Config
-	port, _ := strconv.Atoi(os.Getenv("Port"))
+	port, _ := strconv.Atoi(os.Getenv("PORT"))
 
 	dbPort, _ := strconv.Atoi(os.Getenv("DbPort"))
 	cfg.Port = uint(port)
