@@ -41,7 +41,7 @@ func Run() error {
 		fmt.Println("Error:", err)
 	}
 
-	fmt.Println("Directorio actual:", currentDir)
+	fmt.Println("Current Directory:", currentDir)
 
 	runDBMigration("file://src/cmd/api/db/migrations", postgresURI)
 	accountRepository := postgress.NewCourseRepository(db)
@@ -69,16 +69,16 @@ func runDBMigration(migrationURL string, dbSource string) {
 
 type Config struct {
 	// Server Configuration
-	Host            string        `default:"localhost"`
-	Port            uint          `default:"8080"`
-	shutdownTimeout time.Duration `default:"10s"`
+	Host            string
+	Port            uint
+	shutdownTimeout time.Duration
 
 	// DataBase Configuration
 
-	DbUser    string        `default:"osmait"`
-	DbPass    string        `default:"admin123"`
-	Dbhost    string        `default:"localhost"`
-	DbPort    uint          `default:"5432"`
-	DbName    string        `default:"my_store"`
-	DbTimeout time.Duration `default:"5s"`
+	DbUser    string
+	DbPass    string
+	Dbhost    string
+	DbPort    uint
+	DbName    string
+	DbTimeout time.Duration
 }
