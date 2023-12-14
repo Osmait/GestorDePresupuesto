@@ -8,3 +8,8 @@ export interface AccountInterface {
   bank: string;
   initialBalance: number;
 }
+export interface PostAccountInterface {
+  name: string;
+  bank: string;
+  initialBalance: number;
+}

@@ -1,20 +1,22 @@
 import type {
-  AccountInterface,
   AccoutInfoInterface,
+  PostAccountInterface,
 } from "../interface/account.interface";
 
 export class AccountRepotory {
-  private url = `http:localhost:8080/account`;
+  private url = `${import.meta.env.HOST}/account`;
+
   private headers: any = {
     "Content-Type": "application/json",
   };
 
   public async findAll(): Promise<AccoutInfoInterface[]> {
+    console.log(import.meta.env.HOST);
     const response = await fetch(this.url, this.headers);
     const result = await response.json();
     return result;
   }
-  public async create(account: AccountInterface): Promise<void> {
+  public async create(account: PostAccountInterface): Promise<void> {
     const options = {
       method: "POST",
       headers: {

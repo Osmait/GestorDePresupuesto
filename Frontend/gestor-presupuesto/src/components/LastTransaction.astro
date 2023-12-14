@@ -1,73 +1,85 @@
 ---
-const typeTranctin = ["Expense","Income"]
-
+import type { Transactions } from "../interface/transaction.interface";
+import { TrasactionRepotory } from "../repository/transaction.repository";
+import { AccountRepotory } from "../repository/account.repository";
+import { type AccoutInfoInterface } from "../interface/account.interface";
+const accountRepository = new AccountRepotory();
+const accounts: AccoutInfoInterface[] = await accountRepository.findAll();
+const transactionRepository = new TrasactionRepotory();
+let listOfTransaction: Transactions[] = await transactionRepository.get("2ThgyKvy3k6Y9lrCbebLkRsDfcA");
+if (Astro.request.method === "POST") {
+  try {
+    const data = await Astro.request.formData();
+    const id= data.get("account") as string;
+    listOfTransaction = await transactionRepository.get(id);
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+  }
+}
 ---
-<h1> Transactions</h1>
+
+<h1>Transactions</h1>
+<form method="POST">
+  <select name="account">
+    {
+      accounts.map((a: AccoutInfoInterface) => (
+        <option value={a.AccountInfo.id}>
+          {a.AccountInfo.bank}: {a.AccountInfo.name}
+        </option>
+      ))
+    }
+  </select>
+  <button type="submit">Filtrar</button>
+</form>
 <table>
-    <thead>
-      <tr>
-        <th>Name</th>
-        <th>Description</th>
-        <th>Amount</th>
-        <th>Type Transaction</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td>John Doe</td>
-        <td>Expense for groceries</td>
-        <td>$50.00</td>
-        <td class={typeTranctin[0] == "Expense" ? "expense" :"income"}>Expense</td>
-      </tr>
-      <tr>
-        <td>Jane Smith</td>
-        <td>Salary payment</td>
-        <td>$1000.00</td>
-        <td  class={typeTranctin[1] == "Expense" ? "expense" :"income"}>Income</td>
-      </tr>
- <tr>
-        <td>John Doe</td>
-        <td>Expense for groceries</td>
-        <td>$50.00</td>
-        <td class={typeTranctin[0] == "Expense" ? "expense" :"income"}>Expense</td>
-      </tr>
-      <tr>
-        <td>Jane Smith</td>
-        <td>Salary payment</td>
-        <td>$1000.00</td>
-        <td  class={typeTranctin[1] == "Expense" ? "expense" :"income"}>Income</td>
-      </tr>
- <tr>
-        <td>John Doe</td>
-        <td>Expense for groceries</td>
-        <td>$50.00</td>
-        <td class={typeTranctin[0] == "Expense" ? "expense" :"income"}>Expense</td>
-      </tr>
-      <tr>
-        <td>Jane Smith</td>
-        <td>Salary payment</td>
-        <td>$1000.00</td>
-        <td  class={typeTranctin[1] == "Expense" ? "expense" :"income"}>Income</td>
-      </tr>
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Description</th>
+      <th>Amount</th>
+      <th>Type Transaction</th>
+    </tr>
+  </thead>
+  <tbody>
+    {
+      listOfTransaction &&
+        listOfTransaction.map((transaction) => (
+          <tr>
+            <td> {transaction.name}</td>
+            <td>{transaction.description}</td>
+            <td>${transaction.amount}</td>
 
-      <!-- Agrega más filas según sea necesario -->
-    </tbody>
-  </table>
+            <td
+              class={
+                transaction.type_transation == "bill" ? "expense" : "income"
+              }
+            >
+              {transaction.type_transation}
+            </td>
+          </tr>
+        ))
+    }
+
+    <!-- Agrega más filas según sea necesario -->
+  </tbody>
+</table>
 <style>
-.expense {
-  color: red;
-}
-.income {
-  color: green;
-}
-table {
-  border-collapse: collapse;
-  width: 100%;
-}
+  .expense {
+    color: red;
+  }
+  .income {
+    color: green;
+  }
+  table {
+    border-collapse: collapse;
+    width: 100%;
+  }
 
-th,
-td {
-  padding: 8px;
-  text-align: left;
-}
-  </style>
+  th,
+  td {
+    padding: 8px;
+    text-align: left;
+  }
+</style>

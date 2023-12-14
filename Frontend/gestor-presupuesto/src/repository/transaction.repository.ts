@@ -1,15 +1,14 @@
 import type { Transactions } from "../interface/transaction.interface";
 
 export class TrasactionRepotory {
-  private url = `http:localhost:8080/transaction`;
+  private url = `${import.meta.env.HOST}/transaction`;
   private headers: any = {
     "Content-Type": "application/json",
   };
 
-  async get() {
-    const response = await fetch(this.url, this.headers);
+  async get(id: string): Promise<Transactions[]> {
+    const response = await fetch(`${this.url}/${id}`, this.headers);
     const result = await response.json();
-    console.log(result);
     return result;
   }
   async create(transaction: Transactions) {
@@ -20,7 +19,9 @@ export class TrasactionRepotory {
       },
       body: JSON.stringify(transaction),
     };
-    fetch(this.url, options);
+    console.log(options);
+    const response = await fetch(this.url, options);
+    console.log(response);
   }
   async delele(id: string) {
     const options = {

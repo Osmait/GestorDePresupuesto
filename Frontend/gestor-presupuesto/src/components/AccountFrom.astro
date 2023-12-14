@@ -1,23 +1,52 @@
+---
+
+import type { PostAccountInterface } from "../interface/account.interface";
+import { AccountRepotory } from "../repository/account.repository";
+const accountRepository = new AccountRepotory()
+
+
+
+if (Astro.request.method === "POST") {
+  try {
+    const data = await Astro.request.formData();
+    const name = data.get("name") as string;
+    const bank= data.get("bank") as string;
+    const initialBalance = data.get("balance") ;
+
+    const account:PostAccountInterface= {
+      name,
+      bank,
+      initialBalance : Number(initialBalance),
+    }
+    
+    await accountRepository.create(account)
+  } catch (error) {
+    if (error instanceof Error) {
+      console.error(error.message);
+    }
+  }
+}
+---
 <div class="login-box">
  
-  <form>
+  <form method="POST">
     <div class="user-box" transition:name="name-label">
-      <input type="text" name="" required="">
-      <label >Name</label>
+      <input type="text" name="name" required="">
+      <label>Name</label>
     </div>
-      <div class="user-box" transition:name="descrition-label">
-      <textarea required=""/>
-       
-      <label>Description</label>
+  <div class="user-box">
+      <input type="text" name="bank" required="">
+      <label>Bank</label>
     </div> 
-    <div class="user-box">
-      <input type="date" name="" required="">
-     
-    </div><center>
-    <a href="#" transition:name="button-submit">
+ <div class="user-box">
+      <input type="text" name="balance" required="">
+      <label>Initial Balance</label>
+    </div>
+       <center>
+    <button type="submit"  transition:name="button-submit">
            Save
        <span></span>
-    </a></center>
+    </button></center>
   </form>
 </div>
 <style>
@@ -37,6 +66,23 @@
 .login-box .user-box {
   position: relative;
 }
+select{
+width: 100%;
+  padding: 10px 0;
+  font-size: 16px;
+  color: #fff;
+  margin-bottom: 30px;
+  border: none;
+  border-bottom: 1px solid #fff;
+  outline: none;
+  background: transparent;
+
+
+}
+  select option {
+  color: black;
+      background-color: transparent ; /* Color de fondo cuando está seleccionado */
+    }
 textarea{
 
 width: 100%;
@@ -89,10 +135,13 @@ width: 100%;
   font-size: 12px;
 }
 
-.login-box form a {
+.login-box form button {
+
   position: relative;
   display: inline-block;
   padding: 10px 20px;
+  background-color: transparent;
+  border: none;
   color: #ffffff;
   font-size: 16px;
   text-decoration: none;
@@ -103,13 +152,13 @@ width: 100%;
   letter-spacing: 4px
 }
 
-.login-box a:hover {
+.login-box form button:hover {
   background: #612639;
-  color: #612639;
+  
   border-radius: 5px;
 }
 
-.login-box a span {
+.login-box button span {
   position: absolute;
   display: block;
 }
@@ -124,7 +173,7 @@ width: 100%;
   }
 }
 
-.login-box a span:nth-child(1) {
+.login-box button span:nth-child(1) {
   bottom: 2px;
   left: -100%;
   width: 100%;
