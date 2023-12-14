@@ -30,7 +30,8 @@ func Run() error {
 
 	dbPort, _ := strconv.Atoi(os.Getenv("DbPort"))
 	cfg.Port = uint(port)
-	cfg.Host = os.Getenv("Host")
+	cfg.Host = os.Getenv("HOST")
+
 	cfg.DbName = os.Getenv("DbName")
 	cfg.DbUser = os.Getenv("DbUser")
 	cfg.DbPass = os.Getenv("DbPass")
