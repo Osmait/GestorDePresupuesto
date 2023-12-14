@@ -5,6 +5,11 @@ go 1.20
 require github.com/rs/zerolog v1.30.0
 
 require (
+	github.com/rs/cors v1.8.1 // indirect
+	github.com/rs/cors/wrapper/gin v0.0.0-20231013084403-73f81b45a644 // indirect
+)
+
+require (
 	github.com/bytedance/sonic v1.10.0-rc3 // indirect
 	github.com/chenzhuoyu/base64x v0.0.0-20230717121745-296ad89f973d // indirect
 	github.com/chenzhuoyu/iasm v0.9.0 // indirect

@@ -27,7 +27,6 @@ func Run() error {
 	cfg.DbPass = "admin123"
 	cfg.DbPort = 5432
 	cfg.Dbhost = "backend-postgres-1"
-	// cfg.Dbhost = "localhost"
 
 	postgresURI := fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", cfg.DbUser, cfg.DbPass, cfg.Dbhost, cfg.DbPort, cfg.DbName)
 
