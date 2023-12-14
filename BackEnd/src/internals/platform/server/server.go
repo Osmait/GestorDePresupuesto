@@ -13,6 +13,8 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server/routes"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
+
+	cors "github.com/rs/cors/wrapper/gin"
 )
 
 type Server struct {
@@ -24,7 +26,7 @@ type Server struct {
 	shutdownTimeout time.Duration
 }
 
-func New(ctx context.Context, host string, port uint, shutdownTimeout time.Duration, servicesAccount account.AccountService, transactionService transaction.TransactionService) (context.Context, Server) {
+func New(ctx context.Context, host string, port uint, shutdownTimeout time.Duration, servicesAccount account.AccountService, transactionService transaction.TransactionService) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
 		httpAddr:            fmt.Sprintf("%s:%d", host, port),
@@ -33,10 +35,11 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout time.Durat
 		shutdownTimeout:     shutdownTimeout,
 	}
 	srv.registerRoutes()
-	return serverContext(ctx), srv
+	return serverContext(ctx), &srv
 }
 
 func (s *Server) registerRoutes() {
+	s.Engine.Use(cors.AllowAll())
 	routes.HealthRoutes(s.Engine)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)
 	routes.TransactionRoutes(s.Engine, s.servicesTransaction)
