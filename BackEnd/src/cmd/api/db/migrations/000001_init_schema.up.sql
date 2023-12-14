@@ -1,4 +1,8 @@
+DROP TABLE IF EXISTS account;
+DROP TABLE IF EXISTS transactions;
 CREATE TYPE TypeTransaction AS ENUM (
+
+
   'bill',
   'income'
 );
