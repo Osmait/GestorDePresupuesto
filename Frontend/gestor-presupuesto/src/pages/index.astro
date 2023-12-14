@@ -1,6 +1,5 @@
 ---
 import Layout from "../layouts/Layout.astro";
-import ChartComponent from "../components/CharstComponent.astro";
 
 import ListOfReminders from "../components/ListOfReminders.astro"
 import ListofAccounts from "../components/ListofAccounts.astro"
@@ -11,7 +10,7 @@ import  LastTransaction from "../components/LastTransaction.astro";
 
   <main class="content-main">
   <section class="chart" transition:name="chart">
-  <ChartComponent client:load transition:persist />
+
   </section>
     <a href="/accounts">
     <section transition:name="accounts">
