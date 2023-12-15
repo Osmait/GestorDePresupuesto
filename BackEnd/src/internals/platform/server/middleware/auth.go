@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
 )
 
 var NO_AUTH_NEEDED = []string{
@@ -26,7 +27,7 @@ type AppClaims struct {
 	jwt.StandardClaims
 }
 
-func AuthMiddleware() gin.HandlerFunc {
+func AuthMiddleware(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if !shoulCheckToken(c.Request.URL.Path) {
 			c.Next()
@@ -61,8 +62,14 @@ func AuthMiddleware() gin.HandlerFunc {
 			return
 		}
 
+		user, err := userService.FindUserById(c, claims.UserId)
+		if err != nil || user == nil {
+			c.JSON(http.StatusInternalServerError, "Error")
+			c.AbortWithStatus(http.StatusInternalServerError)
+			return
+		}
+
 		c.Set("X-User-Id", claims.UserId)
-		c.Set("X-token", token)
 		c.Next()
 	}
 }

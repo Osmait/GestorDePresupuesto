@@ -17,6 +17,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
 	"github.com/rs/zerolog/log"
 )
 
@@ -26,8 +27,10 @@ func Run() error {
 		fmt.Println("Not env")
 	}
 	var cfg Config
-	port, _ := strconv.Atoi(os.Getenv("PORT"))
+	shutdown := 10 * time.Second
 
+	port, _ := strconv.Atoi(os.Getenv("PORT"))
+	cfg.shutdownTimeout = &shutdown
 	dbPort, _ := strconv.Atoi(os.Getenv("DbPort"))
 	cfg.Port = uint(port)
 	cfg.Host = os.Getenv("HOST")
@@ -44,21 +47,15 @@ func Run() error {
 	if err != nil {
 		return err
 	}
-
-	currentDir, err := os.Getwd()
-	if err != nil {
-		fmt.Println("Error:", err)
-	}
-
-	fmt.Println("Current Directory:", currentDir)
-
 	runDBMigration("file://src/cmd/api/db/migrations", postgresURI)
+
 	accountRepository := postgress.NewCourseRepository(db)
 	transactionRepository := postgress.NewTransactionRepository(db)
+	userRepository := postgress.NewUserRespository(db)
 	accountSerevice := account.NewAccountService(accountRepository)
 	transactionServices := transaction.NewTransactionService(transactionRepository)
-
-	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, *accountSerevice, *transactionServices)
+	userServices := user.NewUserService(userRepository)
+	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, accountSerevice, transactionServices, userServices)
 	return srv.Run(ctx)
 }
 
@@ -83,14 +80,13 @@ type Config struct {
 	// Server Configuration
 	Host            string
 	Port            uint
-	shutdownTimeout time.Duration
+	shutdownTimeout *time.Duration
 
 	// DataBase Configuration
 
-	DbUser    string
-	DbPass    string
-	Dbhost    string
-	DbPort    uint
-	DbName    string
-	DbTimeout time.Duration
+	DbUser string
+	DbPass string
+	Dbhost string
+	DbPort uint
+	DbName string
 }

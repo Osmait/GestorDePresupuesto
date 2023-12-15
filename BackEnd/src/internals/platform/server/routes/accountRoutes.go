@@ -6,7 +6,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 )
 
-func AccountRotes(s *gin.Engine, acountService account.AccountService) {
+func AccountRotes(s *gin.Engine, acountService *account.AccountService) {
 	s.POST("/account", handler.CreateAccount(acountService))
 	s.GET("/account", handler.FindAllAccount(acountService))
 	s.DELETE("/account/:id", handler.DeleteAccount(acountService))

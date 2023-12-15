@@ -13,7 +13,7 @@ type AccountResponse struct {
 	CurrentBalance float64
 }
 
-func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
+func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var account accountDomain.Account
 		if err := ctx.BindJSON(&account); err != nil {
@@ -28,7 +28,7 @@ func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
 	}
 }
 
-func FindAllAccount(accountService account.AccountService) gin.HandlerFunc {
+func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		accountList, err := accountService.FindAll(ctx)
 		var accountResponse []AccountResponse
@@ -49,7 +49,7 @@ func FindAllAccount(accountService account.AccountService) gin.HandlerFunc {
 	}
 }
 
-func DeleteAccount(accountService account.AccountService) gin.HandlerFunc {
+func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		err := accountService.DeleteAccount(ctx, id)

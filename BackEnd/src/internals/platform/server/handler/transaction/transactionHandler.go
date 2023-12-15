@@ -10,7 +10,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 )
 
-func CreateTransaction(transactionservice transaction.TransactionService) gin.HandlerFunc {
+func CreateTransaction(transactionservice *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var transaction transactionDomain.Transaction
 		if err := ctx.BindJSON(&transaction); err != nil {
@@ -26,7 +26,7 @@ func CreateTransaction(transactionservice transaction.TransactionService) gin.Ha
 	}
 }
 
-func FindAllTransaction(transactionService transaction.TransactionService) gin.HandlerFunc {
+func FindAllTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		date1 := ctx.Query("date")
 		date2 := ctx.Query("date2")
@@ -50,7 +50,7 @@ func FindAllTransaction(transactionService transaction.TransactionService) gin.H
 	}
 }
 
-func DeleteTransaction(transactionService transaction.TransactionService) gin.HandlerFunc {
+func DeleteTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		err := transactionService.DeleteTransaction(ctx, id)
