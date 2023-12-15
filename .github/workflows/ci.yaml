@@ -17,6 +17,6 @@ jobs:
       - name: init mod
         run: go mod init "github.com/gestordegastos"
       - name: install dep
-        run: go mod download
+        run: go mod tidy
       - name: Test
-        run: go test -v ./..
+        run: go test -v ./...
