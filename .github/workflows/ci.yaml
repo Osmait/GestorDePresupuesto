@@ -14,8 +14,9 @@ jobs:
 
       - name: Change to Backend Directory
         run: cd BackEnd/
+      - name: init mod
+        run: go mod init "github.com/gestordegastos"
       - name: install dep
         run: go mod download
-
       - name: Test
         run: go test -v ./..
