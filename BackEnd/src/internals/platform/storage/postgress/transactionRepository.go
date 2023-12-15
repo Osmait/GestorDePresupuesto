@@ -3,7 +3,6 @@ package postgress
 import (
 	"context"
 	"database/sql"
-	"fmt"
 	"log"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
@@ -50,7 +49,6 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	fmt.Println(transactions)
 	return transactions, nil
 }
 

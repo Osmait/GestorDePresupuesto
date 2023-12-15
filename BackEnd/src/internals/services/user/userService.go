@@ -22,10 +22,23 @@ func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
 	return err
 }
 
+func (u *UserService) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {
+	user, err := u.userRepository.FindUserByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
+}
+
 func (u *UserService) FindUserById(ctx context.Context, id string) (*user.User, error) {
 	user, err := u.userRepository.FindUser(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 	return user, nil
+}
+
+func (u *UserService) DeleteUser(ctx context.Context, id string) error {
+	err := u.userRepository.Delete(ctx, id)
+	return err
 }
