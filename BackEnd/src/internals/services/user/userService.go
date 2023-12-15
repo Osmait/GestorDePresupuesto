@@ -5,6 +5,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
@@ -18,7 +19,12 @@ func NewUserService(userRepo postgress.UserRepositoryInterface) *UserService {
 }
 
 func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
-	err := u.userRepository.CreateUser(ctx, user)
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	user.Password = string(hashPassword)
+	err = u.userRepository.CreateUser(ctx, user)
 	return err
 }
 

@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/go-faker/faker/v4 v4.2.0
+	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/rs/cors/wrapper/gin v0.0.0-20231013084403-73f81b45a644
 	github.com/rs/zerolog v1.30.0
 )
