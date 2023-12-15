@@ -1,12 +1,11 @@
 DROP TABLE IF EXISTS account;
 DROP TABLE IF EXISTS transactions;
+
+DROP TABLE IF EXISTS users;
 CREATE TYPE TypeTransaction AS ENUM (
   'bill',
   'income'
 );
-
-
-
 CREATE TABLE account  (
   id VARCHAR(32) PRIMARY KEY,
   name_account VARCHAR(255),
@@ -24,6 +23,15 @@ CREATE TABLE transactions (
   account_id varchar NOT NULL,
   created_at timestamptz NOT NULL DEFAULT (now())
 );
-
+CREATE TABLE users(
+  id VARCHAR(32) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  last_name VARCHAR(255) NOT NULL,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  password VARCHAR(255) NOT NULL,
+  token VARCHAR(32) ,
+  confirmed BOOLEAN  DEFAULT (false),
+  created_at timestamptz NOT NULL DEFAULT (now())
+);
 
 ALTER TABLE transactions ADD FOREIGN KEY (account_id) REFERENCES account (id);
