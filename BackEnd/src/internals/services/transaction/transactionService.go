@@ -9,6 +9,10 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+const (
+	BILL = "bill"
+)
+
 type TransactionService struct {
 	transactionRepository postgress.TransactionRepsitoryinterface
 }
@@ -25,7 +29,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpi
 		return err
 	}
 	id := uuid.String()
-	if typeTransaction == "bill" {
+	if typeTransaction == BILL {
 		amount = amount * -1
 	}
 
