@@ -5,7 +5,7 @@ type Account struct {
 	Name           string  `json:"name" validate:"required"`
 	Bank           string  `json:"bank" validate:"required"`
 	InitialBalance float64 `json:"initialBalance" validate:"required"`
-	// User_id string  `json:"user_id"`
+	UserId         string  `json:"user_id"`
 }
 
 func NewAccount(balance float64, id string, name string, bank string) *Account {

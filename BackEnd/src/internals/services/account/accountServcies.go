@@ -20,14 +20,15 @@ func NewAccountService(accountRepository postgress.Repository) *AccountService {
 	}
 }
 
-func (s AccountService) CreateAccount(ctx context.Context, id, name, bank string, balace float64) error {
+func (s AccountService) CreateAccount(ctx context.Context, name, bank string, balace float64, userId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
 	}
-	id = uuid.String()
+	id := uuid.String()
 
 	account := account.NewAccount(balace, id, name, bank)
+	account.UserId = userId
 	err = s.accountRepository.Save(ctx, *account)
 
 	return err
