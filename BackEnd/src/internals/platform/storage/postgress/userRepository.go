@@ -22,7 +22,7 @@ func (u *UserRepository) CreateUser(ctx context.Context, user *user.User) error 
 }
 
 func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email from users WHERE email = $1", email)
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password from users WHERE email = $1", email)
 	if err != nil {
 		return nil, err
 	}
@@ -35,7 +35,7 @@ func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*us
 
 	user := user.User{}
 	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email); err == nil {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password); err == nil {
 			return &user, nil
 		}
 	}
