@@ -16,6 +16,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/auth"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
 	"github.com/rs/zerolog/log"
@@ -55,7 +56,8 @@ func Run() error {
 	accountSerevice := account.NewAccountService(accountRepository)
 	transactionServices := transaction.NewTransactionService(transactionRepository)
 	userServices := user.NewUserService(userRepository)
-	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, accountSerevice, transactionServices, userServices)
+	authServices := auth.NewAuthService(userRepository)
+	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.shutdownTimeout, accountSerevice, transactionServices, userServices, authServices)
 	return srv.Run(ctx)
 }
 
