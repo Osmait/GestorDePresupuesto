@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"fmt"
 	"testing"
 
 	"github.com/go-faker/faker/v4"
@@ -45,7 +44,6 @@ func TestCreateUser(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	userServie := NewUserService(mockRepo)
 	user1 := getNewUser()
-	fmt.Println(user1)
 	mockRepo.On("CreateUser", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
 	err := userServie.CreateUser(context.Background(), user1)
 	assert.NoError(t, err)
