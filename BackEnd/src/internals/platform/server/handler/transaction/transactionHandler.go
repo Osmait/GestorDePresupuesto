@@ -29,6 +29,29 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 	}
 }
 
+func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		date1 := ctx.Query("date")
+		date2 := ctx.Query("date2")
+		userId := ctx.GetString("X-User-Id")
+		if date1 == "" || date2 == "" {
+			currenTime := time.Now()
+			date1 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-7)
+			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
+		}
+
+		transactionsList, err := transactionService.FindAllOfAllAccounts(ctx, date1, date2, userId)
+		fmt.Println(transactionsList)
+		if err != nil {
+			fmt.Println(err.Error())
+			ctx.JSON(http.StatusInternalServerError, "Error Finding transantion")
+			return
+		}
+
+		ctx.JSON(http.StatusOK, transactionsList)
+	}
+}
+
 func FindAllTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		date1 := ctx.Query("date")
