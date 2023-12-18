@@ -11,6 +11,7 @@ import (
 
 var NO_AUTH_NEEDED = []string{
 	"login",
+	"user",
 }
 
 func shoulCheckToken(route string) bool {
