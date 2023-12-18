@@ -5,6 +5,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	"github.com/segmentio/ksuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -23,6 +24,11 @@ func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
 	if err != nil {
 		return err
 	}
+	id, err := ksuid.NewRandom()
+	if err != nil {
+		return err
+	}
+	user.Id = id.String()
 	user.Password = string(hashPassword)
 	err = u.userRepository.CreateUser(ctx, user)
 	return err
