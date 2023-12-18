@@ -46,6 +46,15 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 	return accounts, nil
 }
 
+func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, date string, date2 string, id string) ([]*transaction.Transaction, error) {
+	accounts, err := s.transactionRepository.FindAllOfAllAccounts(ctx, date, date2, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return accounts, nil
+}
+
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string) error {
 	err := s.transactionRepository.Delete(ctx, id)
 	return err
