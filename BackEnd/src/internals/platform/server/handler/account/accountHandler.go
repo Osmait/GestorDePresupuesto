@@ -31,7 +31,8 @@ func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 
 func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		accountList, err := accountService.FindAll(ctx)
+		userId := ctx.GetString("X-User-Id")
+		accountList, err := accountService.FindAll(ctx, userId)
 		var accountResponse []AccountResponse
 
 		for _, account := range accountList {
