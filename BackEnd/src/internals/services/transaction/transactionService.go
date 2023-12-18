@@ -2,7 +2,6 @@ package transaction
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
@@ -20,19 +19,19 @@ func NewTransactionService(transactionRepository postgress.TransactionRepsitoryi
 	}
 }
 
-func (s TransactionService) CreateTransaction(ctx context.Context, id, name, descrpition string, amount float64, typeTransaction string, accountId string) error {
+func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpition string, amount float64, typeTransaction string, accountId string, userId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
 	}
-	id = uuid.String()
+	id := uuid.String()
 	if typeTransaction == "bill" {
 		amount = amount * -1
 	}
 
 	transaction := transaction.NewTransaction(id, name, descrpition, typeTransaction, accountId, amount)
+	transaction.User_id = userId
 
-	fmt.Println(typeTransaction)
 	err = s.transactionRepository.Save(ctx, transaction)
 
 	return err

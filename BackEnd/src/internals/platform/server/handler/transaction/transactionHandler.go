@@ -12,12 +12,15 @@ import (
 
 func CreateTransaction(transactionservice *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+
 		var transaction transactionDomain.Transaction
+
 		if err := ctx.BindJSON(&transaction); err != nil {
 			ctx.JSON(http.StatusBadRequest, "Error fields required ")
 			return
 		}
-		err := transactionservice.CreateTransaction(ctx, transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id)
+		err := transactionservice.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id, userId)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, err.Error())
 		}
