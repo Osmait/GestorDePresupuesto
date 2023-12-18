@@ -7,7 +7,7 @@ const accountRepository = new AccountRepotory();
 const accounts: AccoutInfoInterface[] = await accountRepository.findAll();
 console.log(accounts)
 const transactionRepository = new TrasactionRepotory();
-let listOfTransaction: Transactions[] =await transactionRepository.get("2ZYOZtKVD7jUhS0LYDw8ISDGbRJ") 
+let listOfTransaction: Transactions[] =await transactionRepository.get() 
 console.log(listOfTransaction)
 
 

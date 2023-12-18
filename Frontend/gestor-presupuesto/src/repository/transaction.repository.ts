@@ -6,9 +6,11 @@ export class TrasactionRepotory {
     "Content-Type": "application/json",
   };
 
-  async get(id: string): Promise<Transactions[]> {
+  async get(id?: string): Promise<Transactions[]> {
+    const transactionUrl = id ? `${this.url}/${id}` : this.url;
+    console.log(transactionUrl);
     try {
-      const response = await fetch(`${this.url}/${id}`, this.headers);
+      const response = await fetch(transactionUrl, this.headers);
       console.log(response);
       const result = await response.json();
       return result;
