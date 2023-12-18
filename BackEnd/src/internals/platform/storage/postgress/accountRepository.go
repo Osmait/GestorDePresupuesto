@@ -24,8 +24,8 @@ func (repo *AccountRepository) Save(ctx context.Context, account account.Account
 	return err
 }
 
-func (repo *AccountRepository) FindAll(ctx context.Context) ([]*account.Account, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT id,name_account,bank,balance FROM account")
+func (repo *AccountRepository) FindAll(ctx context.Context, userId string) ([]*account.Account, error) {
+	rows, err := repo.db.QueryContext(ctx, "SELECT id,name_account,bank,balance FROM account WHERE user_id = $1", userId)
 	if err != nil {
 		return nil, err
 	}
