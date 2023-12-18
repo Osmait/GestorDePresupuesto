@@ -19,7 +19,7 @@ func (m *MockAccountRepository) Save(ctx context.Context, acc account.Account) e
 	return args.Error(0)
 }
 
-func (m *MockAccountRepository) FindAll(ctx context.Context) ([]*account.Account, error) {
+func (m *MockAccountRepository) FindAll(ctx context.Context, userId string) ([]*account.Account, error) {
 	args := m.Called(ctx)
 	return args.Get(0).([]*account.Account), args.Error(1)
 }
@@ -53,7 +53,7 @@ func TestCreateAccount(t *testing.T) {
 	mockRepo.On("Save", ctx, mock.AnythingOfType("account.Account")).Return(nil)
 
 	// Call the method being tested
-	err := accountSvc.CreateAccount(ctx, id, name, bank, balance)
+	err := accountSvc.CreateAccount(ctx, name, bank, balance, id)
 
 	// Assertions
 	assert.NoError(t, err, "CreateAccount should not return an error")
@@ -88,8 +88,8 @@ func TestFindAll(t *testing.T) {
 
 	// Configura el comportamiento esperado del mock
 	expectedAccounts := []*account.Account{
-		{Id: "1", Name: "Account 1", Bank: "Bank 1", InitialBalance: 100.0},
-		{Id: "2", Name: "Account 2", Bank: "Bank 2", InitialBalance: 200.0},
+		{Id: "1", Name: "Account 1", Bank: "Bank 1", InitialBalance: 100.0, UserId: "1"},
+		{Id: "2", Name: "Account 2", Bank: "Bank 2", InitialBalance: 200.0, UserId: "1"},
 	}
 	mockRepo.On("FindAll", mock.Anything).Return(expectedAccounts, nil)
 
@@ -98,7 +98,7 @@ func TestFindAll(t *testing.T) {
 
 	// Llama al método que estás probando
 	ctx := context.Background()
-	accounts, err := accountSvc.FindAll(ctx)
+	accounts, err := accountSvc.FindAll(ctx, "1")
 
 	// Asegura que el método del mock haya sido llamado y verifica el resultado
 	mockRepo.AssertExpectations(t)
