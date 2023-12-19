@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -36,6 +37,7 @@ func AuthMiddleware(userService *user.UserService) gin.HandlerFunc {
 		}
 
 		token := strings.TrimSpace(c.GetHeader("Authorization"))
+		fmt.Println(c.GetHeader("Authorization"))
 		if token == "" {
 			c.AbortWithStatus(http.StatusUnauthorized)
 			c.JSON(http.StatusUnauthorized, "Error dont Authorization")

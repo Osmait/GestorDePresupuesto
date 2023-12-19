@@ -8,4 +8,7 @@ content-type: application/json
     "password":"12345678"
 }
 
+GET http://localhost:8080/profile
+content-type: application/json
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjJabGRqa1RJZ2Fhd2dQakVSVnJaM21MekpwcSIsImV4cCI6MTcwMzE3NDU0M30.iuFyQMZvRkGwrvB2ydFvPJ3084B_IQZESyjqorkTny8
 

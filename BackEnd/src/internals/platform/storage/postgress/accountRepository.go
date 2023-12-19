@@ -20,7 +20,7 @@ func NewCourseRepository(db *sql.DB) *AccountRepository {
 }
 
 func (repo *AccountRepository) Save(ctx context.Context, account account.Account) error {
-	_, err := repo.db.ExecContext(ctx, "INSERT INTO account (id,name_account,bank,balance) VALUES ($1,$2,$3,$4)", account.Id, account.Name, account.Bank, account.InitialBalance)
+	_, err := repo.db.ExecContext(ctx, "INSERT INTO account (id,name_account,bank,balance,user_id) VALUES ($1,$2,$3,$4,$5)", account.Id, account.Name, account.Bank, account.InitialBalance, account.UserId)
 	return err
 }
 
