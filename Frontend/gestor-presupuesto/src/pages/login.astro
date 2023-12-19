@@ -1,20 +1,29 @@
 ---
 import { ViewTransitions } from "astro:transitions";
 export const prerender = false;
-
+const errors = { resp: "", email: "", password: "" };
 
 if (Astro.request.method === "POST") {
   try {
     const data = await Astro.request.formData();
     const email= data.get("email") as string;
     const password= data.get("password") as string;
+    if (typeof email !== "string") { 
+      errors.email += "Email is not valid. ";
+    }     
+    if (typeof password !== "string" || password.length < 6) {
+      errors.password += "Password must be at least 6 characters. ";
+    }
 
-  const loginRequest ={
+    const loginRequest ={
       email,
       password,
 
     }
-      const options = {
+const hasErrors = Object.values(errors).some(msg => msg)
+    if(!hasErrors){
+
+    const options = {
       method: "POST",
       headers: {
             "content-Type": "application/json",
@@ -25,11 +34,17 @@ if (Astro.request.method === "POST") {
     const response = await fetch(`${import.meta.env.HOST}/login`,options)
     const result = await response.json()
 
+    if(response.status === 200){  
     Astro.cookies.set("x-token",result)
     return Astro.redirect("/")
-  } catch (error) {
+    }
+    errors.resp+=result.error 
+    console.log(errors)
+    }
+  } catch (error) { 
     if (error instanceof Error) {
       console.error(error.message);
+
     }
   }
 }
@@ -46,29 +61,56 @@ if (Astro.request.method === "POST") {
 	</head>
 
 <div class="login-box">
- 
   <form method="POST">
+ 
     <div class="user-box" transition:name="name-label">
-      <input type="email" name="email" required="">
+ 
+      <input type="email" name="email" required>
       <label>Email</label>
     </div>
   <div class="user-box">
-      <input type="password" name="password" required="">
+  
+      <input type="password" name="password" required>
+
+          
       <label>Password</label>
+{errors.password && <p class="error">{errors.password}</p>}
+
+{errors.email && <p class="error">{errors.email}</p>}
+
+{errors.resp && <p class="error">{errors.resp}</p>}
     </div> 
 
        <center>
-    <button type="submit"  transition:name="button-submit">
+    <button type="submit" class="button-submit"  transition:name="button-submit">
            Login
        <span></span>
     </button></center>
   </form>
 </div>
 </html>
+<script>
+
+const button = document.querySelector(".button-submit")
+
+if(button){
+  addEventListener("submit",()=> {
+
+  button.textContent= "loading..."
+  })
+}
+
+</script>
 <style>
 html{
 
   background: url("https://github.com/antoniosarosi/Wallpapers/blob/master/05.jpg?raw=true");
+}
+.error{
+  padding: 10px;
+  color: white;
+  border-radius: 10px;
+  background-color: red;
 }
 .login-box {
   position: absolute;

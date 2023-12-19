@@ -18,15 +18,19 @@ export const onRequest = defineMiddleware(async (context, next) => {
     },
   };
 
-  const data = await fetch(`${import.meta.env.HOST}/profile`, config);
+  try {
+    const data = await fetch(`${import.meta.env.HOST}/profile`, config);
+    const result = await data.json();
+    if (!result.id) {
+      context.redirect("/login");
+      return Response.redirect(new URL("/login", context.url));
+    }
 
-  const result = await data.json();
-  if (!result.id) {
-    context.redirect("/login");
+    context.locals["userId"] = result.id;
+
+    return next();
+  } catch (error) {
+    console.error(error);
     return Response.redirect(new URL("/login", context.url));
   }
-
-  context.locals["userId"] = result.id;
-
-  return next();
 });
