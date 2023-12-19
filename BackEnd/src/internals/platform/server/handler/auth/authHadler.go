@@ -18,7 +18,7 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 		}
 		token, err := authService.Login(ctx, &authRequest)
 		if err != nil {
-			ctx.AbortWithStatus(http.StatusInternalServerError)
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "problem with password or email "})
 			return
 		}
 		ctx.JSON(http.StatusOK, token)
