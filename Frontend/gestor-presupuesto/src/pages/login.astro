@@ -1,27 +1,32 @@
 ---
-
-import type { PostAccountInterface } from "../interface/account.interface";
-import { AccountRepotory } from "../repository/account.repository";
-
-const token = Astro.cookies.get("x-token")?.value as string
-const accountRepository = new AccountRepotory(token)
-
+import { ViewTransitions } from "astro:transitions";
+export const prerender = false;
 
 
 if (Astro.request.method === "POST") {
   try {
     const data = await Astro.request.formData();
-    const name = data.get("name") as string;
-    const bank= data.get("bank") as string;
-    const initialBalance = data.get("balance") ;
+    const email= data.get("email") as string;
+    const password= data.get("password") as string;
 
-    const account:PostAccountInterface= {
-      name,
-      bank,
-      initialBalance : Number(initialBalance),
+  const loginRequest ={
+      email,
+      password,
+
     }
+      const options = {
+      method: "POST",
+      headers: {
+            "content-Type": "application/json",
+          },
+      body: JSON.stringify(loginRequest),
+    };
     
-    await accountRepository.create(account)
+    const response = await fetch(`${import.meta.env.HOST}/login`,options)
+    const result = await response.json()
+
+    Astro.cookies.set("x-token",result)
+    return Astro.redirect("/")
   } catch (error) {
     if (error instanceof Error) {
       console.error(error.message);
@@ -29,29 +34,42 @@ if (Astro.request.method === "POST") {
   }
 }
 ---
+<html>
+	<head>
+		<meta charset="UTF-8" />
+		<meta name="description" content="Astro description" />
+		<meta name="viewport" content="width=device-width" />
+		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+		<meta name="generator" content={Astro.generator} />
+<title>Login</title>
+<ViewTransitions />
+	</head>
+
 <div class="login-box">
  
   <form method="POST">
     <div class="user-box" transition:name="name-label">
-      <input type="text" name="name" required="">
-      <label>Name</label>
+      <input type="email" name="email" required="">
+      <label>Email</label>
     </div>
   <div class="user-box">
-      <input type="text" name="bank" required="">
-      <label>Bank</label>
+      <input type="password" name="password" required="">
+      <label>Password</label>
     </div> 
- <div class="user-box">
-      <input type="text" name="balance" required="">
-      <label>Initial Balance</label>
-    </div>
+
        <center>
     <button type="submit"  transition:name="button-submit">
-           Save
+           Login
        <span></span>
     </button></center>
   </form>
 </div>
+</html>
 <style>
+html{
+
+  background: url("https://github.com/antoniosarosi/Wallpapers/blob/master/05.jpg?raw=true");
+}
 .login-box {
   position: absolute;
   top: 50%;

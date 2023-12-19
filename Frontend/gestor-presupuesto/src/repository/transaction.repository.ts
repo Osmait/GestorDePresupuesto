@@ -2,20 +2,23 @@ import type { Transactions } from "../interface/transaction.interface";
 
 export class TrasactionRepotory {
   private url = `${import.meta.env.HOST}/transaction`;
-  private headers: any = {
-    "Content-Type": "application/json",
+  private config = {
+    headers: {
+      "content-Type": "application/json",
+      Authorization: "",
+    },
   };
+  constructor(token: string) {
+    this.config.headers.Authorization = `Bearer ${token}`;
+  }
 
   async get(id?: string): Promise<Transactions[]> {
     const transactionUrl = id ? `${this.url}/${id}` : this.url;
-    console.log(transactionUrl);
     try {
-      const response = await fetch(transactionUrl, this.headers);
-      console.log(response);
+      const response = await fetch(transactionUrl, this.config);
       const result = await response.json();
       return result;
     } catch (error) {
-      console.log(error);
       return [];
     }
   }
@@ -23,7 +26,7 @@ export class TrasactionRepotory {
     const options = {
       method: "POST",
       headers: {
-        ...this.headers,
+        ...this.config.headers,
       },
       body: JSON.stringify(transaction),
     };
@@ -35,7 +38,7 @@ export class TrasactionRepotory {
     const options = {
       method: "DELETE",
       headers: {
-        ...this.headers,
+        ...this.config.headers,
       },
     };
     fetch(`${this.url}/${id}`, options);

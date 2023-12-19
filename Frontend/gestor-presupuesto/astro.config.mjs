@@ -7,5 +7,5 @@ import netlify from "@astrojs/netlify/functions";
 export default defineConfig({
   integrations: [react()],
   output: "hybrid",
-  adapter: netlify()
+  adapter: netlify(),
 });
