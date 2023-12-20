@@ -1,4 +1,5 @@
 ---
+
 import type { Transactions } from "../interface/transaction.interface";
 import { TrasactionRepotory } from "../repository/transaction.repository";
 import { AccountRepotory } from "../repository/account.repository";
@@ -12,10 +13,9 @@ let listOfTransaction: Transactions[] =await transactionRepository.get()
 
 if (Astro.request.method === "POST") {
   try {
-    const data = await Astro.request.formData();
+    const data = await Astro.request.formData();   
     const id= data.get("account") as string;
     listOfTransaction = await transactionRepository.get(id);
-console.log(listOfTransaction);
   } catch (error) {
     if (error instanceof Error) {
       console.error(error.message);
@@ -49,8 +49,7 @@ console.log(listOfTransaction);
   </thead>
   <tbody>
     {
-      listOfTransaction &&
-        listOfTransaction.map((transaction) => (
+      listOfTransaction && listOfTransaction.map((transaction) => (
           <tr>
             <td> {transaction.name}</td>
             <td>{transaction.description}</td>
