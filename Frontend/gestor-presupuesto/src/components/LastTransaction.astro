@@ -3,12 +3,11 @@ import type { Transactions } from "../interface/transaction.interface";
 import { TrasactionRepotory } from "../repository/transaction.repository";
 import { AccountRepotory } from "../repository/account.repository";
 import { type AccoutInfoInterface } from "../interface/account.interface";
-const accountRepository = new AccountRepotory();
+const token = Astro.cookies.get("x-token")?.value as string
+const accountRepository = new AccountRepotory(token);
 const accounts: AccoutInfoInterface[] = await accountRepository.findAll();
-console.log(accounts)
-const transactionRepository = new TrasactionRepotory();
-let listOfTransaction: Transactions[] =await transactionRepository.get("2ZYOZtKVD7jUhS0LYDw8ISDGbRJ") 
-console.log(listOfTransaction)
+const transactionRepository = new TrasactionRepotory(token);
+let listOfTransaction: Transactions[] =await transactionRepository.get() 
 
 
 if (Astro.request.method === "POST") {

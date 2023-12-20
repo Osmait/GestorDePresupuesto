@@ -10,14 +10,17 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 )
 
-func CreateTransaction(transactionservice transaction.TransactionService) gin.HandlerFunc {
+func CreateTransaction(transactionservice *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+
 		var transaction transactionDomain.Transaction
+
 		if err := ctx.BindJSON(&transaction); err != nil {
 			ctx.JSON(http.StatusBadRequest, "Error fields required ")
 			return
 		}
-		err := transactionservice.CreateTransaction(ctx, transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id)
+		err := transactionservice.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id, userId)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, err.Error())
 		}
@@ -26,7 +29,30 @@ func CreateTransaction(transactionservice transaction.TransactionService) gin.Ha
 	}
 }
 
-func FindAllTransaction(transactionService transaction.TransactionService) gin.HandlerFunc {
+func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		date1 := ctx.Query("date")
+		date2 := ctx.Query("date2")
+		userId := ctx.GetString("X-User-Id")
+		if date1 == "" || date2 == "" {
+			currenTime := time.Now()
+			date1 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-7)
+			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
+		}
+
+		transactionsList, err := transactionService.FindAllOfAllAccounts(ctx, date1, date2, userId)
+		fmt.Println(transactionsList)
+		if err != nil {
+			fmt.Println(err.Error())
+			ctx.JSON(http.StatusInternalServerError, "Error Finding transantion")
+			return
+		}
+
+		ctx.JSON(http.StatusOK, transactionsList)
+	}
+}
+
+func FindAllTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		date1 := ctx.Query("date")
 		date2 := ctx.Query("date2")
@@ -50,7 +76,7 @@ func FindAllTransaction(transactionService transaction.TransactionService) gin.H
 	}
 }
 
-func DeleteTransaction(transactionService transaction.TransactionService) gin.HandlerFunc {
+func DeleteTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		err := transactionService.DeleteTransaction(ctx, id)

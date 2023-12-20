@@ -2,7 +2,9 @@
 
 import type { PostAccountInterface } from "../interface/account.interface";
 import { AccountRepotory } from "../repository/account.repository";
-const accountRepository = new AccountRepotory()
+
+const token = Astro.cookies.get("x-token")?.value as string
+const accountRepository = new AccountRepotory(token)
 
 
 

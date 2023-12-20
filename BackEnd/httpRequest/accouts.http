@@ -1,0 +1,3 @@
+GET http://localhost:8080/accounts
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjJaaXNVRWttYTd1TkJ4NWNFUWNBaVVYMkljMyIsImV4cCI6MTcwMzA5MjQ0OX0.4zFq_8TYGV8JpLvONlMqCTqFZimTLKOsVgDARMFP8xE
+

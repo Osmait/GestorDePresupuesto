@@ -6,17 +6,21 @@ import type {
 export class AccountRepotory {
   private url = `${import.meta.env.HOST}/account`;
 
-  private headers: any = {
-    "Content-Type": "application/json",
+  private config = {
+    headers: {
+      "content-Type": "application/json",
+      Authorization: "",
+    },
   };
-
+  constructor(token: string) {
+    this.config.headers.Authorization = `Bearer ${token}`;
+  }
   public async findAll(): Promise<AccoutInfoInterface[]> {
     try {
-      const response = await fetch(this.url, this.headers);
+      const response = await fetch(this.url, this.config);
       const result = await response.json();
       return result;
     } catch (error) {
-      console.log(error);
       return [];
     }
   }
@@ -24,7 +28,7 @@ export class AccountRepotory {
     const options = {
       method: "POST",
       headers: {
-        ...this.headers,
+        ...this.config.headers,
       },
       body: JSON.stringify(account),
     };
@@ -34,7 +38,7 @@ export class AccountRepotory {
     const options = {
       method: "DELETE",
       headers: {
-        ...this.headers,
+        ...this.config.headers,
       },
     };
     fetch(`${this.url}/${accountId}`, options);

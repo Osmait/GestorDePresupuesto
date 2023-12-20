@@ -1,8 +1,10 @@
 ---
 import { AccountRepotory} from "../repository/account.repository"
 import {type AccoutInfoInterface} from "../interface/account.interface"
-const accountRepository = new AccountRepotory()
+const token = Astro.cookies.get("x-token")?.value as string
+const accountRepository = new AccountRepotory(token)
 const accounts :AccoutInfoInterface[]= await  accountRepository.findAll()
+
 ---
 <section>
 
@@ -16,7 +18,7 @@ const accounts :AccoutInfoInterface[]= await  accountRepository.findAll()
       </tr>
     </thead>
     <tbody>
-{accounts.map(a => (
+{accounts && accounts.map(a => (
 
       <tr>
   <td>{a.AccountInfo.name}</td>

@@ -10,9 +10,12 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server/routes"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/auth"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
 
 	cors "github.com/rs/cors/wrapper/gin"
 )
@@ -20,18 +23,21 @@ import (
 type Server struct {
 	httpAddr            string
 	Engine              *gin.Engine
-	servicesAccunt      account.AccountService
-	servicesTransaction transaction.TransactionService
-
-	shutdownTimeout time.Duration
+	servicesAccunt      *account.AccountService
+	servicesTransaction *transaction.TransactionService
+	servicesUser        *user.UserService
+	servicesAuth        *auth.AuthService
+	shutdownTimeout     *time.Duration
 }
 
-func New(ctx context.Context, host string, port uint, shutdownTimeout time.Duration, servicesAccount account.AccountService, transactionService transaction.TransactionService) (context.Context, *Server) {
+func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Duration, servicesAccount *account.AccountService, transactionService *transaction.TransactionService, userService *user.UserService, authService *auth.AuthService) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
 		httpAddr:            fmt.Sprintf("%s:%d", host, port),
 		servicesAccunt:      servicesAccount,
 		servicesTransaction: transactionService,
+		servicesUser:        userService,
+		servicesAuth:        authService,
 		shutdownTimeout:     shutdownTimeout,
 	}
 	srv.registerRoutes()
@@ -39,7 +45,10 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout time.Durat
 }
 
 func (s *Server) registerRoutes() {
+	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser))
 	s.Engine.Use(cors.AllowAll())
+	routes.AuhtRoutes(s.Engine, s.servicesAuth)
+	routes.UserRoute(s.Engine, s.servicesUser)
 	routes.HealthRoutes(s.Engine)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)
 	routes.TransactionRoutes(s.Engine, s.servicesTransaction)
@@ -60,7 +69,7 @@ func (s *Server) Run(ctx context.Context) error {
 	}()
 
 	<-ctx.Done()
-	ctxShutDown, cancel := context.WithTimeout(context.Background(), s.shutdownTimeout)
+	ctxShutDown, cancel := context.WithTimeout(context.Background(), *s.shutdownTimeout)
 	defer cancel()
 
 	return srv.Shutdown(ctxShutDown)

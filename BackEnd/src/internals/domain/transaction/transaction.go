@@ -9,6 +9,7 @@ type Transaction struct {
 	Amount         float64   `json:"amount" validate:"required"`
 	TypeTransation string    `json:"type_transation" validator:"required"`
 	Account_id     string    `json:"account_id"`
+	User_id        string    `json:"user_id"`
 	Created_at     time.Time `json:"created_at"`
 }
 

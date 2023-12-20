@@ -8,7 +8,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
 )
 
-func GetUser(userService user.UserService) gin.HandlerFunc {
+func GetUser(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		user, err := userService.FindUserById(c, id)
@@ -20,7 +20,19 @@ func GetUser(userService user.UserService) gin.HandlerFunc {
 	}
 }
 
-func CreateUser(userService user.UserService) gin.HandlerFunc {
+func GetProfile(userService *user.UserService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userid := c.GetString("X-User-Id")
+		user, err := userService.FindUserById(c, userid)
+		if err != nil {
+			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"erro": "Find User"})
+			return
+		}
+		c.JSON(http.StatusOK, user)
+	}
+}
+
+func CreateUser(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var user useTye.User
 		err := c.BindJSON(&user)

@@ -4,7 +4,9 @@ import type { AccoutInfoInterface } from "../interface/account.interface";
 import type { PostTransaction } from "../interface/transaction.interface";
 import { AccountRepotory } from "../repository/account.repository";
 import { TrasactionRepotory } from "../repository/transaction.repository";
-const accountRepository = new AccountRepotory()
+const token = Astro.cookies.get("x-token")?.value as string
+
+const accountRepository = new AccountRepotory(token)
 
 const accounts :AccoutInfoInterface[]= await  accountRepository.findAll()
 
@@ -25,7 +27,7 @@ if (Astro.request.method === "POST") {
       account_id: accountId,
    
     }
-    const transactionRepository = new TrasactionRepotory()
+    const transactionRepository = new TrasactionRepotory(token)
     
     await transactionRepository.create(transaction)
   } catch (error) {

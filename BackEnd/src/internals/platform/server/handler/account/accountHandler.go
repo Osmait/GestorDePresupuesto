@@ -13,14 +13,15 @@ type AccountResponse struct {
 	CurrentBalance float64
 }
 
-func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
+func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
 		var account accountDomain.Account
 		if err := ctx.BindJSON(&account); err != nil {
 			ctx.JSON(http.StatusBadRequest, "Error filds required")
 			return
 		}
-		err := accountService.CreateAccount(ctx, account.Id, account.Name, account.Bank, account.InitialBalance)
+		err := accountService.CreateAccount(ctx, account.Name, account.Bank, account.InitialBalance, userId)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, err.Error())
 		}
@@ -28,9 +29,10 @@ func CreateAccount(accountService account.AccountService) gin.HandlerFunc {
 	}
 }
 
-func FindAllAccount(accountService account.AccountService) gin.HandlerFunc {
+func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		accountList, err := accountService.FindAll(ctx)
+		userId := ctx.GetString("X-User-Id")
+		accountList, err := accountService.FindAll(ctx, userId)
 		var accountResponse []AccountResponse
 
 		for _, account := range accountList {
@@ -49,7 +51,7 @@ func FindAllAccount(accountService account.AccountService) gin.HandlerFunc {
 	}
 }
 
-func DeleteAccount(accountService account.AccountService) gin.HandlerFunc {
+func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		err := accountService.DeleteAccount(ctx, id)

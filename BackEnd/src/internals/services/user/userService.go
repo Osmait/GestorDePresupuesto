@@ -5,6 +5,8 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	"github.com/segmentio/ksuid"
+	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
@@ -18,8 +20,26 @@ func NewUserService(userRepo postgress.UserRepositoryInterface) *UserService {
 }
 
 func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
-	err := u.userRepository.CreateUser(ctx, user)
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return err
+	}
+	id, err := ksuid.NewRandom()
+	if err != nil {
+		return err
+	}
+	user.Id = id.String()
+	user.Password = string(hashPassword)
+	err = u.userRepository.CreateUser(ctx, user)
 	return err
+}
+
+func (u *UserService) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {
+	user, err := u.userRepository.FindUserByEmail(ctx, email)
+	if err != nil {
+		return nil, err
+	}
+	return user, nil
 }
 
 func (u *UserService) FindUserById(ctx context.Context, id string) (*user.User, error) {
@@ -28,4 +48,9 @@ func (u *UserService) FindUserById(ctx context.Context, id string) (*user.User, 
 		return nil, err
 	}
 	return user, nil
+}
+
+func (u *UserService) DeleteUser(ctx context.Context, id string) error {
+	err := u.userRepository.Delete(ctx, id)
+	return err
 }
