@@ -30,9 +30,7 @@ export class TrasactionRepotory {
       },
       body: JSON.stringify(transaction),
     };
-    console.log(options);
     const response = await fetch(this.url, options);
-    console.log(response);
   }
   async delele(id: string) {
     const options = {
