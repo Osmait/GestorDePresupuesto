@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -39,13 +40,8 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
-	name := "prueba"
-	descrpition := "Para Probar el Service"
-	amount := 1000.00
-	typeTransaction := "bill"
-	accountId := "1"
-	userId := "1"
-	err := s.CreateTransaction(ctx, name, descrpition, amount, typeTransaction, accountId, userId)
+	transaction := utils.GetNewRandomTransaction()
+	err := s.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id, transaction.User_id)
 	assert.NoError(t, err, "CreateAccount should not return an error")
 	mockRepo.AssertExpectations(t)
 }

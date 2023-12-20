@@ -4,9 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/go-faker/faker/v4"
-
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
+	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -35,15 +34,10 @@ func (m *MockUserRepostory) Delete(ctx context.Context, id string) error {
 	return args.Error(0)
 }
 
-func GetNewUser() *user.User {
-	user1 := user.NewUser(faker.ID, faker.Name(), faker.LastName(), faker.Email(), faker.Password())
-	return user1
-}
-
 func TestCreateUser(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	userServie := NewUserService(mockRepo)
-	user1 := GetNewUser()
+	user1 := utils.GetNewUser()
 	mockRepo.On("CreateUser", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
 	err := userServie.CreateUser(context.Background(), user1)
 	assert.NoError(t, err)
@@ -53,7 +47,7 @@ func TestCreateUser(t *testing.T) {
 func TestFindUser(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	userService := NewUserService(mockRepo)
-	user1 := GetNewUser()
+	user1 := utils.GetNewUser()
 	mockRepo.On("FindUser", context.Background(), mock.Anything).Return(user1, nil)
 	Result, err := userService.FindUserById(context.Background(), user1.Id)
 	assert.NoError(t, err)
@@ -65,7 +59,7 @@ func TestFindUser(t *testing.T) {
 func TestFindUserByEmail(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	UserService := NewUserService(mockRepo)
-	user1 := GetNewUser()
+	user1 := utils.GetNewUser()
 	mockRepo.On("FindUserByEmail", context.Background(), mock.Anything).Return(user1, nil)
 	result, err := UserService.FindUserByEmail(context.Background(), user1.Email)
 	assert.NoError(t, err)
