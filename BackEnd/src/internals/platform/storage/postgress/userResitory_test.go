@@ -8,13 +8,12 @@ import (
 	"strconv"
 	"testing"
 
-	"github.com/go-faker/faker/v4"
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
-	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
+	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/rs/zerolog/log"
 	"github.com/stretchr/testify/assert"
 )
@@ -26,11 +25,6 @@ type Config struct {
 	Dbhost string
 	DbPort uint
 	DbName string
-}
-
-func GetNewUser() *user.User {
-	user1 := user.NewUser(faker.ID, faker.Name(), faker.LastName(), faker.Email(), faker.Password())
-	return user1
 }
 
 func setUp() *sql.DB {
@@ -72,7 +66,7 @@ func TestUserRespo(t *testing.T) {
 	db := setUp()
 	repo := NewUserRespository(db)
 	ctx := context.Background()
-	user := GetNewUser()
+	user := utils.GetNewUser()
 	err := repo.CreateUser(ctx, user)
 	assert.NoError(t, err)
 
@@ -84,4 +78,7 @@ func TestUserRespo(t *testing.T) {
 	assert.NoError(t, err)
 	err = repo.Delete(ctx, user.Id)
 	assert.NoError(t, err)
+	nouser, err := repo.FindUser(ctx, user.Id)
+	assert.NoError(t, err)
+	assert.Equal(t, nouser.Id, "")
 }
