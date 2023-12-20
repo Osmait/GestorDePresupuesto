@@ -8,7 +8,8 @@ const token = Astro.cookies.get("x-token")?.value as string
 const accountRepository = new AccountRepotory(token);
 const accounts: AccoutInfoInterface[] = await accountRepository.findAll();
 const transactionRepository = new TrasactionRepotory(token);
-let listOfTransaction: Transactions[] =await transactionRepository.get() 
+let listOfTransaction: Transactions[]= []
+listOfTransaction =await transactionRepository.get() 
 
 
 if (Astro.request.method === "POST") {
