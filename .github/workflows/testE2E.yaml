@@ -19,7 +19,7 @@ jobs:
         working-directory: ./BackEnd
 
       - name: Install dependencies
-        run: npm ci
+        run: sudo npm ci
         working-directory: ./Frontend/gestor-presupuesto
 
       - name: Install Playwright Browsers
