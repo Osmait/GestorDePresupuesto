@@ -69,12 +69,12 @@ const hasErrors = Object.values(errors).some(msg => msg)
       </div> 
     <div class="user-box" transition:name="name-label">
  
-      <input type="email" name="email" required>
+      <input data-testid="email" type="email" name="email" required>
       <label>Email</label>
     </div>
   <div class="user-box">
   
-      <input type="password" name="password" required>
+      <input  data-testid="password" type="password" name="password" required>
 
           
       <label>Password</label>
@@ -108,7 +108,7 @@ if(button){
 <style>
 html{
 
-  background: url("/public/05.jpg");
+  background: url("/05.jpg");
 }
 .demo{
   border: 1px solid #fff ;
