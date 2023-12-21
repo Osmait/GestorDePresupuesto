@@ -10,7 +10,7 @@ jobs:
     timeout-minutes: 60
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v3
       - uses: actions/setup-node@v3
         with:
           node-version: 18
@@ -19,7 +19,7 @@ jobs:
         working-directory: ./BackEnd
 
       - name: Install dependencies
-        run: npm i
+        run: npm ci
         working-directory: ./Frontend/gestor-presupuesto
 
       - name: Install Playwright Browsers
