@@ -33,6 +33,7 @@ func Run() error {
 
 	cfg := config.NewConfig(os.Getenv("HOST"), uint(port), uint(dbPort), &shutdown, os.Getenv("DbUser"), os.Getenv("DbPass"), os.Getenv("Dbhost"), os.Getenv("DbName"))
 
+	fmt.Println(cfg.Dbhost)
 	postgresURI := cfg.GetPostgresUrl()
 
 	db, err := sql.Open("postgres", postgresURI)

@@ -26,6 +26,7 @@ func NewConfig(host string, Port, Dbport uint, shutdownTimeout *time.Duration, D
 		Port:            Port,
 		ShutdownTimeout: shutdownTimeout,
 		DbUser:          DbUser,
+		Dbhost:          Dbhost,
 		DbPass:          DbPass,
 		DbPort:          Dbport,
 		DbName:          DbName,
