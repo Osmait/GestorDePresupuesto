@@ -41,7 +41,7 @@ func TestCreateAccount(t *testing.T) {
 
 	ctx := context.Background()
 
-	mockRepo.On("Save", ctx, mock.AnythingOfType("account.Account")).Return(nil)
+	mockRepo.On("Save", ctx, mock.AnythingOfType("*account.Account")).Return(nil)
 
 	account := utils.GetNewRandomAccount()
 
