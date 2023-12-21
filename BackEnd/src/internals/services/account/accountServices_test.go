@@ -14,7 +14,7 @@ type MockAccountRepository struct {
 	mock.Mock
 }
 
-func (m *MockAccountRepository) Save(ctx context.Context, acc account.Account) error {
+func (m *MockAccountRepository) Save(ctx context.Context, acc *account.Account) error {
 	args := m.Called(ctx, acc)
 	return args.Error(0)
 }

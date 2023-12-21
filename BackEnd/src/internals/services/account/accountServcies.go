@@ -11,10 +11,10 @@ import (
 )
 
 type AccountService struct {
-	accountRepository postgress.Repository
+	accountRepository postgress.AccountRepositoryInterface
 }
 
-func NewAccountService(accountRepository postgress.Repository) *AccountService {
+func NewAccountService(accountRepository postgress.AccountRepositoryInterface) *AccountService {
 	return &AccountService{
 		accountRepository: accountRepository,
 	}
