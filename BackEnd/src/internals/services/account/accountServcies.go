@@ -29,7 +29,7 @@ func (s *AccountService) CreateAccount(ctx context.Context, name, bank string, b
 
 	account := account.NewAccount(balace, id, name, bank)
 	account.UserId = userId
-	err = s.accountRepository.Save(ctx, *account)
+	err = s.accountRepository.Save(ctx, account)
 
 	return err
 }

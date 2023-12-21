@@ -30,6 +30,7 @@ func Run() error {
 	shutdown := 10 * time.Second
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	dbPort, _ := strconv.Atoi(os.Getenv("DbPort"))
+
 	cfg := config.NewConfig(os.Getenv("HOST"), uint(port), uint(dbPort), &shutdown, os.Getenv("DbUser"), os.Getenv("DbPass"), os.Getenv("Dbhost"), os.Getenv("DbName"))
 
 	postgresURI := cfg.GetPostgresUrl()
@@ -38,11 +39,13 @@ func Run() error {
 	if err != nil {
 		return err
 	}
+
 	utils.RunDBMigration("file://src/cmd/api/db/migrations", postgresURI)
 
 	accountRepository := postgress.NewAccountRepository(db)
 	transactionRepository := postgress.NewTransactionRepository(db)
 	userRepository := postgress.NewUserRespository(db)
+
 	accountSerevice := account.NewAccountService(accountRepository)
 	transactionServices := transaction.NewTransactionService(transactionRepository)
 	userServices := user.NewUserService(userRepository)
