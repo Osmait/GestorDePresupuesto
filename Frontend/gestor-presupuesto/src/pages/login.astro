@@ -31,7 +31,7 @@ const hasErrors = Object.values(errors).some(msg => msg)
       body: JSON.stringify(loginRequest),
     };
     
-    const response = await fetch(`${import.meta.env.HOST}/login`,options)
+    const response = await fetch(`http://localhost:8080/login`,options)
     const result = await response.json()
 
     if(response.status === 200){  
