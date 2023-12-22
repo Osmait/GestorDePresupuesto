@@ -4,7 +4,7 @@ import type {
 } from "../interface/account.interface";
 
 export class AccountRepotory {
-  private url = `http://localhost:8080/account`;
+  private url = `${import.meta.env.HOST}/account`;
 
   private config = {
     headers: {
