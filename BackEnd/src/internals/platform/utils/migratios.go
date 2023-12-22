@@ -23,3 +23,17 @@ func RunDBMigration(migrationURL string, dbSource string) {
 
 	log.Info().Msg("db migrated successfully")
 }
+
+func DownDBMigration(migrationURL string, dbSource string) {
+	fmt.Println(dbSource)
+	migration, err := migrate.New(migrationURL, dbSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create new migrate instance")
+	}
+
+	if err = migration.Down(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal().Err(err).Msg("failed to run migrate up")
+	}
+
+	log.Info().Msg("db migrated successfully")
+}
