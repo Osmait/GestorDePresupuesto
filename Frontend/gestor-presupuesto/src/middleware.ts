@@ -19,7 +19,7 @@ export const onRequest = defineMiddleware(async (context, next) => {
   };
 
   try {
-    const data = await fetch(`${import.meta.env.HOST}/profile`, config);
+    const data = await fetch(`http://localhost:8080/profile`, config);
     const result = await data.json();
     if (!result.id) {
       context.redirect("/login");
