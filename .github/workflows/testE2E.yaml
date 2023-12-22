@@ -29,3 +29,5 @@ jobs:
       - name: Run Playwright tests
         run: npm run test:e2e
         working-directory: ./Frontend/gestor-presupuesto
+        env:
+          HOST: http://localhost:8080
