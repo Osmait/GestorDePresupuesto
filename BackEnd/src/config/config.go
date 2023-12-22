@@ -45,3 +45,7 @@ func NewConfigDb(Dbport uint, DbUser, DbPass, Dbhost, DbName string) *Config {
 func (c *Config) GetPostgresUrl() string {
 	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=disable", c.DbUser, c.DbPass, c.Dbhost, c.DbPort, c.DbName)
 }
+
+func (c *Config) GetServerUrl() string {
+	return fmt.Sprintf("http:%s:%d", c.Host, c.Port)
+}
