@@ -62,8 +62,8 @@ export default defineConfig({
 
   /* Run your local dev server before starting the tests */
   webServer: {
-    command: "npm run start -- --port 3000",
-    url: "http://localhost:3000",
+    command: "npm run preview",
+    url: "http://localhost:4321",
     reuseExistingServer: !process.env.CI,
     timeout: 120 * 1000,
     stdout: "ignore",
@@ -71,6 +71,6 @@ export default defineConfig({
   },
   use: {
     /* Base URL to use in actions like `await page.goto('/')`. */
-    baseURL: "http://localhost:3000",
+    baseURL: "http://localhost:4321",
   },
 });

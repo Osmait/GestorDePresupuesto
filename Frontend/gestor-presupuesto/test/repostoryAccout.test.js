@@ -1,11 +1,10 @@
-import { describe, assert, expect, test, vi, beforeEach } from "vitest";
+import { describe, expect, test, vi, beforeEach } from "vitest";
 import { AccountRepotory } from "../src/repository/account.repository";
-import type { AccoutInfoInterface } from "../src/interface/account.interface";
 
 // Edit an assertion and save to see HMR in action
 global.fetch = vi.fn();
 
-function createFetchResponse(data: any) {
+function createFetchResponse(data) {
   return { json: () => new Promise((resolve) => resolve(data)) };
 }
 describe("repository account ", () => {
@@ -14,7 +13,7 @@ describe("repository account ", () => {
   });
 
   test("findAll returns the result", async () => {
-    const todoListResponse: AccoutInfoInterface[] = [
+    const todoListResponse = [
       {
         AccountInfo: {
           id: "1",
