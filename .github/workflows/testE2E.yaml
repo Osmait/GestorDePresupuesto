@@ -15,7 +15,7 @@ jobs:
         with:
           node-version: 18
       - name: run backend
-        run: docker-compose up -d app postgres app-front
+        run: docker-compose up -d app postgres
         working-directory: ./BackEnd
 
       - name: Install dependencies
@@ -23,7 +23,7 @@ jobs:
         working-directory: ./Frontend/gestor-presupuesto
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: npx playwright install chromium
         working-directory: ./Frontend/gestor-presupuesto
 
       - name: Run Playwright tests

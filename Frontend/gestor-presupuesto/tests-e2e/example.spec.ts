@@ -1,7 +1,7 @@
 import { test, expect } from "@playwright/test";
 
 test.beforeEach("test login", async ({ page }) => {
-  await page.goto("http://localhost:4321/login");
+  await page.goto("/login");
   await page.getByTestId("email").fill("demo@demo.com");
   await page.getByTestId("password").fill("12345678");
   await page.getByRole("button", { name: "Login" }).click();
