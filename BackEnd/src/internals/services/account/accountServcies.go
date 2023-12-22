@@ -39,6 +39,7 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*account
 	if err != nil {
 		return nil, err
 	}
+
 	return accounts, nil
 }
 
