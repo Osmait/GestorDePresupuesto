@@ -23,6 +23,7 @@ jobs:
         working-directory: ./Frontend/gestor-presupuesto
       - name: run unit test
         run: sudo npm run test --project test-unit
+        working-directory: ./Frontend/gestor-presupuesto
 
       # - name: Install Playwright Browsers
       #   run: sudo npx playwright install --with-deps chromium
