@@ -27,6 +27,7 @@ jobs:
         working-directory: ./Frontend/gestor-presupuesto
       - name: run build
         run: sudo npm run build
+        working-directory: ./Frontend/gestor-presupuesto
 
       - name: Run Playwright tests
         run: sudo npm run test:e2e
