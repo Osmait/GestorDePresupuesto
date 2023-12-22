@@ -29,5 +29,5 @@ jobs:
       - name: Run Playwright tests
         run: sudo npm run test:e2e
         env:
-          API: http://localhost:8080
+          API: "http://localhost:8080"
         working-directory: ./Frontend/gestor-presupuesto
