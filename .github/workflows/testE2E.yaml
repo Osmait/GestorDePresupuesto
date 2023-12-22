@@ -25,6 +25,8 @@ jobs:
       - name: Install Playwright Browsers
         run: sudo npx playwright install --with-deps
         working-directory: ./Frontend/gestor-presupuesto
+      - name: get curl
+        run: curl http://localhost:8080
 
       - name: Run Playwright tests
         run: sudo npm run test:e2e
