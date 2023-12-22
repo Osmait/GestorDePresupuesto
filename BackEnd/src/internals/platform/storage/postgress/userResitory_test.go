@@ -16,10 +16,10 @@ func TestUserRespo(t *testing.T) {
 	repo := NewUserRespository(db)
 	ctx := context.Background()
 	user := utils.GetNewRandomUser()
-	err := repo.CreateUser(ctx, user)
+	err := repo.Save(ctx, user)
 	assert.NoError(t, err)
 
-	userDb, err := repo.FindUser(ctx, user.Id)
+	userDb, err := repo.FindUserById(ctx, user.Id)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestUserRespo(t *testing.T) {
 	assert.NoError(t, err)
 	err = repo.Delete(ctx, user.Id)
 	assert.NoError(t, err)
-	nouser, err := repo.FindUser(ctx, user.Id)
+	nouser, err := repo.FindUserById(ctx, user.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, nouser.Id, "")
 }

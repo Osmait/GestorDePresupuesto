@@ -13,7 +13,7 @@ func TestAccountRepository(t *testing.T) {
 	ctx := context.Background()
 	userRepo := NewUserRespository(db)
 	user := utils.GetNewRandomUser()
-	err := userRepo.CreateUser(ctx, user)
+	err := userRepo.Save(ctx, user)
 	assert.NoError(t, err)
 	accountRepo := NewAccountRepository(db)
 	account := utils.GetNewRandomAccount()

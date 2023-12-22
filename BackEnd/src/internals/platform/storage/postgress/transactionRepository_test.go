@@ -23,7 +23,7 @@ func TestTransactionRepository(t *testing.T) {
 	transaction.Account_id = account.Id
 	transaction.User_id = user.Id
 	account.UserId = user.Id
-	err := userRepo.CreateUser(ctx, user)
+	err := userRepo.Save(ctx, user)
 	assert.NoError(t, err)
 	err = accountRepo.Save(ctx, account)
 	assert.NoError(t, err)

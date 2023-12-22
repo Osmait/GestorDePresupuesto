@@ -7,8 +7,8 @@ import (
 )
 
 type UserRepositoryInterface interface {
-	FindUser(ctx context.Context, id string) (*user.User, error)
+	FindUserById(ctx context.Context, id string) (*user.User, error)
 	FindUserByEmail(ctx context.Context, email string) (*user.User, error)
-	CreateUser(ctx context.Context, user *user.User) error
+	Save(ctx context.Context, user *user.User) error
 	Delete(ctx context.Context, id string) error
 }
