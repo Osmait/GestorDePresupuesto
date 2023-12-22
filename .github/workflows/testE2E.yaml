@@ -23,7 +23,7 @@ jobs:
         working-directory: ./Frontend/gestor-presupuesto
 
       - name: Install Playwright Browsers
-        run: npx playwright install --with-deps
+        run: sudo npx playwright install --with-deps
         working-directory: ./Frontend/gestor-presupuesto
 
       - name: Run Playwright tests
