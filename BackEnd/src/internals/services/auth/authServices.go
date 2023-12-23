@@ -28,11 +28,11 @@ func (a *AuthService) Login(ctx context.Context, authRequest *authRequest.AuthRe
 	}
 
 	if user.Email != authRequest.Email {
-		return nil, errorhttp.BadRequest
+		return nil, errorhttp.ErrBadRequest
 	}
 	err = bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(authRequest.Password))
 	if err != nil {
-		return nil, errorhttp.BadRequest
+		return nil, errorhttp.ErrBadRequest
 	}
 
 	fmt.Println(user.Id)
