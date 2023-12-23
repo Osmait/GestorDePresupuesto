@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	useTye "github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
+	errorHandler "github.com/osmait/gestorDePresupuesto/src/internals/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
 )
 
@@ -37,14 +38,16 @@ func CreateUser(userService *user.UserService) gin.HandlerFunc {
 		var user useTye.User
 		err := c.BindJSON(&user)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusBadRequest, err.Error())
+			c.JSON(http.StatusBadRequest, err)
 			return
 		}
+
 		err = userService.CreateUser(c, &user)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, err.Error())
+			errorHandler.ReponseByTypeOfErr(err, c)
 			return
 		}
+
 		c.Status(http.StatusOK)
 	}
 }
