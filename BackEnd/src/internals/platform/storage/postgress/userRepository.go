@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 )
 
 type UserRepository struct {
@@ -35,12 +36,15 @@ func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*us
 
 	user := user.User{}
 	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password); err == nil {
-			return &user, nil
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password); err != nil {
+			return nil, err
 		}
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+	if user.Id == "" {
+		return nil, errorhttp.ErrNotFound
 	}
 	return &user, nil
 }
