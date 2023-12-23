@@ -21,7 +21,7 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 		token, err := authService.Login(ctx, &authRequest)
 		if err != nil {
 			switch {
-			case errors.Is(err, errorhttp.BadRequest):
+			case errors.Is(err, errorhttp.ErrBadRequest):
 				ctx.JSON(http.StatusBadRequest, err)
 				return
 			}
