@@ -21,6 +21,14 @@ func NewUserService(userRepo postgress.UserRepositoryInterface) *UserService {
 }
 
 func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
+	userDuplicate, err := u.userRepository.FindUserByEmail(ctx, user.Email)
+	if !errorhttp.IsErrNotFound(err) && err != nil {
+		return err
+	}
+
+	if userDuplicate != nil {
+		return errorhttp.ErrNotDuplicate
+	}
 	hashPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
@@ -36,13 +44,16 @@ func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
 	return err
 }
 
-func (u *UserService) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {
+func (u *UserService) FindByEmail(ctx context.Context, email string) (*user.User, error) {
 	user, err := u.userRepository.FindUserByEmail(ctx, email)
 	if err != nil {
 		return nil, err
 	}
 	if user.Id == "" {
-		return nil, errorhttp.NotFound
+		return nil, errorhttp.ErrNotFound
+	}
+	if user.Email != email {
+		return nil, errorhttp.ErrNotFound
 	}
 
 	return user, nil
@@ -54,7 +65,10 @@ func (u *UserService) FindUserById(ctx context.Context, id string) (*user.User, 
 		return nil, err
 	}
 	if user.Id == "" {
-		return nil, errorhttp.NotFound
+		return nil, errorhttp.ErrNotFound
+	}
+	if id != user.Id {
+		return nil, errorhttp.ErrNotFound
 	}
 	return user, nil
 }
@@ -65,7 +79,7 @@ func (u *UserService) DeleteUser(ctx context.Context, id string) error {
 		return err
 	}
 	if user.Id == "" {
-		return errorhttp.NotFound
+		return errorhttp.ErrNotFound
 	}
 	err = u.userRepository.Delete(ctx, id)
 	return err
