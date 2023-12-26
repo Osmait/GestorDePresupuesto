@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	transactionDomain "github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
+	errorHandler "github.com/osmait/gestorDePresupuesto/src/internals/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 )
 
@@ -22,7 +23,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 		}
 		err := transactionservice.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id, userId)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, err.Error())
+			errorHandler.ReponseByTypeOfErr(err, ctx)
 		}
 
 		ctx.Status(http.StatusCreated)
@@ -44,7 +45,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		fmt.Println(transactionsList)
 		if err != nil {
 			fmt.Println(err.Error())
-			ctx.JSON(http.StatusInternalServerError, "Error Finding transantion")
+			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
 
@@ -68,7 +69,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		fmt.Println(transactionsList)
 		if err != nil {
 			fmt.Println(err.Error())
-			ctx.JSON(http.StatusInternalServerError, "Error Finding transantion")
+			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
 
@@ -81,7 +82,7 @@ func DeleteTransaction(transactionService *transaction.TransactionService) gin.H
 		id := ctx.Param("id")
 		err := transactionService.DeleteTransaction(ctx, id)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, err.Error())
+			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
 		ctx.JSON(http.StatusOK, "Deleted")

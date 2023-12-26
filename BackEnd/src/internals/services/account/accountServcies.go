@@ -2,7 +2,6 @@ package account
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/account"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
@@ -50,8 +49,6 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
 
 func (s *AccountService) Balance(ctx context.Context, id string) (float64, error) {
 	balance, err := s.accountRepository.Balance(ctx, id)
-	fmt.Println(balance)
-
 	if err != nil {
 		return 0, err
 	}

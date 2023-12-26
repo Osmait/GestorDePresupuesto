@@ -14,7 +14,7 @@ func GetUser(userService *user.UserService) gin.HandlerFunc {
 		id := c.Param("id")
 		user, err := userService.FindUserById(c, id)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"erro": "Find User"})
+			errorHandler.ReponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusOK, user)
@@ -26,7 +26,7 @@ func GetProfile(userService *user.UserService) gin.HandlerFunc {
 		userid := c.GetString("X-User-Id")
 		user, err := userService.FindUserById(c, userid)
 		if err != nil {
-			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"erro": "Find User"})
+			errorHandler.ReponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusOK, user)

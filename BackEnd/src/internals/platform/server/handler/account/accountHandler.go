@@ -5,6 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	accountDomain "github.com/osmait/gestorDePresupuesto/src/internals/domain/account"
+	errorHandler "github.com/osmait/gestorDePresupuesto/src/internals/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 )
 
@@ -23,7 +24,7 @@ func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 		}
 		err := accountService.CreateAccount(ctx, account.Name, account.Bank, account.InitialBalance, userId)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, err.Error())
+			errorHandler.ReponseByTypeOfErr(err, ctx)
 		}
 		ctx.Status(http.StatusCreated)
 	}
@@ -34,18 +35,16 @@ func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		accountList, err := accountService.FindAll(ctx, userId)
 		var accountResponse []AccountResponse
-
+		if err != nil {
+			errorHandler.ReponseByTypeOfErr(err, ctx)
+		}
 		for _, account := range accountList {
 			balance, err := accountService.Balance(ctx, account.Id)
 			if err != nil {
-				ctx.Status(http.StatusInternalServerError)
+				errorHandler.ReponseByTypeOfErr(err, ctx)
 			}
 			accounts := AccountResponse{AccountInfo: account, CurrentBalance: balance + account.InitialBalance}
 			accountResponse = append(accountResponse, accounts)
-		}
-
-		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, "Error Finded accounts")
 		}
 		ctx.JSON(http.StatusOK, accountResponse)
 	}
@@ -56,7 +55,7 @@ func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 		id := ctx.Param("id")
 		err := accountService.DeleteAccount(ctx, id)
 		if err != nil {
-			ctx.JSON(http.StatusInternalServerError, "Error deleting account")
+			errorHandler.ReponseByTypeOfErr(err, ctx)
 		}
 		ctx.JSON(http.StatusOK, "Deleted")
 	}

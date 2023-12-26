@@ -77,6 +77,7 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
+
 	return transactions, nil
 }
 
