@@ -6,18 +6,14 @@ import (
 )
 
 type Config struct {
-	// Server Configuration
-	Host            string
-	Port            uint
 	ShutdownTimeout *time.Duration
-
-	// DataBase Configuration
-
-	DbUser string
-	DbPass string
-	Dbhost string
-	DbPort uint
-	DbName string
+	Host            string
+	DbUser          string
+	DbPass          string
+	Dbhost          string
+	DbName          string
+	Port            uint
+	DbPort          uint
 }
 
 func NewConfig(host string, Port, Dbport uint, shutdownTimeout *time.Duration, DbUser, DbPass, Dbhost, DbName string) *Config {
