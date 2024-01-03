@@ -9,7 +9,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/category"
 )
 
-func CreateCategory(categoryServices category.CategoryServices) gin.HandlerFunc {
+func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var category categoryDomain.Category
 		err := c.Bind(&category)
@@ -27,7 +27,7 @@ func CreateCategory(categoryServices category.CategoryServices) gin.HandlerFunc 
 	}
 }
 
-func FindAllCategorys(categoryServices category.CategoryServices) gin.HandlerFunc {
+func FindAllCategorys(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userId := c.GetString("X-user-Id")
 		categorys, err := categoryServices.FindAll(c, userId)
@@ -39,7 +39,7 @@ func FindAllCategorys(categoryServices category.CategoryServices) gin.HandlerFun
 	}
 }
 
-func DeleteCategory(categoryServices category.CategoryServices) gin.HandlerFunc {
+func DeleteCategory(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		err := categoryServices.Delete(c, id)
