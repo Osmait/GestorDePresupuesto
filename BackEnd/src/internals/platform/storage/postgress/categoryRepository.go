@@ -49,6 +49,31 @@ func (c *CategoryRespository) FindAll(ctx context.Context, userId string) ([]*ca
 	return categorys, nil
 }
 
+func (c *CategoryRespository) FindOne(ctx context.Context, id string) (*category.Category, error) {
+	rows, err := c.db.QueryContext(ctx, "SELECT id,name ,icon FROM categorys WHERE user_id = $1 ", id)
+	if err != nil {
+		return nil, err
+	}
+
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+
+	var category category.Category
+	for rows.Next() {
+		if err = rows.Scan(&category.Id, &category.Name, &category.Icon, &category.CreatedAt); err != nil {
+			return nil, err
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return &category, nil
+}
+
 func (c *CategoryRespository) Delete(ctx context.Context, id string) error {
 	_, err := c.db.ExecContext(ctx, "DELETE FROM categorys WHERE id = $1", id)
 	return err
