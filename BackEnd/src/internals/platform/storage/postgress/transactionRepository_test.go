@@ -31,7 +31,7 @@ func TestTransactionRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	currenTime := time.Now()
-	date1 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-7)
+	date1 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day())
 	date2 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
 	transactionList, err := transactionRepo.FindAll(ctx, date1, date2, account.Id)
 	assert.NoError(t, err)
