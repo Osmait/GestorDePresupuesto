@@ -1,18 +1,15 @@
 ---
 export const prerender = false;
-import  LastTransaction from "../components/LastTransaction.astro";
-import Layout from '../layouts/Layout.astro';
-import BackArrowIcon from "../components/BackArrowIcon.astro" 
+import LastTransaction from "../components/LastTransaction.astro";
+import Layout from "../layouts/Layout.astro";
+import BackArrowIcon from "../components/BackArrowIcon.astro";
 ---
-<Layout title='Transactions'>
 
+<Layout title="Transactions">
   <a href="/">
-    <BackArrowIcon/>
+    <BackArrowIcon />
   </a>
-    <section transition:name="transaction">
-      <LastTransaction/>
-    </section>
- 
+  <section transition:name="transaction">
+    <LastTransaction />
+  </section>
 </Layout>
-
-
