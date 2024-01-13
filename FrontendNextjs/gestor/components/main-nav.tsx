@@ -21,19 +21,31 @@ export function MainNav({
         href="/examples/dashboard"
         className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
       >
-        Customers
+        Accounts
       </Link>
       <Link
         href="/examples/dashboard"
         className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
       >
-        Products
+        Transaction
       </Link>
       <Link
         href="/examples/dashboard"
         className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
       >
-        Settings
+        Category
+      </Link>
+      <Link
+        href="/examples/dashboard"
+        className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+      >
+        Crypto
+      </Link>
+      <Link
+        href="/examples/dashboard"
+        className="text-sm font-medium text-muted-foreground transition-colors hover:text-primary"
+      >
+        Budget
       </Link>
     </nav>
   );

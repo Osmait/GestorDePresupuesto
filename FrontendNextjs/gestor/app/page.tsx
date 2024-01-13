@@ -1,6 +1,3 @@
-import { Metadata } from "next";
-import Image from "next/image";
-
 import { Button } from "../components/ui/button";
 import {
   Card,
@@ -23,6 +20,8 @@ import { Search } from "../components/search";
 import TeamSwitcher from "../components/team-switcher";
 import { UserNav } from "../components/user-nav";
 import { CrytoSeccion } from "@/components/cryto-sesion";
+import CategoryCarousel from "@/components/Category-Carousel";
+import { BudgetSesion } from "@/components/BudgetSesion";
 
 export default function Home() {
   return (
@@ -140,7 +139,7 @@ export default function Home() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Active Now
+                      Category Totals
                     </CardTitle>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -155,11 +154,10 @@ export default function Home() {
                       <path d="M22 12h-4l-3 9L9 3l-3 9H2" />
                     </svg>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">+573</div>
-                    <p className="text-xs text-muted-foreground">
-                      +201 since last hour
-                    </p>
+                  <CardContent className="flex items-center justify-center">
+                    <div className="w-2/3 ">
+                      <CategoryCarousel />
+                    </div>
                   </CardContent>
                 </Card>
               </div>
@@ -185,13 +183,24 @@ export default function Home() {
                 </Card>
                 <Card className="col-span-4">
                   <CardHeader>
-                    <CardTitle>Cryto section</CardTitle>
+                    <CardTitle>Crypto section</CardTitle>
                     <CardDescription>
                       You made 265 sales this month.
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
                     <CrytoSeccion />
+                  </CardContent>
+                </Card>
+                <Card className="col-span-3">
+                  <CardHeader>
+                    <CardTitle>Budgets</CardTitle>
+                    <CardDescription>
+                      You made 265 sales this month.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <BudgetSesion />
                   </CardContent>
                 </Card>
               </div>

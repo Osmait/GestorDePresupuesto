@@ -77,9 +77,11 @@ export function CrytoSeccion() {
                 solana <span>SOL</span>
               </p>
             </TableCell>
-            <TableCell>{invoice.paymentStatus}</TableCell>
-            <TableCell>{invoice.paymentMethod}</TableCell>
-            <TableCell className="text-right">{invoice.totalAmount}</TableCell>
+            <TableCell>${invoice.paymentStatus}</TableCell>
+            <TableCell>${invoice.paymentMethod}</TableCell>
+            <TableCell className="text-right">
+              +${invoice.totalAmount}
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
