@@ -30,6 +30,9 @@ const invoices = [
     totalAmount: 340.0,
   },
 ];
+function getporcentage(total: number, current: number): number {
+  return (total / current) * 100;
+}
 
 export function BudgetSesion() {
   return (
@@ -53,15 +56,19 @@ export function BudgetSesion() {
             <TableCell className="w-3/6 ">
               <Progress
                 className={
-                  (invoice.totalAmount / invoice.paymentStatus) * 100 > 80
+                  getporcentage(invoice.totalAmount, invoice.paymentStatus) > 80
                     ? "bg-red-800"
-                    : (invoice.totalAmount / invoice.paymentStatus) * 100 > 60
+                    : getporcentage(
+                          invoice.totalAmount,
+                          invoice.paymentStatus,
+                        ) > 60
                       ? "bg-yellow-500"
                       : "bg-primary"
                 }
                 value={
-                  (invoice.totalAmount / invoice.paymentStatus) * 100 < 100
-                    ? (invoice.totalAmount / invoice.paymentStatus) * 100
+                  getporcentage(invoice.totalAmount, invoice.paymentStatus) <
+                  100
+                    ? getporcentage(invoice.totalAmount, invoice.paymentStatus)
                     : 100
                 }
               />

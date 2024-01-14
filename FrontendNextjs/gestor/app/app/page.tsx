@@ -1,69 +1,57 @@
-import { Button } from "../components/ui/button";
+import { Button } from "../../components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "../components/ui/card";
+} from "../../components/ui/card";
 import {
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-} from "../components/ui/tabs";
-import { CalendarDateRangePicker } from "../components/date-range-picker";
-import { MainNav } from "../components/main-nav";
-import { Overview } from "../components/orverview";
-import { RecentSales } from "../components/recient-sales";
-import { Search } from "../components/search";
-import TeamSwitcher from "../components/team-switcher";
-import { UserNav } from "../components/user-nav";
+} from "../../components/ui/tabs";
+import { CalendarDateRangePicker } from "../../components/date-range-picker";
+import { Overview } from "../../components/orverview";
+import { RecentSales } from "../../components/recient-sales";
+
 import { CrytoSeccion } from "@/components/cryto-sesion";
 import CategoryCarousel from "@/components/Category-Carousel";
 import { BudgetSesion } from "@/components/BudgetSesion";
+import AccountCarousel from "@/components/AccountTotal";
 
 export default function Home() {
   return (
     <>
       <div className=" flex-col md:flex">
-        <div className="border-b">
-          <div className=" md:flex md:h-16 items-center px-4">
-            <TeamSwitcher />
-            <MainNav className="mx-6 my-6 md:flex" />
-            <div className=" ml-auto flex items-center space-x-4 mb-5 md:mb-0 justify-between ">
-              <Search />
-              <UserNav />
-            </div>
-          </div>
-        </div>
         <div className="flex-1 space-y-4 p-8 pt-6">
           <div className=" md:flex  items-center md:justify-between space-y-2  ">
             <h2 className="text-3xl font-bold tracking-tight">Dashboard</h2>
-            <div className="md:flex  items-center space-x-2 ">
-              <CalendarDateRangePicker className="mb-4 md:mb-0" />
-              <Button>Download</Button>
-            </div>
+            {/* <div className="md:flex  items-center space-x-2 "> */}
+            {/*   <CalendarDateRangePicker className="mb-4 md:mb-0" /> */}
+            {/*   <Button>Download</Button> */}
+            {/* </div> */}
           </div>
           <Tabs defaultValue="overview" className="space-y-4">
-            <TabsList className="flex flex-col h-2/4 md:flex-row ">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="analytics" disabled>
-                Analytics
-              </TabsTrigger>
-              <TabsTrigger value="reports" disabled>
-                Reports
-              </TabsTrigger>
-              <TabsTrigger value="notifications" disabled>
-                Notifications
-              </TabsTrigger>
-            </TabsList>
+            {/* <TabsList className="flex flex-col h-2/4 md:flex-row "> */}
+            {/*   <TabsTrigger value="overview">Overview</TabsTrigger> */}
+            {/*   <TabsTrigger value="analytics" disabled> */}
+            {/*     Analytics */}
+            {/*   </TabsTrigger> */}
+            {/*   <TabsTrigger value="reports" disabled> */}
+            {/*     Reports */}
+            {/*   </TabsTrigger> */}
+            {/*   <TabsTrigger value="notifications" disabled> */}
+            {/*     Notifications */}
+            {/*   </TabsTrigger> */}
+            {/* </TabsList> */}
             <TabsContent value="overview" className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Total Revenue
+                      Total Capital
                     </CardTitle>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -88,7 +76,7 @@ export default function Home() {
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                     <CardTitle className="text-sm font-medium">
-                      Subscriptions
+                      Accounts
                     </CardTitle>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -105,16 +93,17 @@ export default function Home() {
                       <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
                     </svg>
                   </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">+2350</div>
-                    <p className="text-xs text-muted-foreground">
-                      +180.1% from last month
-                    </p>
+                  <CardContent className="flex items-center justify-center">
+                    <div className="w-2/3 ">
+                      <AccountCarousel />
+                    </div>
                   </CardContent>
                 </Card>
                 <Card>
                   <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Sales</CardTitle>
+                    <CardTitle className="text-sm font-medium">
+                      Total Transaction in Last month
+                    </CardTitle>
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
                       viewBox="0 0 24 24"
