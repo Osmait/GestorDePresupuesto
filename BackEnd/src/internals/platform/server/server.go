@@ -45,9 +45,10 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Dura
 }
 
 func (s *Server) registerRoutes() {
+	s.Engine.Use(cors.AllowAll())
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser))
 	routes.HealthRoutes(s.Engine)
-	s.Engine.Use(cors.AllowAll())
+
 	routes.AuhtRoutes(s.Engine, s.servicesAuth)
 	routes.UserRoute(s.Engine, s.servicesUser)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)
