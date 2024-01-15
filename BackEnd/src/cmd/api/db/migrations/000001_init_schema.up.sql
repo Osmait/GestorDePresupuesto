@@ -22,6 +22,8 @@ CREATE TABLE transactions (
   type_transation TypeTransaction NOT NULL,
   account_id varchar NOT NULL,
   user_id VARCHAR NOT NULL,
+  category_id varchar NOT NULL,
+  budget_id VARCHAR,  
   created_at timestamptz NOT NULL DEFAULT (now())
 );
 CREATE TABLE users(
@@ -34,6 +36,34 @@ CREATE TABLE users(
   confirmed BOOLEAN  DEFAULT (false),
   created_at timestamptz NOT NULL DEFAULT (now())
 );
+CREATE TABLE category(
+  id VARCHAR PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  icon VARCHAR(255) NOT NULL,
+  color VARCHAR(255)NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT (now()),
+  user_id VARCHAR NOT NULL,
+  );
+CREATE TABLE crypto(
+  id VARCHAR PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  price float NOT NULL,
+  current_price float NOT NULL,
+  quantity float NOT NULL ,
+  created_at timestamptz NOT NULL DEFAULT (now()),
+  user_id VARCHAR NOT NULL,
+  );
+CREATE TABLE budget (
+  id VARCHAR PRIMARY KEY,
+  category_id varchar NOT NULL,
+  amount float NOT NULL ,
+  created_at timestamptz NOT NULL DEFAULT (now()),
+  user_id VARCHAR NOT NULL,
+  );
+
+ALTER TABLE crypto ADD FOREIGN KEY (user_id) REFERENCES users (id);
+ALTER TABLE transactions ADD FOREIGN KEY (category_id) REFERENCES category (id);
+ALTER TABLE budget ADD FOREIGN KEY (category_id) REFERENCES category (id);
 ALTER TABLE transactions ADD FOREIGN KEY (account_id) REFERENCES account (id);
 ALTER TABLE transactions ADD FOREIGN KEY (user_id) REFERENCES users (id);
 ALTER TABLE account  ADD FOREIGN KEY (user_id) references users (id);
