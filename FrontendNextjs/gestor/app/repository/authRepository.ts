@@ -15,7 +15,6 @@ export class AuthRepository {
       const token = await response.json();
       Cookies.set("x-token", token);
       const user = await this.getProfile(token);
-      console.log(user);
       return user;
     } catch (error) {
       console.log(error);

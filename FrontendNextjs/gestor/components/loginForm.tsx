@@ -1,5 +1,4 @@
 "use client";
-
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -7,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
-  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -17,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { AuthRepository } from "@/app/repository/authRepository";
 import { useRouter } from "next/navigation";
 import { AuthStore } from "@/stores/authStore";
+
 const formSchema = z.object({
   email: z
     .string()
@@ -33,10 +32,9 @@ const formSchema = z.object({
 export function LoginForm() {
   const router = useRouter();
   const setAuth = AuthStore((state) => state.setUser);
-  const user = AuthStore((state) => state.user);
 
   const authRepository = new AuthRepository();
-  // ...  // 1. Define your form.
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -45,12 +43,10 @@ export function LoginForm() {
     },
   });
 
-  // 2. Define a submit handler.
   async function onSubmit(values: z.infer<typeof formSchema>) {
     const user = await authRepository.login(values.email, values.password);
     setAuth(user);
     form.reset();
-    console.log(user);
     router.push("/app");
   }
 
@@ -74,7 +70,6 @@ export function LoginForm() {
                   {...field}
                 />
               </FormControl>
-
               <FormMessage />
             </FormItem>
           )}
@@ -93,7 +88,6 @@ export function LoginForm() {
                   {...field}
                 />
               </FormControl>
-
               <FormMessage />
             </FormItem>
           )}

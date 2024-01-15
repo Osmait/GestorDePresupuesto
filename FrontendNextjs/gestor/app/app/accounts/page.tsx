@@ -1,7 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent } from "../../../components/ui/tabs";
 import { CrytoSeccion } from "@/components/cryto-sesion";
+import { AccountRepository } from "@/app/repository/accountRepository";
 export default function Account() {
+  const accountRepository = new AccountRepository();
+  const accounts = accountRepository.findAll();
+  console.log(accounts);
   return (
     <Tabs defaultValue="overview" className="space-y-4">
       <TabsContent value="overview" className="space-y-4">
