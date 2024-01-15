@@ -1,3 +1,2 @@
-GET http://localhost:8080/accounts
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjJaaXNVRWttYTd1TkJ4NWNFUWNBaVVYMkljMyIsImV4cCI6MTcwMzA5MjQ0OX0.4zFq_8TYGV8JpLvONlMqCTqFZimTLKOsVgDARMFP8xE
-
+GET http://localhost:8080/account
+Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjJab29YUTZpVlpnb1g3cE05SE9oMExZY2g1SiIsImV4cCI6MTcwNTQ0NzQzM30.eq1vvJmruZ2yciNYmR-6a9J5EY0ijt5oAurlHyAeJCo
