@@ -108,4 +108,5 @@ Finances Tracker that will allow you to follow your income, bills, investment (C
 | user_id                 | Varchar              |
 | Created_at              | Timestamptz          |
 
-![image](https://github.com/Osmait/Personal/assets/108156933/7bfc55e5-4a47-4358-93a2-cf59c0451523)
+![image](https://github.com/Osmait/GestorDePresupuesto/assets/108156933/d227fef8-7780-49e2-be88-f3d31f48e74e)
+
