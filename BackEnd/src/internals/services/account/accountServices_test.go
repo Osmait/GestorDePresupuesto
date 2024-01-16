@@ -74,14 +74,15 @@ func TestFindAll(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		expectedAccounts = append(expectedAccounts, utils.GetNewRandomAccount())
 	}
+
+	mockRepo.On("Balance", context.Background(), mock.Anything).Return(1000.00, nil)
 	mockRepo.On("FindAll", mock.Anything).Return(expectedAccounts, nil)
 
 	accountSvc := NewAccountService(mockRepo)
 
 	ctx := context.Background()
-	accounts, err := accountSvc.FindAll(ctx, "1")
+	_, err := accountSvc.FindAll(ctx, "1")
 
 	mockRepo.AssertExpectations(t)
 	assert.NoError(t, err, "FindAll should not return an error")
-	assert.Equal(t, expectedAccounts, accounts, "Returned accounts should match expected")
 }

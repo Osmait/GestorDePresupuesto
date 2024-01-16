@@ -42,7 +42,7 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.Acc
 	var accountResponses []*dto.AccountResponse
 
 	for _, account := range accounts {
-		balance, err := s.Balance(ctx, account.Id)
+		balance, err := s.accountRepository.Balance(ctx, account.Id)
 		if err != nil {
 			return nil, err
 		}
