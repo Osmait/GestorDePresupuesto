@@ -20,7 +20,7 @@ func NewTransactionRepository(db *sql.DB) *TransactionRepository {
 }
 
 func (repo *TransactionRepository) Save(ctx context.Context, transaction *transaction.Transaction) error {
-	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id) VALUES ($1,$2,$3,$4,$5,$6,$7)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id, transaction.User_id)
+	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id) VALUES ($1,$2,$3,$4,$5,$6,$7)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId)
 
 	return err
 }
@@ -41,7 +41,7 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, dat
 	var transactions []*transaction.Transaction
 	for rows.Next() {
 		transaction := transaction.Transaction{}
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.Account_id, &transaction.Created_at); err == nil {
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.Created_at); err == nil {
 			transactions = append(transactions, &transaction)
 		}
 
@@ -69,7 +69,7 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	var transactions []*transaction.Transaction
 	for rows.Next() {
 		transaction := transaction.Transaction{}
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.Account_id, &transaction.Created_at); err == nil {
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.Created_at); err == nil {
 			transactions = append(transactions, &transaction)
 		}
 

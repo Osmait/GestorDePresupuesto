@@ -19,9 +19,12 @@ func TestTransactionRepository(t *testing.T) {
 	transaction := utils.GetNewRandomTransaction()
 	account := utils.GetNewRandomAccount()
 	user := utils.GetNewRandomUser()
+	category := utils.GetNewRandomCategory()
+	category.UserId = user.Id
 
-	transaction.Account_id = account.Id
-	transaction.User_id = user.Id
+	transaction.AccountId = account.Id
+	transaction.UserId = user.Id
+	transaction.CategoryId = category.Id
 	account.UserId = user.Id
 	err := userRepo.Save(ctx, user)
 	assert.NoError(t, err)

@@ -34,7 +34,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpi
 	}
 
 	transaction := transaction.NewTransaction(id, name, descrpition, typeTransaction, accountId, amount)
-	transaction.User_id = userId
+	transaction.UserId = userId
 
 	err = s.transactionRepository.Save(ctx, transaction)
 

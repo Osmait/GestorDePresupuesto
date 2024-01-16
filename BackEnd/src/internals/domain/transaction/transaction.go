@@ -8,8 +8,10 @@ type Transaction struct {
 	Description    string    `json:"description"`
 	Amount         float64   `json:"amount" validate:"required"`
 	TypeTransation string    `json:"type_transation" validator:"required"`
-	Account_id     string    `json:"account_id"`
-	User_id        string    `json:"user_id"`
+	AccountId      string    `json:"account_id"`
+	CategoryId     string    `json:"category_id"`
+	BudgetId       string    `json:"budget_id"`
+	UserId         string    `json:"user_id"`
 	Created_at     time.Time `json:"created_at"`
 }
 
@@ -20,6 +22,6 @@ func NewTransaction(Id, Name, Description, TypeTransation, Account_id string, Am
 		Description:    Description,
 		Amount:         Amount,
 		TypeTransation: TypeTransation,
-		Account_id:     Account_id,
+		AccountId:      Account_id,
 	}
 }

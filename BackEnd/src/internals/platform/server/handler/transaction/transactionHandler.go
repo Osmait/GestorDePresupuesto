@@ -21,7 +21,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			ctx.JSON(http.StatusBadRequest, "Error fields required ")
 			return
 		}
-		err := transactionservice.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.Account_id, userId)
+		err := transactionservice.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, userId)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 		}
