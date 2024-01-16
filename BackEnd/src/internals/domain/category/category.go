@@ -7,6 +7,7 @@ type Category struct {
 	Id        string    `json:"id"`
 	Name      string    `json:"name"`
 	Icon      string    `json:"icon"`
+	Color     string    `json:"color"`
 	UserId    string    `json:"user_id"`
 }
 
