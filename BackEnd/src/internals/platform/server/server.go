@@ -14,6 +14,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server/routes"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/auth"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/budget"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
 
@@ -27,10 +28,11 @@ type Server struct {
 	servicesTransaction *transaction.TransactionService
 	servicesUser        *user.UserService
 	servicesAuth        *auth.AuthService
+	servicesBudget      *budget.BudgetServices
 	shutdownTimeout     *time.Duration
 }
 
-func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Duration, servicesAccount *account.AccountService, transactionService *transaction.TransactionService, userService *user.UserService, authService *auth.AuthService) (context.Context, *Server) {
+func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Duration, servicesAccount *account.AccountService, transactionService *transaction.TransactionService, userService *user.UserService, authService *auth.AuthService, budgetService *budget.BudgetServices) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
 		httpAddr:            fmt.Sprintf("%s:%d", host, port),
@@ -38,6 +40,7 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Dura
 		servicesTransaction: transactionService,
 		servicesUser:        userService,
 		servicesAuth:        authService,
+		servicesBudget:      budgetService,
 		shutdownTimeout:     shutdownTimeout,
 	}
 	srv.registerRoutes()
@@ -53,6 +56,7 @@ func (s *Server) registerRoutes() {
 	routes.UserRoute(s.Engine, s.servicesUser)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)
 	routes.TransactionRoutes(s.Engine, s.servicesTransaction)
+	routes.BudgetRoutes(s.Engine, s.servicesBudget)
 }
 
 func (s *Server) Run(ctx context.Context) error {
