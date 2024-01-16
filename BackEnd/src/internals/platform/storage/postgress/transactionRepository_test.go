@@ -16,6 +16,7 @@ func TestTransactionRepository(t *testing.T) {
 	transactionRepo := NewTransactionRepository(db)
 	accountRepo := NewAccountRepository(db)
 	userRepo := NewUserRespository(db)
+	categoryRepo := NewCategoryRepository(db)
 	transaction := utils.GetNewRandomTransaction()
 	account := utils.GetNewRandomAccount()
 	user := utils.GetNewRandomUser()
@@ -26,7 +27,9 @@ func TestTransactionRepository(t *testing.T) {
 	transaction.UserId = user.Id
 	transaction.CategoryId = category.Id
 	account.UserId = user.Id
-	err := userRepo.Save(ctx, user)
+	err := categoryRepo.Save(ctx, category)
+	assert.NoError(t, err)
+	err = userRepo.Save(ctx, user)
 	assert.NoError(t, err)
 	err = accountRepo.Save(ctx, account)
 	assert.NoError(t, err)
@@ -41,6 +44,9 @@ func TestTransactionRepository(t *testing.T) {
 	assert.NotEmpty(t, transactionList)
 
 	err = transactionRepo.Delete(ctx, transaction.Id)
+	assert.NoError(t, err)
+
+	err = categoryRepo.Delete(ctx, transaction.Id)
 	assert.NoError(t, err)
 
 	err = accountRepo.Delete(ctx, account.Id)

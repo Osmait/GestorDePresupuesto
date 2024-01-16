@@ -19,7 +19,7 @@ func NewCategoryRepository(db *sql.DB) *CategoryRespository {
 }
 
 func (c *CategoryRespository) Save(ctx context.Context, category *category.Category) error {
-	_, err := c.db.ExecContext(ctx, "INSERT INTO categorys (id,name,icon) VALUES($1,$2,$3)  ", category.Id, category.Name, category.Icon)
+	_, err := c.db.ExecContext(ctx, "INSERT INTO categorys (id,name,icon,user_id) VALUES($1,$2,$3,$4)  ", category.Id, category.Name, category.Icon, category.UserId)
 	return err
 }
 
