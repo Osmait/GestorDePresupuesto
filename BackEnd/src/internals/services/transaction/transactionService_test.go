@@ -29,6 +29,11 @@ func (m *MockTransaction) FindAllOfAllAccounts(ctx context.Context, date1 string
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
+func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string) (float64, error) {
+	args := m.Called(ctx, budgetId)
+	return args.Get(0).(float64), args.Error(1)
+}
+
 func (m *MockTransaction) Delete(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
 	return args.Error(0)
