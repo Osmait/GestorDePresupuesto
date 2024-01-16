@@ -5,7 +5,7 @@ import "time"
 type Budget struct {
 	CreatedAt  time.Time
 	Id         string
-	categoryId string
+	CategoryId string
 	UserId     string
 	Amount     float64
 }
@@ -13,7 +13,7 @@ type Budget struct {
 func NewBudget(id, categoryId, userId string, amount float64) *Budget {
 	return &Budget{
 		Id:         id,
-		categoryId: categoryId,
+		CategoryId: categoryId,
 		UserId:     userId,
 		Amount:     amount,
 	}
