@@ -5,6 +5,7 @@ import (
 
 	"github.com/go-faker/faker/v4"
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/account"
+	"github.com/osmait/gestorDePresupuesto/src/internals/domain/category"
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
 )
@@ -25,4 +26,8 @@ func GetNewRandomTransaction() *transaction.Transaction {
 	balances, _ := faker.RandomInt(1, 10000000)
 
 	return transaction.NewTransaction(faker.UUIDDigit(), faker.Name(), faker.Paragraph(), trasanctionType[rand.Intn(2)], faker.UUIDDigit(), float64(balances[0]))
+}
+
+func GetNewRandomCategory() *category.Category {
+	return category.NewCategory(faker.UUIDDigit(), faker.Name(), faker.Name())
 }
