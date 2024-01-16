@@ -3,6 +3,7 @@ package postgress
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"log"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
@@ -79,6 +80,32 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	}
 
 	return transactions, nil
+}
+
+func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetId string) (float64, error) {
+	rows, err := repo.db.QueryContext(ctx,
+		"SELECT   sum(amount)  as currentBudget FROM  transactions   WHERE  budget_id = $1  ", budgetId)
+	if err != nil {
+		return 0, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Fatal(err)
+		}
+	}()
+	var currentBudget float64
+	for rows.Next() {
+		if err = rows.Scan(&currentBudget); err == nil {
+			return currentBudget, nil
+		}
+	}
+	if err = rows.Err(); err != nil {
+		fmt.Println(err)
+		return 0, err
+	}
+
+	return currentBudget, nil
 }
 
 func (repo *TransactionRepository) Delete(ctx context.Context, id string) error {
