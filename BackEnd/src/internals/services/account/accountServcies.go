@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/account"
+	"github.com/osmait/gestorDePresupuesto/src/internals/platform/dto"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 
 	"github.com/segmentio/ksuid"
@@ -33,13 +34,24 @@ func (s *AccountService) CreateAccount(ctx context.Context, name, bank string, b
 	return err
 }
 
-func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*account.Account, error) {
+func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.AccountResponse, error) {
 	accounts, err := s.accountRepository.FindAll(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
+	var accountResponses []*dto.AccountResponse
 
-	return accounts, nil
+	for _, account := range accounts {
+		balance, err := s.Balance(ctx, account.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		accountResponse := dto.NewAccountResponse(account, balance+account.InitialBalance)
+		accountResponses = append(accountResponses, accountResponse)
+	}
+
+	return accountResponses, nil
 }
 
 func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
