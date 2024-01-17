@@ -7,7 +7,7 @@ type UserRequest struct {
 	Email    string `json:"email"`
 }
 
-func NewUserRequest(id, name, lastName, password, email string) *UserRequest {
+func NewUserRequest(name, lastName, password, email string) *UserRequest {
 	return &UserRequest{
 		Name:     name,
 		LastName: lastName,
