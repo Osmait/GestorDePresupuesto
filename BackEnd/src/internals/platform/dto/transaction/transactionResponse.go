@@ -1,8 +1,8 @@
-package transaction
+package dto
 
 import "time"
 
-type Transaction struct {
+type TransactionResponse struct {
 	Id             string    `json:"id"`
 	Name           string    `json:"name" validate:"required"`
 	Description    string    `json:"description"`
@@ -11,12 +11,11 @@ type Transaction struct {
 	AccountId      string    `json:"account_id"`
 	CategoryId     string    `json:"category_id"`
 	BudgetId       string    `json:"budget_id"`
-	UserId         string    `json:"user_id"`
-	Created_at     time.Time `json:"created_at"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
-func NewTransaction(Id, Name, Description, TypeTransation, AccountId, categoryId string, Amount float64) *Transaction {
-	return &Transaction{
+func NewTransactionResponse(Id, Name, Description, TypeTransation, AccountId, categoryId string, Amount float64, createdAt time.Time) *TransactionResponse {
+	return &TransactionResponse{
 		Id:             Id,
 		Name:           Name,
 		Description:    Description,
@@ -24,5 +23,6 @@ func NewTransaction(Id, Name, Description, TypeTransation, AccountId, categoryId
 		TypeTransation: TypeTransation,
 		AccountId:      AccountId,
 		CategoryId:     categoryId,
+		CreatedAt:      createdAt,
 	}
 }
