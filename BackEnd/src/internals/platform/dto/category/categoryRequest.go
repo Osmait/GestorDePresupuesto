@@ -6,7 +6,7 @@ type CategoryRequest struct {
 	Color string `json:"color"`
 }
 
-func NewCategoryRequest(id, name, icon, color string) *CategoryRequest {
+func NewCategoryRequest(name, icon, color string) *CategoryRequest {
 	return &CategoryRequest{
 		Name:  name,
 		Icon:  icon,
