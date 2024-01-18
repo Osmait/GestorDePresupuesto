@@ -37,8 +37,8 @@ func TestTransactionRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	currenTime := time.Now()
-	date1 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day())
-	date2 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
+	date1 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-7)
+	date2 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+5)
 	transactionList, err := transactionRepo.FindAll(ctx, date1, date2, account.Id)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, transactionList)
@@ -53,5 +53,8 @@ func TestTransactionRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	err = userRepo.Delete(ctx, user.Id)
+	assert.NoError(t, err)
+
+	err = categoryRepo.Delete(ctx, category.Id)
 	assert.NoError(t, err)
 }
