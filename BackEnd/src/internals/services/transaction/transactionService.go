@@ -23,7 +23,7 @@ func NewTransactionService(transactionRepository postgress.TransactionRepsitoryi
 	}
 }
 
-func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpition string, amount float64, typeTransaction string, accountId string, userId string) error {
+func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpition string, amount float64, typeTransaction string, accountId string, userId string, categoryId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
@@ -33,7 +33,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpi
 		amount = amount * -1
 	}
 
-	transaction := transaction.NewTransaction(id, name, descrpition, typeTransaction, accountId, amount)
+	transaction := transaction.NewTransaction(id, name, descrpition, typeTransaction, accountId, categoryId, amount)
 	transaction.UserId = userId
 
 	err = s.transactionRepository.Save(ctx, transaction)
