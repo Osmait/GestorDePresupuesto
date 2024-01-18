@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	accountDomain "github.com/osmait/gestorDePresupuesto/src/internals/domain/account"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/account"
 	errorHandler "github.com/osmait/gestorDePresupuesto/src/internals/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 )
@@ -12,7 +12,7 @@ import (
 func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		var account accountDomain.Account
+		var account dto.AccountRequest
 		if err := ctx.BindJSON(&account); err != nil {
 			ctx.JSON(http.StatusBadRequest, "Error filds required")
 			return
