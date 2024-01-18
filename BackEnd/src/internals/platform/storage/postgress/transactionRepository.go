@@ -41,7 +41,7 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, dat
 	var transactions []*transaction.Transaction
 	for rows.Next() {
 		transaction := transaction.Transaction{}
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.Created_at); err == nil {
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CreatedAt); err == nil {
 			transactions = append(transactions, &transaction)
 		}
 
@@ -69,7 +69,7 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	var transactions []*transaction.Transaction
 	for rows.Next() {
 		transaction := transaction.Transaction{}
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.Created_at); err == nil {
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CreatedAt); err == nil {
 			transactions = append(transactions, &transaction)
 		}
 
