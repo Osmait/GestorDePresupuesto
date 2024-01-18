@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/transaction"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 
 	"github.com/segmentio/ksuid"
@@ -23,7 +24,7 @@ func NewTransactionService(transactionRepository postgress.TransactionRepsitoryi
 	}
 }
 
-func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpition string, amount float64, typeTransaction string, accountId string, userId string, categoryId string) error {
+func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpition string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
@@ -36,27 +37,61 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpi
 	transaction := transaction.NewTransaction(id, name, descrpition, typeTransaction, accountId, categoryId, amount)
 	transaction.UserId = userId
 
+	if budgetId != "" {
+		transaction.BudgetId = budgetId
+	}
+
 	err = s.transactionRepository.Save(ctx, transaction)
 
 	return err
 }
 
-func (s TransactionService) FindAll(ctx context.Context, date string, date2 string, id string) ([]*transaction.Transaction, error) {
-	transaction, err := s.transactionRepository.FindAll(ctx, date, date2, id)
+func (s TransactionService) FindAll(ctx context.Context, date string, date2 string, id string) ([]*dto.TransactionResponse, error) {
+	transactionList, err := s.transactionRepository.FindAll(ctx, date, date2, id)
 	if err != nil {
 		return nil, err
 	}
 
-	return transaction, nil
+	var trasanctionResponseList []*dto.TransactionResponse
+	for _, transaction := range transactionList {
+		transactionResponse := dto.NewTransactionResponse(transaction.Id,
+			transaction.Name,
+			transaction.Description,
+			transaction.TypeTransation,
+			transaction.AccountId,
+			transaction.CategoryId,
+			transaction.Amount,
+			transaction.CreatedAt)
+		transactionResponse.BudgetId = transaction.BudgetId
+		trasanctionResponseList = append(trasanctionResponseList, transactionResponse)
+
+	}
+
+	return trasanctionResponseList, nil
 }
 
-func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, date string, date2 string, id string) ([]*transaction.Transaction, error) {
-	accounts, err := s.transactionRepository.FindAllOfAllAccounts(ctx, date, date2, id)
+func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, date string, date2 string, id string) ([]*dto.TransactionResponse, error) {
+	transactionList, err := s.transactionRepository.FindAllOfAllAccounts(ctx, date, date2, id)
 	if err != nil {
 		return nil, err
 	}
 
-	return accounts, nil
+	var trasanctionResponseList []*dto.TransactionResponse
+	for _, transaction := range transactionList {
+		transactionResponse := dto.NewTransactionResponse(transaction.Id,
+			transaction.Name,
+			transaction.Description,
+			transaction.TypeTransation,
+			transaction.AccountId,
+			transaction.CategoryId,
+			transaction.Amount,
+			transaction.CreatedAt)
+		transactionResponse.BudgetId = transaction.BudgetId
+		trasanctionResponseList = append(trasanctionResponseList, transactionResponse)
+
+	}
+
+	return trasanctionResponseList, nil
 }
 
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string) error {

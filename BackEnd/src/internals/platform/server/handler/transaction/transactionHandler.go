@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	transactionDomain "github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/transaction"
 	errorHandler "github.com/osmait/gestorDePresupuesto/src/internals/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 )
@@ -15,15 +15,26 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
 
-		var transaction transactionDomain.Transaction
+		var transactionRequest dto.TransactionRequest
 
-		if err := ctx.BindJSON(&transaction); err != nil {
+		if err := ctx.BindJSON(&transactionRequest); err != nil {
 			ctx.JSON(http.StatusBadRequest, "Error fields required ")
 			return
 		}
-		err := transactionservice.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, userId, transaction.CategoryId)
+		err := transactionservice.CreateTransaction(
+			ctx,
+			transactionRequest.Name,
+			transactionRequest.Description,
+			transactionRequest.Amount,
+			transactionRequest.TypeTransation,
+			transactionRequest.AccountId,
+			userId,
+			transactionRequest.CategoryId,
+			transactionRequest.BudgetId,
+		)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, ctx)
+			return
 		}
 
 		ctx.Status(http.StatusCreated)
@@ -43,7 +54,6 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 
 		transactionsList, err := transactionService.FindAllOfAllAccounts(ctx, date1, date2, userId)
 		if err != nil {
-			fmt.Println(err.Error())
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
@@ -65,9 +75,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		}
 
 		transactionsList, err := transactionService.FindAll(ctx, date1, date2, id)
-		fmt.Println(transactionsList)
 		if err != nil {
-			fmt.Println(err.Error())
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
