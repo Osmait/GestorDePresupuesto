@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/budget"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/dto"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/budget"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 )
