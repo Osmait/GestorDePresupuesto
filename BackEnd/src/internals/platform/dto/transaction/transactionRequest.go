@@ -10,7 +10,7 @@ type TransactionRequest struct {
 	BudgetId       string  `json:"budget_id"`
 }
 
-func NewTransactionRequest(Id, Name, Description, TypeTransation, AccountId, categoryId, budgetId string, Amount float64) *TransactionRequest {
+func NewTransactionRequest(Name, Description, TypeTransation, AccountId, categoryId, budgetId string, Amount float64) *TransactionRequest {
 	return &TransactionRequest{
 		Name:           Name,
 		Description:    Description,
