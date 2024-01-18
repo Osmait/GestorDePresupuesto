@@ -37,7 +37,7 @@ func GetNewRandomTransaction() *transaction.Transaction {
 }
 
 func GetNewRandomCategory() *category.Category {
-	return category.NewCategory(faker.UUIDDigit(), faker.Name(), faker.Name())
+	return category.NewCategory(faker.UUIDDigit(), faker.Name(), faker.Name(), faker.Name())
 }
 
 func GetNewRandomBudget() *budget.Budget {
