@@ -4,8 +4,10 @@ import (
 	"context"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/category"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/category"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
+	"github.com/segmentio/ksuid"
 )
 
 type CategoryServices struct {
@@ -18,25 +20,38 @@ func NewCategoryServices(repo postgress.CategoryRepoInteface) *CategoryServices 
 	}
 }
 
-func (c *CategoryServices) CreateCategory(ctx context.Context, category *category.Category) error {
-	err := c.repository.Save(ctx, category)
-	return err
-}
-
-func (c *CategoryServices) FindAll(ctx context.Context, userId string) ([]*category.Category, error) {
-	categorys, err := c.repository.FindAll(ctx, userId)
-	if err != nil {
-		return nil, err
-	}
-	return categorys, nil
-}
-
-func (c *CategoryServices) Delete(ctx context.Context, id string) error {
-	category, err := c.repository.FindOne(ctx, id)
+func (c *CategoryServices) CreateCategory(ctx context.Context, categoryRequest *dto.CategoryRequest, userId string) error {
+	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
 	}
-	if category.Id != id {
+	id := uuid.String()
+
+	categoryToSave := category.NewCategory(id, categoryRequest.Name, categoryRequest.Icon, categoryRequest.Color)
+	categoryToSave.UserId = userId
+	err = c.repository.Save(ctx, categoryToSave)
+	return err
+}
+
+func (c *CategoryServices) FindAll(ctx context.Context, userId string) ([]*dto.CategoryResponse, error) {
+	categorysList, err := c.repository.FindAll(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	var categoryResponseList []*dto.CategoryResponse
+	for _, category := range categorysList {
+		categoryResonse := dto.NewCategoryResponse(category.Id, category.Name, category.Icon, category.Color, category.CreatedAt)
+		categoryResponseList = append(categoryResponseList, categoryResonse)
+	}
+	return categoryResponseList, nil
+}
+
+func (c *CategoryServices) Delete(ctx context.Context, id string) error {
+	categoryToDelete, err := c.repository.FindOne(ctx, id)
+	if err != nil {
+		return err
+	}
+	if categoryToDelete.Id != id {
 		return errorhttp.ErrNotFound
 	}
 	err = c.repository.Delete(ctx, id)

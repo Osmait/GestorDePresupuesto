@@ -4,20 +4,21 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	categoryDomain "github.com/osmait/gestorDePresupuesto/src/internals/domain/category"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/category"
 	errorHandler "github.com/osmait/gestorDePresupuesto/src/internals/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/category"
 )
 
 func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var category categoryDomain.Category
-		err := c.Bind(&category)
+		var categoryRequest dto.CategoryRequest
+		userId := c.GetString("X-user-Id")
+		err := c.Bind(&categoryRequest)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
-		err = categoryServices.CreateCategory(c, &category)
+		err = categoryServices.CreateCategory(c, &categoryRequest, userId)
 
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, c)
