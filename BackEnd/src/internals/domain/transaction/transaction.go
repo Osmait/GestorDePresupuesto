@@ -12,7 +12,7 @@ type Transaction struct {
 	CategoryId     string    `json:"category_id"`
 	BudgetId       string    `json:"budget_id"`
 	UserId         string    `json:"user_id"`
-	Created_at     time.Time `json:"created_at"`
+	CreatedAt      time.Time `json:"created_at"`
 }
 
 func NewTransaction(Id, Name, Description, TypeTransation, AccountId, categoryId string, Amount float64) *Transaction {
