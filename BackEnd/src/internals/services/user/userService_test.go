@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 	"github.com/stretchr/testify/assert"
@@ -41,10 +42,11 @@ func (m *MockUserRepostory) Delete(ctx context.Context, id string) error {
 func TestCreateUser(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	user1 := utils.GetNewRandomUser()
-	mockRepo.On("FindUserByEmail", context.Background(), user1.Email).Return(nil, errorhttp.ErrNotFound)
-	mockRepo.On("Save", context.Background(), user1).Return(nil)
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Email, user1.Password)
+	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(nil, errorhttp.ErrNotFound)
+	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
 	userServie := NewUserService(mockRepo)
-	err := userServie.CreateUser(context.Background(), user1)
+	err := userServie.CreateUser(context.Background(), userRequest)
 	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
 }
@@ -53,9 +55,10 @@ func TestCreateUserErrorDuplicateEmail(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	userServie := NewUserService(mockRepo)
 	user1 := utils.GetNewRandomUser()
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Email, user1.Password)
 	mockRepo.On("FindUserByEmail", context.Background(), mock.Anything).Return(user1, nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
-	err := userServie.CreateUser(context.Background(), user1)
+	err := userServie.CreateUser(context.Background(), userRequest)
 	assert.Error(t, err)
 }
 
@@ -75,10 +78,11 @@ func TestFindUserByErrorNotFond(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	userService := NewUserService(mockRepo)
 	user1 := utils.GetNewRandomUser()
+
 	mockRepo.On("FindUserById", context.Background(), mock.Anything).Return(user1, nil)
 	Result, err := userService.FindUserById(context.Background(), user1.Id)
 	assert.NoError(t, err)
-	assert.Equal(t, user1, Result)
+	assert.Equal(t, user1.Id, Result.Id)
 
 	mockRepo.AssertExpectations(t)
 }
@@ -102,7 +106,7 @@ func TestFindUserByEmail(t *testing.T) {
 	mockRepo.On("FindUserByEmail", context.Background(), mock.Anything).Return(user1, nil)
 	result, err := UserService.FindByEmail(context.Background(), user1.Email)
 	assert.NoError(t, err)
-	assert.Equal(t, user1, result)
+	assert.Equal(t, user1.Id, result.Id)
 	mockRepo.AssertExpectations(t)
 }
 

@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	useTye "github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/user"
 	errorHandler "github.com/osmait/gestorDePresupuesto/src/internals/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
 )
@@ -35,7 +35,7 @@ func GetProfile(userService *user.UserService) gin.HandlerFunc {
 
 func CreateUser(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var user useTye.User
+		var user dto.UserRequest
 		err := c.BindJSON(&user)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)

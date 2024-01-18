@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 	"github.com/segmentio/ksuid"
@@ -20,8 +21,8 @@ func NewUserService(userRepo postgress.UserRepositoryInterface) *UserService {
 	}
 }
 
-func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
-	userDuplicate, err := u.userRepository.FindUserByEmail(ctx, user.Email)
+func (u *UserService) CreateUser(ctx context.Context, userRequest *dto.UserRequest) error {
+	userDuplicate, err := u.userRepository.FindUserByEmail(ctx, userRequest.Email)
 	if !errorhttp.IsErrNotFound(err) && err != nil {
 		return err
 	}
@@ -29,7 +30,7 @@ func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
 	if userDuplicate != nil {
 		return errorhttp.ErrNotDuplicate
 	}
-	hashPassword, err := bcrypt.GenerateFromPassword([]byte(user.Password), bcrypt.DefaultCost)
+	hashPassword, err := bcrypt.GenerateFromPassword([]byte(userRequest.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return err
 	}
@@ -37,14 +38,13 @@ func (u *UserService) CreateUser(ctx context.Context, user *user.User) error {
 	if err != nil {
 		return err
 	}
-	user.Id = id.String()
-	user.Password = string(hashPassword)
+	userToSave := user.NewUser(id.String(), userRequest.Name, userRequest.LastName, userRequest.Email, string(hashPassword))
 
-	err = u.userRepository.Save(ctx, user)
+	err = u.userRepository.Save(ctx, userToSave)
 	return err
 }
 
-func (u *UserService) FindByEmail(ctx context.Context, email string) (*user.User, error) {
+func (u *UserService) FindByEmail(ctx context.Context, email string) (*dto.UserResponse, error) {
 	user, err := u.userRepository.FindUserByEmail(ctx, email)
 	if err != nil {
 		return nil, err
@@ -56,10 +56,11 @@ func (u *UserService) FindByEmail(ctx context.Context, email string) (*user.User
 		return nil, errorhttp.ErrNotFound
 	}
 
-	return user, nil
+	userResponse := dto.NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.CreatedAt)
+	return userResponse, nil
 }
 
-func (u *UserService) FindUserById(ctx context.Context, id string) (*user.User, error) {
+func (u *UserService) FindUserById(ctx context.Context, id string) (*dto.UserResponse, error) {
 	user, err := u.userRepository.FindUserById(ctx, id)
 	if err != nil {
 		return nil, err
@@ -70,7 +71,8 @@ func (u *UserService) FindUserById(ctx context.Context, id string) (*user.User, 
 	if id != user.Id {
 		return nil, errorhttp.ErrNotFound
 	}
-	return user, nil
+	userResponse := dto.NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.CreatedAt)
+	return userResponse, nil
 }
 
 func (u *UserService) DeleteUser(ctx context.Context, id string) error {
