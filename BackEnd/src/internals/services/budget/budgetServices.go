@@ -7,6 +7,7 @@ import (
 	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/budget"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
+	"github.com/segmentio/ksuid"
 )
 
 type BudgetServices struct {
@@ -21,8 +22,16 @@ func NewBudgetServices(repo postgress.BudgetRepoInterface, trasanctionRepo postg
 	}
 }
 
-func (b *BudgetServices) CreateBudget(ctx context.Context, budget *budget.Budget) error {
-	err := b.repository.Save(ctx, budget)
+func (b *BudgetServices) CreateBudget(ctx context.Context, budgetRequest *dto.BudgetRequest, userId string) error {
+	uuid, err := ksuid.NewRandom()
+	if err != nil {
+		return err
+	}
+	id := uuid.String()
+
+	budgetToSave := budget.NewBudget(id, budgetRequest.CategoryId, userId, budgetRequest.Amount)
+
+	err = b.repository.Save(ctx, budgetToSave)
 	return err
 }
 

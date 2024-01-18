@@ -4,21 +4,23 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	budgetDomain "github.com/osmait/gestorDePresupuesto/src/internals/domain/budget"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/budget"
 
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/budget"
 	errorHandler "github.com/osmait/gestorDePresupuesto/src/internals/platform/server/handler/error"
 )
 
 func CreateBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var budget budgetDomain.Budget
+		var budget dto.BudgetRequest
+
+		userId := c.GetString("X-user-Id")
 		err := c.Bind(&budget)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
-		err = budgetServices.CreateBudget(c, &budget)
+		err = budgetServices.CreateBudget(c, &budget, userId)
 
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, c)
