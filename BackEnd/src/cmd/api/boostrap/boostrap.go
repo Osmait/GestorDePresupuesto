@@ -24,38 +24,44 @@ import (
 )
 
 func Run() error {
+	// load .env
 	err := godotenv.Load(".env")
 	if err != nil {
 		fmt.Println("Not env")
 	}
+
+	// Creating new config
 	shutdown := 10 * time.Second
 	port, _ := strconv.Atoi(os.Getenv("PORT"))
 	dbPort, _ := strconv.Atoi(os.Getenv("DbPort"))
 
 	cfg := config.NewConfig(os.Getenv("HOST"), uint(port), uint(dbPort), &shutdown, os.Getenv("DbUser"), os.Getenv("DbPass"), os.Getenv("Dbhost"), os.Getenv("DbName"))
-
-	fmt.Println(cfg.Dbhost)
 	postgresURI := cfg.GetPostgresUrl()
 
+	// Conecting database
 	db, err := sql.Open("postgres", postgresURI)
 	if err != nil {
 		return err
 	}
-
+	// Run migrate
 	utils.RunDBMigration("file://src/cmd/api/db/migrations", postgresURI)
 
+	// Instance Repositorys
 	accountRepository := postgress.NewAccountRepository(db)
 	transactionRepository := postgress.NewTransactionRepository(db)
 	userRepository := postgress.NewUserRespository(db)
 	budgetRepository := postgress.NewBudgetRepository(db)
 
+	// Instance Services
 	accountSerevice := account.NewAccountService(accountRepository)
 	transactionServices := transaction.NewTransactionService(transactionRepository)
 	userServices := user.NewUserService(userRepository)
 	authServices := auth.NewAuthService(userRepository)
 	budgetServices := budget.NewBudgetServices(budgetRepository, transactionRepository)
 
+	// Instance Server
 	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.ShutdownTimeout, accountSerevice, transactionServices, userServices, authServices, budgetServices)
 
+	// Run Server
 	return srv.Run(ctx)
 }
