@@ -5,16 +5,16 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/account"
 	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/account"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	accountRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/account"
 
 	"github.com/segmentio/ksuid"
 )
 
 type AccountService struct {
-	accountRepository postgress.AccountRepositoryInterface
+	accountRepository accountRepo.AccountRepositoryInterface
 }
 
-func NewAccountService(accountRepository postgress.AccountRepositoryInterface) *AccountService {
+func NewAccountService(accountRepository accountRepo.AccountRepositoryInterface) *AccountService {
 	return &AccountService{
 		accountRepository: accountRepository,
 	}

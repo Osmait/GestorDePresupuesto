@@ -13,8 +13,8 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 )
 
-func setUp() *sql.DB {
-	err := godotenv.Load("../../../../../.env.test")
+func SetUpTest() *sql.DB {
+	err := godotenv.Load("../../../../../../.env.test")
 	if err != nil {
 		fmt.Println("Not env")
 	}
@@ -27,6 +27,7 @@ func setUp() *sql.DB {
 	if err != nil {
 		log.Fatal().Err(err)
 	}
-	utils.RunDBMigration("file:../../../../cmd/api/db/migrations/", postgresURI)
+	utils.RunDBMigration("file:../../../../../cmd/api/db/migrations/", postgresURI)
+
 	return db
 }

@@ -5,16 +5,16 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/category"
 	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/category"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	categoryRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/category"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 	"github.com/segmentio/ksuid"
 )
 
 type CategoryServices struct {
-	repository postgress.CategoryRepoInteface
+	repository categoryRepo.CategoryRepoInteface
 }
 
-func NewCategoryServices(repo postgress.CategoryRepoInteface) *CategoryServices {
+func NewCategoryServices(repo categoryRepo.CategoryRepoInteface) *CategoryServices {
 	return &CategoryServices{
 		repository: repo,
 	}

@@ -5,8 +5,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/transaction"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
-
+	trasanctionRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/transaction"
 	"github.com/segmentio/ksuid"
 )
 
@@ -15,10 +14,10 @@ const (
 )
 
 type TransactionService struct {
-	transactionRepository postgress.TransactionRepsitoryinterface
+	transactionRepository trasanctionRepo.TransactionRepsitoryinterface
 }
 
-func NewTransactionService(transactionRepository postgress.TransactionRepsitoryinterface) *TransactionService {
+func NewTransactionService(transactionRepository trasanctionRepo.TransactionRepsitoryinterface) *TransactionService {
 	return &TransactionService{
 		transactionRepository: transactionRepository,
 	}

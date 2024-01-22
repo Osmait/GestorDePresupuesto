@@ -6,16 +6,19 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/stretchr/testify/assert"
+
+	postgress "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/account"
+	userRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/user"
 )
 
 func TestAccountRepository(t *testing.T) {
-	db := setUp()
+	db := SetUpTest()
 	ctx := context.Background()
-	userRepo := NewUserRespository(db)
+	userRepo := userRepo.NewUserRespository(db)
 	user := utils.GetNewRandomUser()
 	err := userRepo.Save(ctx, user)
 	assert.NoError(t, err)
-	accountRepo := NewAccountRepository(db)
+	accountRepo := postgress.NewAccountRepository(db)
 	account := utils.GetNewRandomAccount()
 	account.UserId = user.Id
 

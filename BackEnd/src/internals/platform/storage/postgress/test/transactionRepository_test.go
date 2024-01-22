@@ -6,17 +6,23 @@ import (
 	"testing"
 	"time"
 
+	accountRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/account"
+	postgress "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/transaction"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/stretchr/testify/assert"
+
+	userRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/user"
+
+	categoryRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/category"
 )
 
 func TestTransactionRepository(t *testing.T) {
-	db := setUp()
+	db := SetUpTest()
 	ctx := context.Background()
-	transactionRepo := NewTransactionRepository(db)
-	accountRepo := NewAccountRepository(db)
-	userRepo := NewUserRespository(db)
-	categoryRepo := NewCategoryRepository(db)
+	transactionRepo := postgress.NewTransactionRepository(db)
+	accountRepo := accountRepo.NewAccountRepository(db)
+	userRepo := userRepo.NewUserRespository(db)
+	categoryRepo := categoryRepo.NewCategoryRepository(db)
 	transaction := utils.GetNewRandomTransaction()
 	account := utils.GetNewRandomAccount()
 	user := utils.GetNewRandomUser()

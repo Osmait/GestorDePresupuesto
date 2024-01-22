@@ -5,17 +5,17 @@ import (
 	"fmt"
 
 	authRequest "github.com/osmait/gestorDePresupuesto/src/internals/domain/auth"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	userRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type AuthService struct {
-	repo postgress.UserRepositoryInterface
+	repo userRepo.UserRepositoryInterface
 }
 
-func NewAuthService(userRepository postgress.UserRepositoryInterface) *AuthService {
+func NewAuthService(userRepository userRepo.UserRepositoryInterface) *AuthService {
 	return &AuthService{
 		repo: userRepository,
 	}

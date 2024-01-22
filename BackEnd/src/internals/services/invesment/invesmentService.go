@@ -4,15 +4,15 @@ import (
 	"context"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/invesment"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	invesmentRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/invesment"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 )
 
 type InvesmentServices struct {
-	repo postgress.InvesmentRepoInterface
+	repo invesmentRepo.InvesmentRepoInterface
 }
 
-func NewInvesmentServices(repo postgress.InvesmentRepoInterface) *InvesmentServices {
+func NewInvesmentServices(repo invesmentRepo.InvesmentRepoInterface) *InvesmentServices {
 	return &InvesmentServices{
 		repo: repo,
 	}

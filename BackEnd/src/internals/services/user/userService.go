@@ -5,17 +5,17 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
 	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/user"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	userRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 	"github.com/segmentio/ksuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
 type UserService struct {
-	userRepository postgress.UserRepositoryInterface
+	userRepository userRepo.UserRepositoryInterface
 }
 
-func NewUserService(userRepo postgress.UserRepositoryInterface) *UserService {
+func NewUserService(userRepo userRepo.UserRepositoryInterface) *UserService {
 	return &UserService{
 		userRepository: userRepo,
 	}

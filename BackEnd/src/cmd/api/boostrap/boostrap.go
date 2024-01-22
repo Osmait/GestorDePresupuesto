@@ -14,7 +14,11 @@ import (
 	_ "github.com/lib/pq"
 	"github.com/osmait/gestorDePresupuesto/src/config"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	accountRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/account"
+
+	budgetRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/budget"
+	transactionRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/transaction"
+	userRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/auth"
@@ -47,10 +51,10 @@ func Run() error {
 	utils.RunDBMigration("file://src/cmd/api/db/migrations", postgresURI)
 
 	// Instance Repositorys
-	accountRepository := postgress.NewAccountRepository(db)
-	transactionRepository := postgress.NewTransactionRepository(db)
-	userRepository := postgress.NewUserRespository(db)
-	budgetRepository := postgress.NewBudgetRepository(db)
+	accountRepository := accountRepo.NewAccountRepository(db)
+	transactionRepository := transactionRepo.NewTransactionRepository(db)
+	userRepository := userRepo.NewUserRespository(db)
+	budgetRepository := budgetRepo.NewBudgetRepository(db)
 
 	// Instance Services
 	accountSerevice := account.NewAccountService(accountRepository)

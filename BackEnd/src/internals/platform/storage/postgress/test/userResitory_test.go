@@ -4,16 +4,14 @@ import (
 	"context"
 	"testing"
 
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
-	_ "github.com/lib/pq"
+	postgress "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestUserRespo(t *testing.T) {
-	db := setUp()
-	repo := NewUserRespository(db)
+	db := SetUpTest()
+	repo := postgress.NewUserRespository(db)
 	ctx := context.Background()
 	user := utils.GetNewRandomUser()
 	err := repo.Save(ctx, user)
