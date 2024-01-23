@@ -38,7 +38,6 @@ func (m *MockCategoryRepository) FindOne(ctx context.Context, id string) (*categ
 func TestCreateCategory(t *testing.T) {
 	mockRepo := &MockCategoryRepository{}
 	ctx := context.Background()
-
 	mockRepo.On("Save", ctx, mock.AnythingOfType("*category.Category")).Return(nil)
 	category := utils.GetNewRandomCategory()
 	categoryServices := NewCategoryServices(mockRepo)
@@ -52,12 +51,10 @@ func TestCreateCategory(t *testing.T) {
 func TestFindAll(t *testing.T) {
 	mockRepo := &MockCategoryRepository{}
 	ctx := context.Background()
-
 	expectedCategory := []*category.Category{}
 	for i := 0; i < 10; i++ {
 		expectedCategory = append(expectedCategory, utils.GetNewRandomCategory())
 	}
-
 	mockRepo.On("FindAll", mock.Anything).Return(expectedCategory, nil)
 
 	categoryServices := NewCategoryServices(mockRepo)
@@ -74,11 +71,8 @@ func TestDeleteCategory(t *testing.T) {
 	ctx := context.Background()
 	mockRepo.On("FindOne", ctx, mock.Anything).Return(category, nil)
 	mockRepo.On("Delete", ctx, mock.Anything, mock.Anything).Return(nil)
-
 	categoryServices := NewCategoryServices(mockRepo)
-
 	err := categoryServices.Delete(ctx, category.Id)
-
 	mockRepo.AssertExpectations(t)
 	assert.NoError(t, err, "DeleteAccount should not return an error")
 }
