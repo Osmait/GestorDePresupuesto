@@ -23,8 +23,11 @@ import (
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/auth"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/budget"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/category"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/user"
+
+	categoryRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/category"
 )
 
 func Run() error {
@@ -55,6 +58,7 @@ func Run() error {
 	transactionRepository := transactionRepo.NewTransactionRepository(db)
 	userRepository := userRepo.NewUserRespository(db)
 	budgetRepository := budgetRepo.NewBudgetRepository(db)
+	categoryRepository := categoryRepo.NewCategoryRepository(db)
 
 	// Instance Services
 	accountSerevice := account.NewAccountService(accountRepository)
@@ -62,9 +66,10 @@ func Run() error {
 	userServices := user.NewUserService(userRepository)
 	authServices := auth.NewAuthService(userRepository)
 	budgetServices := budget.NewBudgetServices(budgetRepository, transactionRepository)
+	categoryServices := category.NewCategoryServices(categoryRepository)
 
 	// Instance Server
-	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.ShutdownTimeout, accountSerevice, transactionServices, userServices, authServices, budgetServices)
+	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.ShutdownTimeout, accountSerevice, transactionServices, userServices, authServices, budgetServices, categoryServices)
 
 	// Run Server
 	return srv.Run(ctx)
