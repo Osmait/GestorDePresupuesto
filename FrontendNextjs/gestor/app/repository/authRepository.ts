@@ -20,6 +20,25 @@ export class AuthRepository {
       console.log(error);
     }
   }
+  async signUp(
+    name: string,
+    lastName: string,
+    email: string,
+    password: string,
+  ) {
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
+      },
+      body: JSON.stringify({ name, lastName, email, password }), // Convertimos el objeto JavaScript a formato JSON
+    };
+    try {
+      await fetch(`${this.url}/user`, options);
+    } catch (error) {
+      console.log(error);
+    }
+  }
   async getProfile(token: string) {
     const options = {
       headers: {
