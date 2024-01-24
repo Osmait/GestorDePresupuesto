@@ -1,7 +1,11 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent } from "../../../components/ui/tabs";
-import { CrytoSeccion } from "@/components/cryto-sesion";
-export default function Transaction() {
+import { TransactionSection } from "@/components/transactionSection";
+import { TransactionRepository } from "@/app/repository/transactionRepository";
+export default async function Transaction() {
+  const transactionRepostiory = new TransactionRepository();
+  const transactions = await transactionRepostiory.findAll();
+
   return (
     <Tabs defaultValue="overview" className="space-y-4">
       <TabsContent value="overview" className="space-y-4">
@@ -9,7 +13,7 @@ export default function Transaction() {
           <Card className="col-span-4">
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">
-                Account List
+                Tansaction List
               </CardTitle>
               <svg
                 xmlns="http://www.w3.org/2000/svg"
@@ -26,7 +30,7 @@ export default function Transaction() {
               </svg>
             </CardHeader>
             <CardContent>
-              <CrytoSeccion />
+              <TransactionSection transactionsList={transactions} />
             </CardContent>
           </Card>
         </div>
