@@ -2,10 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent } from "../../../components/ui/tabs";
 import { CrytoSeccion } from "@/components/cryto-sesion";
 import { AccountRepository } from "@/app/repository/accountRepository";
-export default function Account() {
+import { AccountSection } from "@/components/accountSection";
+export default async function Account() {
   const accountRepository = new AccountRepository();
-  const accounts = accountRepository.findAll();
-  console.log(accounts);
+  const accounts = await accountRepository.findAll();
   return (
     <Tabs defaultValue="overview" className="space-y-4">
       <TabsContent value="overview" className="space-y-4">
@@ -30,7 +30,7 @@ export default function Account() {
               </svg>
             </CardHeader>
             <CardContent>
-              <CrytoSeccion />
+              <AccountSection accouts={accounts} />
             </CardContent>
           </Card>
         </div>
