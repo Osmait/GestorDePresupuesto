@@ -1,0 +1,39 @@
+name: Playwright Tests
+on:
+  push:
+    branches: [main, development]
+  pull_request:
+    branches: [main, development]
+
+jobs:
+  test:
+    timeout-minutes: 60
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18.17
+      # - name: run backend
+      #   run: docker-compose up -d app postgres
+      #   working-directory: ./BackEnd
+
+      - name: Install dependencies
+        run: sudo npm ci
+        working-directory: ./Frontend/gestor-presupuesto
+      - name: run unit test
+        run: sudo npm run test --project test-unit
+        working-directory: ./Frontend/gestor-presupuesto
+
+      # - name: Install Playwright Browsers
+      #   run: sudo npx playwright install --with-deps chromium
+      #   working-directory: ./Frontend/gestor-presupuesto
+      # - name: run build
+      #   run: sudo npm run build
+      #   working-directory: ./Frontend/gestor-presupuesto
+      #
+      # - name: Run Playwright tests
+      #   run: sudo npm run test:e2e
+      #   env:
+      #     API: http://localhost:8080
+      #   working-directory: ./Frontend/gestor-presupuesto

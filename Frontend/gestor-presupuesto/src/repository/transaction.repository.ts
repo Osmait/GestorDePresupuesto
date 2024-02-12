@@ -1,7 +1,7 @@
 import type { Transactions } from "../interface/transaction.interface";
 
 export class TrasactionRepotory {
-  private url = `${import.meta.env.HOST}/transaction`;
+  private url = `${import.meta.env.API}/transaction`;
   private config = {
     headers: {
       "content-Type": "application/json",

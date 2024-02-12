@@ -16,7 +16,7 @@ type MockUserRepostory struct {
 	mock.Mock
 }
 
-func (m *MockUserRepostory) FindUser(ctx context.Context, id string) (*user.User, error) {
+func (m *MockUserRepostory) FindUserById(ctx context.Context, id string) (*user.User, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(*user.User), args.Error(1)
 }
@@ -26,7 +26,7 @@ func (m *MockUserRepostory) FindUserByEmail(ctx context.Context, email string) (
 	return args.Get(0).(*user.User), args.Error(1)
 }
 
-func (m *MockUserRepostory) CreateUser(ctx context.Context, user *user.User) error {
+func (m *MockUserRepostory) Save(ctx context.Context, user *user.User) error {
 	args := m.Called(ctx, user)
 	return args.Error(0)
 }

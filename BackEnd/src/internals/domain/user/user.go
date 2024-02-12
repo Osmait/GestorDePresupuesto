@@ -3,6 +3,7 @@ package user
 import "time"
 
 type User struct {
+	CreatedAt  time.Time `json:"created_at"`
 	Id         string    `json:"id"`
 	Name       string    `json:"name"`
 	LastName   string    `json:"last_name"`
@@ -10,7 +11,6 @@ type User struct {
 	Password   string    `json:"password"`
 	Token      string    `json:"token"`
 	Confirmend string    `json:"confirmend"`
-	CreatedAt  time.Time `json:"created_at"`
 }
 
 func NewUser(id, name, lastName, email, password string) *User {

@@ -2,19 +2,19 @@ package account
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/account"
-	"github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress"
+	dto "github.com/osmait/gestorDePresupuesto/src/internals/platform/dto/account"
+	accountRepo "github.com/osmait/gestorDePresupuesto/src/internals/platform/storage/postgress/account"
 
 	"github.com/segmentio/ksuid"
 )
 
 type AccountService struct {
-	accountRepository postgress.Repository
+	accountRepository accountRepo.AccountRepositoryInterface
 }
 
-func NewAccountService(accountRepository postgress.Repository) *AccountService {
+func NewAccountService(accountRepository accountRepo.AccountRepositoryInterface) *AccountService {
 	return &AccountService{
 		accountRepository: accountRepository,
 	}
@@ -29,17 +29,29 @@ func (s *AccountService) CreateAccount(ctx context.Context, name, bank string, b
 
 	account := account.NewAccount(balace, id, name, bank)
 	account.UserId = userId
-	err = s.accountRepository.Save(ctx, *account)
+	err = s.accountRepository.Save(ctx, account)
 
 	return err
 }
 
-func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*account.Account, error) {
+func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.AccountResponse, error) {
 	accounts, err := s.accountRepository.FindAll(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
-	return accounts, nil
+	var accountResponses []*dto.AccountResponse
+
+	for _, account := range accounts {
+		balance, err := s.accountRepository.Balance(ctx, account.Id)
+		if err != nil {
+			return nil, err
+		}
+
+		accountResponse := dto.NewAccountResponse(account, balance+account.InitialBalance)
+		accountResponses = append(accountResponses, accountResponse)
+	}
+
+	return accountResponses, nil
 }
 
 func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
@@ -49,8 +61,6 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
 
 func (s *AccountService) Balance(ctx context.Context, id string) (float64, error) {
 	balance, err := s.accountRepository.Balance(ctx, id)
-	fmt.Println(balance)
-
 	if err != nil {
 		return 0, err
 	}

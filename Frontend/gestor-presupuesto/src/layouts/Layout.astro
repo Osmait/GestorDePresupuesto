@@ -3,12 +3,9 @@ interface Props {
 	title: string;
 }
 import HomeIcon from "../components/HomeIcon.astro"
-import SettingsIcon from "../components/SettingsIcon.astro"
 import Add from "../components/Add.astro"
 import Wallet from "../components/Wallet.astro"
-import ChartIcon  from "../components/ChartIcon.astro"
 import AccountIcons from "../components/AccountIcon.astro"
-import RemindersIcon  from "../components/RemindersIcon.astro"
 const { title } = Astro.props;
 import { ViewTransitions } from 'astro:transitions';
 ---
@@ -33,15 +30,15 @@ import { ViewTransitions } from 'astro:transitions';
           <HomeIcon/>
 
             </a>
-            <a href="/register"class="nav-bar_link">
+            <a data-testid="register" href="/register"class="nav-bar_link">
 
           <Add/>
 
             </a>
-    <a href="/accounts"class="nav-bar_link">
+    <a data-testid="accounts" href="/accounts"class="nav-bar_link">
                <AccountIcons/>
             </a>
-            <a href="/transactions"class="nav-bar_link">
+            <a data-testid="transactions" href="/transactions"class="nav-bar_link">
           <Wallet/>
 
             </a>

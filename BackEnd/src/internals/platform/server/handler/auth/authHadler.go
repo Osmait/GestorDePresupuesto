@@ -1,11 +1,13 @@
 package handler
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	authRequest "github.com/osmait/gestorDePresupuesto/src/internals/domain/auth"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/auth"
+	"github.com/osmait/gestorDePresupuesto/src/internals/services/errorhttp"
 )
 
 func Login(authService *auth.AuthService) gin.HandlerFunc {
@@ -13,11 +15,16 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 		var authRequest authRequest.AuthRequest
 		err := ctx.Bind(&authRequest)
 		if err != nil {
-			ctx.AbortWithStatusJSON(http.StatusBadRequest, err)
+			ctx.JSON(http.StatusBadRequest, err)
 			return
 		}
 		token, err := authService.Login(ctx, &authRequest)
 		if err != nil {
+			switch {
+			case errors.Is(err, errorhttp.ErrBadRequest):
+				ctx.JSON(http.StatusBadRequest, err)
+				return
+			}
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "problem with password or email "})
 			return
 		}

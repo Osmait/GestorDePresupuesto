@@ -4,6 +4,7 @@ go 1.20
 
 require (
 	github.com/go-faker/faker/v4 v4.2.0
+	github.com/go-playground/assert/v2 v2.2.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/rs/cors/wrapper/gin v0.0.0-20231013084403-73f81b45a644
 	github.com/rs/zerolog v1.30.0
@@ -45,7 +46,7 @@ require (
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/arch v0.4.0 // indirect
 	golang.org/x/crypto v0.11.0
-	golang.org/x/net v0.13.0 // indirect
+	golang.org/x/net v0.13.0
 	golang.org/x/sys v0.10.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/protobuf v1.31.0 // indirect

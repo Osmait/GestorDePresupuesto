@@ -6,253 +6,249 @@ const errors = { resp: "", email: "", password: "" };
 if (Astro.request.method === "POST") {
   try {
     const data = await Astro.request.formData();
-    const email= data.get("email") as string;
-    const password= data.get("password") as string;
-    if (typeof email !== "string") { 
+    const email = data.get("email") as string;
+    const password = data.get("password") as string;
+    if (typeof email !== "string") {
       errors.email += "Email is not valid. ";
-    }     
+    }
     if (typeof password !== "string" || password.length < 6) {
       errors.password += "Password must be at least 6 characters. ";
     }
 
-    const loginRequest ={
+    const loginRequest = {
       email,
       password,
-
-    }
-const hasErrors = Object.values(errors).some(msg => msg)
-    if(!hasErrors){
-
-    const options = {
-      method: "POST",
-      headers: {
-            "content-Type": "application/json",
-          },
-      body: JSON.stringify(loginRequest),
     };
-    
-    const response = await fetch(`${import.meta.env.HOST}/login`,options)
-    const result = await response.json()
+    const hasErrors = Object.values(errors).some((msg) => msg);
+    if (!hasErrors) {
+      const options = {
+        method: "POST",
+        headers: {
+          "content-Type": "application/json",
+        },
+        body: JSON.stringify(loginRequest),
+      };
 
-    if(response.status === 200){  
-    Astro.cookies.set("x-token",result)
-    return Astro.redirect("/")
+      const response = await fetch(`${import.meta.env.API}/login`, options);
+      const result = await response.json();
+
+      if (response.status === 200) {
+        Astro.cookies.set("x-token", result);
+        return Astro.redirect("/");
+      }
+      errors.resp += result.error;
+      console.log(errors);
     }
-    errors.resp+=result.error 
-    console.log(errors)
-    }
-  } catch (error) { 
+  } catch (error) {
     if (error instanceof Error) {
       console.error(error.message);
-
     }
   }
 }
 ---
+
 <html>
-	<head>
-		<meta charset="UTF-8" />
-		<meta name="description" content="Astro description" />
-		<meta name="viewport" content="width=device-width" />
-		<link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-		<meta name="generator" content={Astro.generator} />
-<title>Login</title>
-<ViewTransitions />
-	</head>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="description" content="Astro description" />
+    <meta name="viewport" content="width=device-width" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="generator" content={Astro.generator} />
+    <title>Login</title>
+    <ViewTransitions />
+  </head>
 
-<div class="login-box">
-  <form method="POST">
-<div class="demo">
-  <h2>Demo Account </h2>
-<p>Email: demo@demo.com</p>
-<p>Password: 12345678</p>
-      </div> 
-    <div class="user-box" transition:name="name-label">
- 
-      <input type="email" name="email" required>
-      <label>Email</label>
-    </div>
-  <div class="user-box">
-  
-      <input type="password" name="password" required>
+  <div class="login-box">
+    <form method="POST">
+      <div class="demo">
+        <h2>Demo Account</h2>
+        <p>Email: demo@demo.com</p>
+        <p>Password: 12345678</p>
+      </div>
+      <div class="user-box" transition:name="name-label">
+        <input data-testid="email" type="email" name="email" required />
+        <label>Email</label>
+      </div>
+      <div class="user-box">
+        <input
+          data-testid="password"
+          type="password"
+          name="password"
+          required
+        />
 
-          
-      <label>Password</label>
-{errors.password && <p class="error">{errors.password}</p>}
+        <label>Password</label>
+        {errors.password && <p class="error">{errors.password}</p>}
 
-{errors.email && <p class="error">{errors.email}</p>}
+        {errors.email && <p class="error">{errors.email}</p>}
 
-{errors.resp && <p class="error">{errors.resp}</p>}
-    </div> 
+        {errors.resp && <p class="error">{errors.resp}</p>}
+      </div>
 
-       <center>
-    <button type="submit" class="button-submit"  transition:name="button-submit">
-           Login
-       <span></span>
-    </button></center>
-  </form>
-</div>
-</html>
-<script>
+      <center>
+        <button
+          type="submit"
+          class="button-submit"
+          transition:name="button-submit"
+        >
+          Login
+          <span></span>
+        </button></center
+      >
+    </form>
+  </div>
+  <script>
+    const button = document.querySelector(".button-submit");
 
-const button = document.querySelector(".button-submit")
-
-if(button){
-  addEventListener("submit",()=> {
-
-  button.textContent= "loading..."
-  })
-}
-
-</script>
-<style>
-html{
-
-  background: url("/public/05.jpg");
-}
-.demo{
-  border: 1px solid #fff ;
-  border-radius: 10px;
-  color: white;
-
-  text-align: center;
-  margin-bottom: 10px;
-}
-.error{
-  padding: 10px;
-  color: white;
-  border-radius: 10px;
-  background-color: red;
-}
-.login-box  {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 400px;
-  padding: 40px;
-  transform: translate(-50%, -50%);
-
-  box-sizing: border-box;
-
-  border-radius: 10px;
-}
-
-.login-box .user-box {
-  position: relative;
-}
-select{
-width: 100%;
-  padding: 10px 0;
-  font-size: 16px;
-  color: #fff;
-  margin-bottom: 30px;
-  border: none;
-  border-bottom: 1px solid #fff;
-  outline: none;
-  background: transparent;
-
-
-}
-  select option {
-  color: black;
-      background-color: transparent ; /* Color de fondo cuando está seleccionado */
+    if (button) {
+      addEventListener("submit", () => {
+        button.textContent = "loading...";
+      });
     }
-textarea{
+  </script>
+  <style>
+    html {
+      background: url("/05.jpg");
+    }
+    .demo {
+      border: 1px solid #fff;
+      border-radius: 10px;
+      color: white;
 
-width: 100%;
-  padding: 10px 0;
-  font-size: 16px;
-  color: #fff;
-  margin-bottom: 30px;
-  border: none;
-  border-bottom: 1px solid #fff;
-  outline: none;
-  background: transparent;
+      text-align: center;
+      margin-bottom: 10px;
+    }
+    .error {
+      padding: 10px;
+      color: white;
+      border-radius: 10px;
+      background-color: red;
+    }
+    .login-box {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 400px;
+      padding: 40px;
+      transform: translate(-50%, -50%);
 
-}
-.login-box .user-box input {
-  width: 100%;
-  padding: 10px 0;
-  font-size: 16px;
-  color: #fff;
-  margin-bottom: 30px;
-  border: none;
-  border-bottom: 1px solid #fff;
-  outline: none;
-  background: transparent;
-}
+      box-sizing: border-box;
 
-.login-box .user-box label {
-  position: absolute;
-  top: 0;
-  left: 0;
-  padding: 10px 0;
-  font-size: 16px;
-  color: #fff;
-  pointer-events: none;
-  transition: .5s;
-}
-.user-box textarea:focus ~ label,
-.user-box textarea:valid ~ label{
- top: -20px;
-  left: 0;
-  color: #bdb8b8;
-  font-size: 12px;
+      border-radius: 10px;
+    }
 
-}
+    .login-box .user-box {
+      position: relative;
+    }
+    select {
+      width: 100%;
+      padding: 10px 0;
+      font-size: 16px;
+      color: #fff;
+      margin-bottom: 30px;
+      border: none;
+      border-bottom: 1px solid #fff;
+      outline: none;
+      background: transparent;
+    }
+    select option {
+      color: black;
+      background-color: transparent; /* Color de fondo cuando está seleccionado */
+    }
+    textarea {
+      width: 100%;
+      padding: 10px 0;
+      font-size: 16px;
+      color: #fff;
+      margin-bottom: 30px;
+      border: none;
+      border-bottom: 1px solid #fff;
+      outline: none;
+      background: transparent;
+    }
+    .login-box .user-box input {
+      width: 100%;
+      padding: 10px 0;
+      font-size: 16px;
+      color: #fff;
+      margin-bottom: 30px;
+      border: none;
+      border-bottom: 1px solid #fff;
+      outline: none;
+      background: transparent;
+    }
 
-.login-box .user-box input:focus ~ label,
-.login-box .user-box input:valid ~ label {
-  top: -20px;
-  left: 0;
-  color: #bdb8b8;
-  font-size: 12px;
-}
+    .login-box .user-box label {
+      position: absolute;
+      top: 0;
+      left: 0;
+      padding: 10px 0;
+      font-size: 16px;
+      color: #fff;
+      pointer-events: none;
+      transition: 0.5s;
+    }
+    .user-box textarea:focus ~ label,
+    .user-box textarea:valid ~ label {
+      top: -20px;
+      left: 0;
+      color: #bdb8b8;
+      font-size: 12px;
+    }
 
-.login-box form button {
+    .login-box .user-box input:focus ~ label,
+    .login-box .user-box input:valid ~ label {
+      top: -20px;
+      left: 0;
+      color: #bdb8b8;
+      font-size: 12px;
+    }
 
-  position: relative;
-  display: inline-block;
-  padding: 10px 20px;
-  background-color: transparent;
-  border: none;
-  color: #ffffff;
-  font-size: 16px;
-  text-decoration: none;
-  text-transform: uppercase;
-  overflow: hidden;
-  transition: .5s;
-  margin-top: 40px;
-  letter-spacing: 4px
-}
+    .login-box form button {
+      position: relative;
+      display: inline-block;
+      padding: 10px 20px;
+      background-color: transparent;
+      border: none;
+      color: #ffffff;
+      font-size: 16px;
+      text-decoration: none;
+      text-transform: uppercase;
+      overflow: hidden;
+      transition: 0.5s;
+      margin-top: 40px;
+      letter-spacing: 4px;
+    }
 
-.login-box form button:hover {
-  background: #612639;
-  
-  border-radius: 5px;
-}
+    .login-box form button:hover {
+      background: #612639;
 
-.login-box button span {
-  position: absolute;
-  display: block;
-}
+      border-radius: 5px;
+    }
 
-@keyframes btn-anim1 {
-  0% {
-    left: -100%;
-  }
+    .login-box button span {
+      position: absolute;
+      display: block;
+    }
 
-  50%,100% {
-    left: 100%;
-  }
-}
+    @keyframes btn-anim1 {
+      0% {
+        left: -100%;
+      }
 
-.login-box button span:nth-child(1) {
-  bottom: 2px;
-  left: -100%;
-  width: 100%;
-  height: 2px;
-  background: linear-gradient(90deg, transparent,#612639);
-  animation: btn-anim1 2s linear infinite;
-}
-</style>
+      50%,
+      100% {
+        left: 100%;
+      }
+    }
+
+    .login-box button span:nth-child(1) {
+      bottom: 2px;
+      left: -100%;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #612639);
+      animation: btn-anim1 2s linear infinite;
+    }
+  </style>
+</html>

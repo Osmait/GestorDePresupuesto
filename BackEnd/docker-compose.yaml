@@ -24,6 +24,24 @@ services:
     volumes:
       - .:/app
 
+  app-front:
+    image: node:lts
+    working_dir: /app
+    ports:
+      - 4321:4321
+    depends_on:
+      - postgres
+
+    volumes:
+      - ../Frontend/gestor-presupuesto/:/app
+
+    command: sh -c
+      "
+      npm install
+      && npm run dev -- --host 0.0.0.0 &
+      tail -f /dev/null
+      "
+
   testdb:
     image: postgres:13
     command: ["postgres", "-c", "log_statement=all"]
