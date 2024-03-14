@@ -8,6 +8,6 @@ import (
 
 func HealthRoutes(s *gin.Engine) {
 	s.GET("/", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, "HelloWord")
+		ctx.JSON(http.StatusOK, "Server Up")
 	})
 }
