@@ -19,7 +19,7 @@ func JwtCreate(id string) (*string, error) {
 	claims := AppClaims{
 		UserId: id,
 		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(2 * time.Hour * 24).Unix(),
+			ExpiresAt: time.Now().Add(time.Hour * 72).Unix(),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
