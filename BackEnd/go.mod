@@ -11,12 +11,10 @@ require (
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/rs/cors/wrapper/gin v0.0.0-20231013084403-73f81b45a644
 	github.com/rs/zerolog v1.30.0
+	golang.org/x/time v0.12.0
 )
 
-require (
-	github.com/rs/cors v1.8.1 // indirect
-	golang.org/x/time v0.12.0 // indirect
-)
+require github.com/rs/cors v1.8.1 // indirect
 
 require (
 	github.com/bytedance/sonic v1.10.0-rc3 // indirect
@@ -28,7 +26,7 @@ require (
 	github.com/gin-gonic/gin v1.9.1
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
-	github.com/go-playground/validator/v10 v10.27.0 // indirect
+	github.com/go-playground/validator/v10 v10.27.0
 	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/hashicorp/errwrap v1.1.0 // indirect

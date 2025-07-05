@@ -3,7 +3,7 @@ package main
 import (
 	"log"
 
-	"github.com/osmait/gestorDePresupuesto/src/cmd/api/boostrap"
+	"github.com/osmait/gestorDePresupuesto/cmd/api/boostrap"
 )
 
 func main() {

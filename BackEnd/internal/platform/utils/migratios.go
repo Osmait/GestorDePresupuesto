@@ -1,0 +1,173 @@
+package utils
+
+import (
+	"database/sql"
+	"strings"
+
+	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
+	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
+	_ "github.com/golang-migrate/migrate/v4/source/file"
+	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/rs/zerolog/log"
+)
+
+func RunDBMigration(migrationURL string, dbSource string) {
+	migration, err := migrate.New(migrationURL, dbSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create new migrate instance")
+	}
+
+	if err = migration.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal().Err(err).Msg("failed to run migrate up")
+	}
+
+	log.Info().Msg("db migrated successfully")
+}
+
+func DownDBMigration(migrationURL string, dbSource string) {
+	migration, err := migrate.New(migrationURL, dbSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create new migrate instance")
+	}
+
+	if err = migration.Down(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal().Err(err).Msg("failed to run migrate up")
+	}
+
+	log.Info().Msg("db migrated successfully")
+}
+
+// RunSQLiteMigration runs SQLite migrations using the appropriate migration files
+func RunSQLiteMigration(migrationURL string, dbSource string) {
+	migration, err := migrate.New(migrationURL, dbSource)
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create new migrate instance for SQLite")
+	}
+
+	if err = migration.Up(); err != nil && err != migrate.ErrNoChange {
+		log.Fatal().Err(err).Msg("failed to run SQLite migrate up")
+	}
+
+	log.Info().Msg("SQLite db migrated successfully")
+}
+
+// CreateInMemorySQLiteDB creates an in-memory SQLite database with schema
+func CreateInMemorySQLiteDB() *sql.DB {
+	db, err := sql.Open("sqlite3", ":memory:")
+	if err != nil {
+		log.Fatal().Err(err).Msg("cannot create in-memory SQLite database")
+	}
+
+	// Test connection
+	if err := db.Ping(); err != nil {
+		log.Fatal().Err(err).Msg("cannot ping in-memory SQLite database")
+	}
+
+	return db
+}
+
+// SetupSQLiteSchema sets up the SQLite schema directly without migrations
+func SetupSQLiteSchema(db *sql.DB) error {
+	schema := `
+	-- SQLite compatible schema for testing
+	CREATE TABLE IF NOT EXISTS users(
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		last_name VARCHAR(255) NOT NULL,
+		email VARCHAR(255) UNIQUE NOT NULL,
+		password VARCHAR(255) NOT NULL,
+		token VARCHAR(32),
+		confirmed BOOLEAN DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+	);
+
+	CREATE TABLE IF NOT EXISTS account (
+		id VARCHAR(32) PRIMARY KEY,
+		name_account VARCHAR(255),
+		bank VARCHAR(255),
+		balance REAL,
+		user_id VARCHAR NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+
+	CREATE TABLE IF NOT EXISTS categorys(
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		icon VARCHAR(255) NOT NULL,
+		color VARCHAR(255) NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		user_id VARCHAR NOT NULL,
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+
+	CREATE TABLE IF NOT EXISTS budgets (
+		id VARCHAR PRIMARY KEY,
+		category_id VARCHAR NOT NULL,
+		amount REAL NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		user_id VARCHAR NOT NULL,
+		FOREIGN KEY (category_id) REFERENCES categorys (id),
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+
+	CREATE TABLE IF NOT EXISTS transactions (
+		id VARCHAR PRIMARY KEY,
+		transaction_name VARCHAR NOT NULL,
+		transaction_description TEXT,
+		amount REAL NOT NULL,
+		type_transation VARCHAR NOT NULL CHECK (type_transation IN ('bill', 'income')),
+		account_id VARCHAR NOT NULL,
+		user_id VARCHAR NOT NULL,
+		category_id VARCHAR NOT NULL,
+		budget_id VARCHAR,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (account_id) REFERENCES account (id),
+		FOREIGN KEY (user_id) REFERENCES users (id),
+		FOREIGN KEY (category_id) REFERENCES categorys (id),
+		FOREIGN KEY (budget_id) REFERENCES budgets (id)
+	);
+
+	CREATE TABLE IF NOT EXISTS cryptos(
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		price REAL NOT NULL,
+		current_price REAL NOT NULL,
+		quantity REAL NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		user_id VARCHAR NOT NULL,
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+
+	-- Additional table for investment repository compatibility
+	CREATE TABLE IF NOT EXISTS invesments(
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		price REAL NOT NULL,
+		current_price REAL NOT NULL,
+		quantity REAL NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		user_id VARCHAR NOT NULL,
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+	`
+
+	// Split the schema into individual statements
+	statements := strings.Split(schema, ";")
+
+	for _, statement := range statements {
+		trimmed := strings.TrimSpace(statement)
+		if trimmed != "" {
+			_, err := db.Exec(trimmed)
+			if err != nil {
+				log.Error().Err(err).Str("statement", trimmed).Msg("failed to execute schema statement")
+				return err
+			}
+		}
+	}
+
+	log.Info().Msg("SQLite schema setup successfully")
+	return nil
+}

@@ -203,19 +203,19 @@ test-race:
 # Run database migrations
 migrate-up:
 	@echo "$(BLUE)Running database migrations...$(RESET)"
-	@migrate -path src/cmd/api/db/migrations -database "postgres://osmait:admin123@localhost:5432/$(DEV_DB_NAME)?sslmode=disable" up
+	@migrate -path cmd/api/db/migrations -database "postgres://osmait:admin123@localhost:5432/$(DEV_DB_NAME)?sslmode=disable" up
 	@echo "$(GREEN)Migrations completed$(RESET)"
 
 # Rollback database migrations
 migrate-down:
 	@echo "$(BLUE)Rolling back database migrations...$(RESET)"
-	@migrate -path src/cmd/api/db/migrations -database "postgres://osmait:admin123@localhost:5432/$(DEV_DB_NAME)?sslmode=disable" down
+	@migrate -path cmd/api/db/migrations -database "postgres://osmait:admin123@localhost:5432/$(DEV_DB_NAME)?sslmode=disable" down
 	@echo "$(GREEN)Rollback completed$(RESET)"
 
 # Create new migration
 migrate-create:
 	@read -p "Enter migration name: " name; \
-	migrate create -ext sql -dir src/cmd/api/db/migrations -seq $$name
+	migrate create -ext sql -dir cmd/api/db/migrations -seq $$name
 	@echo "$(GREEN)Migration created$(RESET)"
 
 ## Docker Commands
