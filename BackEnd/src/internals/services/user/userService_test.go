@@ -2,6 +2,7 @@ package user
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/osmait/gestorDePresupuesto/src/internals/domain/user"
@@ -142,4 +143,74 @@ func TestDeleteUserError(t *testing.T) {
 	err := UserService.DeleteUser(context.Background(), user1.Id)
 	assert.Error(t, err)
 	assert.Equal(t, errorhttp.ErrNotFound, err)
+}
+
+// Additional test cases for better coverage
+
+func TestCreateUser_RepositoryError(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	userService := NewUserService(mockRepo)
+	user1 := utils.GetNewRandomUser()
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Email, user1.Password)
+
+	// Mock repository error on FindUserByEmail
+	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(nil, errors.New("database error"))
+
+	err := userService.CreateUser(context.Background(), userRequest)
+	assert.Error(t, err)
+	assert.Equal(t, "database error", err.Error())
+	mockRepo.AssertExpectations(t)
+}
+
+func TestCreateUser_SaveRepositoryError(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	userService := NewUserService(mockRepo)
+	user1 := utils.GetNewRandomUser()
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Email, user1.Password)
+
+	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(nil, errorhttp.ErrNotFound)
+	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(errors.New("save error"))
+
+	err := userService.CreateUser(context.Background(), userRequest)
+	assert.Error(t, err)
+	assert.Equal(t, "save error", err.Error())
+	mockRepo.AssertExpectations(t)
+}
+
+func TestFindByEmail_RepositoryError(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	userService := NewUserService(mockRepo)
+
+	mockRepo.On("FindUserByEmail", context.Background(), mock.Anything).Return((*user.User)(nil), errors.New("database error"))
+
+	_, err := userService.FindByEmail(context.Background(), "test@test.com")
+	assert.Error(t, err)
+	assert.Equal(t, "database error", err.Error())
+	mockRepo.AssertExpectations(t)
+}
+
+func TestDeleteUser_FindUserError(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	userService := NewUserService(mockRepo)
+
+	mockRepo.On("FindUserById", context.Background(), mock.Anything).Return((*user.User)(nil), errors.New("find error"))
+
+	err := userService.DeleteUser(context.Background(), "test-id")
+	assert.Error(t, err)
+	assert.Equal(t, "find error", err.Error())
+	mockRepo.AssertExpectations(t)
+}
+
+func TestDeleteUser_DeleteRepositoryError(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	userService := NewUserService(mockRepo)
+	user1 := utils.GetNewRandomUser()
+
+	mockRepo.On("FindUserById", context.Background(), mock.Anything).Return(user1, nil)
+	mockRepo.On("Delete", context.Background(), mock.Anything).Return(errors.New("delete error"))
+
+	err := userService.DeleteUser(context.Background(), user1.Id)
+	assert.Error(t, err)
+	assert.Equal(t, "delete error", err.Error())
+	mockRepo.AssertExpectations(t)
 }

@@ -1,11 +1,14 @@
 module github.com/osmait/gestorDePresupuesto
 
-go 1.20
+go 1.23.0
+
+toolchain go1.24.4
 
 require (
 	github.com/go-faker/faker/v4 v4.2.0
 	github.com/go-playground/assert/v2 v2.2.0
 	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/rs/cors/wrapper/gin v0.0.0-20231013084403-73f81b45a644
 	github.com/rs/zerolog v1.30.0
 )
@@ -24,7 +27,7 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.14.1 // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/golang-migrate/migrate/v4 v4.16.2
+	github.com/golang-migrate/migrate/v4 v4.18.3
 	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/joho/godotenv v1.5.1
@@ -45,10 +48,10 @@ require (
 	github.com/ugorji/go/codec v1.2.11 // indirect
 	go.uber.org/atomic v1.7.0 // indirect
 	golang.org/x/arch v0.4.0 // indirect
-	golang.org/x/crypto v0.11.0
-	golang.org/x/net v0.13.0
-	golang.org/x/sys v0.10.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/protobuf v1.31.0 // indirect
+	golang.org/x/crypto v0.36.0
+	golang.org/x/net v0.38.0
+	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/text v0.23.0 // indirect
+	google.golang.org/protobuf v1.34.2 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

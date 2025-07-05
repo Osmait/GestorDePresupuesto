@@ -76,6 +76,6 @@ func (b *BudgetRepository) FindOne(ctx context.Context, id string) (*budget.Budg
 }
 
 func (b *BudgetRepository) Delete(ctx context.Context, id string) error {
-	_, err := b.db.ExecContext(ctx, "DELETE FROM budget WHERE id = $1", id)
+	_, err := b.db.ExecContext(ctx, "DELETE FROM budgets WHERE id = $1", id)
 	return err
 }

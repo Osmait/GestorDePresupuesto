@@ -42,9 +42,10 @@ func TestTransactionRepository(t *testing.T) {
 	err = transactionRepo.Save(ctx, transaction)
 	assert.NoError(t, err)
 
-	currenTime := time.Now()
-	date1 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-7)
-	date2 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+5)
+	currentTime := time.Now()
+	// Use SQLite-compatible date format (YYYY-MM-DD)
+	date1 := fmt.Sprintf("%04d-%02d-%02d", currentTime.Year(), currentTime.Month(), currentTime.Day()-7)
+	date2 := fmt.Sprintf("%04d-%02d-%02d", currentTime.Year(), currentTime.Month(), currentTime.Day()+5)
 	transactionList, err := transactionRepo.FindAll(ctx, date1, date2, account.Id)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, transactionList)

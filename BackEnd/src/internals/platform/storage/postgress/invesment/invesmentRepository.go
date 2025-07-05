@@ -19,12 +19,13 @@ func NewInvesmentRepository(db *sql.DB) *InvesmentRepository {
 }
 
 func (i *InvesmentRepository) Save(ctx context.Context, invesment *invesment.Invesment) error {
-	_, err := i.db.ExecContext(ctx, "INSERT INTO invesments (id , name ,price, current_price,quantity) VALUES ($1,$2,$3,$4,$5)", invesment.Id, invesment.Name, invesment.Price, invesment.CurrentPrice, invesment.Quantity)
+	_, err := i.db.ExecContext(ctx, "INSERT INTO invesments (id, name, price, current_price, quantity, user_id) VALUES ($1,$2,$3,$4,$5,$6)",
+		invesment.Id, invesment.Name, invesment.Price, invesment.CurrentPrice, invesment.Quantity, invesment.UserId)
 	return err
 }
 
 func (i *InvesmentRepository) FindAll(ctx context.Context, userId string) ([]*invesment.Invesment, error) {
-	rows, err := i.db.QueryContext(ctx, "SELECT id,name,price,current_price,quantity FROM invesments WHERE id = $1 ", userId)
+	rows, err := i.db.QueryContext(ctx, "SELECT id, name, price, current_price, quantity, user_id, created_at FROM invesments WHERE user_id = $1 ", userId)
 	if err != nil {
 		return nil, err
 	}
@@ -39,7 +40,7 @@ func (i *InvesmentRepository) FindAll(ctx context.Context, userId string) ([]*in
 	var invesments []*invesment.Invesment
 	for rows.Next() {
 		var invesment invesment.Invesment
-		if err = rows.Scan(&invesment.Id, &invesment.Name, &invesment.Price, &invesment.CurrentPrice, &invesment.Quantity); err == nil {
+		if err = rows.Scan(&invesment.Id, &invesment.Name, &invesment.Price, &invesment.CurrentPrice, &invesment.Quantity, &invesment.UserId, &invesment.CreatedAt); err == nil {
 			invesments = append(invesments, &invesment)
 		}
 	}
@@ -50,7 +51,7 @@ func (i *InvesmentRepository) FindAll(ctx context.Context, userId string) ([]*in
 }
 
 func (i *InvesmentRepository) FindOne(ctx context.Context, id string) (*invesment.Invesment, error) {
-	rows, err := i.db.QueryContext(ctx, "SELECT id,name,price,current_price,quantity FROM invesments WHERE id = $1 ", id)
+	rows, err := i.db.QueryContext(ctx, "SELECT id, name, price, current_price, quantity, user_id, created_at FROM invesments WHERE id = $1 ", id)
 	if err != nil {
 		return nil, err
 	}
@@ -64,7 +65,7 @@ func (i *InvesmentRepository) FindOne(ctx context.Context, id string) (*invesmen
 
 	var invesment invesment.Invesment
 	for rows.Next() {
-		if err = rows.Scan(&invesment.Id, &invesment.Name, &invesment.Price, &invesment.CurrentPrice, &invesment.Quantity); err != nil {
+		if err = rows.Scan(&invesment.Id, &invesment.Name, &invesment.Price, &invesment.CurrentPrice, &invesment.Quantity, &invesment.UserId, &invesment.CreatedAt); err != nil {
 			return nil, err
 		}
 	}

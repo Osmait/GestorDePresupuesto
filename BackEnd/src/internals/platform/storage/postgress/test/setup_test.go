@@ -2,32 +2,34 @@ package postgress
 
 import (
 	"database/sql"
-	"fmt"
-	"os"
-	"strconv"
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/joho/godotenv"
-	"github.com/osmait/gestorDePresupuesto/src/config"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/utils"
 )
 
 func SetUpTest() *sql.DB {
-	err := godotenv.Load("../../../../../../.env.test")
-	if err != nil {
-		fmt.Println("Not env")
-	}
-	dbPort, _ := strconv.Atoi(os.Getenv("DbPort"))
-	cfg := config.NewConfigDb(uint(dbPort), os.Getenv("DbUser"), os.Getenv("DbPass"), os.Getenv("Dbhost"), os.Getenv("DbName"))
+	// Create in-memory SQLite database
+	db := utils.CreateInMemorySQLiteDB()
 
-	postgresURI := cfg.GetPostgresUrl()
-
-	db, err := sql.Open("postgres", postgresURI)
+	// Setup SQLite schema
+	err := utils.SetupSQLiteSchema(db)
 	if err != nil {
-		log.Fatal().Err(err)
+		log.Fatal().Err(err).Msg("failed to setup SQLite schema")
 	}
-	utils.RunDBMigration("file:../../../../../cmd/api/db/migrations/", postgresURI)
 
 	return db
+}
+
+// SetUpTestWithCleanup creates a test database and returns a cleanup function
+func SetUpTestWithCleanup() (*sql.DB, func()) {
+	db := SetUpTest()
+
+	cleanup := func() {
+		if db != nil {
+			db.Close()
+		}
+	}
+
+	return db, cleanup
 }
