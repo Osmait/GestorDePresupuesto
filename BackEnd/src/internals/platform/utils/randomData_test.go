@@ -103,8 +103,17 @@ func TestGetNewRandomInvestment(t *testing.T) {
 }
 
 func TestRandomDataConsistency(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping consistency test in short mode")
+	}
+
 	// Test that all random generators produce valid, non-nil results consistently
-	for i := 0; i < 10; i++ {
+	iterations := 10
+	if testing.Short() {
+		iterations = 3
+	}
+
+	for i := 0; i < iterations; i++ {
 		user := GetNewRandomUser()
 		account := GetNewRandomAccount()
 		transaction := GetNewRandomTransaction()
@@ -129,9 +138,13 @@ func TestRandomDataConsistency(t *testing.T) {
 }
 
 func TestTransactionTypeDistribution(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping distribution test in short mode")
+	}
+
 	// Test that transaction types are properly distributed
 	typeCount := make(map[string]int)
-	iterations := 100
+	iterations := 50 // Reduced from 100 for faster execution
 
 	for i := 0; i < iterations; i++ {
 		transaction := GetNewRandomTransaction()

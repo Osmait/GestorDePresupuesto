@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log"
 	"net/http"
@@ -10,6 +11,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/src/config"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/src/internals/platform/server/routes"
 	"github.com/osmait/gestorDePresupuesto/src/internals/services/account"
@@ -32,9 +34,11 @@ type Server struct {
 	servicesBudget      *budget.BudgetServices
 	servicesCategory    *category.CategoryServices
 	shutdownTimeout     *time.Duration
+	db                  *sql.DB
+	config              *config.Config
 }
 
-func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Duration, servicesAccount *account.AccountService, transactionService *transaction.TransactionService, userService *user.UserService, authService *auth.AuthService, budgetService *budget.BudgetServices, categoryServices *category.CategoryServices) (context.Context, *Server) {
+func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Duration, servicesAccount *account.AccountService, transactionService *transaction.TransactionService, userService *user.UserService, authService *auth.AuthService, budgetService *budget.BudgetServices, categoryServices *category.CategoryServices, db *sql.DB, cfg *config.Config) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
 		httpAddr:            fmt.Sprintf("%s:%d", host, port),
@@ -45,6 +49,8 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Dura
 		servicesBudget:      budgetService,
 		servicesCategory:    categoryServices,
 		shutdownTimeout:     shutdownTimeout,
+		db:                  db,
+		config:              cfg,
 	}
 	srv.registerRoutes()
 	return serverContext(ctx), &srv
@@ -53,9 +59,9 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Dura
 func (s *Server) registerRoutes() {
 	s.Engine.Use(cors.AllowAll())
 
-	routes.HealthRoutes(s.Engine)
+	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Environment))
 
-	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser))
+	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
 
 	routes.AuhtRoutes(s.Engine, s.servicesAuth)
 	routes.UserRoute(s.Engine, s.servicesUser)

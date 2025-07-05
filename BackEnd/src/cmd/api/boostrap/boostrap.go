@@ -69,7 +69,7 @@ func Run() error {
 	categoryServices := category.NewCategoryServices(categoryRepository)
 
 	// Instance Server
-	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.ShutdownTimeout, accountSerevice, transactionServices, userServices, authServices, budgetServices, categoryServices)
+	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.ShutdownTimeout, accountSerevice, transactionServices, userServices, authServices, budgetServices, categoryServices, db, cfg)
 
 	// Run Server
 	return srv.Run(ctx)
