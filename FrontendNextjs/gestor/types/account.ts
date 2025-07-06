@@ -4,5 +4,5 @@ export interface Account {
   bank: string;
   balance: number;
   user_id: string;
-  created_at: Date;
+  created_at: string;
 }

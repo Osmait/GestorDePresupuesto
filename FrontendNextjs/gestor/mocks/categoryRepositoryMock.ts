@@ -7,56 +7,56 @@ export class CategoryRepositoryMock {
       name: "Alimentación",
       icon: "🍽️",
       color: "#FF6B6B",
-      created_at: new Date("2024-01-10T08:00:00Z"),
+      created_at: "2024-01-10T08:00:00Z",
     },
     {
       id: "category-2",
       name: "Transporte",
       icon: "🚗",
       color: "#4ECDC4",
-      created_at: new Date("2024-01-10T08:15:00Z"),
+      created_at: "2024-01-10T08:15:00Z",
     },
     {
       id: "category-3",
       name: "Entretenimiento",
       icon: "🎬",
       color: "#45B7D1",
-      created_at: new Date("2024-01-10T08:30:00Z"),
+      created_at: "2024-01-10T08:30:00Z",
     },
     {
       id: "category-4",
       name: "Salud",
       icon: "🏥",
       color: "#F9CA24",
-      created_at: new Date("2024-01-10T08:45:00Z"),
+      created_at: "2024-01-10T08:45:00Z",
     },
     {
       id: "category-5",
       name: "Educación",
       icon: "📚",
       color: "#6C5CE7",
-      created_at: new Date("2024-01-10T09:00:00Z"),
+      created_at: "2024-01-10T09:00:00Z",
     },
     {
       id: "category-6",
       name: "Hogar",
       icon: "🏠",
       color: "#A0E7E5",
-      created_at: new Date("2024-01-10T09:15:00Z"),
+      created_at: "2024-01-10T09:15:00Z",
     },
     {
       id: "category-7",
       name: "Ropa",
       icon: "👕",
       color: "#FF7675",
-      created_at: new Date("2024-01-10T09:30:00Z"),
+      created_at: "2024-01-10T09:30:00Z",
     },
     {
       id: "category-8",
       name: "Tecnología",
       icon: "💻",
       color: "#636E72",
-      created_at: new Date("2024-01-10T09:45:00Z"),
+      created_at: "2024-01-10T09:45:00Z",
     },
   ];
 
@@ -83,7 +83,7 @@ export class CategoryRepositoryMock {
       name,
       icon,
       color,
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     };
 
     this.mockCategories.push(newCategory);
@@ -119,4 +119,37 @@ export class CategoryRepositoryMock {
       c.name.toLowerCase().includes(name.toLowerCase())
     );
   };
+
+  /**
+   * Obtiene categorías filtradas y paginadas como lo haría el backend.
+   * @param filters Filtros y opciones de paginación
+   */
+  async getCategories(filters: {
+    name?: string
+    dateFrom?: string
+    dateTo?: string
+    limit?: number
+    offset?: number
+  }): Promise<Category[]> {
+    let cats = [...this.mockCategories]
+    if (filters.name) {
+      const s = filters.name.toLowerCase()
+      cats = cats.filter(c => c.name.toLowerCase().includes(s))
+    }
+    if (filters.dateFrom) {
+      const from = new Date(filters.dateFrom)
+      cats = cats.filter(c => new Date(c.created_at) >= from)
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo)
+      cats = cats.filter(c => new Date(c.created_at) <= to)
+    }
+    if (filters.offset !== undefined) {
+      cats = cats.slice(filters.offset)
+    }
+    if (filters.limit !== undefined) {
+      cats = cats.slice(0, filters.limit)
+    }
+    return cats.map(c => ({ ...c, created_at: c.created_at }))
+  }
 } 

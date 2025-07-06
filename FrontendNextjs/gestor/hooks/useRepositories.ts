@@ -11,6 +11,7 @@ import {
 	getCategoryRepository,
 	getTransactionRepository,
 	isMockMode,
+	getAnalyticsRepository,
 } from '@/lib/repositoryConfig'
 
 // Hook para manejar cuentas
@@ -394,6 +395,32 @@ export const useAuth = () => {
     getProfile,
   };
 };
+
+// Hook para manejar analíticas
+export const useAnalytics = () => {
+  // No state, just direct calls (puedes agregar loading/error si lo necesitas)
+  const getOverview = async (params: any) => {
+    const repo = await getAnalyticsRepository()
+    return repo.getOverview(params)
+  }
+  const getBar = async (params: any) => {
+    const repo = await getAnalyticsRepository()
+    return repo.getBar(params)
+  }
+  const getPie = async (params: any) => {
+    const repo = await getAnalyticsRepository()
+    return repo.getPie(params)
+  }
+  const getRadar = async (params: any) => {
+    const repo = await getAnalyticsRepository()
+    return repo.getRadar(params)
+  }
+  const getHeatmap = async (params: any) => {
+    const repo = await getAnalyticsRepository()
+    return repo.getHeatmap(params)
+  }
+  return { getOverview, getBar, getPie, getRadar, getHeatmap }
+}
 
 // Hook combinado para dashboard
 export const useDashboard = () => {

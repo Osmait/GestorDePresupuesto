@@ -8,7 +8,7 @@ export class BudgetRepositoryMock {
       user_id: "user-123",
       amount: 5000.00,
       current_amount: 2800.50,
-      created_at: new Date("2024-01-15T10:30:00Z"),
+      created_at: "2024-01-15T10:30:00Z",
     },
     {
       id: "budget-2",
@@ -16,7 +16,7 @@ export class BudgetRepositoryMock {
       user_id: "user-123",
       amount: 3000.00,
       current_amount: 1500.75,
-      created_at: new Date("2024-01-20T14:15:00Z"),
+      created_at: "2024-01-20T14:15:00Z",
     },
     {
       id: "budget-3",
@@ -24,7 +24,7 @@ export class BudgetRepositoryMock {
       user_id: "user-123",
       amount: 2000.00,
       current_amount: 1850.25,
-      created_at: new Date("2024-02-01T09:00:00Z"),
+      created_at: "2024-02-01T09:00:00Z",
     },
     {
       id: "budget-4",
@@ -32,7 +32,7 @@ export class BudgetRepositoryMock {
       user_id: "user-123",
       amount: 1500.00,
       current_amount: 750.00,
-      created_at: new Date("2024-02-05T16:30:00Z"),
+      created_at: "2024-02-05T16:30:00Z",
     },
   ];
 
@@ -58,7 +58,7 @@ export class BudgetRepositoryMock {
       user_id: "user-123", // En producción vendría del token
       amount,
       current_amount: 0,
-      created_at: new Date(),
+      created_at: new Date().toISOString(),
     };
 
     this.mockBudgets.push(newBudget);
@@ -88,4 +88,40 @@ export class BudgetRepositoryMock {
     
     budget.current_amount = newAmount;
   };
+
+  /**
+   * Obtiene presupuestos filtrados y paginados como lo haría el backend.
+   * @param filters Filtros y opciones de paginación
+   */
+  async getBudgets(filters: {
+    userId?: string
+    categoryId?: string
+    dateFrom?: string
+    dateTo?: string
+    limit?: number
+    offset?: number
+  }): Promise<Budget[]> {
+    let budgets = [...this.mockBudgets]
+    if (filters.userId) {
+      budgets = budgets.filter(b => b.user_id === filters.userId)
+    }
+    if (filters.categoryId) {
+      budgets = budgets.filter(b => b.category_id === filters.categoryId)
+    }
+    if (filters.dateFrom) {
+      const from = new Date(filters.dateFrom)
+      budgets = budgets.filter(b => new Date(b.created_at) >= from)
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo)
+      budgets = budgets.filter(b => new Date(b.created_at) <= to)
+    }
+    if (filters.offset !== undefined) {
+      budgets = budgets.slice(filters.offset)
+    }
+    if (filters.limit !== undefined) {
+      budgets = budgets.slice(0, filters.limit)
+    }
+    return budgets.map(b => ({ ...b, created_at: b.created_at }))
+  }
 } 

@@ -335,4 +335,81 @@ export class TransactionRepositoryMock {
       averageTransaction,
     };
   };
+
+  /**
+   * Obtiene transacciones filtradas, ordenadas y paginadas como lo haría el backend.
+   * @param filters Filtros y opciones de paginación/ordenación
+   */
+  async getTransactions(filters: {
+    accountId?: string
+    categoryId?: string
+    type?: 'INCOME' | 'BILL'
+    dateFrom?: string
+    dateTo?: string
+    minAmount?: number
+    maxAmount?: number
+    search?: string
+    sortBy?: 'date' | 'amount'
+    sortOrder?: 'asc' | 'desc'
+    limit?: number
+    offset?: number
+  }): Promise<Transaction[]> {
+    let txs = [...this.mockTransactions]
+
+    // Filtrado
+    if (filters.accountId) {
+      txs = txs.filter(t => t.account_id === filters.accountId)
+    }
+    if (filters.categoryId) {
+      txs = txs.filter(t => t.category_id === filters.categoryId)
+    }
+    if (filters.type) {
+      const typeVal = filters.type === 'INCOME' ? 1 : 0
+      txs = txs.filter(t => t.type_transaction === typeVal)
+    }
+    if (filters.dateFrom) {
+      const from = new Date(filters.dateFrom)
+      txs = txs.filter(t => new Date(t.created_at) >= from)
+    }
+    if (filters.dateTo) {
+      const to = new Date(filters.dateTo)
+      txs = txs.filter(t => new Date(t.created_at) <= to)
+    }
+    if (filters.minAmount !== undefined) {
+      txs = txs.filter(t => t.amount >= filters.minAmount!)
+    }
+    if (filters.maxAmount !== undefined) {
+      txs = txs.filter(t => t.amount <= filters.maxAmount!)
+    }
+    if (filters.search) {
+      const s = filters.search.toLowerCase()
+      txs = txs.filter(t =>
+        t.name.toLowerCase().includes(s) ||
+        (t.description && t.description.toLowerCase().includes(s))
+      )
+    }
+
+    // Ordenación
+    if (filters.sortBy) {
+      const key = filters.sortBy === 'date' ? 'created_at' : 'amount'
+      txs.sort((a, b) => {
+        if (key === 'created_at') {
+          return (new Date(a.created_at).getTime() - new Date(b.created_at).getTime()) * (filters.sortOrder === 'desc' ? -1 : 1)
+        } else {
+          return (a.amount - b.amount) * (filters.sortOrder === 'desc' ? -1 : 1)
+        }
+      })
+    }
+
+    // Paginación
+    if (filters.offset !== undefined) {
+      txs = txs.slice(filters.offset)
+    }
+    if (filters.limit !== undefined) {
+      txs = txs.slice(0, filters.limit)
+    }
+
+    // Convertir fechas a string ISO para simular respuesta API
+    return txs.map(t => ({ ...t, created_at: (t.created_at instanceof Date ? t.created_at.toISOString() : t.created_at) }))
+  }
 } 

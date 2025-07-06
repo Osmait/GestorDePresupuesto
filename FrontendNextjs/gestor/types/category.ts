@@ -3,5 +3,5 @@ export interface Category {
   name: string;
   icon: string;
   color: string;
-  created_at: Date;
+  created_at: string;
 }

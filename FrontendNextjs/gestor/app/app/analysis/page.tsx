@@ -6,14 +6,14 @@ import { ResponsiveRadar } from '@nivo/radar'
 import { ResponsiveHeatMap } from '@nivo/heatmap'
 import { ResponsivePie } from '@nivo/pie'
 import { useTheme } from 'next-themes'
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import { parse, differenceInDays, differenceInMonths, differenceInYears, format, startOfWeek, addDays, addWeeks, addMonths, addYears, startOfMonth, startOfYear } from 'date-fns'
-import { useAccounts, useCategories, useTransactions } from '@/hooks/useRepositories'
+import { useAccounts, useCategories, useTransactions, useAnalytics } from '@/hooks/useRepositories'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
 import { DateRange } from 'react-day-picker'
@@ -350,6 +350,7 @@ export default function AnalysisPage() {
   const { accounts } = useAccounts()
   const { categories } = useCategories()
   const { transactions } = useTransactions()
+  const { getOverview, getBar, getPie, getRadar, getHeatmap } = useAnalytics()
   const [selectedBar, setSelectedBar] = useState<string | null>(null)
   const [selectedPie, setSelectedPie] = useState<string | null>(null)
   const [selectedLine, setSelectedLine] = useState<{ serieId: string, pointIndex: number } | null>(null)
@@ -365,6 +366,66 @@ export default function AnalysisPage() {
     maxAmount: '',
     search: '',
   })
+  const [overviewData, setOverviewData] = useState<any>(null)
+  const [barData, setBarData] = useState<any>(null)
+  const [pieData, setPieData] = useState<any>(null)
+  const [radarData, setRadarData] = useState<any>(null)
+  const [heatmapData, setHeatmapData] = useState<any>(null)
+  const [loading, setLoading] = useState(false)
+
+  // Mapear filtros UI a filtros de API
+  const apiFilters = useMemo(() => {
+    const f: any = {}
+    if (filters.account && filters.account !== 'all') f.accountId = filters.account
+    if (filters.category && filters.category !== 'all') f.categoryId = filters.category
+    if (filters.type && filters.type !== 'all') f.type = filters.type
+    if (filters.filterMode === 'month') {
+      if (filters.month && filters.month !== 'all') {
+        f.dateFrom = `${filters.year}-${filters.month}-01`
+        f.dateTo = `${filters.year}-${filters.month}-31`
+      } else if (filters.year) {
+        f.dateFrom = `${filters.year}-01-01`
+        f.dateTo = `${filters.year}-12-31`
+      }
+    } else if (filters.filterMode === 'range' && filters.dateRange.from && filters.dateRange.to) {
+      f.dateFrom = filters.dateRange.from.toISOString().slice(0, 10)
+      f.dateTo = filters.dateRange.to.toISOString().slice(0, 10)
+    }
+    if (filters.minAmount) f.minAmount = Number(filters.minAmount)
+    if (filters.maxAmount) f.maxAmount = Number(filters.maxAmount)
+    if (filters.search) f.search = filters.search
+    // Agrupación automática
+    if (f.dateFrom && f.dateTo) {
+      const start = new Date(f.dateFrom)
+      const end = new Date(f.dateTo)
+      const days = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
+      if (days <= 31) f.groupBy = 'day'
+      else if (days <= 90) f.groupBy = 'week'
+      else if (days < 365 * 2) f.groupBy = 'month'
+      else f.groupBy = 'year'
+    } else {
+      f.groupBy = 'month'
+    }
+    return f
+  }, [filters])
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([
+      getOverview(apiFilters),
+      getBar(apiFilters),
+      getPie(apiFilters),
+      getRadar(apiFilters),
+      getHeatmap(apiFilters)
+    ]).then(([overview, bar, pie, radar, heatmap]) => {
+      setOverviewData(overview)
+      setBarData(bar)
+      setPieData(pie)
+      setRadarData(radar)
+      setHeatmapData(heatmap)
+    }).finally(() => setLoading(false))
+  }, [JSON.stringify(apiFilters)])
+
   const nivoTheme = useMemo(() => ({
     background: 'transparent',
     textColor: theme === 'dark' ? '#e5e7eb' : '#222',
@@ -387,331 +448,12 @@ export default function AnalysisPage() {
     },
   }), [theme])
 
-  // Utilidad para obtener el mes y año de un label tipo 'Ene', 'Feb', etc.
-  const monthMap: Record<string, string> = {
-    'Ene': '01', 'Feb': '02', 'Mar': '03', 'Abr': '04', 'May': '05', 'Jun': '06',
-    'Jul': '07', 'Ago': '08', 'Sep': '09', 'Oct': '10', 'Nov': '11', 'Dic': '12',
-  }
-
-  // Reemplazar exampleAccounts y exampleCategories por los datos reales
-  const exampleAccounts = accounts.map(a => ({ id: a.id, name_account: a.name_account }))
-  const exampleCategories = categories.map(c => ({ id: c.id, name: c.name }))
-
-  // Filtrar transacciones según los filtros activos
-  const filteredTransactions = useMemo(() => {
-    return transactions.filter(tx => {
-      // Filtro por cuenta
-      if (filters.account !== 'all' && tx.account_id !== filters.account) return false
-      // Filtro por categoría
-      if (filters.category !== 'all' && tx.category_id !== filters.category) return false
-      // Filtro por tipo
-      if (filters.type !== 'all') {
-        if (filters.type === 'INCOME' && tx.type_transaction !== 1) return false
-        if (filters.type === 'BILL' && tx.type_transaction !== 0) return false
-      }
-      // Filtro por fecha
-      if (filters.filterMode === 'month') {
-        if (filters.month !== 'all' && filters.month) {
-          const txMonth = (tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)).getMonth() + 1
-          if (String(txMonth).padStart(2, '0') !== filters.month) return false
-        }
-        if (filters.year) {
-          const txYear = (tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)).getFullYear()
-          if (String(txYear) !== filters.year) return false
-        }
-      } else if (filters.filterMode === 'range') {
-        if (filters.dateRange.from && filters.dateRange.to) {
-          const txDate = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
-          if (txDate < filters.dateRange.from || txDate > filters.dateRange.to) return false
-        }
-      }
-      // Filtro por monto
-      if (filters.minAmount && tx.amount < Number(filters.minAmount)) return false
-      if (filters.maxAmount && tx.amount > Number(filters.maxAmount)) return false
-      // Filtro por búsqueda
-      if (filters.search) {
-        const search = filters.search.toLowerCase()
-        if (!tx.name.toLowerCase().includes(search) && !tx.description.toLowerCase().includes(search)) return false
-      }
-      return true
-    })
-  }, [transactions, filters])
-
-  // Determinar rango de fechas para el gráfico de líneas
-  let start: Date, end: Date
-  if (filters.filterMode === 'range' && filters.dateRange.from && filters.dateRange.to) {
-    start = filters.dateRange.from
-    end = filters.dateRange.to
-  } else {
-    const txDates = filteredTransactions.map(tx => tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at))
-    start = new Date(Math.min(...txDates.map(d => d.getTime())))
-    end = new Date(Math.max(...txDates.map(d => d.getTime())))
-  }
-  const interval = getDateRangeInterval(start, end)
-
-  // Generar datos para los gráficos a partir de filteredTransactions
-  // Línea: evolución de ingresos/gastos/saldo por mes
-  const filteredLineData = useMemo(() => {
-    if (filteredTransactions.length === 0) return [
-      { id: 'Saldo', color: 'hsl(210, 70%, 50%)', data: [] },
-      { id: 'Ingresos', color: 'hsl(140, 70%, 50%)', data: [] },
-      { id: 'Gastos', color: 'hsl(0, 70%, 50%)', data: [] },
-    ]
-    // Declarar labels dentro del useMemo
-    let labels: string[] = []
-    // Calcular intervalo
-    const days = differenceInDays(end, start)
-    const months = differenceInMonths(end, start)
-    const years = differenceInYears(end, start)
-    let getLabel: (date: Date) => string
-    let addFn: (date: Date, n: number) => Date
-    let startFn: (date: Date) => Date
-    if (interval === 'day') {
-      getLabel = d => format(d, 'dd/MM/yyyy')
-      addFn = addDays
-      startFn = d => d
-      let d = start
-      while (d <= end) {
-        labels.push(getLabel(d))
-        d = addFn(d, 1)
-      }
-    } else if (interval === 'week') {
-      getLabel = d => 'Semana ' + format(d, 'w yyyy')
-      addFn = addWeeks
-      startFn = d => startOfWeek(d, { weekStartsOn: 1 })
-      let d = startFn(start)
-      while (d <= end) {
-        labels.push(getLabel(d))
-        d = addFn(d, 1)
-      }
-    } else if (interval === 'month') {
-      getLabel = d => format(d, 'MMM yyyy')
-      addFn = addMonths
-      startFn = startOfMonth
-      let d = startFn(start)
-      while (d <= end) {
-        labels.push(getLabel(d))
-        d = addFn(d, 1)
-      }
-    } else {
-      getLabel = d => format(d, 'yyyy')
-      addFn = addYears
-      startFn = startOfYear
-      let d = startFn(start)
-      while (d <= end) {
-        labels.push(getLabel(d))
-        d = addFn(d, 1)
-      }
-    }
-
-    // Agrupar transacciones por intervalo
-    const groupMap: Record<string, { ingresos: number, gastos: number }> = {}
-    labels.forEach(l => { groupMap[l] = { ingresos: 0, gastos: 0 } })
-    filteredTransactions.forEach(tx => {
-      const date = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
-      let label = getLabel(startFn(date))
-      if (!(label in groupMap)) return // fuera de rango
-      if (tx.type_transaction === 1) groupMap[label].ingresos += tx.amount
-      else if (tx.type_transaction === 0) groupMap[label].gastos += tx.amount
-    })
-    // Calcular saldo acumulado
-    let saldoAcumulado = 0
-    const saldoData: { x: string, y: number }[] = []
-    const ingresosData: { x: string, y: number }[] = []
-    const gastosData: { x: string, y: number }[] = []
-    labels.forEach(l => {
-      saldoAcumulado += groupMap[l].ingresos - groupMap[l].gastos
-      saldoData.push({ x: l, y: saldoAcumulado })
-      ingresosData.push({ x: l, y: groupMap[l].ingresos })
-      gastosData.push({ x: l, y: groupMap[l].gastos })
-    })
-    return [
-      { id: 'Saldo', color: 'hsl(210, 70%, 50%)', data: saldoData },
-      { id: 'Ingresos', color: 'hsl(140, 70%, 50%)', data: ingresosData },
-      { id: 'Gastos', color: 'hsl(0, 70%, 50%)', data: gastosData },
-    ]
-  }, [filteredTransactions, filters, start, end, interval])
-
-  // Nueva estructura para el gráfico de barras: eje X = fecha, barras apiladas por categoría
-  const filteredBarData = useMemo(() => {
-    if (filteredTransactions.length === 0) return []
-    // Obtener todas las fechas únicas en el rango
-    let labels: string[] = []
-    let getLabel: (date: Date) => string
-    let addFn: (date: Date, n: number) => Date
-    let startFn: (date: Date) => Date
-    if (interval === 'day') {
-      getLabel = d => format(d, 'dd/MM/yyyy')
-      addFn = addDays
-      startFn = d => d
-      let d = start
-      while (d <= end) {
-        labels.push(getLabel(d))
-        d = addFn(d, 1)
-      }
-    } else if (interval === 'week') {
-      getLabel = d => 'Semana ' + format(d, 'w yyyy')
-      addFn = addWeeks
-      startFn = d => startOfWeek(d, { weekStartsOn: 1 })
-      let d = startFn(start)
-      while (d <= end) {
-        labels.push(getLabel(d))
-        d = addFn(d, 1)
-      }
-    } else if (interval === 'month') {
-      getLabel = d => format(d, 'MMM yyyy')
-      addFn = addMonths
-      startFn = startOfMonth
-      let d = startFn(start)
-      while (d <= end) {
-        labels.push(getLabel(d))
-        d = addFn(d, 1)
-      }
-    } else {
-      getLabel = d => format(d, 'yyyy')
-      addFn = addYears
-      startFn = startOfYear
-      let d = startFn(start)
-      while (d <= end) {
-        labels.push(getLabel(d))
-        d = addFn(d, 1)
-      }
-    }
-    // Obtener todas las categorías únicas
-    const categoryNames = categories.map(cat => cat.name)
-    // Construir los datos: cada objeto es { fecha, 'Alimentación': monto, ... }
-    const data = labels.map(label => {
-      const row: Record<string, string | number> = { fecha: label }
-      categoryNames.forEach(catName => { row[catName] = 0 })
-      // Sumar montos por categoría para esa fecha
-      filteredTransactions.forEach(tx => {
-        if (tx.type_transaction === 0) {
-          const txDate = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
-          const txLabel = getLabel(startFn(txDate))
-          if (txLabel === label) {
-            const cat = categories.find(c => c.id === tx.category_id)
-            if (cat) row[cat.name] = (row[cat.name] as number) + tx.amount
-          }
-        }
-      })
-      return row
-    })
-    return data
-  }, [filteredTransactions, categories, interval, start, end])
-
-  // Pie: distribución por cuenta
-  const filteredPieData = useMemo(() => {
-    return accounts.map(acc => {
-      const value = filteredTransactions
-        .filter(tx => tx.account_id === acc.id)
-        .reduce((sum, tx) => sum + tx.amount, 0)
-      return { id: acc.id, label: acc.name_account, value, color: '#2563eb' }
-    }).filter(pie => pie.value > 0)
-  }, [filteredTransactions, accounts])
-
-  // Radar: comparación de categorías (gastos e ingresos)
-  const filteredRadarData = useMemo(() => {
-    // Calcular el monto total por categoría
-    const categoryTotals = categories.map(cat => {
-      const gastos = filteredTransactions
-        .filter(tx => tx.category_id === cat.id && tx.type_transaction === 0)
-        .reduce((sum, tx) => sum + tx.amount, 0)
-      const ingresos = filteredTransactions
-        .filter(tx => tx.category_id === cat.id && tx.type_transaction === 1)
-        .reduce((sum, tx) => sum + tx.amount, 0)
-      return { categoria: cat.name, Gastos: gastos, Ingresos: ingresos, total: gastos + ingresos }
-    })
-    // Ordenar por total y tomar top 5
-    const topCategories = categoryTotals
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 5)
-    // Devolver solo las top 5 en el formato esperado por el radar
-    return topCategories.map(({ categoria, Gastos, Ingresos }) => ({ categoria, Gastos, Ingresos }))
-  }, [filteredTransactions, categories])
-
-  // Ajustar el heatmap para mostrar solo el rango seleccionado
-  const filteredHeatData = useMemo(() => {
-    const monthsLabels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
-    const days = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
-    let visibleMonths: string[] = []
-    if (interval === 'month' || interval === 'week' || interval === 'day') {
-      let d = startOfMonth(start)
-      while (d <= end) {
-        visibleMonths.push(monthsLabels[d.getMonth()])
-        d = addMonths(d, 1)
-      }
-    } else {
-      visibleMonths = monthsLabels
-    }
-    return days.map((day, i) => ({
-      id: day,
-      data: visibleMonths.map(month => {
-        const count = filteredTransactions.filter(tx => {
-          const date = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
-          return date.getDay() === ((i + 1) % 7) && monthsLabels[date.getMonth()] === month
-        }).length
-        return { x: month, y: count }
-      })
-    }))
-  }, [filteredTransactions, interval, start, end])
-
-  // Leyenda visual personalizada
-  const legendWrapperStyle = {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    width: '100%',
-    marginTop: '32px',
-    marginBottom: '8px',
-    padding: '10px 0',
-    background: theme === 'dark' ? 'rgba(30, 41, 59, 0.85)' : 'rgba(243, 244, 246, 0.85)',
-    borderRadius: '12px',
-    border: `1.5px solid ${theme === 'dark' ? '#334155' : '#e5e7eb'}`,
-    boxShadow: '0 2px 8px 0 rgba(0,0,0,0.07)',
-    overflowX: 'auto' as const,
-    maxWidth: '100%',
-    animation: 'fadeInLegend 0.7s',
-  }
-  // Animación fade-in para leyenda
-  const legendFadeIn = `@keyframes fadeInLegend { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }`
-  // Estilo para el texto de la leyenda
-  const legendTextStyle = {
-    fontSize: '1.15rem',
-    fontWeight: 600,
-    letterSpacing: '0.01em',
-    margin: '0 18px',
-    whiteSpace: 'nowrap',
-    cursor: 'pointer',
-    transition: 'color 0.2s',
-  }
-  const legendSymbolSize = 18
-  const legendItemStyle = {
-    itemTextColor: theme === 'dark' ? '#fbbf24' : '#1e293b',
-    itemBackground: 'transparent',
-    symbolSize: legendSymbolSize,
-    itemWidth: 110,
-    itemHeight: 32,
-    itemsSpacing: 14,
-    direction: 'row' as const,
-    translateY: 60,
-    symbolShape: 'circle' as const,
-    effects: [
-      {
-        on: 'hover' as const,
-        style: {
-          itemTextColor: theme === 'dark' ? '#f59e42' : '#f87171',
-          itemBackground: theme === 'dark' ? '#222' : '#f3f4f6',
-          cursor: 'pointer',
-        },
-      },
-    ],
-  }
-
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  if (loading) return <div className='p-8 text-center text-lg'>Cargando analíticas...</div>
 
   return (
     <>
-      <style>{legendFadeIn}</style>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
         <div className="container mx-auto px-4 py-8">
           <div className="mb-8">
@@ -763,7 +505,7 @@ export default function AnalysisPage() {
               </CardHeader>
               <CardContent style={{ height: 300 }}>
                 <ResponsiveLine
-                  data={filteredLineData}
+                  data={overviewData?.series || []}
                   theme={nivoTheme}
                   margin={{ top: 30, right: 30, bottom: 60, left: 60 }}
                   xScale={{ type: 'point' }}
@@ -772,16 +514,16 @@ export default function AnalysisPage() {
                     tickSize: 5,
                     tickPadding: 5,
                     tickRotation: 45,
-                    legend: interval === 'day' ? 'Día' : interval === 'week' ? 'Semana' : interval === 'month' ? 'Mes' : 'Año',
+                    legend: apiFilters.groupBy === 'day' ? 'Día' : apiFilters.groupBy === 'week' ? 'Semana' : apiFilters.groupBy === 'month' ? 'Mes' : 'Año',
                     legendOffset: 48,
                     legendPosition: 'middle',
-                    tickValues: filteredLineData[0]?.data.length > 15
-                      ? filteredLineData[0].data.filter((_, i) => i % Math.ceil(filteredLineData[0].data.length / 10) === 0).map(d => d.x)
+                    tickValues: overviewData?.series?.[0]?.data.length > 15
+                      ? overviewData.series[0].data.filter((_, i) => i % Math.ceil(overviewData.series[0].data.length / 10) === 0).map(d => d.x)
                       : undefined,
                     format: v => {
-                      if (interval === 'day') return String(v).slice(0, 5)
-                      if (interval === 'week') return String(v).replace('Semana ', 'S')
-                      if (interval === 'month') return String(v).slice(0, 7)
+                      if (apiFilters.groupBy === 'day') return String(v).slice(0, 5)
+                      if (apiFilters.groupBy === 'week') return String(v).replace('Semana ', 'S')
+                      if (apiFilters.groupBy === 'month') return String(v).slice(0, 7)
                       return v
                     },
                   }}
@@ -802,8 +544,8 @@ export default function AnalysisPage() {
               </CardHeader>
               <CardContent style={{ height: 300 }}>
                 <ResponsiveBar
-                  data={filteredBarData}
-                  keys={categories.map(cat => cat.name)}
+                  data={barData?.data || []}
+                  keys={barData?.categories || []}
                   indexBy='fecha'
                   margin={{ top: 30, right: 30, bottom: 60, left: 60 }}
                   padding={0.3}
@@ -817,16 +559,16 @@ export default function AnalysisPage() {
                     tickSize: 5,
                     tickPadding: 5,
                     tickRotation: 45,
-                    legend: interval === 'day' ? 'Día' : interval === 'week' ? 'Semana' : interval === 'month' ? 'Mes' : 'Año',
+                    legend: apiFilters.groupBy === 'day' ? 'Día' : apiFilters.groupBy === 'week' ? 'Semana' : apiFilters.groupBy === 'month' ? 'Mes' : 'Año',
                     legendOffset: 48,
                     legendPosition: 'middle',
-                    tickValues: filteredBarData.length > 15
-                      ? filteredBarData.filter((_, i) => i % Math.ceil(filteredBarData.length / 10) === 0).map(d => d.fecha)
+                    tickValues: barData?.data?.length > 15
+                      ? barData.data.filter((_, i) => i % Math.ceil(barData.data.length / 10) === 0).map(d => d.fecha)
                       : undefined,
                     format: v => {
-                      if (interval === 'day') return String(v).slice(0, 5)
-                      if (interval === 'week') return String(v).replace('Semana ', 'S')
-                      if (interval === 'month') return String(v).slice(0, 7)
+                      if (apiFilters.groupBy === 'day') return String(v).slice(0, 5)
+                      if (apiFilters.groupBy === 'week') return String(v).replace('Semana ', 'S')
+                      if (apiFilters.groupBy === 'month') return String(v).slice(0, 7)
                       return v
                     },
                   }}
@@ -845,7 +587,7 @@ export default function AnalysisPage() {
                 <CardTitle>Distribución por Cuenta</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
-                <ResponsivePie data={filteredPieData} margin={{ top: 30, right: 30, bottom: 50, left: 60 }} innerRadius={0.5} padAngle={0.7} cornerRadius={3} activeOuterRadiusOffset={8} borderWidth={1} borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }} arcLinkLabelsSkipAngle={10} arcLinkLabelsTextColor={theme === 'dark' ? '#e5e7eb' : '#222'} arcLinkLabelsThickness={2} arcLinkLabelsColor={{ from: 'color' }} arcLabelsSkipAngle={10} arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }} theme={nivoTheme} />
+                <ResponsivePie data={pieData || []} margin={{ top: 30, right: 30, bottom: 50, left: 60 }} innerRadius={0.5} padAngle={0.7} cornerRadius={3} activeOuterRadiusOffset={8} borderWidth={1} borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }} arcLinkLabelsSkipAngle={10} arcLinkLabelsTextColor={theme === 'dark' ? '#e5e7eb' : '#222'} arcLinkLabelsThickness={2} arcLinkLabelsColor={{ from: 'color' }} arcLabelsSkipAngle={10} arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }} theme={nivoTheme} />
               </CardContent>
             </Card>
             <Card>
@@ -853,7 +595,7 @@ export default function AnalysisPage() {
                 <CardTitle>Radar de Categorías</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
-                <ResponsiveRadar data={filteredRadarData} keys={['Gastos', 'Ingresos']} indexBy='categoria' maxValue='auto' margin={{ top: 30, right: 30, bottom: 50, left: 60 }} curve='linearClosed' borderWidth={2} borderColor={{ from: 'color' }} gridLevels={5} gridShape='circular' gridLabelOffset={36} enableDots={true} dotSize={8} dotColor={{ theme: 'background' }} dotBorderWidth={2} dotBorderColor={{ from: 'color' }} enableDotLabel={true} dotLabel='value' dotLabelYOffset={-12} colors={{ scheme: 'nivo' }} fillOpacity={0.25} blendMode='multiply' animate={true} isInteractive={true} theme={nivoTheme} />
+                <ResponsiveRadar data={radarData || []} keys={['Gastos', 'Ingresos']} indexBy='categoria' maxValue='auto' margin={{ top: 30, right: 30, bottom: 50, left: 60 }} curve='linearClosed' borderWidth={2} borderColor={{ from: 'color' }} gridLevels={5} gridShape='circular' gridLabelOffset={36} enableDots={true} dotSize={8} dotColor={{ theme: 'background' }} dotBorderWidth={2} dotBorderColor={{ from: 'color' }} enableDotLabel={true} dotLabel='value' dotLabelYOffset={-12} colors={{ scheme: 'nivo' }} fillOpacity={0.25} blendMode='multiply' animate={true} isInteractive={true} theme={nivoTheme} />
               </CardContent>
             </Card>
             <Card className='md:col-span-2'>
@@ -862,7 +604,7 @@ export default function AnalysisPage() {
               </CardHeader>
               <CardContent style={{ height: 300 }}>
                 <ResponsiveHeatMap
-                  data={filteredHeatData}
+                  data={heatmapData || []}
                   margin={{ top: 30, right: 30, bottom: 50, left: 60 }}
                   forceSquare={true}
                   axisTop={null}

@@ -4,5 +4,5 @@ export interface Budget {
   user_id: string;
   amount: number;
   current_amount: number;
-  created_at: Date;
+  created_at: string;
 }

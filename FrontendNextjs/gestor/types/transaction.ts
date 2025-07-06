@@ -11,5 +11,5 @@ export interface Transaction {
   account_id: string;
   category_id: string;
   budget_id?: string;
-  created_at: Date;
+  created_at: string;
 }
