@@ -58,12 +58,12 @@ func Run() error {
 	}()
 
 	logger.WithField("config", map[string]interface{}{
-		"environment": cfg.Environment,
-		"host":        cfg.Host,
-		"port":        cfg.Port,
-		"db_type":     cfg.DbType,
-		"tracing":     cfg.EnableTracing,
-		"metrics":     cfg.EnableMetrics,
+		"environment": cfg.Server.Environment,
+		"host":        cfg.Server.Host,
+		"port":        cfg.Server.Port,
+		"db_type":     cfg.Database.Type,
+		"tracing":     cfg.FeatureFlags.EnableTracing,
+		"metrics":     cfg.FeatureFlags.EnableMetrics,
 	}).Info("Starting application")
 
 	// Connect to database
@@ -86,14 +86,14 @@ func Run() error {
 	repositories := initializeRepositories(db)
 
 	// Initialize services
-	services := initializeServices(repositories)
+	services := initializeServices(repositories, cfg)
 
 	// Initialize and start server
 	serverCtx, srv := server.New(
 		ctx,
-		cfg.Host,
-		cfg.Port,
-		cfg.ShutdownTimeout,
+		cfg.Server.Host,
+		cfg.Server.Port,
+		&cfg.Server.ShutdownTimeout,
 		services.accountService,
 		services.transactionService,
 		services.userService,
@@ -104,7 +104,7 @@ func Run() error {
 		cfg,
 	)
 
-	logger.Infof("Server starting on %s:%d", cfg.Host, cfg.Port)
+	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
 
 	// Start server
 	if err := srv.Run(serverCtx); err != nil {
@@ -119,9 +119,9 @@ func Run() error {
 func initializeObservability(cfg *config.Config) (*observability.Logger, *observability.Provider, *observability.BusinessMetrics, error) {
 	// Initialize structured logger
 	loggerCfg := &observability.LoggerConfig{
-		Level:      cfg.LogLevel,
-		Format:     cfg.LogFormat,
-		Output:     cfg.LogOutput,
+		Level:      cfg.Logging.Level,
+		Format:     cfg.Logging.Format,
+		Output:     cfg.Logging.Output,
 		TimeFormat: time.RFC3339,
 		Caller:     cfg.IsDevelopment(),
 	}
@@ -132,21 +132,21 @@ func initializeObservability(cfg *config.Config) (*observability.Logger, *observ
 	var businessMetrics *observability.BusinessMetrics
 
 	// Initialize OpenTelemetry if enabled
-	if cfg.EnableTracing || cfg.EnableMetrics {
+	if cfg.FeatureFlags.EnableTracing || cfg.FeatureFlags.EnableMetrics {
 		otelCfg := &observability.Config{
-			ServiceName:        cfg.OtelServiceName,
-			ServiceVersion:     cfg.OtelServiceVersion,
-			Environment:        cfg.OtelEnvironment,
-			OTLPEndpoint:       cfg.OtelOTLPEndpoint,
-			JaegerEndpoint:     cfg.OtelJaegerEndpoint,
-			EnableStdout:       cfg.OtelEnableStdout,
-			EnableMetrics:      cfg.EnableMetrics,
-			EnableTracing:      cfg.EnableTracing,
-			SamplingRate:       cfg.OtelSamplingRate,
-			BatchTimeout:       cfg.OtelBatchTimeout,
-			MaxBatchSize:       cfg.OtelMaxBatchSize,
-			MaxQueueSize:       cfg.OtelMaxQueueSize,
-			PrometheusEndpoint: cfg.PrometheusEndpoint,
+			ServiceName:        cfg.OpenTelemetry.ServiceName,
+			ServiceVersion:     cfg.OpenTelemetry.ServiceVersion,
+			Environment:        cfg.OpenTelemetry.Environment,
+			OTLPEndpoint:       cfg.OpenTelemetry.OTLPEndpoint,
+			JaegerEndpoint:     cfg.OpenTelemetry.JaegerEndpoint,
+			EnableStdout:       cfg.OpenTelemetry.EnableStdout,
+			EnableMetrics:      cfg.FeatureFlags.EnableMetrics,
+			EnableTracing:      cfg.FeatureFlags.EnableTracing,
+			SamplingRate:       cfg.OpenTelemetry.SamplingRate,
+			BatchTimeout:       cfg.OpenTelemetry.BatchTimeout,
+			MaxBatchSize:       cfg.OpenTelemetry.MaxBatchSize,
+			MaxQueueSize:       cfg.OpenTelemetry.MaxQueueSize,
+			PrometheusEndpoint: cfg.Prometheus.Endpoint,
 		}
 
 		var err error
@@ -158,14 +158,14 @@ func initializeObservability(cfg *config.Config) (*observability.Logger, *observ
 		logger.Info("OpenTelemetry initialized successfully")
 
 		// Initialize business metrics
-		if cfg.EnableMetrics {
-			businessMetrics, err = observability.NewBusinessMetrics(cfg.OtelServiceName)
+		if cfg.FeatureFlags.EnableMetrics {
+			businessMetrics, err = observability.NewBusinessMetrics(cfg.OpenTelemetry.ServiceName)
 			if err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to initialize business metrics: %w", err)
 			}
 
 			// Initialize global metrics
-			if err := observability.InitializeGlobalMetrics(cfg.OtelServiceName); err != nil {
+			if err := observability.InitializeGlobalMetrics(cfg.OpenTelemetry.ServiceName); err != nil {
 				return nil, nil, nil, fmt.Errorf("failed to initialize global metrics: %w", err)
 			}
 
@@ -181,7 +181,7 @@ func initializeDatabase(ctx context.Context, cfg *config.Config, logger *observa
 	var databaseURL string
 	var driverName string
 
-	switch cfg.DbType {
+	switch cfg.Database.Type {
 	case config.DatabaseTypeSQLite:
 		databaseURL = cfg.GetSQLiteUrl()
 		driverName = "sqlite3"
@@ -189,12 +189,12 @@ func initializeDatabase(ctx context.Context, cfg *config.Config, logger *observa
 		databaseURL = cfg.GetPostgresUrl()
 		driverName = "postgres"
 	default:
-		return nil, fmt.Errorf("unsupported database type: %s", cfg.DbType)
+		return nil, fmt.Errorf("unsupported database type: %s", cfg.Database.Type)
 	}
 
 	logger.WithFields(map[string]interface{}{
 		"driver": driverName,
-		"type":   cfg.DbType,
+		"type":   cfg.Database.Type,
 	}).Info("Connecting to database")
 
 	db, err := sql.Open(driverName, databaseURL)
@@ -202,41 +202,42 @@ func initializeDatabase(ctx context.Context, cfg *config.Config, logger *observa
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}
 
-	// Test database connection
+	// Configure connection pool
+	db.SetMaxOpenConns(cfg.Database.MaxOpenConns)
+	db.SetMaxIdleConns(cfg.Database.MaxIdleConns)
+	db.SetConnMaxLifetime(cfg.Database.ConnMaxLifetime)
+	db.SetConnMaxIdleTime(cfg.Database.ConnMaxIdleTime)
+
+	// Test connection
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+
 	if err := db.PingContext(ctx); err != nil {
+		db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
-
-	// Configure connection pool
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(5)
-	db.SetConnMaxLifetime(5 * time.Minute)
 
 	logger.Info("Database connection established successfully")
 	return db, nil
 }
 
-// runMigrations executes database migrations
+// runMigrations runs database migrations
 func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 	logger.Info("Running database migrations")
 
-	migrationPath := "file://cmd/api/db/migrations"
-
-	switch cfg.DbType {
+	switch cfg.Database.Type {
 	case config.DatabaseTypePostgres:
-		utils.RunDBMigration(migrationPath, cfg.GetPostgresUrl())
+		utils.RunDBMigration("file://cmd/api/db/migrations", cfg.GetPostgresUrl())
 		return nil
 	case config.DatabaseTypeSQLite:
-		// For SQLite migrations, we might need a different approach
-		// For now, we'll skip migrations for SQLite in production
-		logger.Info("Skipping migrations for SQLite database")
+		utils.RunSQLiteMigration("cmd/api/db/migrations", cfg.GetSQLiteUrl())
 		return nil
 	default:
-		return fmt.Errorf("unsupported database type for migrations: %s", cfg.DbType)
+		return fmt.Errorf("unsupported database type for migrations: %s", cfg.Database.Type)
 	}
 }
 
-// repositories holds all repository instances
+// repositories holds all repository interfaces
 type repositories struct {
 	accountRepository     accountRepo.AccountRepositoryInterface
 	transactionRepository transactionRepo.TransactionRepsitoryinterface
@@ -270,12 +271,12 @@ type services struct {
 }
 
 // initializeServices creates all service instances
-func initializeServices(repos *repositories) *services {
+func initializeServices(repos *repositories, cfg *config.Config) *services {
 	return &services{
 		accountService:     account.NewAccountService(repos.accountRepository),
 		transactionService: transaction.NewTransactionService(repos.transactionRepository),
 		userService:        user.NewUserService(repos.userRepository),
-		authService:        auth.NewAuthService(repos.userRepository),
+		authService:        auth.NewAuthService(repos.userRepository, cfg),
 		budgetService:      budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
 		categoryService:    category.NewCategoryServices(repos.categoryRepository),
 		invesmentService:   invesment.NewInvesmentServices(repos.invesmentRepository),

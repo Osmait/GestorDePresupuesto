@@ -14,7 +14,7 @@ func CreateBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var budget dto.BudgetRequest
 
-		userId := c.GetString("X-user-Id")
+		userId := c.GetString("X-User-Id")
 		err := c.Bind(&budget)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
@@ -32,7 +32,7 @@ func CreateBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 
 func FindAllBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userId := c.GetString("X-user-Id")
+		userId := c.GetString("X-User-Id")
 		budgets, err := budgetServices.FindAll(c, userId)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, c)

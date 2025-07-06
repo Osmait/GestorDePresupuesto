@@ -68,6 +68,124 @@ func CreateInMemorySQLiteDB() *sql.DB {
 	return db
 }
 
+// SetupPostgreSQLSchema sets up the PostgreSQL schema directly without migrations
+func SetupPostgreSQLSchema(db *sql.DB) error {
+	schema := `
+	-- PostgreSQL schema for E2E testing
+	DROP TABLE IF EXISTS transactions CASCADE;
+	DROP TABLE IF EXISTS budgets CASCADE;
+	DROP TABLE IF EXISTS categorys CASCADE;
+	DROP TABLE IF EXISTS account CASCADE;
+	DROP TABLE IF EXISTS users CASCADE;
+	DROP TABLE IF EXISTS cryptos CASCADE;
+	DROP TABLE IF EXISTS invesments CASCADE;
+	DROP TYPE IF EXISTS TypeTransaction CASCADE;
+
+	CREATE TYPE TypeTransaction AS ENUM (
+		'bill',
+		'income'
+	);
+
+	CREATE TABLE users(
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		last_name VARCHAR(255) NOT NULL,
+		email VARCHAR(255) UNIQUE NOT NULL,
+		password VARCHAR(255) NOT NULL,
+		token VARCHAR(32),
+		confirmed BOOLEAN DEFAULT false,
+		created_at timestamptz NOT NULL DEFAULT (now())
+	);
+
+	CREATE TABLE account (
+		id VARCHAR(32) PRIMARY KEY,
+		name_account VARCHAR(255),
+		bank VARCHAR(255),
+		balance float,
+		user_id VARCHAR NOT NULL,
+		created_at timestamptz NOT NULL DEFAULT (now()),
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+
+	CREATE TABLE categorys(
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		icon VARCHAR(255) NOT NULL,
+		color VARCHAR(255) NOT NULL,
+		created_at timestamptz NOT NULL DEFAULT (now()),
+		user_id VARCHAR NOT NULL,
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+
+	CREATE TABLE budgets (
+		id VARCHAR PRIMARY KEY,
+		category_id VARCHAR NOT NULL,
+		amount float NOT NULL,
+		created_at timestamptz NOT NULL DEFAULT (now()),
+		user_id VARCHAR NOT NULL,
+		FOREIGN KEY (category_id) REFERENCES categorys (id),
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+
+	CREATE TABLE transactions (
+		id VARCHAR PRIMARY KEY,
+		transaction_name VARCHAR NOT NULL,
+		transaction_description TEXT,
+		amount float NOT NULL,
+		type_transation TypeTransaction NOT NULL,
+		account_id VARCHAR NOT NULL,
+		user_id VARCHAR NOT NULL,
+		category_id VARCHAR NOT NULL,
+		budget_id VARCHAR,
+		created_at timestamptz NOT NULL DEFAULT (now()),
+		FOREIGN KEY (account_id) REFERENCES account (id),
+		FOREIGN KEY (user_id) REFERENCES users (id),
+		FOREIGN KEY (category_id) REFERENCES categorys (id),
+		FOREIGN KEY (budget_id) REFERENCES budgets (id)
+	);
+
+	CREATE TABLE cryptos(
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		price float NOT NULL,
+		current_price float NOT NULL,
+		quantity float NOT NULL,
+		created_at timestamptz NOT NULL DEFAULT (now()),
+		user_id VARCHAR NOT NULL,
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+
+	-- Additional table for investment repository compatibility
+	CREATE TABLE invesments(
+		id VARCHAR PRIMARY KEY,
+		name VARCHAR(255) NOT NULL,
+		price float NOT NULL,
+		current_price float NOT NULL,
+		quantity float NOT NULL,
+		created_at timestamptz NOT NULL DEFAULT (now()),
+		user_id VARCHAR NOT NULL,
+		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+	`
+
+	// Split the schema into individual statements
+	statements := strings.Split(schema, ";")
+
+	for _, statement := range statements {
+		trimmed := strings.TrimSpace(statement)
+		if trimmed != "" {
+			_, err := db.Exec(trimmed)
+			if err != nil {
+				log.Error().Err(err).Str("statement", trimmed).Msg("failed to execute PostgreSQL schema statement")
+				return err
+			}
+		}
+	}
+
+	log.Info().Msg("PostgreSQL schema setup successfully")
+	return nil
+}
+
 // SetupSQLiteSchema sets up the SQLite schema directly without migrations
 func SetupSQLiteSchema(db *sql.DB) error {
 	schema := `

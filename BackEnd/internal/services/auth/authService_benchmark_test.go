@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/go-faker/faker/v4"
+	"github.com/osmait/gestorDePresupuesto/internal/config"
 	authRequest "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	"github.com/stretchr/testify/mock"
@@ -41,10 +42,19 @@ func getNewUserBench() *user.User {
 	return user.NewUser(faker.UUIDHyphenated(), faker.Name(), faker.LastName(), faker.Email(), faker.Password())
 }
 
+func getTestConfigBench() *config.Config {
+	return &config.Config{
+		JWT: config.JWTConfig{
+			Secret: "test-secret-key-for-benchmarking",
+		},
+	}
+}
+
 // BenchmarkAuthService_Login tests the performance of user authentication
 func BenchmarkAuthService_Login(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Create test users with hashed passwords
@@ -83,7 +93,8 @@ func BenchmarkAuthService_Login(b *testing.B) {
 // BenchmarkAuthService_Login_Parallel tests authentication under concurrent load
 func BenchmarkAuthService_Login_Parallel(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Create test user with hashed password
@@ -110,7 +121,8 @@ func BenchmarkAuthService_Login_Parallel(b *testing.B) {
 // BenchmarkAuthService_Login_DifferentUsers tests authentication with different users
 func BenchmarkAuthService_Login_DifferentUsers(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Create multiple test users
@@ -152,7 +164,8 @@ func BenchmarkAuthService_Login_DifferentUsers(b *testing.B) {
 // BenchmarkAuthService_Login_MemoryAllocation tests memory allocation patterns
 func BenchmarkAuthService_Login_MemoryAllocation(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Create test user
@@ -180,7 +193,8 @@ func BenchmarkAuthService_Login_MemoryAllocation(b *testing.B) {
 // BenchmarkAuthService_Login_HighConcurrency tests performance under high concurrent load
 func BenchmarkAuthService_Login_HighConcurrency(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Create test users for high concurrency
@@ -221,7 +235,8 @@ func BenchmarkAuthService_Login_HighConcurrency(b *testing.B) {
 // BenchmarkAuthService_Login_BatchOperations tests batch authentication operations
 func BenchmarkAuthService_Login_BatchOperations(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Create test users
@@ -265,7 +280,8 @@ func BenchmarkAuthService_Login_BatchOperations(b *testing.B) {
 // BenchmarkAuthService_Login_PasswordComplexity tests authentication with different password complexities
 func BenchmarkAuthService_Login_PasswordComplexity(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Different password complexities
@@ -304,7 +320,8 @@ func BenchmarkAuthService_Login_PasswordComplexity(b *testing.B) {
 // BenchmarkAuthService_Login_BCryptCosts tests authentication with different bcrypt costs
 func BenchmarkAuthService_Login_BCryptCosts(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Different bcrypt costs
@@ -335,7 +352,8 @@ func BenchmarkAuthService_Login_BCryptCosts(b *testing.B) {
 // BenchmarkAuthService_Login_ConcurrentUsers tests concurrent authentication for different users
 func BenchmarkAuthService_Login_ConcurrentUsers(b *testing.B) {
 	mockRepo := &MockUserRepositoryBench{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfigBench()
+	authService := NewAuthService(mockRepo, testConfig)
 	ctx := context.Background()
 
 	// Create multiple test users for concurrent access

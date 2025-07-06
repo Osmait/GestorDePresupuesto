@@ -12,7 +12,7 @@ import (
 func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		var categoryRequest dto.CategoryRequest
-		userId := c.GetString("X-user-Id")
+		userId := c.GetString("X-User-Id")
 		err := c.Bind(&categoryRequest)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
@@ -30,7 +30,7 @@ func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 
 func FindAllCategorys(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		userId := c.GetString("X-user-Id")
+		userId := c.GetString("X-User-Id")
 		categorys, err := categoryServices.FindAll(c, userId)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, c)

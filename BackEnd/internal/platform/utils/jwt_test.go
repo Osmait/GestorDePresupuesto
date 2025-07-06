@@ -8,15 +8,17 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+const testSecret = "test-secret-for-jwt-testing"
+
 func TestJwtCreate(t *testing.T) {
 	id := "user123"
-	tokenString, err := JwtCreate(id)
+	tokenString, err := JwtCreate(id, testSecret)
 
 	assert.NoError(t, err, "Expected no errors")
 	assert.NotEmpty(t, tokenString, "Expected the token not to be empty")
 
 	token, err := jwt.ParseWithClaims(*tokenString, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte("secreto"), nil
+		return []byte(testSecret), nil
 	})
 
 	assert.NoError(t, err, "Error decoding the token")
@@ -29,11 +31,20 @@ func TestJwtCreate(t *testing.T) {
 
 func TestJwtCreate_EmptyUserId(t *testing.T) {
 	// Test with empty user ID
-	tokenString, err := JwtCreate("")
+	tokenString, err := JwtCreate("", testSecret)
 
 	assert.Error(t, err, "Expected error for empty user ID")
 	assert.Nil(t, tokenString, "Token should be nil for empty user ID")
-	assert.Equal(t, "id is void ", err.Error(), "Error message should match expected")
+	assert.Equal(t, "id is void", err.Error(), "Error message should match expected")
+}
+
+func TestJwtCreate_EmptySecret(t *testing.T) {
+	// Test with empty secret
+	tokenString, err := JwtCreate("user123", "")
+
+	assert.Error(t, err, "Expected error for empty secret")
+	assert.Nil(t, tokenString, "Token should be nil for empty secret")
+	assert.Equal(t, "secret is required", err.Error(), "Error message should match expected")
 }
 
 func TestJwtCreate_ValidUserId_DifferentFormats(t *testing.T) {
@@ -50,7 +61,7 @@ func TestJwtCreate_ValidUserId_DifferentFormats(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			tokenString, err := JwtCreate(tc.userId)
+			tokenString, err := JwtCreate(tc.userId, testSecret)
 
 			assert.NoError(t, err, "Should not error for valid user ID")
 			assert.NotNil(t, tokenString, "Token should not be nil")
@@ -58,7 +69,7 @@ func TestJwtCreate_ValidUserId_DifferentFormats(t *testing.T) {
 
 			// Verify token can be parsed
 			token, err := jwt.ParseWithClaims(*tokenString, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
-				return []byte("secreto"), nil
+				return []byte(testSecret), nil
 			})
 
 			assert.NoError(t, err, "Token should be parseable")
@@ -73,14 +84,14 @@ func TestJwtCreate_ValidUserId_DifferentFormats(t *testing.T) {
 
 func TestJwtCreate_TokenExpiration(t *testing.T) {
 	id := "test_user"
-	tokenString, err := JwtCreate(id)
+	tokenString, err := JwtCreate(id, testSecret)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, tokenString)
 
 	// Parse token to check expiration
 	token, err := jwt.ParseWithClaims(*tokenString, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte("secreto"), nil
+		return []byte(testSecret), nil
 	})
 
 	assert.NoError(t, err)
@@ -100,7 +111,7 @@ func TestJwtCreate_TokenExpiration(t *testing.T) {
 
 func TestJwtCreate_TokenStructure(t *testing.T) {
 	id := "test_structure"
-	tokenString, err := JwtCreate(id)
+	tokenString, err := JwtCreate(id, testSecret)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, tokenString)
@@ -118,9 +129,9 @@ func TestJwtCreate_MultipleTokensAreDifferent(t *testing.T) {
 	id := "same_user"
 
 	// Create multiple tokens for the same user
-	token1, err1 := JwtCreate(id)
+	token1, err1 := JwtCreate(id, testSecret)
 	time.Sleep(time.Millisecond) // Small delay to ensure different timestamps
-	token2, err2 := JwtCreate(id)
+	token2, err2 := JwtCreate(id, testSecret)
 
 	assert.NoError(t, err1)
 	assert.NoError(t, err2)
@@ -133,6 +144,33 @@ func TestJwtCreate_MultipleTokensAreDifferent(t *testing.T) {
 	// For this test, we'll just verify both tokens are valid but don't require them to be different
 	assert.NotEmpty(t, *token1)
 	assert.NotEmpty(t, *token2)
+}
+
+func TestJwtCreate_DifferentSecrets(t *testing.T) {
+	id := "test_user"
+	secret1 := "secret1"
+	secret2 := "secret2"
+
+	// Create tokens with different secrets
+	token1, err1 := JwtCreate(id, secret1)
+	token2, err2 := JwtCreate(id, secret2)
+
+	assert.NoError(t, err1)
+	assert.NoError(t, err2)
+	assert.NotNil(t, token1)
+	assert.NotNil(t, token2)
+
+	// Token created with secret1 should not be valid with secret2
+	_, err := jwt.ParseWithClaims(*token1, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secret2), nil
+	})
+	assert.Error(t, err, "Token created with secret1 should not be valid with secret2")
+
+	// Token created with secret2 should not be valid with secret1
+	_, err = jwt.ParseWithClaims(*token2, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
+		return []byte(secret1), nil
+	})
+	assert.Error(t, err, "Token created with secret2 should not be valid with secret1")
 }
 
 func TestAppClaims_Structure(t *testing.T) {

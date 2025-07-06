@@ -72,7 +72,7 @@ func AuthMiddleware(userService *user.UserService, config *config.Config) gin.Ha
 				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
 			}
 			// Use configurable secret from environment
-			return []byte(config.JWTSecret), nil
+			return []byte(config.JWT.Secret), nil
 		})
 
 		if err != nil {

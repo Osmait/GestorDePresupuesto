@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/osmait/gestorDePresupuesto/internal/config"
 	authRequest "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
@@ -12,12 +13,14 @@ import (
 )
 
 type AuthService struct {
-	repo userRepo.UserRepositoryInterface
+	repo   userRepo.UserRepositoryInterface
+	config *config.Config
 }
 
-func NewAuthService(userRepository userRepo.UserRepositoryInterface) *AuthService {
+func NewAuthService(userRepository userRepo.UserRepositoryInterface, config *config.Config) *AuthService {
 	return &AuthService{
-		repo: userRepository,
+		repo:   userRepository,
+		config: config,
 	}
 }
 
@@ -36,7 +39,7 @@ func (a *AuthService) Login(ctx context.Context, authRequest *authRequest.AuthRe
 	}
 
 	fmt.Println(user.Id)
-	token, err := utils.JwtCreate(user.Id)
+	token, err := utils.JwtCreate(user.Id, a.config.JWT.Secret)
 	if err != nil {
 		return nil, err
 	}

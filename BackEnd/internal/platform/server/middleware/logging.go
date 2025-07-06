@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"io"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -37,7 +36,7 @@ func (w *responseWriter) Write(b []byte) (int, error) {
 // InitializeLogger configures the global logger with the given configuration
 func InitializeLogger(cfg *config.Config) {
 	// Set log level
-	switch cfg.LogLevel {
+	switch cfg.Logging.Level {
 	case "debug":
 		zerolog.SetGlobalLevel(zerolog.DebugLevel)
 	case "info":
@@ -55,7 +54,7 @@ func InitializeLogger(cfg *config.Config) {
 	}
 
 	// Set log format
-	if cfg.LogFormat == "text" || cfg.IsDevelopment() {
+	if cfg.Logging.Format == "console" {
 		log.Logger = log.Output(zerolog.ConsoleWriter{
 			Out:        os.Stdout,
 			TimeFormat: time.RFC3339,
@@ -65,12 +64,12 @@ func InitializeLogger(cfg *config.Config) {
 		log.Logger = zerolog.New(os.Stdout).With().
 			Timestamp().
 			Str("service", "gestor-presupuesto").
-			Str("environment", string(cfg.Environment)).
+			Str("environment", string(cfg.Server.Environment)).
 			Logger()
 	}
 
-	// Add caller information in development
-	if cfg.IsDevelopment() {
+	// Set caller information if enabled
+	if cfg.Logging.Caller {
 		log.Logger = log.Logger.With().Caller().Logger()
 	}
 }
@@ -111,14 +110,14 @@ func RequestLogging(cfg *config.Config) gin.HandlerFunc {
 
 		// Capture request body if configured
 		var requestBody []byte
-		if cfg.IsDevelopment() && method != "GET" {
+		if cfg.Logging.Caller && method != "GET" {
 			requestBody, _ = io.ReadAll(c.Request.Body)
 			c.Request.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 		}
 
 		// Wrap response writer to capture response body
 		var responseBody *bytes.Buffer
-		if cfg.IsDevelopment() {
+		if cfg.Logging.Caller {
 			responseBody = &bytes.Buffer{}
 			c.Writer = &responseWriter{
 				ResponseWriter: c.Writer,
@@ -164,7 +163,7 @@ func RequestLogging(cfg *config.Config) gin.HandlerFunc {
 		}
 
 		// Add request/response body in development
-		if cfg.IsDevelopment() {
+		if cfg.Logging.Caller {
 			if len(requestBody) > 0 && len(requestBody) < 1024 { // Limit body size
 				logEvent = logEvent.RawJSON("request_body", requestBody)
 			}
@@ -307,7 +306,17 @@ func PerformanceLogging(slowThreshold time.Duration) gin.HandlerFunc {
 
 // generateRequestID creates a simple request ID
 func generateRequestID() string {
-	return strconv.FormatInt(time.Now().UnixNano(), 36)
+	return time.Now().Format("20060102150405") + "-" + randomString(8)
+}
+
+// randomString generates a random string of specified length
+func randomString(length int) string {
+	const charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[time.Now().UnixNano()%int64(len(charset))]
+	}
+	return string(b)
 }
 
 // CorrelationID middleware adds correlation ID to requests for distributed tracing

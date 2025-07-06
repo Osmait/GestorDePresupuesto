@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/go-faker/faker/v4"
+	"github.com/osmait/gestorDePresupuesto/internal/config"
 	authRequest "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	"github.com/stretchr/testify/assert"
@@ -41,9 +42,18 @@ func getNewUser() *user.User {
 	return user1
 }
 
+func getTestConfig() *config.Config {
+	return &config.Config{
+		JWT: config.JWTConfig{
+			Secret: "test-secret-key-for-testing",
+		},
+	}
+}
+
 func TestAuthServices(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
-	authService := NewAuthService(mockRepo)
+	testConfig := getTestConfig()
+	authService := NewAuthService(mockRepo, testConfig)
 
 	user1 := getNewUser()
 	passwor := user1.Password

@@ -78,7 +78,104 @@ run:
 # Run with hot reload using air
 dev:
 	@echo "$(BLUE)Starting development server with hot reload...$(RESET)"
-	@air
+	@$(shell go env GOPATH)/bin/air
+
+# Start development environment with database
+dev-start:
+	@echo "$(BLUE)Starting development environment with database...$(RESET)"
+	@docker-compose up -d postgres
+	@echo "$(GREEN)Waiting for PostgreSQL to be ready...$(RESET)"
+	@sleep 5
+	@echo "$(GREEN)PostgreSQL is ready!$(RESET)"
+	@echo "$(BLUE)Starting application with hot reload...$(RESET)"
+	@ENV=development \
+	 DB_HOST=localhost \
+	 DB_PORT=5432 \
+	 DB_USER=osmait \
+	 DB_PASSWORD=admin123 \
+	 DB_NAME=my_store \
+	 DB_TYPE=postgres \
+	 SERVER_HOST=localhost \
+	 SERVER_PORT=8080 \
+	 JWT_SECRET=your-super-secret-development-key-with-32-plus-characters-for-jwt-tokens \
+	 $(shell go env GOPATH)/bin/air
+
+# Start full development environment (backend + database + frontend)
+dev-full:
+	@echo "$(BLUE)Starting full development environment...$(RESET)"
+	@docker-compose up -d
+	@echo "$(GREEN)Full development environment started!$(RESET)"
+	@echo "$(YELLOW)Services:$(RESET)"
+	@echo "  - Backend: http://localhost:8080"
+	@echo "  - Frontend: http://localhost:4321"
+	@echo "  - Database: localhost:5432"
+
+# Stop development environment
+dev-stop:
+	@echo "$(BLUE)Stopping development environment...$(RESET)"
+	@docker-compose down
+	@echo "$(GREEN)Development environment stopped$(RESET)"
+
+# Restart development environment
+dev-restart: dev-stop dev-start
+
+# Show logs of development environment
+dev-logs:
+	@echo "$(BLUE)Showing development environment logs...$(RESET)"
+	@docker-compose logs -f
+
+# Setup development environment (first time setup)
+dev-setup:
+	@echo "$(BLUE)Setting up development environment...$(RESET)"
+	@make dev-deps
+	@echo "$(BLUE)Creating .env file for development...$(RESET)"
+	@make dev-env
+	@echo "$(BLUE)Starting database and running migrations...$(RESET)"
+	@docker-compose up -d postgres
+	@sleep 10
+	@echo "$(GREEN)Development environment setup completed!$(RESET)"
+
+# Create .env file for development
+dev-env:
+	@echo "$(BLUE)Creating .env file for development...$(RESET)"
+	@echo "# Development Environment Configuration" > .env
+	@echo "ENV=development" >> .env
+	@echo "SERVER_HOST=localhost" >> .env
+	@echo "SERVER_PORT=8080" >> .env
+	@echo "DB_HOST=localhost" >> .env
+	@echo "DB_PORT=5432" >> .env
+	@echo "DB_USER=osmait" >> .env
+	@echo "DB_PASSWORD=admin123" >> .env
+	@echo "DB_NAME=my_store" >> .env
+	@echo "DB_TYPE=postgres" >> .env
+	@echo "JWT_SECRET=your-super-secret-development-key-with-32-plus-characters-for-jwt-tokens" >> .env
+	@echo "SHUTDOWN_TIMEOUT=30s" >> .env
+	@echo "ENABLE_METRICS=true" >> .env
+	@echo "ENABLE_TRACING=true" >> .env
+	@echo "ENABLE_DEBUG_MODE=true" >> .env
+	@echo "LOG_LEVEL=debug" >> .env
+	@echo "LOG_FORMAT=console" >> .env
+	@echo "$(GREEN).env file created for development$(RESET)"
+
+# Run database migrations
+migrate:
+	@echo "$(BLUE)Running database migrations...$(RESET)"
+	@go run $(MAIN_PATH) migrate
+	@echo "$(GREEN)Migrations completed$(RESET)"
+
+# Reset database (dangerous - development only)
+dev-reset-db:
+	@echo "$(RED)WARNING: This will destroy all data in the development database!$(RESET)"
+	@echo "$(YELLOW)Press Ctrl+C to cancel or Enter to continue...$(RESET)"
+	@read
+	@docker-compose down postgres
+	@docker volume rm gestordePresupuesto_postgres_data 2>/dev/null || true
+	@rm -rf postgres_data
+	@echo "$(BLUE)Starting fresh database...$(RESET)"
+	@docker-compose up -d postgres
+	@sleep 10
+	@make migrate
+	@echo "$(GREEN)Database reset completed$(RESET)"
 
 # Install development dependencies
 dev-deps:
@@ -344,6 +441,15 @@ help:
 	@echo "  run           - Run the application"
 	@echo "  dev           - Start development server with hot reload"
 	@echo "  dev-deps      - Install development dependencies"
+	@echo "  dev-start     - Start development environment with database"
+	@echo "  dev-full      - Start full development environment (backend + database + frontend)"
+	@echo "  dev-stop      - Stop development environment"
+	@echo "  dev-restart   - Restart development environment"
+	@echo "  dev-logs      - Show logs of development environment"
+	@echo "  dev-setup     - Setup development environment (first time setup)"
+	@echo "  dev-env       - Create .env file for development"
+	@echo "  migrate       - Run database migrations"
+	@echo "  dev-reset-db  - Reset database (dangerous - development only)"
 	@echo ""
 	@echo "$(YELLOW)Code Quality Commands:$(RESET)"
 	@echo "  fmt           - Format code"
@@ -386,4 +492,102 @@ help:
 	@echo "  ci            - Run all CI checks"
 	@echo "  release       - Prepare for release"
 	@echo "  info          - Show project information"
-	@echo "  help          - Display this help message" 
+	@echo "  help          - Display this help message"
+	@echo ""
+	@echo "$(YELLOW)E2E Testing Commands:$(RESET)"
+	@echo "  e2e           - Run all E2E tests"
+	@echo "  e2e-smoke     - Run E2E smoke tests"
+	@echo "  e2e-flows     - Run E2E flow tests"
+	@echo "  e2e-scenarios - Run E2E scenario tests"
+	@echo "  e2e-performance - Run E2E performance tests"
+	@echo "  e2e-stress    - Run E2E stress tests"
+	@echo "  e2e-coverage  - Generate E2E coverage report"
+	@echo "  e2e-clean     - Clean E2E test containers"
+	@echo "  e2e-setup     - Setup E2E test environment"
+	@echo ""
+	@echo "$(YELLOW)E2E Docker Commands:$(RESET)"
+	@echo "  e2e-docker-up - Start E2E environment"
+	@echo "  e2e-docker-down - Stop E2E environment"
+	@echo "  e2e-docker-test - Run E2E tests in Docker"
+	@echo "  e2e-docker-debug - Start E2E environment with debug tools"
+
+## E2E Test Commands
+
+# E2E Test targets
+e2e:
+	@echo "$(BLUE)🧪 Running E2E tests...$(RESET)"
+	@./scripts/e2e-test.sh run
+
+e2e-smoke:
+	@echo "$(BLUE)🔥 Running smoke tests...$(RESET)"
+	@./scripts/e2e-test.sh smoke
+
+e2e-flows:
+	@echo "$(BLUE)🌊 Running flow tests...$(RESET)"
+	@./scripts/e2e-test.sh flows -v
+
+e2e-scenarios:
+	@echo "$(BLUE)🎭 Running scenario tests...$(RESET)"
+	@./scripts/e2e-test.sh scenarios -v
+
+e2e-performance:
+	@echo "$(BLUE)⚡ Running performance tests...$(RESET)"
+	@./scripts/e2e-test.sh performance -v
+
+e2e-stress:
+	@echo "$(BLUE)💪 Running stress tests...$(RESET)"
+	@./scripts/e2e-test.sh stress -v
+
+e2e-coverage:
+	@echo "$(BLUE)📊 Generating E2E coverage report...$(RESET)"
+	@./scripts/e2e-test.sh coverage
+
+e2e-clean:
+	@echo "$(BLUE)🧹 Cleaning E2E test containers...$(RESET)"
+	@./scripts/e2e-test.sh clean
+
+# E2E Docker targets
+e2e-docker-up:
+	@echo "$(BLUE)🐳 Starting E2E environment...$(RESET)"
+	@docker-compose -f docker-compose.e2e.yml up -d postgres-e2e redis-e2e
+	@echo "$(YELLOW)⏳ Waiting for services to be ready...$(RESET)"
+	@sleep 10
+	@echo "$(GREEN)E2E environment ready!$(RESET)"
+
+e2e-docker-down:
+	@echo "$(BLUE)🐳 Stopping E2E environment...$(RESET)"
+	@docker-compose -f docker-compose.e2e.yml down -v
+	@echo "$(GREEN)E2E environment stopped$(RESET)"
+
+e2e-docker-test:
+	@echo "$(BLUE)🐳 Running E2E tests in Docker...$(RESET)"
+	@docker-compose -f docker-compose.e2e.yml --profile e2e up --build --abort-on-container-exit e2e-tests
+
+e2e-docker-debug:
+	@echo "$(BLUE)🐳 Starting E2E environment with debugging tools...$(RESET)"
+	@docker-compose -f docker-compose.e2e.yml --profile debug up -d
+	@echo "$(GREEN)E2E debug environment started!$(RESET)"
+	@echo "$(YELLOW)Debug tools available:$(RESET)"
+	@echo "  - Adminer (DB): http://localhost:8082"
+	@echo "  - Redis Commander: http://localhost:8083"
+	@echo "  - Application: http://localhost:8081"
+
+# E2E setup and dependencies
+e2e-setup:
+	@echo "$(BLUE)🔧 Setting up E2E test environment...$(RESET)"
+	@mkdir -p coverage
+	@mkdir -p test-results
+	@chmod +x scripts/e2e-test.sh
+	@echo "$(GREEN)E2E test environment setup completed$(RESET)"
+
+# Enhanced test targets
+test-all-comprehensive:
+	@echo "$(BLUE)🧪 Running comprehensive test suite...$(RESET)"
+	@make test
+	@make e2e-smoke
+
+test-ci-full:
+	@echo "$(BLUE)🚀 Running full CI test suite...$(RESET)"
+	@make test-coverage
+	@make test-race
+	@make e2e 

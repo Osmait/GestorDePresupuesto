@@ -12,10 +12,16 @@ type AppClaims struct {
 	jwt.StandardClaims
 }
 
-func JwtCreate(id string) (*string, error) {
+// JwtCreate creates a JWT token with the provided secret
+func JwtCreate(id string, secret string) (*string, error) {
 	if id == "" {
-		return nil, errors.New("id is void ")
+		return nil, errors.New("id is void")
 	}
+
+	if secret == "" {
+		return nil, errors.New("secret is required")
+	}
+
 	claims := AppClaims{
 		UserId: id,
 		StandardClaims: jwt.StandardClaims{
@@ -24,11 +30,11 @@ func JwtCreate(id string) (*string, error) {
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
 
-	// Sign and get the complete encoded token as a string using the secret
-	tokenString, err := token.SignedString([]byte("secreto"))
+	// Sign and get the complete encoded token as a string using the provided secret
+	tokenString, err := token.SignedString([]byte(secret))
 	if err != nil {
 		return nil, err
 	}
 
-	return &tokenString, err
+	return &tokenString, nil
 }

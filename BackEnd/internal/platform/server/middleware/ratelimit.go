@@ -9,218 +9,265 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
-	"golang.org/x/time/rate"
 )
 
-// RateLimitStore maintains rate limiters for different clients
+// RateLimitStore represents a rate limiting store
 type RateLimitStore struct {
-	limiters map[string]*rate.Limiter
+	requests map[string][]time.Time
 	mu       sync.RWMutex
 	config   *config.Config
 }
 
-// NewRateLimitStore creates a new rate limit store
+// NewRateLimitStore creates a new rate limiting store
 func NewRateLimitStore(config *config.Config) *RateLimitStore {
-	store := &RateLimitStore{
-		limiters: make(map[string]*rate.Limiter),
+	return &RateLimitStore{
+		requests: make(map[string][]time.Time),
 		config:   config,
 	}
-
-	// Start cleanup goroutine to remove old limiters
-	go store.cleanupRoutine()
-
-	return store
 }
 
-// getLimiter returns a rate limiter for the given key (IP address or user ID)
-func (rls *RateLimitStore) getLimiter(key string) *rate.Limiter {
-	rls.mu.Lock()
-	defer rls.mu.Unlock()
+// RateLimitService provides rate limiting functionality
+type RateLimitService struct {
+	store  *RateLimitStore
+	config *config.Config
+}
 
-	limiter, exists := rls.limiters[key]
+// NewRateLimitService creates a new rate limiting service
+func NewRateLimitService(config *config.Config) *RateLimitService {
+	return &RateLimitService{
+		store:  NewRateLimitStore(config),
+		config: config,
+	}
+}
+
+// IsAllowed checks if a request should be allowed based on rate limits
+func (rls *RateLimitService) IsAllowed(key string) bool {
+	rls.store.mu.Lock()
+	defer rls.store.mu.Unlock()
+
+	now := time.Now()
+	window := rls.config.RateLimit.Window
+	limit := rls.config.RateLimit.Requests
+	burst := rls.config.RateLimit.Burst
+
+	// Get current requests for this key
+	requests, exists := rls.store.requests[key]
 	if !exists {
-		// Create new limiter with configured rate and burst
-		limiter = rate.NewLimiter(
-			rate.Every(rls.config.RateLimitWindow/time.Duration(rls.config.RateLimitRequests)),
-			rls.config.RateLimitBurst,
-		)
-		rls.limiters[key] = limiter
+		requests = []time.Time{}
 	}
 
-	return limiter
-}
-
-// cleanupRoutine periodically removes unused limiters to prevent memory leaks
-func (rls *RateLimitStore) cleanupRoutine() {
-	ticker := time.NewTicker(time.Hour) // Cleanup every hour
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			rls.mu.Lock()
-			// Simple cleanup: remove all limiters
-			// In production, you might want more sophisticated cleanup
-			rls.limiters = make(map[string]*rate.Limiter)
-			rls.mu.Unlock()
+	// Remove old requests outside the window
+	validRequests := []time.Time{}
+	for _, req := range requests {
+		if now.Sub(req) <= window {
+			validRequests = append(validRequests, req)
 		}
 	}
+
+	// Check if we're within limits
+	if len(validRequests) >= limit {
+		// Check if we can allow burst traffic
+		if len(validRequests) >= limit+burst {
+			return false
+		}
+	}
+
+	// Add current request
+	validRequests = append(validRequests, now)
+	rls.store.requests[key] = validRequests
+
+	return true
 }
 
-// RateLimitByIP applies rate limiting based on client IP address
-func RateLimitByIP(store *RateLimitStore) gin.HandlerFunc {
+// isIPWhitelisted checks if an IP is in the whitelist
+func (store *RateLimitStore) isIPWhitelisted(ip string) bool {
+	if !store.config.RateLimit.Enabled {
+		return true
+	}
+
+	for _, whitelistedIP := range store.config.RateLimit.IPWhitelist {
+		if ip == whitelistedIP {
+			return true
+		}
+		// Simple CIDR check (basic implementation)
+		if strings.Contains(whitelistedIP, "/") && strings.HasPrefix(ip, strings.Split(whitelistedIP, "/")[0]) {
+			return true
+		}
+	}
+	return false
+}
+
+// generateRateLimitKey generates a key for rate limiting
+func (rls *RateLimitService) generateRateLimitKey(c *gin.Context) string {
+	// If user-based rate limiting is enabled and user is authenticated
+	if rls.config.RateLimit.UserBased {
+		if userID, exists := c.Get("X-User-Id"); exists {
+			return "user:" + userID.(string)
+		}
+	}
+
+	// Fall back to IP-based rate limiting
+	return "ip:" + c.ClientIP()
+}
+
+// RateLimitMiddleware creates a rate limiting middleware
+func RateLimitMiddleware(config *config.Config) gin.HandlerFunc {
+	service := NewRateLimitService(config)
+
 	return func(c *gin.Context) {
-		if !store.config.RateLimitEnabled {
+		// Skip rate limiting if disabled
+		if !config.RateLimit.Enabled {
 			c.Next()
 			return
 		}
 
-		// Skip rate limiting for certain endpoints
-		if shouldSkipRateLimit(c.Request.URL.Path) {
+		// Check IP whitelist
+		if service.store.isIPWhitelisted(c.ClientIP()) {
 			c.Next()
 			return
 		}
 
-		// Get client IP
-		clientIP := getClientIP(c)
-
-		// Get or create limiter for this IP
-		limiter := store.getLimiter(clientIP)
+		// Generate rate limit key
+		key := service.generateRateLimitKey(c)
 
 		// Check if request is allowed
-		if !limiter.Allow() {
-			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", store.config.RateLimitRequests))
-			c.Header("X-RateLimit-Window", store.config.RateLimitWindow.String())
-			c.Header("Retry-After", "60") // Suggest retry after 60 seconds
-
+		if !service.IsAllowed(key) {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":       "rate limit exceeded",
-				"message":     "too many requests from this IP address",
-				"retry_after": "60 seconds",
+				"retry_after": config.RateLimit.Window.Seconds(),
 			})
 			c.Abort()
 			return
 		}
 
-		// Add rate limit headers to response
-		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", store.config.RateLimitRequests))
-		c.Header("X-RateLimit-Window", store.config.RateLimitWindow.String())
+		// Add rate limit headers
+		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", config.RateLimit.Requests))
+		c.Header("X-RateLimit-Window", config.RateLimit.Window.String())
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", getRemainingRequests(service, key)))
 
 		c.Next()
 	}
 }
 
-// RateLimitByUser applies rate limiting based on authenticated user
-func RateLimitByUser(store *RateLimitStore) gin.HandlerFunc {
+// getRemainingRequests calculates remaining requests for a key
+func getRemainingRequests(service *RateLimitService, key string) int {
+	service.store.mu.RLock()
+	defer service.store.mu.RUnlock()
+
+	requests, exists := service.store.requests[key]
+	if !exists {
+		return service.config.RateLimit.Requests
+	}
+
+	now := time.Now()
+	window := service.config.RateLimit.Window
+
+	// Count valid requests within the window
+	validCount := 0
+	for _, req := range requests {
+		if now.Sub(req) <= window {
+			validCount++
+		}
+	}
+
+	remaining := service.config.RateLimit.Requests - validCount
+	if remaining < 0 {
+		return 0
+	}
+	return remaining
+}
+
+// IPRateLimitMiddleware creates an IP-based rate limiting middleware
+func IPRateLimitMiddleware(config *config.Config) gin.HandlerFunc {
+	service := NewRateLimitService(config)
+
 	return func(c *gin.Context) {
-		if !store.config.RateLimitEnabled {
+		if !config.RateLimit.Enabled {
 			c.Next()
 			return
 		}
 
-		// Skip rate limiting for certain endpoints
-		if shouldSkipRateLimit(c.Request.URL.Path) {
+		key := "ip:" + c.ClientIP()
+
+		if !service.IsAllowed(key) {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":       "IP rate limit exceeded",
+				"retry_after": config.RateLimit.Window.Seconds(),
+			})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// UserRateLimitMiddleware creates a user-based rate limiting middleware
+func UserRateLimitMiddleware(config *config.Config) gin.HandlerFunc {
+	service := NewRateLimitService(config)
+
+	return func(c *gin.Context) {
+		if !config.RateLimit.Enabled {
 			c.Next()
 			return
 		}
 
-		// Get user ID from context (set by auth middleware)
 		userID, exists := c.Get("X-User-Id")
 		if !exists {
-			// No user context, skip user-based rate limiting
 			c.Next()
 			return
 		}
 
-		userIDStr, ok := userID.(string)
-		if !ok {
-			// Invalid user ID format, skip rate limiting
-			c.Next()
-			return
-		}
+		key := "user:" + userID.(string)
 
-		// Create unique key for user rate limiting
-		key := fmt.Sprintf("user:%s", userIDStr)
-
-		// Get or create limiter for this user
-		limiter := store.getLimiter(key)
-
-		// Check if request is allowed
-		if !limiter.Allow() {
-			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", store.config.RateLimitRequests))
-			c.Header("X-RateLimit-Window", store.config.RateLimitWindow.String())
-			c.Header("Retry-After", "60")
-
+		if !service.IsAllowed(key) {
 			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "rate limit exceeded",
-				"message":     "too many requests from this user",
-				"retry_after": "60 seconds",
+				"error":       "user rate limit exceeded",
+				"retry_after": config.RateLimit.Window.Seconds(),
 			})
 			c.Abort()
 			return
 		}
 
-		// Add rate limit headers to response
-		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", store.config.RateLimitRequests))
-		c.Header("X-RateLimit-Window", store.config.RateLimitWindow.String())
-
 		c.Next()
 	}
 }
 
-// StrictRateLimit applies stricter rate limiting for sensitive endpoints
-func StrictRateLimit(store *RateLimitStore, requestsPerMinute int) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if !store.config.RateLimitEnabled {
-			c.Next()
-			return
+// CleanupMiddleware periodically cleans up old rate limit entries
+func (rls *RateLimitService) CleanupMiddleware() {
+	ticker := time.NewTicker(rls.config.RateLimit.Window)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				rls.cleanup()
+			}
 		}
+	}()
+}
 
-		// Get client identifier (prefer user ID, fallback to IP)
-		var key string
-		if userID, exists := c.Get("X-User-Id"); exists {
-			if userIDStr, ok := userID.(string); ok {
-				key = fmt.Sprintf("strict:user:%s", userIDStr)
+// cleanup removes old rate limit entries
+func (rls *RateLimitService) cleanup() {
+	rls.store.mu.Lock()
+	defer rls.store.mu.Unlock()
+
+	now := time.Now()
+	window := rls.config.RateLimit.Window
+
+	for key, requests := range rls.store.requests {
+		validRequests := []time.Time{}
+		for _, req := range requests {
+			if now.Sub(req) <= window {
+				validRequests = append(validRequests, req)
 			}
 		}
 
-		if key == "" {
-			key = fmt.Sprintf("strict:ip:%s", getClientIP(c))
+		if len(validRequests) == 0 {
+			delete(rls.store.requests, key)
+		} else {
+			rls.store.requests[key] = validRequests
 		}
-
-		// Create limiter with stricter limits
-		strictLimiter := rate.NewLimiter(
-			rate.Every(time.Minute/time.Duration(requestsPerMinute)),
-			requestsPerMinute/2, // Lower burst capacity for strict endpoints
-		)
-
-		// Check if request is allowed
-		if !strictLimiter.Allow() {
-			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", requestsPerMinute))
-			c.Header("X-RateLimit-Window", "1m")
-			c.Header("Retry-After", "120")
-
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "strict rate limit exceeded",
-				"message":     "too many requests to sensitive endpoint",
-				"retry_after": "2 minutes",
-			})
-			c.Abort()
-			return
-		}
-
-		c.Next()
 	}
-}
-
-// LoginRateLimit applies specific rate limiting for login endpoints
-func LoginRateLimit(store *RateLimitStore) gin.HandlerFunc {
-	return StrictRateLimit(store, 10) // 10 login attempts per minute
-}
-
-// TransactionRateLimit applies specific rate limiting for financial transactions
-func TransactionRateLimit(store *RateLimitStore) gin.HandlerFunc {
-	return StrictRateLimit(store, 30) // 30 transactions per minute
 }
 
 // getClientIP extracts the real client IP address from various headers
@@ -267,44 +314,4 @@ func shouldSkipRateLimit(path string) bool {
 	}
 
 	return false
-}
-
-// RateLimitConfig holds rate limiting configuration for specific endpoints
-type RateLimitConfig struct {
-	RequestsPerMinute int
-	BurstCapacity     int
-	WindowDuration    time.Duration
-}
-
-// CustomRateLimit creates a rate limiter with custom configuration
-func CustomRateLimit(store *RateLimitStore, config RateLimitConfig) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		if !store.config.RateLimitEnabled {
-			c.Next()
-			return
-		}
-
-		// Get client identifier
-		clientIP := getClientIP(c)
-		key := fmt.Sprintf("custom:%s:%s", c.Request.URL.Path, clientIP)
-
-		// Get or create limiter for this key
-		limiter := store.getLimiter(key)
-
-		if !limiter.Allow() {
-			c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", config.RequestsPerMinute))
-			c.Header("X-RateLimit-Window", config.WindowDuration.String())
-			c.Header("Retry-After", "60")
-
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "custom rate limit exceeded",
-				"message":     "too many requests to this endpoint",
-				"retry_after": "60 seconds",
-			})
-			c.Abort()
-			return
-		}
-
-		c.Next()
-	}
 }

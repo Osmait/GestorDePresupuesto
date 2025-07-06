@@ -64,12 +64,12 @@ func (s *Server) registerRoutes() {
 	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
 
 	// Observability middleware
-	if s.config.EnableTracing {
-		s.Engine.Use(middleware.TracingMiddleware(s.config.OtelServiceName))
+	if s.config.FeatureFlags.EnableTracing {
+		s.Engine.Use(middleware.TracingMiddleware(s.config.OpenTelemetry.ServiceName))
 	}
 
 	// Health routes (before authentication)
-	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Environment))
+	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Server.Environment))
 
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))

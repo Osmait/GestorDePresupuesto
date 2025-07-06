@@ -45,7 +45,7 @@ func (m *MockUserRepostory) Delete(ctx context.Context, id string) error {
 func TestCreateUser(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	user1 := utils.GetNewRandomUser()
-	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Email, user1.Password)
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
 	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(nil, errorhttp.ErrNotFound)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
 	userServie := NewUserService(mockRepo)
@@ -54,15 +54,16 @@ func TestCreateUser(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestCreateUserErrorDuplicateEmail(t *testing.T) {
+func TestCreateUserWithExistingEmail(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
-	userServie := NewUserService(mockRepo)
 	user1 := utils.GetNewRandomUser()
-	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Email, user1.Password)
-	mockRepo.On("FindUserByEmail", context.Background(), mock.Anything).Return(user1, nil)
-	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
+	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(user1, nil)
+	userServie := NewUserService(mockRepo)
 	err := userServie.CreateUser(context.Background(), userRequest)
 	assert.Error(t, err)
+	assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeConflict))
+	mockRepo.AssertExpectations(t)
 }
 
 func TestFindUser(t *testing.T) {
@@ -152,7 +153,7 @@ func TestCreateUser_RepositoryError(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	userService := NewUserService(mockRepo)
 	user1 := utils.GetNewRandomUser()
-	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Email, user1.Password)
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
 
 	// Mock repository error on FindUserByEmail
 	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(nil, errors.New("database error"))
@@ -168,7 +169,7 @@ func TestCreateUser_SaveRepositoryError(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	userService := NewUserService(mockRepo)
 	user1 := utils.GetNewRandomUser()
-	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Email, user1.Password)
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
 
 	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(nil, errorhttp.ErrNotFound)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(errors.New("save error"))
@@ -218,5 +219,33 @@ func TestDeleteUser_DeleteRepositoryError(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "delete error")
 	assert.Contains(t, err.Error(), "Database operation failed")
+	mockRepo.AssertExpectations(t)
+}
+
+func TestUpdateUser(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	user1 := utils.GetNewRandomUser()
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
+	mockRepo.On("FindUserById", context.Background(), user1.Id).Return(user1, nil)
+	// No need to mock FindUserByEmail since we're not changing the email
+	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
+	userServie := NewUserService(mockRepo)
+	err := userServie.UpdateUser(context.Background(), user1.Id, userRequest)
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestUpdateUserWithExistingEmail(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	user1 := utils.GetNewRandomUser()
+	user2 := utils.GetNewRandomUser()
+	// Use a different email to trigger the conflict check
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user2.Email)
+	mockRepo.On("FindUserById", context.Background(), user1.Id).Return(user1, nil)
+	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(user2, nil)
+	userServie := NewUserService(mockRepo)
+	err := userServie.UpdateUser(context.Background(), user1.Id, userRequest)
+	assert.Error(t, err)
+	assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeConflict))
 	mockRepo.AssertExpectations(t)
 }

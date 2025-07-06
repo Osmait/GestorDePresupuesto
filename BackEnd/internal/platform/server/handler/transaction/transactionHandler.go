@@ -47,9 +47,14 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		date2 := ctx.Query("date2")
 		userId := ctx.GetString("X-User-Id")
 		if date1 == "" || date2 == "" {
-			currenTime := time.Now()
-			date1 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-7)
-			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
+			currentTime := time.Now()
+			// Use proper date arithmetic to avoid negative days
+			date1Time := currentTime.AddDate(0, 0, -7) // 7 days ago
+			date2Time := currentTime.AddDate(0, 0, 1)  // 1 day from now
+
+			// Format dates properly
+			date1 = fmt.Sprintf("%d/%d/%d", date1Time.Year(), date1Time.Month(), date1Time.Day())
+			date2 = fmt.Sprintf("%d/%d/%d", date2Time.Year(), date2Time.Month(), date2Time.Day())
 		}
 
 		transactionsList, err := transactionService.FindAllOfAllAccounts(ctx, date1, date2, userId)
@@ -69,9 +74,14 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		id := ctx.Param("id")
 
 		if date1 == "" || date2 == "" {
-			currenTime := time.Now()
-			date1 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-2)
-			date2 = fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
+			currentTime := time.Now()
+			// Use proper date arithmetic to avoid negative days
+			date1Time := currentTime.AddDate(0, 0, -2) // 2 days ago
+			date2Time := currentTime.AddDate(0, 0, 1)  // 1 day from now
+
+			// Format dates properly
+			date1 = fmt.Sprintf("%d/%d/%d", date1Time.Year(), date1Time.Month(), date1Time.Day())
+			date2 = fmt.Sprintf("%d/%d/%d", date2Time.Year(), date2Time.Month(), date2Time.Day())
 		}
 
 		transactionsList, err := transactionService.FindAll(ctx, date1, date2, id)
