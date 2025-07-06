@@ -57,12 +57,24 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Dura
 }
 
 func (s *Server) registerRoutes() {
+	// Basic middleware
 	s.Engine.Use(cors.AllowAll())
 
+	// Error handling middleware (must be first)
+	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
+
+	// Observability middleware
+	if s.config.EnableTracing {
+		s.Engine.Use(middleware.TracingMiddleware(s.config.OtelServiceName))
+	}
+
+	// Health routes (before authentication)
 	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Environment))
 
+	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
 
+	// Application routes
 	routes.AuhtRoutes(s.Engine, s.servicesAuth)
 	routes.UserRoute(s.Engine, s.servicesUser)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)

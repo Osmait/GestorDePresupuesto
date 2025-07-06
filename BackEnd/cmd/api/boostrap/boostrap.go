@@ -4,19 +4,21 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"os"
-	"strconv"
+	"os/signal"
+	"syscall"
 	"time"
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
-	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
+
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
-
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
+	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	invesmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/invesment"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
@@ -24,53 +26,258 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
+	"github.com/osmait/gestorDePresupuesto/internal/services/invesment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
-
-	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
 )
 
 func Run() error {
-	// load .env
-	err := godotenv.Load(".env")
+	// Create application context that can be cancelled
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
+	defer cancel()
+
+	// Load configuration
+	cfg, err := config.LoadConfig()
 	if err != nil {
-		fmt.Println("Not env")
+		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Creating new config
-	shutdown := 10 * time.Second
-	port, _ := strconv.Atoi(os.Getenv("PORT"))
-	dbPort, _ := strconv.Atoi(os.Getenv("DbPort"))
-
-	cfg := config.NewConfig(os.Getenv("HOST"), uint(port), uint(dbPort), &shutdown, os.Getenv("DbUser"), os.Getenv("DbPass"), os.Getenv("Dbhost"), os.Getenv("DbName"))
-	postgresURI := cfg.GetPostgresUrl()
-
-	// Conecting database
-	db, err := sql.Open("postgres", postgresURI)
+	// Initialize observability
+	logger, otelProvider, _, err := initializeObservability(cfg)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize observability: %w", err)
 	}
-	// Run migrate
-	utils.RunDBMigration("file://src/cmd/api/db/migrations", postgresURI)
+	defer func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if otelProvider != nil {
+			if err := otelProvider.Shutdown(ctx); err != nil {
+				logger.WithError(err).Error("Failed to shutdown OpenTelemetry provider")
+			}
+		}
+	}()
 
-	// Instance Repositorys
-	accountRepository := accountRepo.NewAccountRepository(db)
-	transactionRepository := transactionRepo.NewTransactionRepository(db)
-	userRepository := userRepo.NewUserRespository(db)
-	budgetRepository := budgetRepo.NewBudgetRepository(db)
-	categoryRepository := categoryRepo.NewCategoryRepository(db)
+	logger.WithField("config", map[string]interface{}{
+		"environment": cfg.Environment,
+		"host":        cfg.Host,
+		"port":        cfg.Port,
+		"db_type":     cfg.DbType,
+		"tracing":     cfg.EnableTracing,
+		"metrics":     cfg.EnableMetrics,
+	}).Info("Starting application")
 
-	// Instance Services
-	accountSerevice := account.NewAccountService(accountRepository)
-	transactionServices := transaction.NewTransactionService(transactionRepository)
-	userServices := user.NewUserService(userRepository)
-	authServices := auth.NewAuthService(userRepository)
-	budgetServices := budget.NewBudgetServices(budgetRepository, transactionRepository)
-	categoryServices := category.NewCategoryServices(categoryRepository)
+	// Connect to database
+	db, err := initializeDatabase(ctx, cfg, logger)
+	if err != nil {
+		return fmt.Errorf("failed to initialize database: %w", err)
+	}
+	defer func() {
+		if err := db.Close(); err != nil {
+			logger.WithError(err).Error("Failed to close database connection")
+		}
+	}()
 
-	// Instance Server
-	ctx, srv := server.New(context.Background(), cfg.Host, cfg.Port, cfg.ShutdownTimeout, accountSerevice, transactionServices, userServices, authServices, budgetServices, categoryServices, db, cfg)
+	// Run database migrations
+	if err := runMigrations(cfg, logger); err != nil {
+		return fmt.Errorf("failed to run migrations: %w", err)
+	}
 
-	// Run Server
-	return srv.Run(ctx)
+	// Initialize repositories
+	repositories := initializeRepositories(db)
+
+	// Initialize services
+	services := initializeServices(repositories)
+
+	// Initialize and start server
+	serverCtx, srv := server.New(
+		ctx,
+		cfg.Host,
+		cfg.Port,
+		cfg.ShutdownTimeout,
+		services.accountService,
+		services.transactionService,
+		services.userService,
+		services.authService,
+		services.budgetService,
+		services.categoryService,
+		db,
+		cfg,
+	)
+
+	logger.Infof("Server starting on %s:%d", cfg.Host, cfg.Port)
+
+	// Start server
+	if err := srv.Run(serverCtx); err != nil {
+		return fmt.Errorf("server failed: %w", err)
+	}
+
+	logger.Info("Application shutdown completed")
+	return nil
+}
+
+// initializeObservability sets up OpenTelemetry, logging, and metrics
+func initializeObservability(cfg *config.Config) (*observability.Logger, *observability.Provider, *observability.BusinessMetrics, error) {
+	// Initialize structured logger
+	loggerCfg := &observability.LoggerConfig{
+		Level:      cfg.LogLevel,
+		Format:     cfg.LogFormat,
+		Output:     cfg.LogOutput,
+		TimeFormat: time.RFC3339,
+		Caller:     cfg.IsDevelopment(),
+	}
+	logger := observability.NewLogger(loggerCfg)
+	observability.InitializeGlobalLogger(loggerCfg)
+
+	var otelProvider *observability.Provider
+	var businessMetrics *observability.BusinessMetrics
+
+	// Initialize OpenTelemetry if enabled
+	if cfg.EnableTracing || cfg.EnableMetrics {
+		otelCfg := &observability.Config{
+			ServiceName:        cfg.OtelServiceName,
+			ServiceVersion:     cfg.OtelServiceVersion,
+			Environment:        cfg.OtelEnvironment,
+			OTLPEndpoint:       cfg.OtelOTLPEndpoint,
+			JaegerEndpoint:     cfg.OtelJaegerEndpoint,
+			EnableStdout:       cfg.OtelEnableStdout,
+			EnableMetrics:      cfg.EnableMetrics,
+			EnableTracing:      cfg.EnableTracing,
+			SamplingRate:       cfg.OtelSamplingRate,
+			BatchTimeout:       cfg.OtelBatchTimeout,
+			MaxBatchSize:       cfg.OtelMaxBatchSize,
+			MaxQueueSize:       cfg.OtelMaxQueueSize,
+			PrometheusEndpoint: cfg.PrometheusEndpoint,
+		}
+
+		var err error
+		otelProvider, err = observability.NewProvider(otelCfg)
+		if err != nil {
+			return nil, nil, nil, fmt.Errorf("failed to initialize OpenTelemetry: %w", err)
+		}
+
+		logger.Info("OpenTelemetry initialized successfully")
+
+		// Initialize business metrics
+		if cfg.EnableMetrics {
+			businessMetrics, err = observability.NewBusinessMetrics(cfg.OtelServiceName)
+			if err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to initialize business metrics: %w", err)
+			}
+
+			// Initialize global metrics
+			if err := observability.InitializeGlobalMetrics(cfg.OtelServiceName); err != nil {
+				return nil, nil, nil, fmt.Errorf("failed to initialize global metrics: %w", err)
+			}
+
+			logger.Info("Business metrics initialized successfully")
+		}
+	}
+
+	return logger, otelProvider, businessMetrics, nil
+}
+
+// initializeDatabase connects to the database
+func initializeDatabase(ctx context.Context, cfg *config.Config, logger *observability.Logger) (*sql.DB, error) {
+	var databaseURL string
+	var driverName string
+
+	switch cfg.DbType {
+	case config.DatabaseTypeSQLite:
+		databaseURL = cfg.GetSQLiteUrl()
+		driverName = "sqlite3"
+	case config.DatabaseTypePostgres:
+		databaseURL = cfg.GetPostgresUrl()
+		driverName = "postgres"
+	default:
+		return nil, fmt.Errorf("unsupported database type: %s", cfg.DbType)
+	}
+
+	logger.WithFields(map[string]interface{}{
+		"driver": driverName,
+		"type":   cfg.DbType,
+	}).Info("Connecting to database")
+
+	db, err := sql.Open(driverName, databaseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to open database connection: %w", err)
+	}
+
+	// Test database connection
+	if err := db.PingContext(ctx); err != nil {
+		return nil, fmt.Errorf("failed to ping database: %w", err)
+	}
+
+	// Configure connection pool
+	db.SetMaxOpenConns(25)
+	db.SetMaxIdleConns(5)
+	db.SetConnMaxLifetime(5 * time.Minute)
+
+	logger.Info("Database connection established successfully")
+	return db, nil
+}
+
+// runMigrations executes database migrations
+func runMigrations(cfg *config.Config, logger *observability.Logger) error {
+	logger.Info("Running database migrations")
+
+	migrationPath := "file://cmd/api/db/migrations"
+
+	switch cfg.DbType {
+	case config.DatabaseTypePostgres:
+		utils.RunDBMigration(migrationPath, cfg.GetPostgresUrl())
+		return nil
+	case config.DatabaseTypeSQLite:
+		// For SQLite migrations, we might need a different approach
+		// For now, we'll skip migrations for SQLite in production
+		logger.Info("Skipping migrations for SQLite database")
+		return nil
+	default:
+		return fmt.Errorf("unsupported database type for migrations: %s", cfg.DbType)
+	}
+}
+
+// repositories holds all repository instances
+type repositories struct {
+	accountRepository     accountRepo.AccountRepositoryInterface
+	transactionRepository transactionRepo.TransactionRepsitoryinterface
+	userRepository        userRepo.UserRepositoryInterface
+	budgetRepository      budgetRepo.BudgetRepoInterface
+	categoryRepository    categoryRepo.CategoryRepoInteface
+	invesmentRepository   invesmentRepo.InvesmentRepoInterface
+}
+
+// initializeRepositories creates all repository instances
+func initializeRepositories(db *sql.DB) *repositories {
+	return &repositories{
+		accountRepository:     accountRepo.NewAccountRepository(db),
+		transactionRepository: transactionRepo.NewTransactionRepository(db),
+		userRepository:        userRepo.NewUserRespository(db),
+		budgetRepository:      budgetRepo.NewBudgetRepository(db),
+		categoryRepository:    categoryRepo.NewCategoryRepository(db),
+		invesmentRepository:   invesmentRepo.NewInvesmentRepository(db),
+	}
+}
+
+// services holds all service instances
+type services struct {
+	accountService     *account.AccountService
+	transactionService *transaction.TransactionService
+	userService        *user.UserService
+	authService        *auth.AuthService
+	budgetService      *budget.BudgetServices
+	categoryService    *category.CategoryServices
+	invesmentService   *invesment.InvesmentServices
+}
+
+// initializeServices creates all service instances
+func initializeServices(repos *repositories) *services {
+	return &services{
+		accountService:     account.NewAccountService(repos.accountRepository),
+		transactionService: transaction.NewTransactionService(repos.transactionRepository),
+		userService:        user.NewUserService(repos.userRepository),
+		authService:        auth.NewAuthService(repos.userRepository),
+		budgetService:      budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
+		categoryService:    category.NewCategoryServices(repos.categoryRepository),
+		invesmentService:   invesment.NewInvesmentServices(repos.invesmentRepository),
+	}
 }

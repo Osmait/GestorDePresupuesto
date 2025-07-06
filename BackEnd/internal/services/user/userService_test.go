@@ -5,12 +5,14 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
-	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
-	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
-	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
+	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
+	appErrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
+	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 )
 
 type MockUserRepostory struct {
@@ -70,8 +72,7 @@ func TestFindUser(t *testing.T) {
 	mockRepo.On("FindUserById", context.Background(), mock.Anything).Return(user1, nil)
 	_, err := userService.FindUserById(context.Background(), "1")
 	assert.Error(t, err)
-	assert.Equal(t, err, errorhttp.ErrNotFound)
-
+	assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeNotFound))
 	mockRepo.AssertExpectations(t)
 }
 
@@ -118,7 +119,7 @@ func TestFindUserByEmailError(t *testing.T) {
 	mockRepo.On("FindUserByEmail", context.Background(), mock.Anything).Return(user1, nil)
 	_, err := UserService.FindByEmail(context.Background(), "test@test.com")
 	assert.Error(t, err)
-	assert.Equal(t, errorhttp.ErrNotFound, err)
+	assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeNotFound))
 	mockRepo.AssertExpectations(t)
 }
 
@@ -142,7 +143,7 @@ func TestDeleteUserError(t *testing.T) {
 	mockRepo.On("Delete", context.Background(), mock.Anything).Return(nil)
 	err := UserService.DeleteUser(context.Background(), user1.Id)
 	assert.Error(t, err)
-	assert.Equal(t, errorhttp.ErrNotFound, err)
+	assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeValidation))
 }
 
 // Additional test cases for better coverage
@@ -158,7 +159,8 @@ func TestCreateUser_RepositoryError(t *testing.T) {
 
 	err := userService.CreateUser(context.Background(), userRequest)
 	assert.Error(t, err)
-	assert.Equal(t, "database error", err.Error())
+	assert.Contains(t, err.Error(), "database error")
+	assert.Contains(t, err.Error(), "Database operation failed")
 	mockRepo.AssertExpectations(t)
 }
 
@@ -173,7 +175,8 @@ func TestCreateUser_SaveRepositoryError(t *testing.T) {
 
 	err := userService.CreateUser(context.Background(), userRequest)
 	assert.Error(t, err)
-	assert.Equal(t, "save error", err.Error())
+	assert.Contains(t, err.Error(), "save error")
+	assert.Contains(t, err.Error(), "Database operation failed")
 	mockRepo.AssertExpectations(t)
 }
 
@@ -185,7 +188,8 @@ func TestFindByEmail_RepositoryError(t *testing.T) {
 
 	_, err := userService.FindByEmail(context.Background(), "test@test.com")
 	assert.Error(t, err)
-	assert.Equal(t, "database error", err.Error())
+	assert.Contains(t, err.Error(), "database error")
+	assert.Contains(t, err.Error(), "Database operation failed")
 	mockRepo.AssertExpectations(t)
 }
 
@@ -197,7 +201,8 @@ func TestDeleteUser_FindUserError(t *testing.T) {
 
 	err := userService.DeleteUser(context.Background(), "test-id")
 	assert.Error(t, err)
-	assert.Equal(t, "find error", err.Error())
+	assert.Contains(t, err.Error(), "find error")
+	assert.Contains(t, err.Error(), "Database operation failed")
 	mockRepo.AssertExpectations(t)
 }
 
@@ -211,6 +216,7 @@ func TestDeleteUser_DeleteRepositoryError(t *testing.T) {
 
 	err := userService.DeleteUser(context.Background(), user1.Id)
 	assert.Error(t, err)
-	assert.Equal(t, "delete error", err.Error())
+	assert.Contains(t, err.Error(), "delete error")
+	assert.Contains(t, err.Error(), "Database operation failed")
 	mockRepo.AssertExpectations(t)
 }

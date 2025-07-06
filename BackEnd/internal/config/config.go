@@ -72,6 +72,20 @@ type Config struct {
 	EnableTracing     bool
 	EnableHealthCheck bool
 	EnableSwaggerDocs bool
+
+	// OpenTelemetry configuration
+	OtelServiceName       string
+	OtelServiceVersion    string
+	OtelEnvironment       string
+	OtelSamplingRate      float64
+	OtelOTLPEndpoint      string
+	OtelJaegerEndpoint    string
+	OtelEnableStdout      bool
+	OtelBatchTimeout      time.Duration
+	OtelMaxBatchSize      int
+	OtelMaxQueueSize      int
+	PrometheusEndpoint    string
+	PrometheusMetricsPath string
 }
 
 // LoadConfig loads configuration from environment variables
@@ -124,6 +138,20 @@ func LoadConfig() (*Config, error) {
 		EnableTracing:     getEnvBool("ENABLE_TRACING", false),
 		EnableHealthCheck: getEnvBool("ENABLE_HEALTH_CHECK", true),
 		EnableSwaggerDocs: getEnvBool("ENABLE_SWAGGER_DOCS", false),
+
+		// OpenTelemetry configuration
+		OtelServiceName:       getEnvString("OTEL_SERVICE_NAME", "my-service"),
+		OtelServiceVersion:    getEnvString("OTEL_SERVICE_VERSION", "0.1.0"),
+		OtelEnvironment:       getEnvString("OTEL_ENVIRONMENT", "development"),
+		OtelSamplingRate:      getEnvFloat("OTEL_SAMPLING_RATE", 1.0),
+		OtelOTLPEndpoint:      getEnvString("OTEL_OTLP_ENDPOINT", "http://localhost:4317"),
+		OtelJaegerEndpoint:    getEnvString("OTEL_JAEGER_ENDPOINT", "http://localhost:14250"),
+		OtelEnableStdout:      getEnvBool("OTEL_ENABLE_STDOUT", true),
+		OtelBatchTimeout:      getDuration(getEnvString("OTEL_BATCH_TIMEOUT", "10s")),
+		OtelMaxBatchSize:      getEnvInt("OTEL_MAX_BATCH_SIZE", 512),
+		OtelMaxQueueSize:      getEnvInt("OTEL_MAX_QUEUE_SIZE", 1024),
+		PrometheusEndpoint:    getEnvString("PROMETHEUS_ENDPOINT", "http://localhost:9090"),
+		PrometheusMetricsPath: getEnvString("PROMETHEUS_METRICS_PATH", "/metrics"),
 	}
 
 	return config, config.validate()
@@ -255,6 +283,16 @@ func getEnvBool(key string, defaultValue bool) bool {
 	if value := os.Getenv(key); value != "" {
 		if boolValue, err := strconv.ParseBool(value); err == nil {
 			return boolValue
+		}
+	}
+	return defaultValue
+}
+
+// getEnvFloat returns the environment variable value as float64 or the default value
+func getEnvFloat(key string, defaultValue float64) float64 {
+	if value := os.Getenv(key); value != "" {
+		if floatValue, err := strconv.ParseFloat(value, 64); err == nil {
+			return floatValue
 		}
 	}
 	return defaultValue
