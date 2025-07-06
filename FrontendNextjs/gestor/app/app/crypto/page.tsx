@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AnimatedTabs } from '@/components/client/animated-tabs'
 import { Button } from '@/components/ui/button'
 import { 
 	Bitcoin, 
@@ -269,46 +269,48 @@ export default async function CryptoPage() {
 				</div>
 
 				{/* Contenido principal con tabs */}
-				<Tabs defaultValue="all" className="space-y-6">
-					<TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3 bg-muted/50 dark:bg-muted/30">
-						<TabsTrigger value="all" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<PieChart className="h-4 w-4" />
-							<span className="hidden sm:inline">Todo</span>
-						</TabsTrigger>
-						<TabsTrigger value="gainers" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<TrendingUp className="h-4 w-4" />
-							<span className="hidden sm:inline">Ganadores</span>
-						</TabsTrigger>
-						<TabsTrigger value="losers" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<TrendingDown className="h-4 w-4" />
-							<span className="hidden sm:inline">Perdedores</span>
-						</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value="all" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{assets.map((asset) => (
-								<CryptoCard key={asset.id} asset={asset} />
-							))}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="gainers" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{profitableAssets.map((asset) => (
-								<CryptoCard key={asset.id} asset={asset} />
-							))}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="losers" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{declineAssets.map((asset) => (
-								<CryptoCard key={asset.id} asset={asset} />
-							))}
-						</div>
-					</TabsContent>
-				</Tabs>
+				<AnimatedTabs
+					tabs={[
+						{
+							value: 'all',
+							label: 'Todo',
+							icon: <PieChart className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{assets.map((asset) => (
+										<CryptoCard key={asset.id} asset={asset} />
+									))}
+								</div>
+							)
+						},
+						{
+							value: 'gainers',
+							label: 'Ganadores',
+							icon: <TrendingUp className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{profitableAssets.map((asset) => (
+										<CryptoCard key={asset.id} asset={asset} />
+									))}
+								</div>
+							)
+						},
+						{
+							value: 'losers',
+							label: 'Perdedores',
+							icon: <TrendingDown className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{declineAssets.map((asset) => (
+										<CryptoCard key={asset.id} asset={asset} />
+									))}
+								</div>
+							)
+						}
+					]}
+					defaultValue="all"
+					className="space-y-6"
+				/>
 
 				{/* Información de desarrollo */}
 				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">

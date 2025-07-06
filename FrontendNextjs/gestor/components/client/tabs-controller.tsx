@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AnimatedTabs } from '@/components/client/animated-tabs'
 
 interface Tab {
 	value: string
@@ -17,27 +17,12 @@ interface TabsControllerProps {
 	listClassName?: string
 }
 
-export function TabsController({ tabs, defaultValue, className, listClassName }: TabsControllerProps) {
+export function TabsController({ tabs, defaultValue, className }: TabsControllerProps) {
 	return (
-		<Tabs defaultValue={defaultValue} className={className}>
-			<TabsList className={listClassName}>
-				{tabs.map((tab) => (
-					<TabsTrigger 
-						key={tab.value} 
-						value={tab.value} 
-						className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground"
-					>
-						{tab.icon}
-						<span className="hidden sm:inline">{tab.label}</span>
-					</TabsTrigger>
-				))}
-			</TabsList>
-
-			{tabs.map((tab) => (
-				<TabsContent key={tab.value} value={tab.value} className="space-y-6">
-					{tab.content}
-				</TabsContent>
-			))}
-		</Tabs>
+		<AnimatedTabs
+			tabs={tabs}
+			defaultValue={defaultValue}
+			className={className}
+		/>
 	)
 } 

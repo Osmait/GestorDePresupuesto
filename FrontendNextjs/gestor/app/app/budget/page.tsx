@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AnimatedTabs } from '@/components/client/animated-tabs'
 import { Button } from '@/components/ui/button'
 import { getBudgetRepository, getCategoryRepository, getTransactionRepository } from '@/lib/repositoryConfig'
 import { Budget } from '@/types/budget'
@@ -257,79 +257,81 @@ export default async function BudgetPage() {
 				</div>
 
 				{/* Contenido principal con tabs */}
-				<Tabs defaultValue="all" className="space-y-6">
-					<TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3 bg-muted/50 dark:bg-muted/30">
-						<TabsTrigger value="all" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<PiggyBank className="h-4 w-4" />
-							<span className="hidden sm:inline">Todos</span>
-						</TabsTrigger>
-						<TabsTrigger value="active" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<CheckCircle className="h-4 w-4" />
-							<span className="hidden sm:inline">Activos</span>
-						</TabsTrigger>
-						<TabsTrigger value="exceeded" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<AlertTriangle className="h-4 w-4" />
-							<span className="hidden sm:inline">Excedidos</span>
-						</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value="all" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{budgets.map((budget) => {
-								const category = categories.find(c => c.id === budget.category_id)
-								const spent = getBudgetSpent(budget.id)
-								const budgetTransactions = getBudgetTransactions(budget.id)
-								return (
-									<BudgetCard 
-										key={budget.id} 
-										budget={budget} 
-										category={category}
-										spent={spent}
-										transactions={budgetTransactions}
-									/>
-								)
-							})}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="active" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{activeBudgets.map((budget) => {
-								const category = categories.find(c => c.id === budget.category_id)
-								const spent = getBudgetSpent(budget.id)
-								const budgetTransactions = getBudgetTransactions(budget.id)
-								return (
-									<BudgetCard 
-										key={budget.id} 
-										budget={budget} 
-										category={category}
-										spent={spent}
-										transactions={budgetTransactions}
-									/>
-								)
-							})}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="exceeded" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{overBudgets.map((budget) => {
-								const category = categories.find(c => c.id === budget.category_id)
-								const spent = getBudgetSpent(budget.id)
-								const budgetTransactions = getBudgetTransactions(budget.id)
-								return (
-									<BudgetCard 
-										key={budget.id} 
-										budget={budget} 
-										category={category}
-										spent={spent}
-										transactions={budgetTransactions}
-									/>
-								)
-							})}
-						</div>
-					</TabsContent>
-				</Tabs>
+				<AnimatedTabs
+					tabs={[
+						{
+							value: 'all',
+							label: 'Todos',
+							icon: <PiggyBank className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{budgets.map((budget) => {
+										const category = categories.find(c => c.id === budget.category_id)
+										const spent = getBudgetSpent(budget.id)
+										const budgetTransactions = getBudgetTransactions(budget.id)
+										return (
+											<BudgetCard 
+												key={budget.id} 
+												budget={budget} 
+												category={category}
+												spent={spent}
+												transactions={budgetTransactions}
+											/>
+										)
+									})}
+								</div>
+							)
+						},
+						{
+							value: 'active',
+							label: 'Activos',
+							icon: <CheckCircle className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{activeBudgets.map((budget) => {
+										const category = categories.find(c => c.id === budget.category_id)
+										const spent = getBudgetSpent(budget.id)
+										const budgetTransactions = getBudgetTransactions(budget.id)
+										return (
+											<BudgetCard 
+												key={budget.id} 
+												budget={budget} 
+												category={category}
+												spent={spent}
+												transactions={budgetTransactions}
+											/>
+										)
+									})}
+								</div>
+							)
+						},
+						{
+							value: 'exceeded',
+							label: 'Excedidos',
+							icon: <AlertTriangle className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{overBudgets.map((budget) => {
+										const category = categories.find(c => c.id === budget.category_id)
+										const spent = getBudgetSpent(budget.id)
+										const budgetTransactions = getBudgetTransactions(budget.id)
+										return (
+											<BudgetCard 
+												key={budget.id} 
+												budget={budget} 
+												category={category}
+												spent={spent}
+												transactions={budgetTransactions}
+											/>
+										)
+									})}
+								</div>
+							)
+						}
+					]}
+					defaultValue="all"
+					className="space-y-6"
+				/>
 
 				{/* Información de desarrollo */}
 				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">

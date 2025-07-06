@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AnimatedTabs } from '@/components/client/animated-tabs'
 import { Button } from '@/components/ui/button'
 import { getCategoryRepository, getTransactionRepository } from '@/lib/repositoryConfig'
 import { Category } from '@/types/category'
@@ -182,58 +182,60 @@ export default async function CategoriesPage() {
 				</div>
 
 				{/* Contenido principal con tabs */}
-				<Tabs defaultValue="all" className="space-y-6">
-					<TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3 bg-muted/50 dark:bg-muted/30">
-						<TabsTrigger value="all" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<Tag className="h-4 w-4" />
-							<span className="hidden sm:inline">Todas</span>
-						</TabsTrigger>
-						<TabsTrigger value="active" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<Activity className="h-4 w-4" />
-							<span className="hidden sm:inline">Activas</span>
-						</TabsTrigger>
-						<TabsTrigger value="inactive" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<Target className="h-4 w-4" />
-							<span className="hidden sm:inline">Inactivas</span>
-						</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value="all" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{categories.map((category) => (
-								<CategoryCard 
-									key={category.id} 
-									category={category} 
-									transactions={transactions}
-								/>
-							))}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="active" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{activeCategories.map((category) => (
-								<CategoryCard 
-									key={category.id} 
-									category={category} 
-									transactions={transactions}
-								/>
-							))}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="inactive" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{inactiveCategories.map((category) => (
-								<CategoryCard 
-									key={category.id} 
-									category={category} 
-									transactions={transactions}
-								/>
-							))}
-						</div>
-					</TabsContent>
-				</Tabs>
+				<AnimatedTabs
+					tabs={[
+						{
+							value: 'all',
+							label: 'Todas',
+							icon: <Tag className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{categories.map((category) => (
+										<CategoryCard 
+											key={category.id} 
+											category={category} 
+											transactions={transactions}
+										/>
+									))}
+								</div>
+							)
+						},
+						{
+							value: 'active',
+							label: 'Activas',
+							icon: <Activity className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{activeCategories.map((category) => (
+										<CategoryCard 
+											key={category.id} 
+											category={category} 
+											transactions={transactions}
+										/>
+									))}
+								</div>
+							)
+						},
+						{
+							value: 'inactive',
+							label: 'Inactivas',
+							icon: <Target className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{inactiveCategories.map((category) => (
+										<CategoryCard 
+											key={category.id} 
+											category={category} 
+											transactions={transactions}
+										/>
+									))}
+								</div>
+							)
+						}
+					]}
+					defaultValue="all"
+					className="space-y-6"
+				/>
 
 				{/* Información de desarrollo */}
 				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">

@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AnimatedTabs } from '@/components/client/animated-tabs'
 import { 
 	getAuthRepository, 
 	getAccountRepository, 
@@ -328,115 +328,117 @@ export default async function DashboardPage() {
 				<DashboardHeader user={user} />
 				<StatsGrid accounts={accounts} transactions={transactions} />
 				
-				<Tabs defaultValue="overview" className="space-y-6">
-					<TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-4 bg-muted/50 dark:bg-muted/30">
-						<TabsTrigger value="overview" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<BarChart3 className="h-4 w-4" />
-							<span className="hidden sm:inline">Resumen</span>
-						</TabsTrigger>
-						<TabsTrigger value="accounts" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<CreditCard className="h-4 w-4" />
-							<span className="hidden sm:inline">Cuentas</span>
-						</TabsTrigger>
-						<TabsTrigger value="transactions" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<Wallet className="h-4 w-4" />
-							<span className="hidden sm:inline">Transacciones</span>
-						</TabsTrigger>
-						<TabsTrigger value="budgets" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<PieChart className="h-4 w-4" />
-							<span className="hidden sm:inline">Presupuestos</span>
-						</TabsTrigger>
-					</TabsList>
+				<AnimatedTabs
+					defaultValue="overview"
+					className="space-y-6"
+					tabs={[
+						{
+							value: 'overview',
+							label: 'Resumen',
+							icon: <BarChart3 className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+									<Card className="lg:col-span-2 border-border/50 dark:border-border/20">
+										<CardHeader>
+											<CardTitle className="flex items-center gap-2 text-foreground">
+												<Wallet className="h-5 w-5" />
+												Transacciones Recientes
+											</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<div className="space-y-1">
+												{recentTransactions.map((transaction) => {
+													const category = categories.find(c => c.id === transaction.category_id)
+													return (
+														<TransactionItem 
+															key={transaction.id} 
+															transaction={transaction} 
+															category={category}
+														/>
+													)
+												})}
+											</div>
+										</CardContent>
+									</Card>
 
-					<TabsContent value="overview" className="space-y-6">
-						<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-							<Card className="lg:col-span-2 border-border/50 dark:border-border/20">
-								<CardHeader>
-									<CardTitle className="flex items-center gap-2 text-foreground">
-										<Wallet className="h-5 w-5" />
-										Transacciones Recientes
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<div className="space-y-1">
-										{recentTransactions.map((transaction) => {
-											const category = categories.find(c => c.id === transaction.category_id)
-											return (
-												<TransactionItem 
-													key={transaction.id} 
-													transaction={transaction} 
-													category={category}
-												/>
-											)
-										})}
-									</div>
-								</CardContent>
-							</Card>
-
-							<Card className="border-border/50 dark:border-border/20">
-								<CardHeader>
-									<CardTitle className="flex items-center gap-2 text-foreground">
-										<PieChart className="h-5 w-5" />
-										Categorías
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<div className="space-y-4">
-										{categories.slice(0, 6).map((category) => (
-											<CategoryCard 
-												key={category.id} 
-												category={category} 
-												transactions={transactions}
+									<Card className="border-border/50 dark:border-border/20">
+										<CardHeader>
+											<CardTitle className="flex items-center gap-2 text-foreground">
+												<PieChart className="h-5 w-5" />
+												Categorías
+											</CardTitle>
+										</CardHeader>
+										<CardContent>
+											<div className="space-y-4">
+												{categories.slice(0, 6).map((category) => (
+													<CategoryCard 
+														key={category.id} 
+														category={category} 
+														transactions={transactions}
+													/>
+												))}
+											</div>
+										</CardContent>
+									</Card>
+								</div>
+							)
+						},
+						{
+							value: 'accounts',
+							label: 'Cuentas',
+							icon: <CreditCard className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+									{accounts.map((account) => (
+										<AccountCard key={account.id} account={account} />
+									))}
+								</div>
+							)
+						},
+						{
+							value: 'transactions',
+							label: 'Transacciones',
+							icon: <Wallet className="h-4 w-4" />,
+							content: (
+								<div className="space-y-4">
+									{transactions.map((transaction) => {
+										const category = categories.find(c => c.id === transaction.category_id)
+										return (
+											<TransactionItem 
+												key={transaction.id} 
+												transaction={transaction} 
+												category={category}
 											/>
-										))}
-									</div>
-								</CardContent>
-							</Card>
-						</div>
-					</TabsContent>
-
-					<TabsContent value="accounts" className="space-y-6">
-						<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-							{accounts.map((account) => (
-								<AccountCard key={account.id} account={account} />
-							))}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="transactions" className="space-y-6">
-						<div className="space-y-4">
-							{transactions.map((transaction) => {
-								const category = categories.find(c => c.id === transaction.category_id)
-								return (
-									<TransactionItem 
-										key={transaction.id} 
-										transaction={transaction} 
-										category={category}
-									/>
-								)
-							})}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="budgets" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{budgets.map((budget) => {
-								const category = categories.find(c => c.id === budget.category_id)
-								const spent = transactions
-									.filter(t => t.budget_id === budget.id && t.type_transaction === TypeTransaction.BILL)
-									.reduce((sum, t) => sum + t.amount, 0)
-								return (
-									<BudgetCard 
-										key={budget.id} 
-										budget={budget} 
-										category={category} 
-										spent={spent}
-									/>
-								)
-							})}
-						</div>
-					</TabsContent>
-				</Tabs>
+										)
+									})}
+								</div>
+							)
+						},
+						{
+							value: 'budgets',
+							label: 'Presupuestos',
+							icon: <PieChart className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{budgets.map((budget) => {
+										const category = categories.find(c => c.id === budget.category_id)
+										const spent = transactions
+											.filter(t => t.budget_id === budget.id && t.type_transaction === TypeTransaction.BILL)
+											.reduce((sum, t) => sum + t.amount, 0)
+										return (
+											<BudgetCard 
+												key={budget.id} 
+												budget={budget} 
+												category={category} 
+												spent={spent}
+											/>
+										)
+									})}
+								</div>
+							)
+						}
+					]}
+				/>
 
 				{/* Información de desarrollo */}
 				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">

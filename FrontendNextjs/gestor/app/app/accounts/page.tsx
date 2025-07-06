@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { AnimatedTabs } from '@/components/client/animated-tabs'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { getAccountRepository } from '@/lib/repositoryConfig'
@@ -163,47 +163,49 @@ export default async function AccountsPage() {
 					<AccountSummaryCard accounts={accounts} />
 				</div>
 
-				{/* Contenido principal con tabs */}
-				<Tabs defaultValue="all" className="space-y-6">
-					<TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-3 bg-muted/50 dark:bg-muted/30">
-						<TabsTrigger value="all" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<Wallet className="h-4 w-4" />
-							<span className="hidden sm:inline">Todas</span>
-						</TabsTrigger>
-						<TabsTrigger value="positive" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<TrendingUp className="h-4 w-4" />
-							<span className="hidden sm:inline">Positivas</span>
-						</TabsTrigger>
-						<TabsTrigger value="negative" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<TrendingDown className="h-4 w-4" />
-							<span className="hidden sm:inline">Negativas</span>
-						</TabsTrigger>
-					</TabsList>
-
-					<TabsContent value="all" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{accounts.map((account) => (
-								<AccountCard key={account.id} account={account} />
-							))}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="positive" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{accounts.filter(account => account.balance > 0).map((account) => (
-								<AccountCard key={account.id} account={account} />
-							))}
-						</div>
-					</TabsContent>
-
-					<TabsContent value="negative" className="space-y-6">
-						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-							{accounts.filter(account => account.balance < 0).map((account) => (
-								<AccountCard key={account.id} account={account} />
-							))}
-						</div>
-					</TabsContent>
-				</Tabs>
+				{/* Contenido principal con tabs animados */}
+				<AnimatedTabs
+					defaultValue="all"
+					className="space-y-6"
+					tabs={[
+						{
+							value: 'all',
+							label: 'Todas',
+							icon: <Wallet className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{accounts.map((account) => (
+										<AccountCard key={account.id} account={account} />
+									))}
+								</div>
+							)
+						},
+						{
+							value: 'positive',
+							label: 'Positivas',
+							icon: <TrendingUp className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{accounts.filter(account => account.balance > 0).map((account) => (
+										<AccountCard key={account.id} account={account} />
+									))}
+								</div>
+							)
+						},
+						{
+							value: 'negative',
+							label: 'Negativas',
+							icon: <TrendingDown className="h-4 w-4" />,
+							content: (
+								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+									{accounts.filter(account => account.balance < 0).map((account) => (
+										<AccountCard key={account.id} account={account} />
+									))}
+								</div>
+							)
+						}
+					]}
+				/>
 
 				{/* Información de desarrollo */}
 				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">
