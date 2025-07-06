@@ -28,13 +28,22 @@ export function DashboardCharts({ categories, transactions }: DashboardChartsPro
 	console.log('DashboardCharts transactions:', transactions)
 	const { theme } = useTheme()
 
+	// Filtrar solo transacciones del mes y año actual
+	const now = new Date()
+	const currentMonth = now.getMonth() + 1
+	const currentYear = now.getFullYear()
+	const currentMonthTransactions = useMemo(() => transactions.filter(tx => {
+		const date = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
+		return (date.getMonth() + 1) === currentMonth && date.getFullYear() === currentYear
+	}), [transactions, currentMonth, currentYear])
+
 	// Normalizar type_transaction
-	const normalizedTransactions = useMemo(() => transactions.map(t => ({
+	const normalizedTransactions = useMemo(() => currentMonthTransactions.map(t => ({
 		...t,
 		type_transaction: t.type_transaction === '0' ? 'BILL'
 			: t.type_transaction === '1' ? 'INCOME'
 			: t.type_transaction
-	})), [transactions])
+	})), [currentMonthTransactions])
 
 	// Pie: Distribución de gastos por categoría
 	const pieData: CategoryData[] = useMemo(() => {

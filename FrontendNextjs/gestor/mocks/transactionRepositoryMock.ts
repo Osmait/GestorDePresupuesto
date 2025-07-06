@@ -86,6 +86,85 @@ export class TransactionRepositoryMock {
       category_id: "category-6",
       created_at: new Date("2024-01-21T09:30:00Z"),
     },
+    // Transacciones adicionales para 2023-2025
+    // 2023
+    {
+      id: 'transaction-2023-01', name: 'Supermercado', description: 'Compra mensual', amount: 120, type_transaction: TypeTransaction.BILL, account_id: '1', category_id: 'category-1', created_at: new Date('2023-01-10T10:00:00Z')
+    },
+    {
+      id: 'transaction-2023-02', name: 'Salario', description: 'Pago mensual', amount: 2500, type_transaction: TypeTransaction.INCOME, account_id: '1', category_id: 'category-5', created_at: new Date('2023-01-31T08:00:00Z')
+    },
+    {
+      id: 'transaction-2023-03', name: 'Gasolina', description: 'Tanque lleno', amount: 60, type_transaction: TypeTransaction.BILL, account_id: '2', category_id: 'category-2', created_at: new Date('2023-02-15T14:20:00Z')
+    },
+    {
+      id: 'transaction-2023-04', name: 'Cine', description: 'Entretenimiento', amount: 30, type_transaction: TypeTransaction.BILL, account_id: '1', category_id: 'category-3', created_at: new Date('2023-03-05T19:45:00Z')
+    },
+    {
+      id: 'transaction-2023-05', name: 'Venta online', description: 'Ingreso extra', amount: 400, type_transaction: TypeTransaction.INCOME, account_id: '2', category_id: 'category-8', created_at: new Date('2023-04-12T16:30:00Z')
+    },
+    {
+      id: 'transaction-2023-06', name: 'Pago servicios', description: 'Luz y agua', amount: 180, type_transaction: TypeTransaction.BILL, account_id: '3', category_id: 'category-6', created_at: new Date('2023-05-21T09:30:00Z')
+    },
+    // 2024
+    {
+      id: 'transaction-2024-01', name: 'Supermercado', description: 'Compra mensual', amount: 130, type_transaction: TypeTransaction.BILL, account_id: '1', category_id: 'category-1', created_at: new Date('2024-01-10T10:00:00Z')
+    },
+    {
+      id: 'transaction-2024-02', name: 'Salario', description: 'Pago mensual', amount: 2600, type_transaction: TypeTransaction.INCOME, account_id: '1', category_id: 'category-5', created_at: new Date('2024-01-31T08:00:00Z')
+    },
+    {
+      id: 'transaction-2024-03', name: 'Gasolina', description: 'Tanque lleno', amount: 65, type_transaction: TypeTransaction.BILL, account_id: '2', category_id: 'category-2', created_at: new Date('2024-02-15T14:20:00Z')
+    },
+    {
+      id: 'transaction-2024-04', name: 'Cine', description: 'Entretenimiento', amount: 35, type_transaction: TypeTransaction.BILL, account_id: '1', category_id: 'category-3', created_at: new Date('2024-03-05T19:45:00Z')
+    },
+    {
+      id: 'transaction-2024-05', name: 'Venta online', description: 'Ingreso extra', amount: 420, type_transaction: TypeTransaction.INCOME, account_id: '2', category_id: 'category-8', created_at: new Date('2024-04-12T16:30:00Z')
+    },
+    {
+      id: 'transaction-2024-06', name: 'Pago servicios', description: 'Luz y agua', amount: 185, type_transaction: TypeTransaction.BILL, account_id: '3', category_id: 'category-6', created_at: new Date('2024-05-21T09:30:00Z')
+    },
+    // 2025
+    {
+      id: 'transaction-2025-01', name: 'Supermercado', description: 'Compra mensual', amount: 140, type_transaction: TypeTransaction.BILL, account_id: '1', category_id: 'category-1', created_at: new Date('2025-01-10T10:00:00Z')
+    },
+    {
+      id: 'transaction-2025-02', name: 'Salario', description: 'Pago mensual', amount: 2700, type_transaction: TypeTransaction.INCOME, account_id: '1', category_id: 'category-5', created_at: new Date('2025-01-31T08:00:00Z')
+    },
+    {
+      id: 'transaction-2025-03', name: 'Gasolina', description: 'Tanque lleno', amount: 70, type_transaction: TypeTransaction.BILL, account_id: '2', category_id: 'category-2', created_at: new Date('2025-02-15T14:20:00Z')
+    },
+    {
+      id: 'transaction-2025-04', name: 'Cine', description: 'Entretenimiento', amount: 40, type_transaction: TypeTransaction.BILL, account_id: '1', category_id: 'category-3', created_at: new Date('2025-03-05T19:45:00Z')
+    },
+    {
+      id: 'transaction-2025-05', name: 'Venta online', description: 'Ingreso extra', amount: 450, type_transaction: TypeTransaction.INCOME, account_id: '2', category_id: 'category-8', created_at: new Date('2025-04-12T16:30:00Z')
+    },
+    {
+      id: 'transaction-2025-06', name: 'Pago servicios', description: 'Luz y agua', amount: 190, type_transaction: TypeTransaction.BILL, account_id: '3', category_id: 'category-6', created_at: new Date('2025-05-21T09:30:00Z')
+    },
+    {
+      id: 'transaction-2025-07', name: 'Supermercado', description: 'Compra mensual', amount: 145, type_transaction: TypeTransaction.BILL, account_id: '1', category_id: 'category-1', created_at: new Date('2025-07-10T10:00:00Z')
+    },
+    {
+      id: 'transaction-2025-08', name: 'Restaurante', description: 'Cena con amigos', amount: 80, type_transaction: TypeTransaction.BILL, account_id: '2', category_id: 'category-9', created_at: new Date('2025-07-05T20:00:00Z')
+    },
+    {
+      id: 'transaction-2025-09', name: 'Gimnasio', description: 'Pago mensual', amount: 50, type_transaction: TypeTransaction.BILL, account_id: '3', category_id: 'category-10', created_at: new Date('2025-07-02T08:00:00Z')
+    },
+    {
+      id: 'transaction-2025-10', name: 'Freelance', description: 'Proyecto web', amount: 1200, type_transaction: TypeTransaction.INCOME, account_id: '2', category_id: 'category-11', created_at: new Date('2025-07-10T10:00:00Z')
+    },
+    {
+      id: 'transaction-2025-11', name: 'Farmacia', description: 'Medicinas', amount: 60, type_transaction: TypeTransaction.BILL, account_id: '1', category_id: 'category-4', created_at: new Date('2025-07-12T15:00:00Z')
+    },
+    {
+      id: 'transaction-2025-12', name: 'Supermercado', description: 'Compra semanal', amount: 200, type_transaction: TypeTransaction.BILL, account_id: '3', category_id: 'category-1', created_at: new Date('2025-07-15T18:00:00Z')
+    },
+    {
+      id: 'transaction-2025-13', name: 'Venta de libro', description: 'Ingreso extra', amount: 90, type_transaction: TypeTransaction.INCOME, account_id: '1', category_id: 'category-12', created_at: new Date('2025-07-18T11:00:00Z')
+    },
   ];
 
   findAll = async (): Promise<Transaction[]> => {

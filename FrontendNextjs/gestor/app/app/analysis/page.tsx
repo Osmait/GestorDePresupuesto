@@ -190,11 +190,17 @@ const months = [
   { value: '11', label: 'Noviembre' },
   { value: '12', label: 'Diciembre' },
 ]
-const years = [
-  { value: '2024', label: '2024' },
-  { value: '2023', label: '2023' },
-  { value: '2022', label: '2022' },
-]
+const now = new Date()
+const defaultMonth = String(now.getMonth() + 1).padStart(2, '0')
+const defaultYear = String(now.getFullYear())
+
+// Generar opciones de años dinámicamente para incluir el año actual y futuros
+const minYear = 2022
+const maxYear = now.getFullYear() + 1 // Incluye el próximo año por si acaso
+const years = Array.from({ length: maxYear - minYear + 1 }, (_, i) => {
+  const y = String(minYear + i)
+  return { value: y, label: y }
+})
 
 // Definir el tipo para los filtros
 interface AnalysisFiltersState {
@@ -343,8 +349,8 @@ export default function AnalysisPage() {
   const [selectedLine, setSelectedLine] = useState<{ serieId: string, pointIndex: number } | null>(null)
   const [filters, setFilters] = useState<AnalysisFiltersState>({
     filterMode: 'month',
-    month: 'all',
-    year: '',
+    month: defaultMonth,
+    year: defaultYear,
     dateRange: { from: null, to: null },
     account: 'all',
     category: 'all',
@@ -520,15 +526,65 @@ export default function AnalysisPage() {
     ]
   }, [filteredTransactions, filters, start, end, interval])
 
-  // Barras: gastos por categoría
+  // Adaptar el gráfico de barras para mostrar evolución temporal por categoría
+  type BarDatum = { categoria: string, [key: string]: number | string }
   const filteredBarData = useMemo(() => {
+    if (filteredTransactions.length === 0) return []
+    let labels: string[] = []
+    let getLabel: (date: Date) => string
+    let addFn: (date: Date, n: number) => Date
+    let startFn: (date: Date) => Date
+    if (interval === 'day') {
+      getLabel = d => format(d, 'dd/MM/yyyy')
+      addFn = addDays
+      startFn = d => d
+      let d = start
+      while (d <= end) {
+        labels.push(getLabel(d))
+        d = addFn(d, 1)
+      }
+    } else if (interval === 'week') {
+      getLabel = d => 'Semana ' + format(d, 'w yyyy')
+      addFn = addWeeks
+      startFn = d => startOfWeek(d, { weekStartsOn: 1 })
+      let d = startFn(start)
+      while (d <= end) {
+        labels.push(getLabel(d))
+        d = addFn(d, 1)
+      }
+    } else if (interval === 'month') {
+      getLabel = d => format(d, 'MMM yyyy')
+      addFn = addMonths
+      startFn = startOfMonth
+      let d = startFn(start)
+      while (d <= end) {
+        labels.push(getLabel(d))
+        d = addFn(d, 1)
+      }
+    } else {
+      getLabel = d => format(d, 'yyyy')
+      addFn = addYears
+      startFn = startOfYear
+      let d = startFn(start)
+      while (d <= end) {
+        labels.push(getLabel(d))
+        d = addFn(d, 1)
+      }
+    }
+    // Para cada categoría, construir un objeto con los montos por periodo
     return categories.map(cat => {
-      const monto = filteredTransactions
-        .filter(tx => tx.category_id === cat.id && tx.type_transaction === 0)
-        .reduce((sum, tx) => sum + tx.amount, 0)
-      return { categoria: cat.name, monto }
-    }).filter(bar => bar.monto > 0)
-  }, [filteredTransactions, categories])
+      const barDatum: BarDatum = { categoria: cat.name }
+      labels.forEach(l => { barDatum[l] = 0 })
+      filteredTransactions.forEach(tx => {
+        if (tx.category_id === cat.id && tx.type_transaction === 0) {
+          const date = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
+          const label = getLabel(startFn(date))
+          if (label in barDatum) barDatum[label] = (barDatum[label] as number) + tx.amount
+        }
+      })
+      return barDatum
+    }).filter(bar => labels.some(l => (bar[l] as number) > 0))
+  }, [filteredTransactions, categories, interval, start, end])
 
   // Pie: distribución por cuenta
   const filteredPieData = useMemo(() => {
@@ -542,32 +598,50 @@ export default function AnalysisPage() {
 
   // Radar: comparación de categorías (gastos e ingresos)
   const filteredRadarData = useMemo(() => {
-    return categories.map(cat => {
+    // Calcular el monto total por categoría
+    const categoryTotals = categories.map(cat => {
       const gastos = filteredTransactions
         .filter(tx => tx.category_id === cat.id && tx.type_transaction === 0)
         .reduce((sum, tx) => sum + tx.amount, 0)
       const ingresos = filteredTransactions
         .filter(tx => tx.category_id === cat.id && tx.type_transaction === 1)
         .reduce((sum, tx) => sum + tx.amount, 0)
-      return { categoria: cat.name, Gastos: gastos, Ingresos: ingresos }
-    }).filter(radar => radar.Gastos > 0 || radar.Ingresos > 0)
+      return { categoria: cat.name, Gastos: gastos, Ingresos: ingresos, total: gastos + ingresos }
+    })
+    // Ordenar por total y tomar top 5
+    const topCategories = categoryTotals
+      .sort((a, b) => b.total - a.total)
+      .slice(0, 5)
+    // Devolver solo las top 5 en el formato esperado por el radar
+    return topCategories.map(({ categoria, Gastos, Ingresos }) => ({ categoria, Gastos, Ingresos }))
   }, [filteredTransactions, categories])
 
-  // Heatmap: actividad por día de la semana y mes
+  // Ajustar el heatmap para mostrar solo el rango seleccionado
   const filteredHeatData = useMemo(() => {
     const monthsLabels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
     const days = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
+    // Determinar meses visibles en el rango
+    let visibleMonths: string[] = []
+    if (interval === 'month' || interval === 'week' || interval === 'day') {
+      let d = startOfMonth(start)
+      while (d <= end) {
+        visibleMonths.push(monthsLabels[d.getMonth()])
+        d = addMonths(d, 1)
+      }
+    } else {
+      visibleMonths = monthsLabels
+    }
     return days.map((day, i) => {
-      const data = monthsLabels.map((month, j) => {
+      const data = visibleMonths.map((month, j) => {
         const count = filteredTransactions.filter(tx => {
           const date = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
-          return date.getDay() === ((i + 1) % 7) && date.getMonth() === j
+          return date.getDay() === ((i + 1) % 7) && monthsLabels[date.getMonth()] === month
         }).length
         return { x: month, y: count }
       })
       return { id: day, data }
     })
-  }, [filteredTransactions])
+  }, [filteredTransactions, interval, start, end])
 
   // Leyenda visual personalizada
   const legendWrapperStyle = {
@@ -673,7 +747,43 @@ export default function AnalysisPage() {
                 <CardTitle>Gastos por Categoría</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
-                <ResponsiveBar data={filteredBarData} keys={['monto']} indexBy='categoria' margin={{ top: 30, right: 30, bottom: 50, left: 60 }} padding={0.3} valueScale={{ type: 'linear' }} indexScale={{ type: 'band', round: true }} colors={{ scheme: 'nivo' }} borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }} axisTop={null} axisRight={null} axisBottom={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: 'Categoría', legendOffset: 36, legendPosition: 'middle' }} axisLeft={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: 'Monto', legendOffset: -50, legendPosition: 'middle' }} labelSkipWidth={12} labelSkipHeight={12} labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }} legends={[]} theme={nivoTheme} />
+                <ResponsiveBar
+                  data={filteredBarData}
+                  keys={filteredBarData.length > 0 ? Object.keys(filteredBarData[0]).filter(k => k !== 'categoria') : []}
+                  indexBy='categoria'
+                  margin={{ top: 30, right: 30, bottom: 60, left: 60 }}
+                  padding={0.3}
+                  valueScale={{ type: 'linear' }}
+                  indexScale={{ type: 'band', round: true }}
+                  colors={{ scheme: 'nivo' }}
+                  borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
+                  axisTop={null}
+                  axisRight={null}
+                  axisBottom={{
+                    tickSize: 5,
+                    tickPadding: 5,
+                    tickRotation: 45,
+                    legend: interval === 'day' ? 'Día' : interval === 'week' ? 'Semana' : interval === 'month' ? 'Mes' : 'Año',
+                    legendOffset: 48,
+                    legendPosition: 'middle',
+                    tickValues: filteredBarData.length > 0 && Object.keys(filteredBarData[0]).length > 15
+                      ? Object.keys(filteredBarData[0]).filter(k => k !== 'categoria').filter((_, i, arr) => i % Math.ceil(arr.length / 10) === 0)
+                      : undefined,
+                    format: v => {
+                      if (interval === 'day') return String(v).slice(0, 5)
+                      if (interval === 'week') return String(v).replace('Semana ', 'S')
+                      if (interval === 'month') return String(v).slice(0, 7)
+                      return v
+                    },
+                  }}
+                  axisLeft={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: 'Monto', legendOffset: -50, legendPosition: 'middle' }}
+                  labelSkipWidth={12}
+                  labelSkipHeight={12}
+                  labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
+                  legends={[]}
+                  theme={nivoTheme}
+                  groupMode='grouped'
+                />
               </CardContent>
             </Card>
             <Card>
