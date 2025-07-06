@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { UserNav } from '@/components/user-nav'
 import { Search } from '@/components/search'
 import { SidebarController } from '@/components/client/sidebar-controller'
+import { AnimatedSidebarNav } from '@/components/client/sidebar-nav-animated'
 import { 
 	LayoutDashboard,
 	CreditCard,
@@ -93,44 +94,7 @@ const bottomNavItems: NavItem[] = [
 	}
 ]
 
-// Server Component para NavLink
-function NavLink({ item, isExpanded, pathname }: { 
-	item: NavItem 
-	isExpanded: boolean 
-	pathname: string 
-}) {
-	const isActive = pathname === item.href
-	const Icon = item.icon
 
-	return (
-		<Link
-			href={item.href}
-			className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 group relative ${
-				isActive
-					? 'bg-gradient-to-r from-primary/10 to-primary/5 text-primary border border-primary/20 shadow-sm'
-					: 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
-			} ${!isExpanded && 'justify-center px-2'}`}
-		>
-			<Icon className={`h-4 w-4 flex-shrink-0 ${isActive && 'text-primary'}`} />
-			{isExpanded && (
-				<>
-					<span className="flex-1 truncate">{item.title}</span>
-					{item.badge && (
-						<Badge variant="secondary" className="text-xs">
-							{item.badge}
-						</Badge>
-					)}
-				</>
-			)}
-			{!isExpanded && (
-				<div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md shadow-lg border opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none z-50 whitespace-nowrap">
-					{item.title}
-					{item.badge && ` (${item.badge})`}
-				</div>
-			)}
-		</Link>
-	)
-}
 
 // Server Component para el header del sidebar
 function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
@@ -156,22 +120,19 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 	)
 }
 
-// Server Component para la navegación
-function SidebarNav({ items, isExpanded, pathname }: { 
+// Wrapper para la navegación animada
+function SidebarNavWrapper({ items, isExpanded, onMobileClose }: { 
 	items: NavItem[] 
 	isExpanded: boolean 
-	pathname: string 
+	onMobileClose?: () => void
 }) {
 	return (
 		<nav className="flex-1 p-4 space-y-2">
-			{items.map((item) => (
-				<NavLink 
-					key={item.href} 
-					item={item} 
-					isExpanded={isExpanded} 
-					pathname={pathname} 
-				/>
-			))}
+			<AnimatedSidebarNav 
+				items={items}
+				isExpanded={isExpanded}
+				onMobileClose={onMobileClose}
+			/>
 		</nav>
 	)
 }
@@ -180,44 +141,38 @@ function SidebarNav({ items, isExpanded, pathname }: {
 function SidebarFooter({ 
 	items, 
 	isExpanded, 
-	pathname, 
 	sidebarHoverEnabled, 
 	toggleCollapsed 
 }: { 
 	items: NavItem[] 
 	isExpanded: boolean 
-	pathname: string 
 	sidebarHoverEnabled: boolean
 	toggleCollapsed: () => void
 }) {
 	return (
 		<div className="border-t border-border/50 p-4 space-y-2">
-			{items.map((item) => (
-				<NavLink 
-					key={item.href} 
-					item={item} 
-					isExpanded={isExpanded} 
-					pathname={pathname} 
-				/>
-			))}
+			<AnimatedSidebarNav 
+				items={items}
+				isExpanded={isExpanded}
+			/>
 			
 			<div className="pt-2">
 				<Button 
 					variant="ghost" 
 					size="sm" 
 					onClick={toggleCollapsed}
-					className={`w-full transition-all duration-200 ${!isExpanded && 'px-2'}`}
+					className={`w-full transition-all duration-300 ${!isExpanded && 'px-2'} group`}
 				>
 					{isExpanded ? (
 						<>
-							<ChevronLeft className="h-4 w-4 mr-2" />
-							Contraer
+							<ChevronLeft className="h-4 w-4 mr-2 transition-all duration-200 group-hover:scale-110" />
+							<span className="transition-all duration-200 group-hover:translate-x-1">Contraer</span>
 							{sidebarHoverEnabled && (
-								<Mouse className="h-3 w-3 ml-2 opacity-50" />
+								<Mouse className="h-3 w-3 ml-2 opacity-50 transition-all duration-200 group-hover:opacity-100" />
 							)}
 						</>
 					) : (
-						<ChevronRight className="h-4 w-4" />
+						<ChevronRight className="h-4 w-4 transition-all duration-200 group-hover:scale-110 group-hover:translate-x-1" />
 					)}
 				</Button>
 			</div>
@@ -304,16 +259,15 @@ export function SidebarNew({ children }: SidebarProps) {
 						<div className="flex h-full flex-col">
 							<SidebarHeader isExpanded={isExpanded} />
 							
-							<SidebarNav 
+							<SidebarNavWrapper 
 								items={navItems} 
 								isExpanded={isExpanded} 
-								pathname={pathname}
+								onMobileClose={toggleMobile}
 							/>
 							
 							<SidebarFooter 
 								items={bottomNavItems}
 								isExpanded={isExpanded} 
-								pathname={pathname}
 								sidebarHoverEnabled={sidebarHoverEnabled}
 								toggleCollapsed={toggleCollapsed}
 							/>
