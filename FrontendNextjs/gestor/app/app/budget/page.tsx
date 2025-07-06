@@ -1,6 +1,3 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -30,6 +27,7 @@ interface BudgetCardProps {
 	transactions: Transaction[]
 }
 
+// Server Component para LoadingSpinner (no se usa en Server Components)
 function LoadingSpinner() {
 	return (
 		<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/20 dark:from-background dark:to-secondary/10">
@@ -45,6 +43,7 @@ function LoadingSpinner() {
 	)
 }
 
+// Server Component para BudgetCard
 function BudgetCard({ budget, category, spent, transactions }: BudgetCardProps) {
 	const progressPercentage = (spent / budget.amount) * 100
 	const remaining = budget.amount - spent
@@ -141,6 +140,7 @@ function BudgetCard({ budget, category, spent, transactions }: BudgetCardProps) 
 	)
 }
 
+// Server Component para BudgetSummaryCard
 function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], transactions: Transaction[] }) {
 	const totalBudget = budgets.reduce((sum, budget) => sum + budget.amount, 0)
 	const totalSpent = budgets.reduce((sum, budget) => {
@@ -195,53 +195,18 @@ function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], trans
 	)
 }
 
-export default function BudgetPage() {
-	const [budgets, setBudgets] = useState<Budget[]>([])
-	const [categories, setCategories] = useState<Category[]>([])
-	const [transactions, setTransactions] = useState<Transaction[]>([])
-	const [isLoading, setIsLoading] = useState(true)
-
-	useEffect(() => {
-		const loadData = async () => {
-			try {
-				console.log('🔄 Cargando presupuestos, categorías y transacciones mock...')
-				const budgetRepository = await getBudgetRepository()
-				const categoryRepository = await getCategoryRepository()
-				const transactionRepository = await getTransactionRepository()
-				
-				const [budgetsData, categoriesData, transactionsData] = await Promise.all([
-					budgetRepository.findAll(),
-					categoryRepository.findAll(),
-					transactionRepository.findAll()
-				])
-				
-				setBudgets(budgetsData)
-				setCategories(categoriesData)
-				setTransactions(transactionsData)
-				console.log('✅ Datos cargados exitosamente')
-			} catch (error) {
-				console.error('❌ Error cargando datos:', error)
-			} finally {
-				setIsLoading(false)
-			}
-		}
-
-		// Add timeout to prevent infinite loading
-		const timeoutId = setTimeout(() => {
-			console.log('⏰ Timeout en presupuestos, forzando fin de carga')
-			setIsLoading(false)
-		}, 5000)
-
-		loadData().finally(() => {
-			clearTimeout(timeoutId)
-		})
-
-		return () => clearTimeout(timeoutId)
-	}, [])
-
-	if (isLoading) {
-		return <LoadingSpinner />
-	}
+// Componente principal - Server Component que carga datos directamente
+export default async function BudgetPage() {
+	// Cargar datos en el servidor
+	const budgetRepository = await getBudgetRepository()
+	const categoryRepository = await getCategoryRepository()
+	const transactionRepository = await getTransactionRepository()
+	
+	const [budgets, categories, transactions] = await Promise.all([
+		budgetRepository.findAll(),
+		categoryRepository.findAll(),
+		transactionRepository.findAll()
+	])
 
 	const getBudgetTransactions = (budgetId: string) => {
 		return transactions.filter(t => t.budget_id === budgetId)
@@ -260,7 +225,7 @@ export default function BudgetPage() {
 
 	const overBudgets = budgets.filter(budget => {
 		const spent = getBudgetSpent(budget.id)
-		return spent > budget.amount
+		return spent >= budget.amount
 	})
 
 	return (
@@ -274,14 +239,10 @@ export default function BudgetPage() {
 								Gestión de Presupuestos
 							</h1>
 							<p className="text-muted-foreground mt-2 text-lg">
-								Planifica, controla y supervisa tus gastos financieros
+								Planifica y controla tus gastos con presupuestos inteligentes
 							</p>
 						</div>
 						<div className="flex items-center gap-3">
-							<Button variant="outline" className="border-border/50">
-								<Calendar className="h-4 w-4 mr-2" />
-								Período
-							</Button>
 							<Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
 								<PlusCircle className="h-4 w-4 mr-2" />
 								Nuevo Presupuesto
@@ -306,19 +267,18 @@ export default function BudgetPage() {
 							<CheckCircle className="h-4 w-4" />
 							<span className="hidden sm:inline">Activos</span>
 						</TabsTrigger>
-						<TabsTrigger value="over" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
+						<TabsTrigger value="exceeded" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
 							<AlertTriangle className="h-4 w-4" />
 							<span className="hidden sm:inline">Excedidos</span>
 						</TabsTrigger>
 					</TabsList>
 
-					{/* Tab: Todos los presupuestos */}
 					<TabsContent value="all" className="space-y-6">
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 							{budgets.map((budget) => {
 								const category = categories.find(c => c.id === budget.category_id)
-								const budgetTransactions = getBudgetTransactions(budget.id)
 								const spent = getBudgetSpent(budget.id)
+								const budgetTransactions = getBudgetTransactions(budget.id)
 								return (
 									<BudgetCard 
 										key={budget.id} 
@@ -332,13 +292,12 @@ export default function BudgetPage() {
 						</div>
 					</TabsContent>
 
-					{/* Tab: Presupuestos activos */}
 					<TabsContent value="active" className="space-y-6">
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 							{activeBudgets.map((budget) => {
 								const category = categories.find(c => c.id === budget.category_id)
-								const budgetTransactions = getBudgetTransactions(budget.id)
 								const spent = getBudgetSpent(budget.id)
+								const budgetTransactions = getBudgetTransactions(budget.id)
 								return (
 									<BudgetCard 
 										key={budget.id} 
@@ -350,23 +309,14 @@ export default function BudgetPage() {
 								)
 							})}
 						</div>
-						{activeBudgets.length === 0 && (
-							<Card className="border-border/50 dark:border-border/20">
-								<CardContent className="p-8 text-center">
-									<CheckCircle className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-									<p className="text-muted-foreground">No hay presupuestos activos</p>
-								</CardContent>
-							</Card>
-						)}
 					</TabsContent>
 
-					{/* Tab: Presupuestos excedidos */}
-					<TabsContent value="over" className="space-y-6">
+					<TabsContent value="exceeded" className="space-y-6">
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 							{overBudgets.map((budget) => {
 								const category = categories.find(c => c.id === budget.category_id)
-								const budgetTransactions = getBudgetTransactions(budget.id)
 								const spent = getBudgetSpent(budget.id)
+								const budgetTransactions = getBudgetTransactions(budget.id)
 								return (
 									<BudgetCard 
 										key={budget.id} 
@@ -378,53 +328,43 @@ export default function BudgetPage() {
 								)
 							})}
 						</div>
-						{overBudgets.length === 0 && (
-							<Card className="border-border/50 dark:border-border/20">
-								<CardContent className="p-8 text-center">
-									<CheckCircle className="h-12 w-12 mx-auto mb-4 text-green-600 dark:text-green-400" />
-									<p className="text-muted-foreground">¡Excelente! No hay presupuestos excedidos</p>
-								</CardContent>
-							</Card>
-						)}
 					</TabsContent>
 				</Tabs>
 
-				{/* Información adicional */}
-				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-purple-50/50 dark:from-blue-900/10 dark:to-purple-900/10 border-blue-200/50 dark:border-blue-800/30">
+				{/* Información de desarrollo */}
+				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-							<Target className="h-5 w-5" />
-							Análisis de Presupuestos
+							<PiggyBank className="h-5 w-5" />
+							Información de Desarrollo
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Total Presupuestos:</p>
-								<p className="text-blue-700 dark:text-blue-300">{budgets.length} configurados</p>
+								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Estado del Sistema:</p>
+								<div className="space-y-2">
+									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
+										✅ Server Component optimizado
+									</Badge>
+									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
+										✅ Data loading en servidor
+									</Badge>
+								</div>
 							</div>
 							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Promedio por Presupuesto:</p>
-								<p className="text-blue-700 dark:text-blue-300">
-									${budgets.length > 0 ? Math.round(budgets.reduce((sum, b) => sum + b.amount, 0) / budgets.length).toLocaleString() : 0}
-								</p>
-							</div>
-							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Categorías Presupuestadas:</p>
-								<p className="text-blue-700 dark:text-blue-300">
-									{Array.from(new Set(budgets.map(b => b.category_id))).length} categorías
-								</p>
-							</div>
-							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Eficiencia Promedio:</p>
-								<p className="text-blue-700 dark:text-blue-300">
-									{budgets.length > 0 ? Math.round(
-										budgets.reduce((sum, budget) => {
-											const spent = getBudgetSpent(budget.id)
-											return sum + Math.min((spent / budget.amount) * 100, 100)
-										}, 0) / budgets.length
-									) : 0}%
-								</p>
+								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Datos Disponibles:</p>
+								<div className="space-y-2">
+									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
+										🎯 {budgets.length} presupuestos
+									</Badge>
+									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
+										📊 {categories.length} categorías
+									</Badge>
+									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
+										💳 {transactions.length} transacciones
+									</Badge>
+								</div>
 							</div>
 						</div>
 					</CardContent>

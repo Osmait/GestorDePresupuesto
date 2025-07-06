@@ -1,44 +1,39 @@
-import type { Metadata } from "next";
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import '../../styles/globals.css'
+import { ThemeProvider } from '@/components/theme-provider'
+import { SettingsProvider } from '../../contexts'
+import { SidebarNew } from '@/components/sidebar-new'
+import { cn } from '../../lib/utils'
 
-import { Inter as FontSans } from "next/font/google";
-import "../../styles/globals.css";
-import { ThemeProvider } from "@/components/theme-provider";
-import { SettingsProvider } from "../../contexts";
-import { Sidebar } from "@/components/sidebar";
-import { cn } from "../../lib/utils";
-
-export const fontSans = FontSans({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
+const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
-  title: "FinanceApp - Gestor Personal",
-  description: "Aplicación para gestión de finanzas personales",
-};
+	title: 'Gestor de Presupuesto',
+	description: 'Sistema de gestión financiera personal',
+}
 
-export default function AppLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="es">
-      <body
-        className={cn(
-          "min-h-screen bg-background font-sans antialiased",
-          fontSans.variable,
-        )}
-      >
-        				<ThemeProvider
+export default function RootLayout({
+	children,
+}: {
+	children: React.ReactNode
+}) {
+	return (
+		<html lang="es">
+			<body className={cn(inter.className, 'antialiased')}>
+				<ThemeProvider
 					attribute="class"
 					defaultTheme="system"
 					enableSystem
 					disableTransitionOnChange
 				>
 					<SettingsProvider>
-						<Sidebar>
+						<SidebarNew>
 							{children}
-						</Sidebar>
+						</SidebarNew>
 					</SettingsProvider>
 				</ThemeProvider>
-      </body>
-    </html>
-  );
+			</body>
+		</html>
+	)
 }

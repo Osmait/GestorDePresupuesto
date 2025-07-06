@@ -1,5 +1,7 @@
 import { cn } from "@/lib/utils";
-import { fontSans } from "../app/layout";
+import { Inter } from "next/font/google";
+
+const inter = Inter({ subsets: ["latin"] });
 
 export default function RegisterLayout({
   children, // will be a page or nested layout
@@ -11,7 +13,7 @@ export default function RegisterLayout({
       <body
         className={cn(
           "min-h-screen bg-background font-sans antialiased",
-          fontSans.variable,
+          inter.className,
         )}
       >
         {children}

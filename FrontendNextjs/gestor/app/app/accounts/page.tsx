@@ -1,6 +1,3 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -14,6 +11,7 @@ import {
 	PlusCircle, 
 	Building, 
 	TrendingUp,
+	TrendingDown,
 	Wallet,
 	ArrowUpRight,
 	ArrowDownRight,
@@ -24,6 +22,7 @@ interface AccountCardProps {
 	account: Account
 }
 
+// Server Component para LoadingSpinner (no se usa en Server Components)
 function LoadingSpinner() {
 	return (
 		<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/20 dark:from-background dark:to-secondary/10">
@@ -39,6 +38,7 @@ function LoadingSpinner() {
 	)
 }
 
+// Server Component para AccountCard
 function AccountCard({ account }: AccountCardProps) {
 	const isPositive = account.balance > 0
 	
@@ -92,6 +92,7 @@ function AccountCard({ account }: AccountCardProps) {
 	)
 }
 
+// Server Component para AccountSummaryCard
 function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
 	const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0)
 	const positiveAccounts = accounts.filter(account => account.balance > 0)
@@ -128,41 +129,11 @@ function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
 	)
 }
 
-export default function AccountsPage() {
-	const [accounts, setAccounts] = useState<Account[]>([])
-	const [isLoading, setIsLoading] = useState(true)
-
-	useEffect(() => {
-		const loadAccounts = async () => {
-			try {
-				console.log('🔄 Cargando cuentas mock...')
-				const accountRepository = await getAccountRepository()
-				const accountsData = await accountRepository.findAll()
-				setAccounts(accountsData)
-				console.log('✅ Cuentas cargadas exitosamente')
-			} catch (error) {
-				console.error('❌ Error cargando cuentas:', error)
-			} finally {
-				setIsLoading(false)
-			}
-		}
-
-		// Add timeout to prevent infinite loading
-		const timeoutId = setTimeout(() => {
-			console.log('⏰ Timeout en cuentas, forzando fin de carga')
-			setIsLoading(false)
-		}, 5000)
-
-		loadAccounts().finally(() => {
-			clearTimeout(timeoutId)
-		})
-
-		return () => clearTimeout(timeoutId)
-	}, [])
-
-	if (isLoading) {
-		return <LoadingSpinner />
-	}
+// Componente principal - Server Component que carga datos directamente
+export default async function AccountsPage() {
+	// Cargar datos en el servidor
+	const accountRepository = await getAccountRepository()
+	const accounts = await accountRepository.findAll()
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
@@ -203,13 +174,12 @@ export default function AccountsPage() {
 							<TrendingUp className="h-4 w-4" />
 							<span className="hidden sm:inline">Positivas</span>
 						</TabsTrigger>
-						<TabsTrigger value="banks" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
-							<Building className="h-4 w-4" />
-							<span className="hidden sm:inline">Por Banco</span>
+						<TabsTrigger value="negative" className="flex items-center gap-2 data-[state=active]:bg-background data-[state=active]:text-foreground">
+							<TrendingDown className="h-4 w-4" />
+							<span className="hidden sm:inline">Negativas</span>
 						</TabsTrigger>
 					</TabsList>
 
-					{/* Tab: Todas las cuentas */}
 					<TabsContent value="all" className="space-y-6">
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 							{accounts.map((account) => (
@@ -218,7 +188,6 @@ export default function AccountsPage() {
 						</div>
 					</TabsContent>
 
-					{/* Tab: Cuentas positivas */}
 					<TabsContent value="positive" className="space-y-6">
 						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 							{accounts.filter(account => account.balance > 0).map((account) => (
@@ -227,53 +196,43 @@ export default function AccountsPage() {
 						</div>
 					</TabsContent>
 
-					{/* Tab: Por banco */}
-					<TabsContent value="banks" className="space-y-6">
-						{Array.from(new Set(accounts.map(account => account.bank))).map((bank) => (
-							<Card key={bank} className="border-border/50 dark:border-border/20">
-								<CardHeader>
-									<CardTitle className="flex items-center gap-2 text-foreground">
-										<Building className="h-5 w-5" />
-										{bank}
-									</CardTitle>
-								</CardHeader>
-								<CardContent>
-									<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-										{accounts.filter(account => account.bank === bank).map((account) => (
-											<AccountCard key={account.id} account={account} />
-										))}
-									</div>
-								</CardContent>
-							</Card>
-						))}
+					<TabsContent value="negative" className="space-y-6">
+						<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+							{accounts.filter(account => account.balance < 0).map((account) => (
+								<AccountCard key={account.id} account={account} />
+							))}
+						</div>
 					</TabsContent>
 				</Tabs>
 
-				{/* Información adicional */}
+				{/* Información de desarrollo */}
 				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">
 					<CardHeader>
 						<CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-							<CreditCard className="h-5 w-5" />
-							Información de Cuentas
+							<Wallet className="h-5 w-5" />
+							Información de Desarrollo
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Total de Cuentas:</p>
-								<p className="text-blue-700 dark:text-blue-300">{accounts.length} cuentas activas</p>
+								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Estado del Sistema:</p>
+								<div className="space-y-2">
+									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
+										✅ Server Component optimizado
+									</Badge>
+									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
+										✅ Data loading en servidor
+									</Badge>
+								</div>
 							</div>
 							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Balance Promedio:</p>
-								<p className="text-blue-700 dark:text-blue-300">
-									${accounts.length > 0 ? Math.round(accounts.reduce((sum, acc) => sum + acc.balance, 0) / accounts.length).toLocaleString() : 0}
-								</p>
-							</div>
-							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Bancos Únicos:</p>
-								<p className="text-blue-700 dark:text-blue-300">
-									{Array.from(new Set(accounts.map(acc => acc.bank))).length} bancos diferentes
-								</p>
+								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Datos Disponibles:</p>
+								<div className="space-y-2">
+									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
+										🏦 {accounts.length} cuentas cargadas
+									</Badge>
+								</div>
 							</div>
 						</div>
 					</CardContent>

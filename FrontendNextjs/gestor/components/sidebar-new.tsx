@@ -1,4 +1,7 @@
+'use client'
+
 import Link from 'next/link'
+import { usePathname } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { UserNav } from '@/components/user-nav'
@@ -267,8 +270,10 @@ function MainHeader({ isExpanded, toggleMobile }: {
 	)
 }
 
-// Componente principal que combina Server y Client Components
+// Componente principal que combina Client Components
 export function SidebarNew({ children }: SidebarProps) {
+	const pathname = usePathname()
+
 	return (
 		<SidebarController>
 			{({
@@ -302,13 +307,13 @@ export function SidebarNew({ children }: SidebarProps) {
 							<SidebarNav 
 								items={navItems} 
 								isExpanded={isExpanded} 
-								pathname="/app" // TODO: Get actual pathname
+								pathname={pathname}
 							/>
 							
 							<SidebarFooter 
 								items={bottomNavItems}
 								isExpanded={isExpanded} 
-								pathname="/app" // TODO: Get actual pathname
+								pathname={pathname}
 								sidebarHoverEnabled={sidebarHoverEnabled}
 								toggleCollapsed={toggleCollapsed}
 							/>

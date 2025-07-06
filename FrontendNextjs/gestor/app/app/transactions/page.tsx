@@ -1,6 +1,3 @@
-'use client'
-
-import { useEffect, useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -25,6 +22,7 @@ interface TransactionItemProps {
 	category?: Category
 }
 
+// Server Component para LoadingSpinner (no se usa en Server Components)
 function LoadingSpinner() {
 	return (
 		<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/20 dark:from-background dark:to-secondary/10">
@@ -40,6 +38,7 @@ function LoadingSpinner() {
 	)
 }
 
+// Server Component para TransactionItem
 function TransactionItem({ transaction, category }: TransactionItemProps) {
 	const isIncome = transaction.type_transaction === TypeTransaction.INCOME
 	
@@ -88,6 +87,7 @@ function TransactionItem({ transaction, category }: TransactionItemProps) {
 	)
 }
 
+// Server Component para TransactionSummaryCard
 function TransactionSummaryCard({ transactions }: { transactions: Transaction[] }) {
 	const totalIncome = transactions.filter(t => t.type_transaction === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0)
 	const totalExpenses = transactions.filter(t => t.type_transaction === TypeTransaction.BILL).reduce((sum, t) => sum + t.amount, 0)
@@ -126,49 +126,16 @@ function TransactionSummaryCard({ transactions }: { transactions: Transaction[] 
 	)
 }
 
-export default function TransactionsPage() {
-	const [transactions, setTransactions] = useState<Transaction[]>([])
-	const [categories, setCategories] = useState<Category[]>([])
-	const [isLoading, setIsLoading] = useState(true)
-
-	useEffect(() => {
-		const loadData = async () => {
-			try {
-				console.log('🔄 Cargando transacciones y categorías mock...')
-				const transactionRepository = await getTransactionRepository()
-				const categoryRepository = await getCategoryRepository()
-				
-				const [transactionsData, categoriesData] = await Promise.all([
-					transactionRepository.findAll(),
-					categoryRepository.findAll()
-				])
-				
-				setTransactions(transactionsData)
-				setCategories(categoriesData)
-				console.log('✅ Datos cargados exitosamente')
-			} catch (error) {
-				console.error('❌ Error cargando datos:', error)
-			} finally {
-				setIsLoading(false)
-			}
-		}
-
-		// Add timeout to prevent infinite loading
-		const timeoutId = setTimeout(() => {
-			console.log('⏰ Timeout en transacciones, forzando fin de carga')
-			setIsLoading(false)
-		}, 5000)
-
-		loadData().finally(() => {
-			clearTimeout(timeoutId)
-		})
-
-		return () => clearTimeout(timeoutId)
-	}, [])
-
-	if (isLoading) {
-		return <LoadingSpinner />
-	}
+// Componente principal - Server Component que carga datos directamente
+export default async function TransactionsPage() {
+	// Cargar datos en el servidor
+	const transactionRepository = await getTransactionRepository()
+	const categoryRepository = await getCategoryRepository()
+	
+	const [transactions, categories] = await Promise.all([
+		transactionRepository.findAll(),
+		categoryRepository.findAll()
+	])
 
 	const incomeTransactions = transactions.filter(t => t.type_transaction === TypeTransaction.INCOME)
 	const expenseTransactions = transactions.filter(t => t.type_transaction === TypeTransaction.BILL)
@@ -222,7 +189,6 @@ export default function TransactionsPage() {
 						</TabsTrigger>
 					</TabsList>
 
-					{/* Tab: Todas las transacciones */}
 					<TabsContent value="all" className="space-y-6">
 						<div className="space-y-4">
 							{transactions.map((transaction) => {
@@ -238,7 +204,6 @@ export default function TransactionsPage() {
 						</div>
 					</TabsContent>
 
-					{/* Tab: Ingresos */}
 					<TabsContent value="income" className="space-y-6">
 						<div className="space-y-4">
 							{incomeTransactions.map((transaction) => {
@@ -252,17 +217,8 @@ export default function TransactionsPage() {
 								)
 							})}
 						</div>
-						{incomeTransactions.length === 0 && (
-							<Card className="border-border/50 dark:border-border/20">
-								<CardContent className="p-8 text-center">
-									<TrendingUp className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-									<p className="text-muted-foreground">No hay ingresos registrados</p>
-								</CardContent>
-							</Card>
-						)}
 					</TabsContent>
 
-					{/* Tab: Gastos */}
 					<TabsContent value="expenses" className="space-y-6">
 						<div className="space-y-4">
 							{expenseTransactions.map((transaction) => {
@@ -276,48 +232,46 @@ export default function TransactionsPage() {
 								)
 							})}
 						</div>
-						{expenseTransactions.length === 0 && (
-							<Card className="border-border/50 dark:border-border/20">
-								<CardContent className="p-8 text-center">
-									<TrendingDown className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
-									<p className="text-muted-foreground">No hay gastos registrados</p>
-								</CardContent>
-							</Card>
-						)}
 					</TabsContent>
 				</Tabs>
 
-				{/* Información adicional */}
-				<Card className="mt-8 bg-gradient-to-r from-green-50/50 to-emerald-50/50 dark:from-green-900/10 dark:to-emerald-900/10 border-green-200/50 dark:border-green-800/30">
+				{/* Información de desarrollo */}
+				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">
 					<CardHeader>
-						<CardTitle className="flex items-center gap-2 text-green-900 dark:text-green-100">
+						<CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
 							<Wallet className="h-5 w-5" />
-							Estadísticas de Transacciones
+							Información de Desarrollo
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
+						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 							<div>
-								<p className="font-semibold text-green-800 dark:text-green-200 mb-2">Total Transacciones:</p>
-								<p className="text-green-700 dark:text-green-300">{transactions.length} registradas</p>
+								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Estado del Sistema:</p>
+								<div className="space-y-2">
+									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
+										✅ Server Component optimizado
+									</Badge>
+									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
+										✅ Data loading en servidor
+									</Badge>
+								</div>
 							</div>
 							<div>
-								<p className="font-semibold text-green-800 dark:text-green-200 mb-2">Promedio por Transacción:</p>
-								<p className="text-green-700 dark:text-green-300">
-									${transactions.length > 0 ? Math.round(transactions.reduce((sum, t) => sum + t.amount, 0) / transactions.length).toLocaleString() : 0}
-								</p>
-							</div>
-							<div>
-								<p className="font-semibold text-green-800 dark:text-green-200 mb-2">Categorías Únicas:</p>
-								<p className="text-green-700 dark:text-green-300">
-									{Array.from(new Set(transactions.map(t => t.category_id))).length} categorías
-								</p>
-							</div>
-							<div>
-								<p className="font-semibold text-green-800 dark:text-green-200 mb-2">Última Transacción:</p>
-								<p className="text-green-700 dark:text-green-300">
-									{transactions.length > 0 ? new Date(Math.max(...transactions.map(t => new Date(t.created_at).getTime()))).toLocaleDateString('es-ES') : 'N/A'}
-								</p>
+								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Datos Disponibles:</p>
+								<div className="space-y-2">
+									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
+										💳 {transactions.length} transacciones
+									</Badge>
+									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
+										📊 {categories.length} categorías
+									</Badge>
+									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
+										💰 {incomeTransactions.length} ingresos
+									</Badge>
+									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
+										💸 {expenseTransactions.length} gastos
+									</Badge>
+								</div>
 							</div>
 						</div>
 					</CardContent>
