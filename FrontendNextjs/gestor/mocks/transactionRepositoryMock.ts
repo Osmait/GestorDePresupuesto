@@ -165,6 +165,67 @@ export class TransactionRepositoryMock {
     {
       id: 'transaction-2025-13', name: 'Venta de libro', description: 'Ingreso extra', amount: 90, type_transaction: TypeTransaction.INCOME, account_id: '1', category_id: 'category-12', created_at: new Date('2025-07-18T11:00:00Z')
     },
+    // Transacciones adicionales para julio 2025
+    {
+      id: 'transaction-2025-07-01',
+      name: 'Café matutino',
+      description: 'Café en cafetería local',
+      amount: 4.5,
+      type_transaction: TypeTransaction.BILL,
+      account_id: '1',
+      category_id: 'category-3',
+      created_at: new Date('2025-07-01T08:30:00Z'),
+    },
+    {
+      id: 'transaction-2025-07-02',
+      name: 'Ingreso freelance',
+      description: 'Pago por diseño gráfico',
+      amount: 300,
+      type_transaction: TypeTransaction.INCOME,
+      account_id: '2',
+      category_id: 'category-11',
+      created_at: new Date('2025-07-02T12:00:00Z'),
+    },
+    {
+      id: 'transaction-2025-07-03',
+      name: 'Supermercado',
+      description: 'Compra semanal de víveres',
+      amount: 95.2,
+      type_transaction: TypeTransaction.BILL,
+      account_id: '3',
+      category_id: 'category-1',
+      created_at: new Date('2025-07-03T17:45:00Z'),
+    },
+    {
+      id: 'transaction-2025-07-04',
+      name: 'Restaurante',
+      description: 'Cena familiar',
+      amount: 60,
+      type_transaction: TypeTransaction.BILL,
+      account_id: '2',
+      category_id: 'category-9',
+      created_at: new Date('2025-07-04T20:15:00Z'),
+    },
+    {
+      id: 'transaction-2025-07-05',
+      name: 'Venta de artículo',
+      description: 'Venta de bicicleta usada',
+      amount: 150,
+      type_transaction: TypeTransaction.INCOME,
+      account_id: '1',
+      category_id: 'category-8',
+      created_at: new Date('2025-07-05T10:00:00Z'),
+    },
+    {
+      id: 'transaction-2025-07-06',
+      name: 'Farmacia',
+      description: 'Compra de medicamentos',
+      amount: 32.8,
+      type_transaction: TypeTransaction.BILL,
+      account_id: '3',
+      category_id: 'category-4',
+      created_at: new Date('2025-07-06T15:30:00Z'),
+    },
   ];
 
   findAll = async (): Promise<Transaction[]> => {

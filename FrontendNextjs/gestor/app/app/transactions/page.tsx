@@ -1,3 +1,5 @@
+'use client'
+
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AnimatedTabs } from '@/components/client/animated-tabs'
@@ -16,6 +18,13 @@ import {
 	TrendingUp,
 	TrendingDown
 } from 'lucide-react'
+import { useAccounts, useCategories, useTransactions } from '@/hooks/useRepositories'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
+import { Input } from '@/components/ui/input'
+import { CalendarDateRangePicker } from '@/components/date-range-picker'
+import { useState, useEffect } from 'react'
+import { DateRange } from 'react-day-picker'
 
 interface TransactionItemProps {
 	transaction: Transaction
@@ -127,18 +136,77 @@ function TransactionSummaryCard({ transactions }: { transactions: Transaction[] 
 }
 
 // Componente principal - Server Component que carga datos directamente
-export default async function TransactionsPage() {
-	// Cargar datos en el servidor
-	const transactionRepository = await getTransactionRepository()
-	const categoryRepository = await getCategoryRepository()
-	
-	const [transactions, categories] = await Promise.all([
-		transactionRepository.findAll(),
-		categoryRepository.findAll()
-	])
+export default function TransactionsPage() {
+	const { transactions, isLoading: isLoadingTx } = useTransactions()
+	const { categories, isLoading: isLoadingCat } = useCategories()
+	const { accounts, isLoading: isLoadingAcc } = useAccounts()
 
 	const incomeTransactions = transactions.filter(t => t.type_transaction === TypeTransaction.INCOME)
 	const expenseTransactions = transactions.filter(t => t.type_transaction === TypeTransaction.BILL)
+
+	const [drawerOpen, setDrawerOpen] = useState(false)
+	const [filters, setFilters] = useState({
+		dateRange: { from: undefined, to: undefined } as DateRange,
+		type: 'all',
+		account: 'all',
+		category: 'all',
+		minAmount: '',
+		maxAmount: '',
+		search: '',
+	})
+	const [filtered, setFiltered] = useState<Transaction[] | null>(null)
+
+	function applyFilters() {
+		let txs = transactions
+		if (filters.dateRange.from && filters.dateRange.to) {
+			txs = txs.filter(tx => {
+				const d = new Date(tx.created_at)
+				return d >= filters.dateRange.from! && d <= filters.dateRange.to!
+			})
+		}
+		if (filters.type !== 'all') {
+			txs = txs.filter(tx => (filters.type === 'INCOME' ? tx.type_transaction === TypeTransaction.INCOME : tx.type_transaction === TypeTransaction.BILL))
+		}
+		if (filters.account !== 'all') {
+			txs = txs.filter(tx => tx.account_id === filters.account)
+		}
+		if (filters.category !== 'all') {
+			txs = txs.filter(tx => tx.category_id === filters.category)
+		}
+		if (filters.minAmount) {
+			txs = txs.filter(tx => tx.amount >= Number(filters.minAmount))
+		}
+		if (filters.maxAmount) {
+			txs = txs.filter(tx => tx.amount <= Number(filters.maxAmount))
+		}
+		if (filters.search) {
+			txs = txs.filter(tx => tx.description.toLowerCase().includes(filters.search.toLowerCase()))
+		}
+		setFiltered(txs)
+	}
+
+	function clearFilters() {
+		setFilters({
+			dateRange: { from: undefined, to: undefined },
+			type: 'all',
+			account: 'all',
+			category: 'all',
+			minAmount: '',
+			maxAmount: '',
+			search: '',
+		})
+		setFiltered(null)
+	}
+
+	const shownTransactions = filtered ? filtered : transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10)
+
+	useEffect(() => {
+		applyFilters()
+	}, [filters, transactions])
+
+	if (isLoadingTx || isLoadingCat || isLoadingAcc) {
+		return <div className="flex justify-center items-center min-h-screen"><span className="text-lg">Cargando datos...</span></div>
+	}
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
@@ -155,7 +223,7 @@ export default async function TransactionsPage() {
 							</p>
 						</div>
 						<div className="flex items-center gap-3">
-							<Button variant="outline" className="border-border/50">
+							<Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
 								<Filter className="h-4 w-4 mr-2" />
 								Filtrar
 							</Button>
@@ -167,9 +235,75 @@ export default async function TransactionsPage() {
 					</div>
 				</div>
 
+				<Drawer open={drawerOpen} onOpenChange={setDrawerOpen} side="right">
+					<DrawerContent side="right">
+						<DrawerHeader>
+							<DrawerTitle>Filtrar Transacciones</DrawerTitle>
+						</DrawerHeader>
+						<form className="p-4 space-y-4">
+							<CalendarDateRangePicker value={filters.dateRange} onChange={dateRange => {
+								if (dateRange && typeof dateRange === 'object' && 'from' in dateRange && 'to' in dateRange) {
+									setFilters(f => ({ ...f, dateRange }))
+								}
+							}} />
+							<div>
+								<label className="block mb-1">Tipo</label>
+								<Select value={filters.type} onValueChange={v => setFilters(f => ({ ...f, type: v }))}>
+									<SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+									<SelectContent>
+										<SelectItem value="all">Todos</SelectItem>
+										<SelectItem value="INCOME">Ingreso</SelectItem>
+										<SelectItem value="BILL">Gasto</SelectItem>
+									</SelectContent>
+								</Select>
+							</div>
+							<div>
+								<label className="block mb-1">Cuenta</label>
+								<Select value={filters.account} onValueChange={v => setFilters(f => ({ ...f, account: v }))}>
+									<SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+									<SelectContent>
+										<SelectItem value="all">Todas</SelectItem>
+										{accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name_account}</SelectItem>)}
+									</SelectContent>
+								</Select>
+							</div>
+							<div>
+								<label className="block mb-1">Categoría</label>
+								<Select value={filters.category} onValueChange={v => setFilters(f => ({ ...f, category: v }))}>
+									<SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+									<SelectContent>
+										<SelectItem value="all">Todas</SelectItem>
+										{categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
+									</SelectContent>
+								</Select>
+							</div>
+							<div className="flex gap-2">
+								<div className="flex-1">
+									<label className="block mb-1">Monto mínimo</label>
+									<Input type="number" value={filters.minAmount} onChange={e => setFilters(f => ({ ...f, minAmount: e.target.value }))} placeholder="0" min={0} />
+								</div>
+								<div className="flex-1">
+									<label className="block mb-1">Monto máximo</label>
+									<Input type="number" value={filters.maxAmount} onChange={e => setFilters(f => ({ ...f, maxAmount: e.target.value }))} placeholder="99999" min={0} />
+								</div>
+							</div>
+							<div>
+								<label className="block mb-1">Buscar</label>
+								<Input type="text" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Buscar por descripción..." />
+							</div>
+							<DrawerFooter>
+								<Button type="button" variant="outline" onClick={clearFilters} className="w-full">Limpiar Filtros</Button>
+								<DrawerClose asChild>
+									<Button type="button" variant="ghost" className="w-full">Cerrar</Button>
+								</DrawerClose>
+							</DrawerFooter>
+						</form>
+					</DrawerContent>
+				</Drawer>
+
 				{/* Resumen de transacciones */}
 				<div className="mb-8">
-					<TransactionSummaryCard transactions={transactions} />
+					<TransactionSummaryCard transactions={shownTransactions} />
 				</div>
 
 				{/* Contenido principal con tabs */}
@@ -181,7 +315,7 @@ export default async function TransactionsPage() {
 							icon: <Wallet className="h-4 w-4" />,
 							content: (
 								<div className="space-y-4">
-									{transactions.map((transaction) => {
+									{shownTransactions.map((transaction) => {
 										const category = categories.find(c => c.id === transaction.category_id)
 										return (
 											<TransactionItem 

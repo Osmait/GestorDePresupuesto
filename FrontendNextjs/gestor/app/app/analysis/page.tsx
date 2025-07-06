@@ -15,6 +15,8 @@ import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import { parse, differenceInDays, differenceInMonths, differenceInYears, format, startOfWeek, addDays, addWeeks, addMonths, addYears, startOfMonth, startOfYear } from 'date-fns'
 import { useAccounts, useCategories, useTransactions } from '@/hooks/useRepositories'
 import { Button } from '@/components/ui/button'
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
+import { DateRange } from 'react-day-picker'
 
 // Datos mock para ejemplo visual
 const mockLine = [
@@ -207,7 +209,7 @@ interface AnalysisFiltersState {
   filterMode: 'month' | 'range'
   month: string
   year: string
-  dateRange: { from: Date | null, to: Date | null }
+  dateRange: DateRange
   account: string
   category: string
   type: string
@@ -221,14 +223,14 @@ function AnalysisFilters({ filters, setFilters }: {
   setFilters: React.Dispatch<React.SetStateAction<AnalysisFiltersState>>
 }) {
   return (
-    <form className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8'>
-      <div className='col-span-2 flex flex-col gap-2'>
+    <form className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8'>
+      <div className='md:col-span-2 lg:col-span-3 flex flex-col gap-2'>
         <Label>Modo de filtro de fecha</Label>
         <div className='flex gap-2'>
           <Button
             type='button'
             variant={filters.filterMode === 'month' ? 'default' : 'outline'}
-            onClick={() => setFilters(f => ({ ...f, filterMode: 'month', dateRange: { from: null, to: null } }))}
+            onClick={() => setFilters(f => ({ ...f, filterMode: 'month', dateRange: { from: undefined, to: undefined } }))}
           >
             Mes/Año
           </Button>
@@ -246,7 +248,7 @@ function AnalysisFilters({ filters, setFilters }: {
           <div>
             <Label htmlFor='month'>Mes</Label>
             <Select value={filters.month} onValueChange={v => setFilters(f => ({ ...f, month: v }))}>
-              <SelectTrigger id='month'>
+              <SelectTrigger id='month' className='w-full'>
                 <SelectValue placeholder='Selecciona mes' />
               </SelectTrigger>
               <SelectContent>
@@ -257,7 +259,7 @@ function AnalysisFilters({ filters, setFilters }: {
           <div>
             <Label htmlFor='year'>Año</Label>
             <Select value={filters.year} onValueChange={v => setFilters(f => ({ ...f, year: v }))}>
-              <SelectTrigger id='year'>
+              <SelectTrigger id='year' className='w-full'>
                 <SelectValue placeholder='Selecciona año' />
               </SelectTrigger>
               <SelectContent>
@@ -268,18 +270,22 @@ function AnalysisFilters({ filters, setFilters }: {
         </>
       )}
       {filters.filterMode === 'range' && (
-        <div className='col-span-2'>
+        <div className='md:col-span-2 lg:col-span-3'>
           <Label>Rango de fechas</Label>
           <CalendarDateRangePicker
             value={filters.dateRange}
-            onChange={dateRange => setFilters(f => ({ ...f, dateRange }))}
+            onChange={dateRange => {
+              if (dateRange && typeof dateRange === 'object' && 'from' in dateRange && 'to' in dateRange) {
+                setFilters(f => ({ ...f, dateRange }))
+              }
+            }}
           />
         </div>
       )}
       <div>
         <Label htmlFor='account'>Cuenta</Label>
         <Select value={filters.account} onValueChange={v => setFilters(f => ({ ...f, account: v }))}>
-          <SelectTrigger id='account'>
+          <SelectTrigger id='account' className='w-full'>
             <SelectValue placeholder='Todas las cuentas' />
           </SelectTrigger>
           <SelectContent>
@@ -291,7 +297,7 @@ function AnalysisFilters({ filters, setFilters }: {
       <div>
         <Label htmlFor='category'>Categoría</Label>
         <Select value={filters.category} onValueChange={v => setFilters(f => ({ ...f, category: v }))}>
-          <SelectTrigger id='category'>
+          <SelectTrigger id='category' className='w-full'>
             <SelectValue placeholder='Todas las categorías' />
           </SelectTrigger>
           <SelectContent>
@@ -303,7 +309,7 @@ function AnalysisFilters({ filters, setFilters }: {
       <div>
         <Label htmlFor='type'>Tipo</Label>
         <Select value={filters.type} onValueChange={v => setFilters(f => ({ ...f, type: v }))}>
-          <SelectTrigger id='type'>
+          <SelectTrigger id='type' className='w-full'>
             <SelectValue placeholder='Todos los tipos' />
           </SelectTrigger>
           <SelectContent>
@@ -314,15 +320,15 @@ function AnalysisFilters({ filters, setFilters }: {
       </div>
       <div>
         <Label htmlFor='minAmount'>Monto mínimo</Label>
-        <Input id='minAmount' type='number' value={filters.minAmount} onChange={e => setFilters(f => ({ ...f, minAmount: e.target.value }))} placeholder='0' min={0} />
+        <Input id='minAmount' type='number' value={filters.minAmount} onChange={e => setFilters(f => ({ ...f, minAmount: e.target.value }))} placeholder='0' min={0} className='w-full' />
       </div>
       <div>
         <Label htmlFor='maxAmount'>Monto máximo</Label>
-        <Input id='maxAmount' type='number' value={filters.maxAmount} onChange={e => setFilters(f => ({ ...f, maxAmount: e.target.value }))} placeholder='99999' min={0} />
+        <Input id='maxAmount' type='number' value={filters.maxAmount} onChange={e => setFilters(f => ({ ...f, maxAmount: e.target.value }))} placeholder='99999' min={0} className='w-full' />
       </div>
-      <div className='col-span-2'>
+      <div className='md:col-span-2 lg:col-span-3'>
         <Label htmlFor='search'>Buscar</Label>
-        <Input id='search' type='text' value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder='Buscar por nombre o descripción...' />
+        <Input id='search' type='text' value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder='Buscar por nombre o descripción...' className='w-full' />
       </div>
     </form>
   )
@@ -351,7 +357,7 @@ export default function AnalysisPage() {
     filterMode: 'month',
     month: defaultMonth,
     year: defaultYear,
-    dateRange: { from: null, to: null },
+    dateRange: { from: undefined, to: undefined },
     account: 'all',
     category: 'all',
     type: 'all',
@@ -526,10 +532,10 @@ export default function AnalysisPage() {
     ]
   }, [filteredTransactions, filters, start, end, interval])
 
-  // Adaptar el gráfico de barras para mostrar evolución temporal por categoría
-  type BarDatum = { categoria: string, [key: string]: number | string }
+  // Nueva estructura para el gráfico de barras: eje X = fecha, barras apiladas por categoría
   const filteredBarData = useMemo(() => {
     if (filteredTransactions.length === 0) return []
+    // Obtener todas las fechas únicas en el rango
     let labels: string[] = []
     let getLabel: (date: Date) => string
     let addFn: (date: Date, n: number) => Date
@@ -571,19 +577,26 @@ export default function AnalysisPage() {
         d = addFn(d, 1)
       }
     }
-    // Para cada categoría, construir un objeto con los montos por periodo
-    return categories.map(cat => {
-      const barDatum: BarDatum = { categoria: cat.name }
-      labels.forEach(l => { barDatum[l] = 0 })
+    // Obtener todas las categorías únicas
+    const categoryNames = categories.map(cat => cat.name)
+    // Construir los datos: cada objeto es { fecha, 'Alimentación': monto, ... }
+    const data = labels.map(label => {
+      const row: Record<string, string | number> = { fecha: label }
+      categoryNames.forEach(catName => { row[catName] = 0 })
+      // Sumar montos por categoría para esa fecha
       filteredTransactions.forEach(tx => {
-        if (tx.category_id === cat.id && tx.type_transaction === 0) {
-          const date = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
-          const label = getLabel(startFn(date))
-          if (label in barDatum) barDatum[label] = (barDatum[label] as number) + tx.amount
+        if (tx.type_transaction === 0) {
+          const txDate = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
+          const txLabel = getLabel(startFn(txDate))
+          if (txLabel === label) {
+            const cat = categories.find(c => c.id === tx.category_id)
+            if (cat) row[cat.name] = (row[cat.name] as number) + tx.amount
+          }
         }
       })
-      return barDatum
-    }).filter(bar => labels.some(l => (bar[l] as number) > 0))
+      return row
+    })
+    return data
   }, [filteredTransactions, categories, interval, start, end])
 
   // Pie: distribución por cuenta
@@ -695,13 +708,55 @@ export default function AnalysisPage() {
     ],
   }
 
+  const [drawerOpen, setDrawerOpen] = useState(false)
+
   return (
     <>
       <style>{legendFadeIn}</style>
       <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
         <div className="container mx-auto px-4 py-8">
-          <h1 className="text-4xl font-bold mb-8 bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent">Análisis Financiero Avanzado</h1>
-          <AnalysisFilters filters={filters} setFilters={setFilters} />
+          <div className="mb-8">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+              <div>
+                <h1 className="text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent">
+                  Analíticas
+                </h1>
+                <p className="text-muted-foreground mt-2 text-lg">
+                  Visualiza y explora tus datos financieros con filtros avanzados
+                </p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
+                  Filtrar
+                </Button>
+              </div>
+            </div>
+          </div>
+          <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} side="right">
+            <DrawerContent side="right" className="p-6">
+              <DrawerHeader>
+                <DrawerTitle>Filtrar Analíticas</DrawerTitle>
+              </DrawerHeader>
+              <AnalysisFilters filters={filters} setFilters={setFilters} />
+              <DrawerFooter>
+                <Button type="button" variant="outline" onClick={() => setFilters({
+                  filterMode: 'month',
+                  month: defaultMonth,
+                  year: defaultYear,
+                  dateRange: { from: undefined, to: undefined },
+                  account: 'all',
+                  category: 'all',
+                  type: 'all',
+                  minAmount: '',
+                  maxAmount: '',
+                  search: '',
+                })} className="w-full">Limpiar Filtros</Button>
+                <DrawerClose asChild>
+                  <Button type="button" variant="ghost" className="w-full">Cerrar</Button>
+                </DrawerClose>
+              </DrawerFooter>
+            </DrawerContent>
+          </Drawer>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             <Card>
               <CardHeader>
@@ -749,8 +804,8 @@ export default function AnalysisPage() {
               <CardContent style={{ height: 300 }}>
                 <ResponsiveBar
                   data={filteredBarData}
-                  keys={filteredBarData.length > 0 ? Object.keys(filteredBarData[0]).filter(k => k !== 'categoria') : []}
-                  indexBy='categoria'
+                  keys={categories.map(cat => cat.name)}
+                  indexBy='fecha'
                   margin={{ top: 30, right: 30, bottom: 60, left: 60 }}
                   padding={0.3}
                   valueScale={{ type: 'linear' }}
@@ -766,8 +821,8 @@ export default function AnalysisPage() {
                     legend: interval === 'day' ? 'Día' : interval === 'week' ? 'Semana' : interval === 'month' ? 'Mes' : 'Año',
                     legendOffset: 48,
                     legendPosition: 'middle',
-                    tickValues: filteredBarData.length > 0 && Object.keys(filteredBarData[0]).length > 15
-                      ? Object.keys(filteredBarData[0]).filter(k => k !== 'categoria').filter((_, i, arr) => i % Math.ceil(arr.length / 10) === 0)
+                    tickValues: filteredBarData.length > 15
+                      ? filteredBarData.filter((_, i) => i % Math.ceil(filteredBarData.length / 10) === 0).map(d => d.fecha)
                       : undefined,
                     format: v => {
                       if (interval === 'day') return String(v).slice(0, 5)
@@ -782,7 +837,7 @@ export default function AnalysisPage() {
                   labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
                   legends={[]}
                   theme={nivoTheme}
-                  groupMode='grouped'
+                  groupMode='stacked'
                 />
               </CardContent>
             </Card>
