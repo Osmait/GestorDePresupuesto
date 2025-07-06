@@ -1,3 +1,15 @@
+'use client'
+import { useState } from 'react'
+import { useAccounts } from '@/hooks/useRepositories'
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
+import { Input } from '@/components/ui/input'
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
+import { useAuth } from '@/hooks/useRepositories'
+import { AlertCircle, Loader2, PlusCircle } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AnimatedTabs } from '@/components/client/animated-tabs'
@@ -8,7 +20,7 @@ import { Account } from '@/types/account'
 import { 
 	CreditCard, 
 	DollarSign, 
-	PlusCircle, 
+	PlusCircle as LucidePlusCircle, 
 	Building, 
 	TrendingUp,
 	TrendingDown,
@@ -129,11 +141,97 @@ function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
 	)
 }
 
-// Componente principal - Server Component que carga datos directamente
-export default async function AccountsPage() {
-	// Cargar datos en el servidor
-	const accountRepository = await getAccountRepository()
-	const accounts = await accountRepository.findAll()
+// Esquema de validación para el formulario de cuenta
+const accountSchema = z.object({
+	name_account: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
+	bank: z.string().min(2, 'El banco debe tener al menos 2 caracteres'),
+	balance: z.coerce.number().min(0, 'El balance debe ser mayor o igual a 0'),
+})
+type AccountFormValues = z.infer<typeof accountSchema>
+
+function AccountFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boolean) => void }) {
+	const { createAccount, isLoading, error } = useAccounts()
+	const { user } = useAuth()
+	const [success, setSuccess] = useState(false)
+	const form = useForm<AccountFormValues>({
+		resolver: zodResolver(accountSchema),
+		defaultValues: { name_account: '', bank: '', balance: 0 },
+	})
+
+	async function onSubmit(values: AccountFormValues) {
+		if (!user?.id) return
+		try {
+			await createAccount(values.name_account, values.bank, values.balance, user.id)
+			setSuccess(true)
+			form.reset()
+			setTimeout(() => {
+				setSuccess(false)
+				setOpen(false)
+			}, 1200)
+		} catch {}
+	}
+
+	return (
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Nueva Cuenta</DialogTitle>
+				</DialogHeader>
+				{success ? (
+					<div className="flex flex-col items-center justify-center py-8">
+						<Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+						<p className="text-green-600 font-semibold">¡Cuenta creada!</p>
+					</div>
+				) : (
+					<Form {...form}>
+						<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+							<FormField control={form.control} name="name_account" render={({ field }) => (
+								<FormItem>
+									<FormLabel>Nombre de la cuenta</FormLabel>
+									<FormControl><Input {...field} placeholder="Ej: Cuenta Principal" /></FormControl>
+									<FormMessage />
+								</FormItem>
+							)} />
+							<FormField control={form.control} name="bank" render={({ field }) => (
+								<FormItem>
+									<FormLabel>Banco</FormLabel>
+									<FormControl><Input {...field} placeholder="Ej: Banco Nacional" /></FormControl>
+									<FormMessage />
+								</FormItem>
+							)} />
+							<FormField control={form.control} name="balance" render={({ field }) => (
+								<FormItem>
+									<FormLabel>Balance inicial</FormLabel>
+									<FormControl><Input type="number" {...field} min={0} step={0.01} /></FormControl>
+									<FormMessage />
+								</FormItem>
+							)} />
+							<DialogFooter>
+								<Button type="submit" disabled={isLoading} className="w-full">
+									{isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
+									Crear Cuenta
+								</Button>
+								<DialogClose asChild>
+									<Button type="button" variant="ghost" className="w-full">Cancelar</Button>
+								</DialogClose>
+							</DialogFooter>
+						</form>
+					</Form>
+				)}
+				{error && (
+					<Alert variant="destructive" className="mt-4">
+						<AlertCircle className="h-4 w-4" />
+						<AlertDescription>{error}</AlertDescription>
+					</Alert>
+				)}
+			</DialogContent>
+		</Dialog>
+	)
+}
+
+export default function AccountsPage() {
+	const { accounts, isLoading } = useAccounts()
+	const [modalOpen, setModalOpen] = useState(false)
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
@@ -150,10 +248,11 @@ export default async function AccountsPage() {
 							</p>
 						</div>
 						<div className="flex items-center gap-3">
-							<Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+							<Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" onClick={() => setModalOpen(true)}>
 								<PlusCircle className="h-4 w-4 mr-2" />
 								Nueva Cuenta
 							</Button>
+							<AccountFormModal open={modalOpen} setOpen={setModalOpen} />
 						</div>
 					</div>
 				</div>
@@ -171,7 +270,7 @@ export default async function AccountsPage() {
 						{
 							value: 'all',
 							label: 'Todas',
-							icon: <Wallet className="h-4 w-4" />,
+							icon: <Wallet className="h-4 w-4" />, 
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 									{accounts.map((account) => (
@@ -183,7 +282,7 @@ export default async function AccountsPage() {
 						{
 							value: 'positive',
 							label: 'Positivas',
-							icon: <TrendingUp className="h-4 w-4" />,
+							icon: <TrendingUp className="h-4 w-4" />, 
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 									{accounts.filter(account => account.balance > 0).map((account) => (
@@ -195,7 +294,7 @@ export default async function AccountsPage() {
 						{
 							value: 'negative',
 							label: 'Negativas',
-							icon: <TrendingDown className="h-4 w-4" />,
+							icon: <TrendingDown className="h-4 w-4" />, 
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 									{accounts.filter(account => account.balance < 0).map((account) => (
@@ -203,7 +302,7 @@ export default async function AccountsPage() {
 									))}
 								</div>
 							)
-						}
+						},
 					]}
 				/>
 

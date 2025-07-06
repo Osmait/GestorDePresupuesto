@@ -1,3 +1,15 @@
+'use client'
+import { useState } from 'react'
+import { useBudgets, useCategories, useTransactions } from '@/hooks/useRepositories'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
+import { Input } from '@/components/ui/input'
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { AlertCircle, Loader2, PlusCircle, AlertTriangle } from 'lucide-react'
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
@@ -11,11 +23,9 @@ import {
 	PiggyBank, 
 	TrendingUp, 
 	TrendingDown, 
-	PlusCircle, 
 	Target,
 	Calendar,
 	DollarSign,
-	AlertTriangle,
 	CheckCircle,
 	Clock
 } from 'lucide-react'
@@ -143,12 +153,9 @@ function BudgetCard({ budget, category, spent, transactions }: BudgetCardProps) 
 // Server Component para BudgetSummaryCard
 function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], transactions: Transaction[] }) {
 	const totalBudget = budgets.reduce((sum, budget) => sum + budget.amount, 0)
-	const totalSpent = budgets.reduce((sum, budget) => {
-		const spent = transactions
-			.filter(t => t.budget_id === budget.id && t.type_transaction === TypeTransaction.BILL)
-			.reduce((spentSum, t) => spentSum + t.amount, 0)
-		return sum + spent
-	}, 0)
+	const totalSpent = transactions
+		.filter(t => t.type_transaction === TypeTransaction.BILL)
+		.reduce((sum, t) => sum + t.amount, 0)
 	const totalRemaining = totalBudget - totalSpent
 	const overBudgetCount = budgets.filter(budget => {
 		const spent = transactions
@@ -195,38 +202,105 @@ function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], trans
 	)
 }
 
-// Componente principal - Server Component que carga datos directamente
-export default async function BudgetPage() {
-	// Cargar datos en el servidor
-	const budgetRepository = await getBudgetRepository()
-	const categoryRepository = await getCategoryRepository()
-	const transactionRepository = await getTransactionRepository()
-	
-	const [budgets, categories, transactions] = await Promise.all([
-		budgetRepository.findAll(),
-		categoryRepository.findAll(),
-		transactionRepository.findAll()
-	])
+const budgetSchema = z.object({
+	category_id: z.string().min(1, 'Selecciona una categoría'),
+	amount: z.coerce.number().min(1, 'El monto debe ser mayor a 0'),
+})
+type BudgetFormValues = z.infer<typeof budgetSchema>
 
-	const getBudgetTransactions = (budgetId: string) => {
-		return transactions.filter(t => t.budget_id === budgetId)
+function BudgetFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boolean) => void }) {
+	const { createBudget, isLoading, error } = useBudgets()
+	const { categories } = useCategories()
+	const [success, setSuccess] = useState(false)
+	const form = useForm<BudgetFormValues>({
+		resolver: zodResolver(budgetSchema),
+		defaultValues: { category_id: '', amount: 0 },
+	})
+
+	async function onSubmit(values: BudgetFormValues) {
+		try {
+			await createBudget(values.category_id, values.amount)
+			setSuccess(true)
+			form.reset({ category_id: '', amount: 0 })
+			setTimeout(() => {
+				setSuccess(false)
+				setOpen(false)
+			}, 1200)
+		} catch {}
 	}
 
-	const getBudgetSpent = (budgetId: string) => {
+	return (
+		<Dialog open={open} onOpenChange={setOpen}>
+			<DialogContent>
+				<DialogHeader>
+					<DialogTitle>Nuevo Presupuesto</DialogTitle>
+				</DialogHeader>
+				{success ? (
+					<div className="flex flex-col items-center justify-center py-8">
+						<Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+						<p className="text-green-600 font-semibold">¡Presupuesto creado!</p>
+					</div>
+				) : (
+					<Form {...form}>
+						<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+							<FormField control={form.control} name="category_id" render={({ field }) => (
+								<FormItem>
+									<FormLabel>Categoría</FormLabel>
+									<FormControl>
+										<Select value={field.value} onValueChange={field.onChange}>
+											<SelectTrigger><SelectValue placeholder="Selecciona una categoría" /></SelectTrigger>
+											<SelectContent>
+												{categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>)}
+											</SelectContent>
+										</Select>
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)} />
+							<FormField control={form.control} name="amount" render={({ field }) => (
+								<FormItem>
+									<FormLabel>Monto</FormLabel>
+									<FormControl><Input type="number" {...field} min={1} step={0.01} /></FormControl>
+									<FormMessage />
+								</FormItem>
+							)} />
+							<DialogFooter>
+								<Button type="submit" disabled={isLoading} className="w-full">
+									{isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
+									Crear Presupuesto
+								</Button>
+								<DialogClose asChild>
+									<Button type="button" variant="ghost" className="w-full">Cancelar</Button>
+								</DialogClose>
+							</DialogFooter>
+						</form>
+					</Form>
+				)}
+				{error && (
+					<Alert variant="destructive" className="mt-4">
+						<AlertCircle className="h-4 w-4" />
+						<AlertDescription>{error}</AlertDescription>
+					</Alert>
+				)}
+			</DialogContent>
+		</Dialog>
+	)
+}
+
+export default function BudgetPage() {
+	const { budgets, isLoading } = useBudgets()
+	const { categories } = useCategories()
+	const { transactions } = useTransactions()
+	const [modalOpen, setModalOpen] = useState(false)
+
+	function getBudgetTransactions(budgetId: string) {
+		return transactions.filter(t => t.budget_id === budgetId)
+	}
+	function getBudgetSpent(budgetId: string) {
 		return transactions
 			.filter(t => t.budget_id === budgetId && t.type_transaction === TypeTransaction.BILL)
 			.reduce((sum, t) => sum + t.amount, 0)
 	}
-
-	const activeBudgets = budgets.filter(budget => {
-		const spent = getBudgetSpent(budget.id)
-		return spent < budget.amount
-	})
-
-	const overBudgets = budgets.filter(budget => {
-		const spent = getBudgetSpent(budget.id)
-		return spent >= budget.amount
-	})
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
@@ -239,138 +313,33 @@ export default async function BudgetPage() {
 								Gestión de Presupuestos
 							</h1>
 							<p className="text-muted-foreground mt-2 text-lg">
-								Planifica y controla tus gastos con presupuestos inteligentes
+								Planifica y controla tus gastos por categoría
 							</p>
 						</div>
 						<div className="flex items-center gap-3">
-							<Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70">
+							<Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" onClick={() => setModalOpen(true)}>
 								<PlusCircle className="h-4 w-4 mr-2" />
 								Nuevo Presupuesto
 							</Button>
+							<BudgetFormModal open={modalOpen} setOpen={setModalOpen} />
 						</div>
 					</div>
 				</div>
-
 				{/* Resumen de presupuestos */}
 				<div className="mb-8">
 					<BudgetSummaryCard budgets={budgets} transactions={transactions} />
 				</div>
-
-				{/* Contenido principal con tabs */}
-				<AnimatedTabs
-					tabs={[
-						{
-							value: 'all',
-							label: 'Todos',
-							icon: <PiggyBank className="h-4 w-4" />,
-							content: (
-								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{budgets.map((budget) => {
-										const category = categories.find(c => c.id === budget.category_id)
-										const spent = getBudgetSpent(budget.id)
-										const budgetTransactions = getBudgetTransactions(budget.id)
-										return (
-											<BudgetCard 
-												key={budget.id} 
-												budget={budget} 
-												category={category}
-												spent={spent}
-												transactions={budgetTransactions}
-											/>
-										)
-									})}
-								</div>
-							)
-						},
-						{
-							value: 'active',
-							label: 'Activos',
-							icon: <CheckCircle className="h-4 w-4" />,
-							content: (
-								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{activeBudgets.map((budget) => {
-										const category = categories.find(c => c.id === budget.category_id)
-										const spent = getBudgetSpent(budget.id)
-										const budgetTransactions = getBudgetTransactions(budget.id)
-										return (
-											<BudgetCard 
-												key={budget.id} 
-												budget={budget} 
-												category={category}
-												spent={spent}
-												transactions={budgetTransactions}
-											/>
-										)
-									})}
-								</div>
-							)
-						},
-						{
-							value: 'exceeded',
-							label: 'Excedidos',
-							icon: <AlertTriangle className="h-4 w-4" />,
-							content: (
-								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{overBudgets.map((budget) => {
-										const category = categories.find(c => c.id === budget.category_id)
-										const spent = getBudgetSpent(budget.id)
-										const budgetTransactions = getBudgetTransactions(budget.id)
-										return (
-											<BudgetCard 
-												key={budget.id} 
-												budget={budget} 
-												category={category}
-												spent={spent}
-												transactions={budgetTransactions}
-											/>
-										)
-									})}
-								</div>
-							)
-						}
-					]}
-					defaultValue="all"
-					className="space-y-6"
-				/>
-
-				{/* Información de desarrollo */}
-				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-							<PiggyBank className="h-5 w-5" />
-							Información de Desarrollo
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Estado del Sistema:</p>
-								<div className="space-y-2">
-									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
-										✅ Server Component optimizado
-									</Badge>
-									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
-										✅ Data loading en servidor
-									</Badge>
-								</div>
-							</div>
-							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Datos Disponibles:</p>
-								<div className="space-y-2">
-									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
-										🎯 {budgets.length} presupuestos
-									</Badge>
-									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
-										📊 {categories.length} categorías
-									</Badge>
-									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
-										💳 {transactions.length} transacciones
-									</Badge>
-								</div>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
+				{/* Lista de presupuestos */}
+				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+					{budgets.map(budget => {
+						const category = categories.find(c => c.id === budget.category_id)
+						const spent = getBudgetSpent(budget.id)
+						const txs = getBudgetTransactions(budget.id)
+						return (
+							<BudgetCard key={budget.id} budget={budget} category={category} spent={spent} transactions={txs} />
+						)
+					})}
+				</div>
 			</div>
 		</div>
 	)
