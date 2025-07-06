@@ -30,6 +30,7 @@ import {
 	Zap,
 	LucideIcon
 } from 'lucide-react'
+import { DashboardCharts } from '@/components/DashboardCharts'
 
 interface StatCardProps {
 	title: string
@@ -326,6 +327,14 @@ export default async function DashboardPage() {
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
 			<div className="container mx-auto px-4 py-8">
 				<DashboardHeader user={user} />
+				<DashboardCharts 
+					categories={categories} 
+					transactions={transactions.map(t => ({
+						...t,
+						type_transaction: String(t.type_transaction),
+						created_at: typeof t.created_at === 'string' ? t.created_at : t.created_at.toISOString()
+					}))} 
+				/>
 				<StatsGrid accounts={accounts} transactions={transactions} />
 				
 				<AnimatedTabs
