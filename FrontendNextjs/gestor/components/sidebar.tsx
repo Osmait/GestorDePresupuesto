@@ -25,7 +25,8 @@ import {
 	HelpCircle,
 	Bell,
 	Plus,
-	Mouse
+	Mouse,
+	BarChart
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -77,7 +78,13 @@ const navItems: NavItem[] = [
 		icon: Bitcoin,
 		badge: 'Beta',
 		description: 'Portafolio de criptomonedas'
-	}
+	},
+	{
+		title: 'Analíticas',
+		href: '/app/analysis',
+		icon: BarChart,
+		description: 'Visualización y reportes',
+	},
 ]
 
 const bottomNavItems: NavItem[] = [
