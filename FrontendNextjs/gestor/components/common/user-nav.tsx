@@ -1,5 +1,5 @@
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
-import { Button } from "./ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,8 +9,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuShortcut,
   DropdownMenuTrigger,
-} from "./ui/dropdown-menu";
-import { ModeToggle } from "@/components/ToggleMode";
+} from '@/components/ui/dropdown-menu'
+import { ModeToggle } from '@/components/common/ToggleMode'
 
 export function UserNav() {
   return (

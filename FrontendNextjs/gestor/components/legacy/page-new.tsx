@@ -1,8 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { AccountsDataLoader } from '@/components/client/accounts-data-loader'
-import { TabsController } from '@/components/client/tabs-controller'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/ui/card'
+import { Badge } from '@/components/common/ui/badge'
+import { Button } from '@/components/common/ui/button'
+import { AccountsDataLoader } from '@/components/common/client/accounts-data-loader'
+import { TabsController } from '@/components/common/client/tabs-controller'
 import { Account } from '@/types/account'
 import { 
 	CreditCard,

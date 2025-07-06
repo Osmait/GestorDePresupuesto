@@ -8,7 +8,7 @@ import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, Loader2, LogIn } from 'lucide-react'
 
-import { Button } from '@/components/ui/button'
+import { Button } from '@/components/common/ui/button'
 import {
 	Form,
 	FormControl,
@@ -16,10 +16,10 @@ import {
 	FormItem,
 	FormLabel,
 	FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Alert, AlertDescription } from '@/components/ui/alert'
+} from '@/components/common/ui/form'
+import { Input } from '@/components/common/ui/input'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/common/ui/card'
+import { Alert, AlertDescription } from '@/components/common/ui/alert'
 import { getAuthRepository } from '@/lib/repositoryConfig'
 
 // Schema de validación con Zod

@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AnimatedTabs } from '@/components/client/animated-tabs'
+import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Button } from '@/components/ui/button'
 import { getTransactionRepository, getCategoryRepository } from '@/lib/repositoryConfig'
 import { Transaction, TypeTransaction } from '@/types/transaction'
@@ -19,21 +19,20 @@ import {
 	TrendingDown
 } from 'lucide-react'
 import { useAccounts, useCategories, useTransactions, useBudgets } from '@/hooks/useRepositories'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
+import { Drawer, DrawerTrigger, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerClose } from '@/components/ui/drawer'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
-import { useState, useEffect } from 'react'
-import { DateRange } from 'react-day-picker'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
-import { useForm } from 'react-hook-form'
+import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
+import { useState, useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { Loader2, AlertCircle } from 'lucide-react'
+import { DateRange } from 'react-day-picker'
 import { format } from 'date-fns'
-import { Loader2 } from 'lucide-react'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 
 interface TransactionItemProps {
 	transaction: Transaction
@@ -479,12 +478,9 @@ export default function TransactionsPage() {
 								<label className="block mb-1">Buscar</label>
 								<Input type="text" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Buscar por descripción..." />
 							</div>
-							<DrawerFooter>
-								<Button type="button" variant="outline" onClick={clearFilters} className="w-full">Limpiar Filtros</Button>
-								<DrawerClose asChild>
-									<Button type="button" variant="ghost" className="w-full">Cerrar</Button>
-								</DrawerClose>
-							</DrawerFooter>
+							<DrawerClose asChild>
+								<Button type="button" variant="ghost" className="w-full">Cerrar</Button>
+							</DrawerClose>
 						</form>
 					</DrawerContent>
 				</Drawer>

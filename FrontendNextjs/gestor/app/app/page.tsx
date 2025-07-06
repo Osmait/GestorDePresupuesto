@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
-import { AnimatedTabs } from '@/components/client/animated-tabs'
+import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { 
 	getAuthRepository, 
 	getAccountRepository, 
@@ -30,7 +30,7 @@ import {
 	Zap,
 	LucideIcon
 } from 'lucide-react'
-import { DashboardCharts } from '@/components/DashboardCharts'
+import { DashboardCharts } from '@/components/transactions/DashboardCharts'
 
 interface StatCardProps {
 	title: string

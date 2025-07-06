@@ -11,12 +11,12 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertCircle, Loader2, PlusCircle, Tag, Palette, Activity } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AnimatedTabs } from '@/components/client/animated-tabs'
+import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Button } from '@/components/ui/button'
 import { getCategoryRepository, getTransactionRepository } from '@/lib/repositoryConfig'
 import { Category } from '@/types/category'
 import { Transaction } from '@/types/transaction'
-import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 
 interface CategoryCardProps {
 	category: Category

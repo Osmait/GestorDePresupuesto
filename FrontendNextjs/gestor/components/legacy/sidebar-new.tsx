@@ -4,10 +4,10 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { UserNav } from '@/components/user-nav'
-import { Search } from '@/components/search'
-import { SidebarController } from '@/components/client/sidebar-controller'
-import { AnimatedSidebarNav } from '@/components/client/sidebar-nav-animated'
+import { UserNav } from '@/components/common/user-nav'
+import { Search } from '@/components/common/search'
+import { SidebarController } from '@/components/common/sidebar-controller'
+import { AnimatedSidebarNav } from '@/components/common/sidebar-nav-animated'
 import { 
 	LayoutDashboard,
 	CreditCard,

@@ -1,6 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { AnimatedTabs } from '@/components/client/animated-tabs'
+import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Button } from '@/components/ui/button'
 import { 
 	Bitcoin, 

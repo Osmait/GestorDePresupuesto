@@ -633,7 +633,6 @@ export default function AnalysisPage() {
   const filteredHeatData = useMemo(() => {
     const monthsLabels = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic']
     const days = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom']
-    // Determinar meses visibles en el rango
     let visibleMonths: string[] = []
     if (interval === 'month' || interval === 'week' || interval === 'day') {
       let d = startOfMonth(start)
@@ -644,16 +643,16 @@ export default function AnalysisPage() {
     } else {
       visibleMonths = monthsLabels
     }
-    return days.map((day, i) => {
-      const data = visibleMonths.map((month, j) => {
+    return days.map((day, i) => ({
+      id: day,
+      data: visibleMonths.map(month => {
         const count = filteredTransactions.filter(tx => {
           const date = tx.created_at instanceof Date ? tx.created_at : new Date(tx.created_at)
           return date.getDay() === ((i + 1) % 7) && monthsLabels[date.getMonth()] === month
         }).length
         return { x: month, y: count }
       })
-      return { id: day, data }
-    })
+    }))
   }, [filteredTransactions, interval, start, end])
 
   // Leyenda visual personalizada
@@ -862,7 +861,21 @@ export default function AnalysisPage() {
                 <CardTitle>Mapa de Calor Semanal</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
-                <ResponsiveHeatMap data={filteredHeatData} keys={['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun']} indexBy='id' margin={{ top: 30, right: 30, bottom: 50, left: 60 }} forceSquare={true} axisTop={null} axisRight={null} axisBottom={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: 'Mes', legendOffset: 36, legendPosition: 'middle' }} axisLeft={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: 'Día', legendOffset: -50, legendPosition: 'middle' }} cellOpacity={1} cellBorderColor={{ from: 'color', modifiers: [['darker', 0.4]] }} labelTextColor={{ from: 'color', modifiers: [['darker', 1.8]] }} theme={nivoTheme} />
+                <ResponsiveHeatMap
+                  data={filteredHeatData}
+                  keys={['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']}
+                  indexBy='id'
+                  margin={{ top: 30, right: 30, bottom: 50, left: 60 }}
+                  forceSquare={true}
+                  axisTop={null}
+                  axisRight={null}
+                  axisBottom={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: 'Mes', legendOffset: 36, legendPosition: 'middle' }}
+                  axisLeft={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: 'Día', legendOffset: -50, legendPosition: 'middle' }}
+                  cellOpacity={1}
+                  cellBorderColor={{ from: 'color', modifiers: [['darker', 0.4]] }}
+                  labelTextColor={{ from: 'color', modifiers: [['darker', 1.8]] }}
+                  theme={nivoTheme}
+                />
               </CardContent>
             </Card>
           </div>

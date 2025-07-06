@@ -1,9 +1,9 @@
 'use client'
 
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/common/ui/button'
+import { Card, CardContent } from '@/components/common/ui/card'
+import { Badge } from '@/components/common/ui/badge'
 import { 
 	ArrowRight, 
 	BarChart3, 
