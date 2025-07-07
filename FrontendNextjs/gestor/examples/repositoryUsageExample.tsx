@@ -132,7 +132,7 @@ const DashboardExample = () => {
       .filter(t => t.type_transaction === TypeTransaction.BILL)
       .reduce((sum, t) => sum + t.amount, 0);
 
-    const totalBalance = accounts.reduce((sum, a) => sum + a.balance, 0);
+    const totalBalance = (accounts ?? []).reduce((sum, a) => sum + a.initial_balance, 0);
 
     return { totalIncome, totalExpenses, totalBalance };
   };
@@ -209,22 +209,22 @@ const DashboardExample = () => {
       <div className="bg-white rounded-lg shadow mb-8">
         <div className="px-6 py-4 border-b border-gray-200">
           <h2 className="text-xl font-semibold text-gray-800">
-            Cuentas ({accounts.length})
+            Cuentas ({accounts?.length ?? 0})
           </h2>
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {accounts.map(account => (
+            {Array.isArray(accounts) && accounts.map(account => (
               <div
                 key={account.id}
                 className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow"
               >
                 <h3 className="font-semibold text-gray-800 mb-1">
-                  {account.name_account}
+                  {account.name}
                 </h3>
                 <p className="text-sm text-gray-600 mb-2">{account.bank}</p>
                 <p className="text-lg font-bold text-green-600 mb-3">
-                  ${account.balance.toLocaleString()}
+                  ${account.initial_balance.toLocaleString()}
                 </p>
                 <button
                   onClick={() => handleDeleteAccount(account.id)}

@@ -30,11 +30,11 @@ export function AccountSection({ accouts }: Props) {
           <TableBody>
             {accouts.map((account) => (
               <TableRow key={account.id}>
-                <TableCell>{account.name_account}</TableCell>
+                <TableCell>{account.name}</TableCell>
                 <TableCell className="font-medium flex gap-x-4 items-center sticky left-0.5 ">
                   {account.bank}
                 </TableCell>
-                <TableCell className="text-right">{account.balance}</TableCell>
+                <TableCell className="text-right">{account.initial_balance}</TableCell>
               </TableRow>
             ))}
           </TableBody>

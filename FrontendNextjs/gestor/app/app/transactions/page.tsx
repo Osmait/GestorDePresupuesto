@@ -252,7 +252,7 @@ function TransactionFormModal({ open, setOpen }: { open: boolean, setOpen: (v: b
 										<Select value={field.value} onValueChange={field.onChange}>
 											<SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
 											<SelectContent>
-												{accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name_account}</SelectItem>)}
+												{accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
 											</SelectContent>
 										</Select>
 									</FormControl>
@@ -450,7 +450,7 @@ export default function TransactionsPage() {
 									<SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
 									<SelectContent>
 										<SelectItem value="all">Todas</SelectItem>
-										{accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name_account}</SelectItem>)}
+										{accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
 									</SelectContent>
 								</Select>
 							</div>

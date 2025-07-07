@@ -1,7 +1,7 @@
 // Configuración centralizada para repositorios
 // MODO DESARROLLO: Solo mocks activados para evitar problemas con next/headers
 
-const USE_MOCKS = true // SIEMPRE true durante desarrollo
+const USE_MOCKS = false // Cambiado a false para usar el backend real
 
 // Importar solo los mocks
 import { AccountRepositoryMock } from '@/mocks/accountRepositoryMock'
@@ -10,26 +10,31 @@ import { BudgetRepositoryMock } from '@/mocks/budgetRepositoryMock'
 import { CategoryRepositoryMock } from '@/mocks/categoryRepositoryMock'
 import { TransactionRepositoryMock } from '@/mocks/transactionRepositoryMock'
 import { AnalyticsRepositoryMock } from '@/mocks/analyticsRepositoryMock'
+// Importar el repositorio real
+import { AuthRepository } from '@/app/repository/authRepository'
+import { AccountRepository } from '@/app/repository/accountRepository'
+import { TransactionRepository } from '@/app/repository/transactionRepository'
+import { CategoryRepository } from '@/app/repository/categoryRepository'
 
 // Crear instancias únicas
-let accountRepositoryInstance: AccountRepositoryMock | null = null;
-let authRepositoryInstance: AuthRepositoryMock | null = null;
+let accountRepositoryInstance: AccountRepository | null = null;
+let authRepositoryInstance: AuthRepository | null = null;
 let budgetRepositoryInstance: BudgetRepositoryMock | null = null;
-let categoryRepositoryInstance: CategoryRepositoryMock | null = null;
-let transactionRepositoryInstance: TransactionRepositoryMock | null = null;
+let categoryRepositoryInstance: CategoryRepository | null = null;
+let transactionRepositoryInstance: TransactionRepository | null = null;
 let analyticsRepositoryInstance: AnalyticsRepositoryMock | null = null;
 
 // Funciones para obtener repositorios (con singleton pattern)
 export const getAccountRepository = async () => {
   if (!accountRepositoryInstance) {
-    accountRepositoryInstance = new AccountRepositoryMock();
+    accountRepositoryInstance = new AccountRepository();
   }
   return accountRepositoryInstance;
 };
 
 export const getAuthRepository = async () => {
   if (!authRepositoryInstance) {
-    authRepositoryInstance = new AuthRepositoryMock();
+    authRepositoryInstance = new AuthRepository();
   }
   return authRepositoryInstance;
 };
@@ -43,14 +48,14 @@ export const getBudgetRepository = async () => {
 
 export const getCategoryRepository = async () => {
   if (!categoryRepositoryInstance) {
-    categoryRepositoryInstance = new CategoryRepositoryMock();
+    categoryRepositoryInstance = new CategoryRepository();
   }
   return categoryRepositoryInstance;
 };
 
 export const getTransactionRepository = async () => {
   if (!transactionRepositoryInstance) {
-    transactionRepositoryInstance = new TransactionRepositoryMock();
+    transactionRepositoryInstance = new TransactionRepository();
   }
   return transactionRepositoryInstance;
 };
@@ -63,11 +68,11 @@ export const getAnalyticsRepository = async () => {
 };
 
 // Exportar instancias directas para compatibilidad
-export const accountRepository = new AccountRepositoryMock();
-export const authRepository = new AuthRepositoryMock();
+export const accountRepository = new AccountRepository();
+export const authRepository = new AuthRepository();
 export const budgetRepository = new BudgetRepositoryMock();
-export const categoryRepository = new CategoryRepositoryMock();
-export const transactionRepository = new TransactionRepositoryMock();
+export const categoryRepository = new CategoryRepository();
+export const transactionRepository = new TransactionRepository();
 export const analyticsRepository = new AnalyticsRepositoryMock();
 
 // Función para verificar si estamos en modo mock

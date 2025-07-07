@@ -133,10 +133,10 @@ const SimpleHookExample = () => {
             {accounts.accounts.slice(0, 3).map(account => (
               <div key={account.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
                 <div>
-                  <p className="font-medium">{account.name_account}</p>
+                  <p className="font-medium">{account.name}</p>
                   <p className="text-sm text-gray-600">{account.bank}</p>
                 </div>
-                <p className="font-bold text-green-600">${account.balance.toLocaleString()}</p>
+                <p className="font-bold text-green-600">${account.initial_balance.toLocaleString()}</p>
               </div>
             ))}
           </div>

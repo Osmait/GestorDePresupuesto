@@ -1,10 +1,11 @@
 import { Category } from "@/types/category";
-import { cookies } from "next/headers";
+import Cookies from "js-cookie";
+
 export class CategoryRepository {
   private url = "http://127.0.0.1:8080";
 
   async findAll(): Promise<Category[]> {
-    const token = cookies().get("x-token");
+    const token = Cookies.get("x-token");
     const options = {
       headers: {
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
@@ -21,14 +22,13 @@ export class CategoryRepository {
   }
 
   async create(name: string, icon: string, color: string): Promise<void> {
-    const token = cookies().get("x-token");
+    const token = Cookies.get("x-token");
     const options = {
+      method: "POST",
       headers: {
-        method: "POST",
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
         Authorization: `Bearer ${token}`,
       },
-
       body: JSON.stringify({ name, icon, color }), // Convertimos el objeto JavaScript a formato JSON
     };
     try {
@@ -37,11 +37,12 @@ export class CategoryRepository {
       console.log(error);
     }
   }
+
   async delete(id: string) {
-    const token = cookies().get("x-token");
+    const token = Cookies.get("x-token");
     const options = {
+      method: "DELETE",
       headers: {
-        method: "DELETE",
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
         Authorization: `Bearer ${token}`,
       },

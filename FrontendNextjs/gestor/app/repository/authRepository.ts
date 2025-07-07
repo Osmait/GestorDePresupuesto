@@ -31,7 +31,7 @@ export class AuthRepository {
       headers: {
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
       },
-      body: JSON.stringify({ name, lastName, email, password }), // Convertimos el objeto JavaScript a formato JSON
+      body: JSON.stringify({ name, last_name: lastName, email, password }), // Usar last_name como espera el backend
     };
     try {
       await fetch(`${this.url}/user`, options);

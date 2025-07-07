@@ -52,7 +52,7 @@ function LoadingSpinner() {
 
 // Server Component para AccountCard
 function AccountCard({ account }: AccountCardProps) {
-	const isPositive = account.balance > 0
+	const isPositive = account.initial_balance > 0
 	
 	return (
 		<Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
@@ -61,11 +61,11 @@ function AccountCard({ account }: AccountCardProps) {
 					<div className="flex items-center space-x-4">
 						<Avatar className="h-14 w-14 border-2 border-primary/20">
 							<AvatarFallback className="bg-gradient-to-br from-primary/80 to-primary text-primary-foreground font-semibold text-lg">
-								{account.name_account.charAt(0).toUpperCase()}
+								{(account.name ?? '').charAt(0).toUpperCase()}
 							</AvatarFallback>
 						</Avatar>
 						<div>
-							<p className="font-semibold text-foreground text-lg">{account.name_account}</p>
+							<p className="font-semibold text-foreground text-lg">{account.name}</p>
 							<p className="text-sm text-muted-foreground flex items-center gap-1">
 								<Building className="h-4 w-4" />
 								{account.bank}
@@ -87,7 +87,7 @@ function AccountCard({ account }: AccountCardProps) {
 								<ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
 							)}
 							<span className={`font-bold text-2xl ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-								${account.balance.toLocaleString()}
+								{(account.initial_balance ?? 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
 							</span>
 						</div>
 					</div>
@@ -95,7 +95,7 @@ function AccountCard({ account }: AccountCardProps) {
 					<div className="flex justify-between items-center pt-2 border-t border-border/50">
 						<span className="text-xs text-muted-foreground">USD</span>
 						<Badge variant="outline" className="bg-muted/30 dark:bg-muted/20">
-							{account.balance > 10000 ? 'Alto' : account.balance > 5000 ? 'Medio' : 'Bajo'}
+							{account.initial_balance > 10000 ? 'Alto' : account.initial_balance > 5000 ? 'Medio' : 'Bajo'}
 						</Badge>
 					</div>
 				</div>
@@ -106,9 +106,9 @@ function AccountCard({ account }: AccountCardProps) {
 
 // Server Component para AccountSummaryCard
 function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
-	const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0)
-	const positiveAccounts = accounts.filter(account => account.balance > 0)
-	const negativeAccounts = accounts.filter(account => account.balance < 0)
+	const totalBalance = (accounts ?? []).reduce((sum, account) => sum + account.initial_balance, 0)
+	const positiveAccounts = (accounts ?? []).filter(account => account.initial_balance > 0)
+	const negativeAccounts = (accounts ?? []).filter(account => account.initial_balance < 0)
 	
 	return (
 		<Card className="border-border/50 dark:border-border/20">
@@ -128,12 +128,12 @@ function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
 					<div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
 						<TrendingUp className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
 						<p className="text-sm font-medium text-muted-foreground">Cuentas Positivas</p>
-						<p className="text-2xl font-bold text-foreground">{positiveAccounts.length}</p>
+						<p className="text-2xl font-bold text-foreground">{positiveAccounts?.length ?? 0}</p>
 					</div>
 					<div className="text-center p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5">
 						<CreditCard className="h-6 w-6 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
 						<p className="text-sm font-medium text-muted-foreground">Total Cuentas</p>
-						<p className="text-2xl font-bold text-foreground">{accounts.length}</p>
+						<p className="text-2xl font-bold text-foreground">{accounts?.length ?? 0}</p>
 					</div>
 				</div>
 			</CardContent>
@@ -143,9 +143,9 @@ function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
 
 // Esquema de validación para el formulario de cuenta
 const accountSchema = z.object({
-	name_account: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
+	name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
 	bank: z.string().min(2, 'El banco debe tener al menos 2 caracteres'),
-	balance: z.coerce.number().min(0, 'El balance debe ser mayor o igual a 0'),
+	initial_balance: z.coerce.number().min(0, 'El balance debe ser mayor o igual a 0'),
 })
 type AccountFormValues = z.infer<typeof accountSchema>
 
@@ -155,13 +155,12 @@ function AccountFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boole
 	const [success, setSuccess] = useState(false)
 	const form = useForm<AccountFormValues>({
 		resolver: zodResolver(accountSchema),
-		defaultValues: { name_account: '', bank: '', balance: 0 },
+		defaultValues: { name: '', bank: '', initial_balance: 0 },
 	})
 
 	async function onSubmit(values: AccountFormValues) {
-		if (!user?.id) return
 		try {
-			await createAccount(values.name_account, values.bank, values.balance, user.id)
+			await createAccount(values.name, values.bank, values.initial_balance)
 			setSuccess(true)
 			form.reset()
 			setTimeout(() => {
@@ -185,7 +184,7 @@ function AccountFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boole
 				) : (
 					<Form {...form}>
 						<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-							<FormField control={form.control} name="name_account" render={({ field }) => (
+							<FormField control={form.control} name="name" render={({ field }) => (
 								<FormItem>
 									<FormLabel>Nombre de la cuenta</FormLabel>
 									<FormControl><Input {...field} placeholder="Ej: Cuenta Principal" /></FormControl>
@@ -199,7 +198,7 @@ function AccountFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boole
 									<FormMessage />
 								</FormItem>
 							)} />
-							<FormField control={form.control} name="balance" render={({ field }) => (
+							<FormField control={form.control} name="initial_balance" render={({ field }) => (
 								<FormItem>
 									<FormLabel>Balance inicial</FormLabel>
 									<FormControl><Input type="number" {...field} min={0} step={0.01} /></FormControl>
@@ -273,7 +272,7 @@ export default function AccountsPage() {
 							icon: <Wallet className="h-4 w-4" />, 
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{accounts.map((account) => (
+									{Array.isArray(accounts) && accounts.map((account) => (
 										<AccountCard key={account.id} account={account} />
 									))}
 								</div>
@@ -285,7 +284,7 @@ export default function AccountsPage() {
 							icon: <TrendingUp className="h-4 w-4" />, 
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{accounts.filter(account => account.balance > 0).map((account) => (
+									{Array.isArray(accounts) && accounts.filter(account => account.initial_balance > 0).map((account) => (
 										<AccountCard key={account.id} account={account} />
 									))}
 								</div>
@@ -297,7 +296,7 @@ export default function AccountsPage() {
 							icon: <TrendingDown className="h-4 w-4" />, 
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{accounts.filter(account => account.balance < 0).map((account) => (
+									{Array.isArray(accounts) && accounts.filter(account => account.initial_balance < 0).map((account) => (
 										<AccountCard key={account.id} account={account} />
 									))}
 								</div>
@@ -331,7 +330,7 @@ export default function AccountsPage() {
 								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Datos Disponibles:</p>
 								<div className="space-y-2">
 									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
-										🏦 {accounts.length} cuentas cargadas
+										🏦 {(accounts?.length ?? 0)} cuentas cargadas
 									</Badge>
 								</div>
 							</div>

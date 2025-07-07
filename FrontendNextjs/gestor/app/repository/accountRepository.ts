@@ -1,40 +1,46 @@
 import { Account } from "@/types/account";
-import { cookies } from "next/headers";
+import Cookies from "js-cookie";
+
 export class AccountRepository {
   private url = "http://127.0.0.1:8080";
 
   async findAll(): Promise<Account[]> {
-    const token = cookies().get("x-token");
+    const token = Cookies.get("x-token");
     const options = {
       headers: {
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
         Authorization: `Bearer ${token}`,
       },
     };
+
     try {
       const response = await fetch(`${this.url}/account`, options);
-      const account: Account[] = await response.json();
-      return account;
+      const data = await response.json();
+      // Normalizar la respuesta para que sea un array de Account plano
+      const accounts = data.map((item: any) => ({
+        ...item.account_info,
+        current_balance: item.current_balance,
+      }));
+      return accounts;
     } catch (error) {
+      console.log(error);
       return [];
     }
   }
 
   async create(
-    name_account: string,
+    name: string,
     bank: string,
-    balance: number,
-    user_id: string,
+    initial_balance: number,
   ): Promise<void> {
-    const token = cookies().get("x-token");
+    const token = Cookies.get("x-token");
     const options = {
+      method: "POST",
       headers: {
-        method: "POST",
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
         Authorization: `Bearer ${token}`,
       },
-
-      body: JSON.stringify({ name_account, bank, balance, user_id }), // Convertimos el objeto JavaScript a formato JSON
+      body: JSON.stringify({ name, bank, initial_balance }), // Payload correcto para el backend
     };
     try {
       await fetch(`${this.url}/account`, options);
@@ -43,10 +49,10 @@ export class AccountRepository {
     }
   }
   async delete(id: string): Promise<void> {
-    const token = cookies().get("x-token");
+    const token = Cookies.get("x-token");
     const options = {
+      method: "DELETE",
       headers: {
-        method: "DELETE",
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
         Authorization: `Bearer ${token}`,
       },

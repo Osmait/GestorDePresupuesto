@@ -1,21 +1,23 @@
 import { Transaction, TypeTransaction } from "@/types/transaction";
-import { cookies } from "next/headers";
+import Cookies from "js-cookie";
+
 export class TransactionRepository {
   private url = "http://127.0.0.1:8080";
 
   async findAll(): Promise<Transaction[]> {
-    const token = cookies().get("x-token");
+    const token = Cookies.get("x-token");
     const options = {
       headers: {
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
     };
     try {
       const response = await fetch(`${this.url}/transaction`, options);
-      const account: Transaction[] = await response.json();
-      return account;
+      const transactions: Transaction[] = await response.json();
+      return transactions;
     } catch (error) {
+      console.log(error);
       return [];
     }
   }
@@ -29,35 +31,41 @@ export class TransactionRepository {
     category_id: string,
     budget_id?: string,
   ): Promise<void> {
-    const token = cookies().get("x-token");
+    const token = Cookies.get("x-token");
+    let typeTransactionString = "";
+    if (typeTransaction === TypeTransaction.INCOME) typeTransactionString = "INCOME";
+    else if (typeTransaction === TypeTransaction.BILL) typeTransactionString = "BILL";
     const options = {
+      method: "POST",
       headers: {
-        method: "POST",
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({
         name,
         description,
         amount,
-        typeTransaction,
+        typeTransaction: typeTransactionString,
         account_id,
         category_id,
         budget_id: budget_id ? budget_id : null,
-      }), // Convertimos el objeto JavaScript a formato JSON
+      }),
     };
     try {
-      await fetch(`${this.url}/transaction`, options);
+      const response = await fetch(`${this.url}/transaction`, options);
+      const data = await response.json();
+      console.log(data);
     } catch (error) {
       console.log(error);
     }
   }
-  async delete(id: string) {
-    const token = cookies().get("x-token");
+
+  async delete(id: string): Promise<void> {
+    const token = Cookies.get("x-token");
     const options = {
+      method: "DELETE",
       headers: {
-        method: "DELETE",
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
+        "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
     };

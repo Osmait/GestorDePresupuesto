@@ -1,8 +1,8 @@
 export interface Account {
   id: string;
-  name_account: string;
+  name: string;
   bank: string;
-  balance: number;
+  initial_balance: number;
   user_id: string;
   created_at: string;
 }

@@ -156,24 +156,24 @@ function CategoryCard({ category, transactions }: {
 
 // Server Component para AccountCard
 function AccountCard({ account }: { account: Account }) {
-	const isPositive = account.balance > 0
+	const isPositive = account.initial_balance > 0
 
 	return (
 		<Card className="border-border/50 dark:border-border/20 hover:shadow-lg dark:hover:shadow-lg/25 transition-all duration-200">
 			<CardContent className="p-6">
 				<div className="flex items-center justify-between mb-4">
 					<div>
-						<h3 className="font-semibold text-foreground">{account.name_account}</h3>
+						<h3 className="font-semibold text-foreground">{account.name}</h3>
 						<p className="text-sm text-muted-foreground">{account.bank}</p>
 					</div>
 					<CreditCard className="h-5 w-5 text-muted-foreground" />
 				</div>
 				<div className="space-y-2">
 					<p className={`text-2xl font-bold ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-						${account.balance.toLocaleString()}
+						${(account.initial_balance ?? 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
 					</p>
 					<Badge variant="outline" className="text-xs">
-						{account.balance > 10000 ? 'Alto' : account.balance > 5000 ? 'Medio' : 'Bajo'}
+						{account.initial_balance > 10000 ? 'Alto' : account.initial_balance > 5000 ? 'Medio' : 'Bajo'}
 					</Badge>
 				</div>
 			</CardContent>
@@ -261,7 +261,7 @@ function StatsGrid({ accounts, transactions }: {
 	accounts: Account[] 
 	transactions: Transaction[] 
 }) {
-	const totalBalance = accounts.reduce((sum, acc) => sum + acc.balance, 0)
+	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + acc.initial_balance, 0)
 	const totalIncome = transactions.filter(t => t.type_transaction === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0)
 	const totalExpenses = transactions.filter(t => t.type_transaction === TypeTransaction.BILL).reduce((sum, t) => sum + t.amount, 0)
 	const netIncome = totalIncome - totalExpenses
@@ -302,6 +302,12 @@ function StatsGrid({ accounts, transactions }: {
 			/>
 		</div>
 	)
+}
+
+// Server Component para AccountSummaryCard
+import { Account } from '@/types/account'
+function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
+	// Implementation of AccountSummaryCard function
 }
 
 // Componente principal - Server Component que carga datos directamente
@@ -398,7 +404,7 @@ export default async function DashboardPage() {
 							icon: <CreditCard className="h-4 w-4" />,
 							content: (
 								<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-									{accounts.map((account) => (
+									{Array.isArray(accounts) && accounts.map((account) => (
 										<AccountCard key={account.id} account={account} />
 									))}
 								</div>
@@ -480,7 +486,7 @@ export default async function DashboardPage() {
 										👤 {user ? 'Usuario autenticado' : 'Sin usuario'}
 									</Badge>
 									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
-										🏦 {accounts.length} cuentas
+										🏦 {accounts?.length ?? 0} cuentas
 									</Badge>
 									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
 										💳 {transactions.length} transacciones

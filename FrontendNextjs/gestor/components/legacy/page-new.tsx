@@ -35,7 +35,7 @@ function LoadingSpinner() {
 
 // Server Component para AccountCard
 function AccountCard({ account }: AccountCardProps) {
-	const isPositive = account.balance > 0
+	const isPositive = account.initial_balance > 0
 
 	return (
 		<Card className="border-border/50 dark:border-border/20 hover:shadow-lg dark:hover:shadow-lg/25 transition-all duration-200">
@@ -47,7 +47,7 @@ function AccountCard({ account }: AccountCardProps) {
 								<CreditCard className="h-5 w-5 text-primary" />
 							</div>
 							<div>
-								<h3 className="font-semibold text-foreground">{account.name_account}</h3>
+								<h3 className="font-semibold text-foreground">{account.name}</h3>
 								<p className="text-sm text-muted-foreground">{account.bank}</p>
 							</div>
 						</div>
@@ -58,7 +58,7 @@ function AccountCard({ account }: AccountCardProps) {
 								<TrendingUp className="h-5 w-5 text-red-600 dark:text-red-400 rotate-180" />
 							)}
 							<span className={`font-bold text-2xl ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-								${account.balance.toLocaleString()}
+								${(account.initial_balance ?? 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
 							</span>
 						</div>
 					</div>
@@ -66,7 +66,7 @@ function AccountCard({ account }: AccountCardProps) {
 					<div className="flex justify-between items-center pt-2 border-t border-border/50">
 						<span className="text-xs text-muted-foreground">USD</span>
 						<Badge variant="outline" className="bg-muted/30 dark:bg-muted/20">
-							{account.balance > 10000 ? 'Alto' : account.balance > 5000 ? 'Medio' : 'Bajo'}
+							{account.initial_balance > 10000 ? 'Alto' : account.initial_balance > 5000 ? 'Medio' : 'Bajo'}
 						</Badge>
 					</div>
 				</div>
@@ -77,8 +77,8 @@ function AccountCard({ account }: AccountCardProps) {
 
 // Server Component para AccountSummaryCard
 function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
-	const totalBalance = accounts.reduce((sum, account) => sum + account.balance, 0)
-	const positiveAccounts = accounts.filter(account => account.balance > 0)
+	const totalBalance = accounts.reduce((sum, account) => sum + account.initial_balance, 0)
+	const positiveAccounts = accounts.filter(account => account.initial_balance > 0)
 	
 	return (
 		<Card className="border-border/50 dark:border-border/20">
@@ -154,7 +154,7 @@ function AccountsInfo({ accounts }: { accounts: Account[] }) {
 					<div>
 						<p className="font-semibold text-blue-800 dark:text-blue-200 mb-2">Balance Promedio:</p>
 						<p className="text-blue-700 dark:text-blue-300">
-							${accounts.length > 0 ? Math.round(accounts.reduce((sum, acc) => sum + acc.balance, 0) / accounts.length).toLocaleString() : 0}
+							${accounts.length > 0 ? Math.round(accounts.reduce((sum, acc) => sum + acc.initial_balance, 0) / accounts.length).toLocaleString() : 0}
 						</p>
 					</div>
 					<div>
@@ -209,7 +209,7 @@ export default function AccountsPageNew() {
 						icon: <TrendingUp className="h-4 w-4" />,
 						content: (
 							<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-								{accounts.filter(account => account.balance > 0).map((account) => (
+								{accounts.filter(account => account.initial_balance > 0).map((account) => (
 									<AccountCard key={account.id} account={account} />
 								))}
 							</div>

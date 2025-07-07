@@ -17,6 +17,7 @@ import { useAccounts, useCategories, useTransactions, useAnalytics } from '@/hoo
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
 import { DateRange } from 'react-day-picker'
+import { Account } from '@/types/account'
 
 // Datos mock para ejemplo visual
 const mockLine = [
@@ -162,9 +163,9 @@ const mockPie = [
 
 // Datos de ejemplo para filtros
 const exampleAccounts = [
-  { id: '1', name_account: 'Cuenta Principal' },
-  { id: '2', name_account: 'Cuenta Ahorros' },
-  { id: '3', name_account: 'Cuenta Corriente' },
+  { id: '1', name: 'Cuenta Principal' },
+  { id: '2', name: 'Cuenta Ahorros' },
+  { id: '3', name: 'Cuenta Corriente' },
 ]
 const exampleCategories = [
   { id: 'category-1', name: 'Alimentación' },
@@ -290,7 +291,7 @@ function AnalysisFilters({ filters, setFilters }: {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value='all'>Todas</SelectItem>
-            {exampleAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name_account}</SelectItem>)}
+            {exampleAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -343,6 +344,11 @@ function getDateRangeInterval(start: Date, end: Date) {
   if (days <= 90) return 'week'
   if (years < 2) return 'month'
   return 'year'
+}
+
+// Server Component para AccountCard
+function AccountCard({ account }: { account: Account }) {
+  // ... existing code ...
 }
 
 export default function AnalysisPage() {
