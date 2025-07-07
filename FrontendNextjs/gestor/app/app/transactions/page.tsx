@@ -385,7 +385,7 @@ export default function TransactionsPage() {
 		setFiltered(null)
 	}
 
-	const shownTransactions = filtered ? filtered : transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10)
+	const shownTransactions = filtered ? filtered : (Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10) : [])
 
 	useEffect(() => {
 		applyFilters()
@@ -499,7 +499,7 @@ export default function TransactionsPage() {
 							icon: <Wallet className="h-4 w-4" />,
 							content: (
 								<div className="space-y-4">
-									{shownTransactions.map((transaction) => {
+									{Array.isArray(shownTransactions) ? shownTransactions.map((transaction) => {
 										const category = categories.find(c => c.id === transaction.category_id)
 										return (
 											<TransactionItem 
@@ -508,7 +508,7 @@ export default function TransactionsPage() {
 												category={category}
 											/>
 										)
-									})}
+									}):[]}
 								</div>
 							)
 						},
@@ -518,7 +518,7 @@ export default function TransactionsPage() {
 							icon: <TrendingUp className="h-4 w-4" />,
 							content: (
 								<div className="space-y-4">
-									{incomeTransactions.map((transaction) => {
+									{Array.isArray(incomeTransactions) ? incomeTransactions.map((transaction) => {
 										const category = categories.find(c => c.id === transaction.category_id)
 										return (
 											<TransactionItem 
@@ -527,7 +527,7 @@ export default function TransactionsPage() {
 												category={category}
 											/>
 										)
-									})}
+									}):[]}
 								</div>
 							)
 						},
@@ -537,7 +537,7 @@ export default function TransactionsPage() {
 							icon: <TrendingDown className="h-4 w-4" />,
 							content: (
 								<div className="space-y-4">
-									{expenseTransactions.map((transaction) => {
+									{Array.isArray(expenseTransactions) ? expenseTransactions.map((transaction) => {
 										const category = categories.find(c => c.id === transaction.category_id)
 										return (
 											<TransactionItem 
@@ -546,7 +546,7 @@ export default function TransactionsPage() {
 												category={category}
 											/>
 										)
-									})}
+									}):[]}
 								</div>
 							)
 						}

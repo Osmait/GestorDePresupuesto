@@ -275,7 +275,7 @@ const DashboardExample = () => {
         </div>
         <div className="p-6">
           <div className="space-y-4">
-            {transactions.slice(0, 5).map(transaction => (
+            {Array.isArray(transactions) ? transactions.slice(0, 5).map(transaction => (
               <div
                 key={transaction.id}
                 className="flex items-center justify-between p-4 border border-gray-200 rounded-lg hover:shadow-md transition-shadow"

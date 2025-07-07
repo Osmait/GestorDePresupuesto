@@ -38,7 +38,7 @@ export function DashboardCharts({ categories, transactions }: DashboardChartsPro
 	}), [transactions, currentMonth, currentYear])
 
 	// Normalizar type_transaction
-	const normalizedTransactions = useMemo(() => currentMonthTransactions.map(t => ({
+	const normalizedTransactions = useMemo(() => (Array.isArray(currentMonthTransactions) ? currentMonthTransactions : []).map(t => ({
 		...t,
 		type_transaction: t.type_transaction === '0' ? 'BILL'
 			: t.type_transaction === '1' ? 'INCOME'
@@ -52,12 +52,12 @@ export function DashboardCharts({ categories, transactions }: DashboardChartsPro
 		gastos.forEach(t => {
 			grouped[t.category_id] = (grouped[t.category_id] || 0) + t.amount
 		})
-		const data = categories.map(cat => ({
+		const data = Array.isArray(categories) ? categories.map(cat => ({
 			id: cat.id,
 			label: cat.name,
 			value: grouped[cat.id] || 0,
 			color: cat.color
-		})).filter(d => d.value > 0)
+		})).filter(d => d.value > 0) : [];
 		console.log('Pie chart data:', data)
 		return data
 	}, [categories, normalizedTransactions])

@@ -15,6 +15,7 @@ export class TransactionRepository {
     try {
       const response = await fetch(`${this.url}/transaction`, options);
       const transactions: Transaction[] = await response.json();
+      console.log(transactions);
       return transactions;
     } catch (error) {
       console.log(error);
@@ -33,8 +34,8 @@ export class TransactionRepository {
   ): Promise<void> {
     const token = Cookies.get("x-token");
     let typeTransactionString = "";
-    if (typeTransaction === TypeTransaction.INCOME) typeTransactionString = "INCOME";
-    else if (typeTransaction === TypeTransaction.BILL) typeTransactionString = "BILL";
+    if (typeTransaction === TypeTransaction.INCOME) typeTransactionString = "income";
+    else if (typeTransaction === TypeTransaction.BILL) typeTransactionString = "bill";
     const options = {
       method: "POST",
       headers: {
@@ -45,12 +46,13 @@ export class TransactionRepository {
         name,
         description,
         amount,
-        typeTransaction: typeTransactionString,
+        type_transation: typeTransactionString,
         account_id,
         category_id,
         budget_id: budget_id ? budget_id : null,
       }),
     };
+    console.log(options);
     try {
       const response = await fetch(`${this.url}/transaction`, options);
       const data = await response.json();

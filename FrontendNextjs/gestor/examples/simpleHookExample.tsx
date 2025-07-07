@@ -160,7 +160,7 @@ const SimpleHookExample = () => {
       <div className="bg-white rounded-lg shadow p-6 mt-8">
         <h2 className="text-xl font-semibold mb-4">Recent Transactions</h2>
         <div className="space-y-3">
-          {transactions.transactions.slice(0, 5).map(transaction => (
+          {Array.isArray(transactions.transactions) ? transactions.transactions.slice(0, 5).map(transaction => (
             <div key={transaction.id} className="flex justify-between items-center p-3 bg-gray-50 rounded">
               <div>
                 <p className="font-medium">{transaction.name}</p>

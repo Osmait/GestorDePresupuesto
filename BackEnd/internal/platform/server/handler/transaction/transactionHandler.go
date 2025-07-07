@@ -21,6 +21,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			ctx.JSON(http.StatusBadRequest, "Error fields required ")
 			return
 		}
+		fmt.Println("transactionRequest", transactionRequest.TypeTransation)
 		err := transactionservice.CreateTransaction(
 			ctx,
 			transactionRequest.Name,
@@ -37,7 +38,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			return
 		}
 
-		ctx.Status(http.StatusCreated)
+		ctx.JSON(http.StatusCreated, "Transaction created")
 	}
 }
 

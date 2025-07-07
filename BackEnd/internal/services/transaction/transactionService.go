@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
@@ -39,6 +40,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpi
 	if budgetId != "" {
 		transaction.BudgetId = budgetId
 	}
+	fmt.Println("transaction", transaction.TypeTransation)
 
 	err = s.transactionRepository.Save(ctx, transaction)
 
@@ -65,6 +67,7 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 		trasanctionResponseList = append(trasanctionResponseList, transactionResponse)
 
 	}
+	fmt.Println("trasanctionResponseList", trasanctionResponseList)
 
 	return trasanctionResponseList, nil
 }

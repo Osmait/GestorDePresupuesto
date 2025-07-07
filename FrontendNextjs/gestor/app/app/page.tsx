@@ -130,7 +130,7 @@ function CategoryCard({ category, transactions }: {
 	category: Category 
 	transactions: Transaction[] 
 }) {
-	const categoryTransactions = transactions.filter(t => t.category_id === category.id)
+	const categoryTransactions = Array.isArray(transactions) ? transactions.filter(t => t.category_id === category.id) : [];
 	const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
 
 	return (
@@ -262,8 +262,12 @@ function StatsGrid({ accounts, transactions }: {
 	transactions: Transaction[] 
 }) {
 	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + acc.initial_balance, 0)
-	const totalIncome = transactions.filter(t => t.type_transaction === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0)
-	const totalExpenses = transactions.filter(t => t.type_transaction === TypeTransaction.BILL).reduce((sum, t) => sum + t.amount, 0)
+	const totalIncome = Array.isArray(transactions)
+		? transactions.filter(t => t.type_transaction === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0)
+		: 0;
+	const totalExpenses = Array.isArray(transactions)
+		? transactions.filter(t => t.type_transaction === TypeTransaction.BILL).reduce((sum, t) => sum + t.amount, 0)
+		: 0;
 	const netIncome = totalIncome - totalExpenses
 
 	return (
@@ -305,7 +309,6 @@ function StatsGrid({ accounts, transactions }: {
 }
 
 // Server Component para AccountSummaryCard
-import { Account } from '@/types/account'
 function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
 	// Implementation of AccountSummaryCard function
 }
@@ -327,7 +330,7 @@ export default async function DashboardPage() {
 		budgetRepository.findAll()
 	])
 
-	const recentTransactions = transactions.slice(0, 8)
+	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
@@ -335,10 +338,10 @@ export default async function DashboardPage() {
 				<DashboardHeader user={user} />
 				<DashboardCharts 
 					categories={categories} 
-					transactions={transactions.map(t => ({
+					transactions={(Array.isArray(transactions) ? transactions : []).map(t => ({
 						...t,
 						type_transaction: String(t.type_transaction),
-						created_at: typeof t.created_at === 'string' ? t.created_at : t.created_at.toISOString()
+						created_at: (t.created_at && typeof t.created_at === 'object' && typeof (t.created_at as Date).toISOString === 'function') ? (t.created_at as Date).toISOString() : String(t.created_at)
 					}))} 
 				/>
 				<StatsGrid accounts={accounts} transactions={transactions} />
@@ -362,7 +365,7 @@ export default async function DashboardPage() {
 										</CardHeader>
 										<CardContent>
 											<div className="space-y-1">
-												{recentTransactions.map((transaction) => {
+												{Array.isArray(recentTransactions) ? recentTransactions.map((transaction) => {
 													const category = categories.find(c => c.id === transaction.category_id)
 													return (
 														<TransactionItem 
@@ -371,7 +374,7 @@ export default async function DashboardPage() {
 															category={category}
 														/>
 													)
-												})}
+												}):[]}
 											</div>
 										</CardContent>
 									</Card>
@@ -385,13 +388,13 @@ export default async function DashboardPage() {
 										</CardHeader>
 										<CardContent>
 											<div className="space-y-4">
-												{categories.slice(0, 6).map((category) => (
+												{Array.isArray(categories) ? categories.slice(0, 6).map((category) => (
 													<CategoryCard 
 														key={category.id} 
 														category={category} 
 														transactions={transactions}
 													/>
-												))}
+												)):[]}
 											</div>
 										</CardContent>
 									</Card>
@@ -416,7 +419,7 @@ export default async function DashboardPage() {
 							icon: <Wallet className="h-4 w-4" />,
 							content: (
 								<div className="space-y-4">
-									{transactions.map((transaction) => {
+									{Array.isArray(transactions) ? transactions.map((transaction) => {
 										const category = categories.find(c => c.id === transaction.category_id)
 										return (
 											<TransactionItem 
@@ -425,7 +428,7 @@ export default async function DashboardPage() {
 												category={category}
 											/>
 										)
-									})}
+									}):[]}
 								</div>
 							)
 						},
@@ -436,10 +439,12 @@ export default async function DashboardPage() {
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 									{budgets.map((budget) => {
-										const category = categories.find(c => c.id === budget.category_id)
-										const spent = transactions
-											.filter(t => t.budget_id === budget.id && t.type_transaction === TypeTransaction.BILL)
-											.reduce((sum, t) => sum + t.amount, 0)
+										const category = Array.isArray(categories) ? categories.find(c => c.id === budget.category_id) : undefined;
+										const spent = Array.isArray(transactions)
+											? transactions
+												.filter(t => t.budget_id === budget.id && t.type_transaction === TypeTransaction.BILL)
+												.reduce((sum, t) => sum + t.amount, 0)
+											: 0;
 										return (
 											<BudgetCard 
 												key={budget.id} 
