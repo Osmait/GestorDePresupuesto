@@ -14,7 +14,6 @@ import {
 	getAnalyticsRepository,
 } from '@/lib/repositoryConfig'
 
-// Hook para manejar cuentas
 export function useAccounts() {
 	const [accounts, setAccounts] = useState<Account[]>([])
 	const [isLoading, setIsLoading] = useState(false)

@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google'
 import '../../styles/globals.css'
 import { ThemeProvider } from '@/components/common/theme-provider'
 import { SettingsProvider } from '../../contexts'
-import { SidebarNew } from '@/components/legacy/sidebar-new'
+import { Sidebar } from '@/components/common/sidebar'
 import { cn } from '../../lib/utils'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -28,9 +28,9 @@ export default function RootLayout({
 					disableTransitionOnChange
 				>
 					<SettingsProvider>
-						<SidebarNew>
+						<Sidebar>
 							{children}
-						</SidebarNew>
+						</Sidebar>
 					</SettingsProvider>
 				</ThemeProvider>
 			</body>
