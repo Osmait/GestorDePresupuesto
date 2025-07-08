@@ -1,56 +1,51 @@
 import { Category } from "@/types/category";
-import Cookies from "js-cookie";
+import { BaseRepository } from "@/lib/base-repository";
 
-export class CategoryRepository {
-  private url = "http://127.0.0.1:8080";
-
+export class CategoryRepository extends BaseRepository {
   async findAll(): Promise<Category[]> {
-    const token = Cookies.get("x-token");
-    const options = {
-      headers: {
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
-    };
     try {
-      const response = await fetch(`${this.url}/category`, options);
-      const category: Category[] = await response.json();
-      return category;
+      const categories = await this.get<Category[]>("/category");
+      console.log("categories data", categories);
+      return categories;
     } catch (error) {
+      console.error("Error fetching categories:", error);
       return [];
     }
   }
 
   async create(name: string, icon: string, color: string): Promise<void> {
-    const token = Cookies.get("x-token");
-    const options = {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ name, icon, color }), // Convertimos el objeto JavaScript a formato JSON
-    };
     try {
-      await fetch(`${this.url}/category`, options);
+      await this.post("/category", { name, icon, color });
     } catch (error) {
-      console.log(error);
+      console.error("Error creating category:", error);
+      throw error;
     }
   }
 
-  async delete(id: string) {
-    const token = Cookies.get("x-token");
-    const options = {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
-    };
+  async update(id: string, name: string, icon: string, color: string): Promise<void> {
     try {
-      await fetch(`${this.url}/category/${id}`, options);
+      await this.put(`/category/${id}`, { name, icon, color });
     } catch (error) {
-      console.log(error);
+      console.error("Error updating category:", error);
+      throw error;
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    try {
+      await this.deleteRequest(`/category/${id}`);
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      throw error;
+    }
+  }
+
+  async findById(id: string): Promise<Category | null> {
+    try {
+      return await this.get<Category>(`/category/${id}`);
+    } catch (error) {
+      console.error("Error fetching category by id:", error);
+      return null;
     }
   }
 }

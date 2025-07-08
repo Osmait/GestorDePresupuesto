@@ -52,7 +52,10 @@ function LoadingSpinner() {
 
 // Server Component para AccountCard
 function AccountCard({ account }: AccountCardProps) {
-	const isPositive = account.initial_balance > 0
+	const currentBalance = account.current_balance ?? account.initial_balance ?? 0
+	const initialBalance = account.initial_balance ?? 0
+	const isPositive = currentBalance > 0
+	const hasGrowth = currentBalance > initialBalance
 	
 	return (
 		<Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
@@ -87,15 +90,24 @@ function AccountCard({ account }: AccountCardProps) {
 								<ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
 							)}
 							<span className={`font-bold text-2xl ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-								{(account.initial_balance ?? 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+								${currentBalance.toLocaleString()}
 							</span>
 						</div>
 					</div>
 					
+					{initialBalance !== currentBalance && (
+						<div className="flex justify-between items-center text-xs">
+							<span className="text-muted-foreground">Saldo inicial: ${initialBalance.toLocaleString()}</span>
+							<span className={`font-medium ${hasGrowth ? 'text-green-600' : 'text-red-600'}`}>
+								{hasGrowth ? '+' : ''}{(currentBalance - initialBalance).toLocaleString()}
+							</span>
+						</div>
+					)}
+					
 					<div className="flex justify-between items-center pt-2 border-t border-border/50">
 						<span className="text-xs text-muted-foreground">USD</span>
 						<Badge variant="outline" className="bg-muted/30 dark:bg-muted/20">
-							{account.initial_balance > 10000 ? 'Alto' : account.initial_balance > 5000 ? 'Medio' : 'Bajo'}
+							{currentBalance > 10000 ? 'Alto' : currentBalance > 5000 ? 'Medio' : 'Bajo'}
 						</Badge>
 					</div>
 				</div>
@@ -106,9 +118,11 @@ function AccountCard({ account }: AccountCardProps) {
 
 // Server Component para AccountSummaryCard
 function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
-	const totalBalance = (accounts ?? []).reduce((sum, account) => sum + account.initial_balance, 0)
-	const positiveAccounts = (accounts ?? []).filter(account => account.initial_balance > 0)
-	const negativeAccounts = (accounts ?? []).filter(account => account.initial_balance < 0)
+	const totalCurrentBalance = (accounts ?? []).reduce((sum, account) => sum + (account.current_balance ?? account.initial_balance ?? 0), 0)
+	const totalInitialBalance = (accounts ?? []).reduce((sum, account) => sum + (account.initial_balance ?? 0), 0)
+	const positiveAccounts = (accounts ?? []).filter(account => (account.current_balance ?? account.initial_balance ?? 0) > 0)
+	const negativeAccounts = (accounts ?? []).filter(account => (account.current_balance ?? account.initial_balance ?? 0) < 0)
+	const balanceDifference = totalCurrentBalance - totalInitialBalance
 	
 	return (
 		<Card className="border-border/50 dark:border-border/20">
@@ -119,16 +133,28 @@ function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
 				</CardTitle>
 			</CardHeader>
 			<CardContent>
-				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+				<div className="grid grid-cols-1 md:grid-cols-4 gap-4">
 					<div className="text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5">
 						<DollarSign className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
-						<p className="text-sm font-medium text-muted-foreground">Balance Total</p>
-						<p className="text-2xl font-bold text-foreground">${totalBalance.toLocaleString()}</p>
+						<p className="text-sm font-medium text-muted-foreground">Balance Actual</p>
+						<p className="text-2xl font-bold text-foreground">${totalCurrentBalance.toLocaleString()}</p>
+						{totalInitialBalance !== totalCurrentBalance && (
+							<p className="text-xs text-muted-foreground mt-1">
+								Inicial: ${totalInitialBalance.toLocaleString()}
+							</p>
+						)}
 					</div>
 					<div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
 						<TrendingUp className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
 						<p className="text-sm font-medium text-muted-foreground">Cuentas Positivas</p>
 						<p className="text-2xl font-bold text-foreground">{positiveAccounts?.length ?? 0}</p>
+					</div>
+					<div className="text-center p-4 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 dark:from-orange-500/5 dark:to-red-500/5">
+						<TrendingDown className="h-6 w-6 mx-auto mb-2 text-orange-600 dark:text-orange-400" />
+						<p className="text-sm font-medium text-muted-foreground">Diferencia Total</p>
+						<p className={`text-2xl font-bold ${balanceDifference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+							{balanceDifference >= 0 ? '+' : ''}${balanceDifference.toLocaleString()}
+						</p>
 					</div>
 					<div className="text-center p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5">
 						<CreditCard className="h-6 w-6 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
@@ -284,7 +310,7 @@ export default function AccountsPage() {
 							icon: <TrendingUp className="h-4 w-4" />, 
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{Array.isArray(accounts) && accounts.filter(account => account.initial_balance > 0).map((account) => (
+									{Array.isArray(accounts) && accounts.filter(account => (account.current_balance ?? account.initial_balance ?? 0) > 0).map((account) => (
 										<AccountCard key={account.id} account={account} />
 									))}
 								</div>
@@ -296,7 +322,7 @@ export default function AccountsPage() {
 							icon: <TrendingDown className="h-4 w-4" />, 
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{Array.isArray(accounts) && accounts.filter(account => account.initial_balance < 0).map((account) => (
+									{Array.isArray(accounts) && accounts.filter(account => (account.current_balance ?? account.initial_balance ?? 0) < 0).map((account) => (
 										<AccountCard key={account.id} account={account} />
 									))}
 								</div>
