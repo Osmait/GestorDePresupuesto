@@ -11,7 +11,7 @@ export class AccountRepository extends BaseRepository {
         ...item.account_info,
         current_balance: item.current_balance,
       }));
-      
+     console.log(accounts);
       return accounts;
     } catch (error) {
       console.error("Error fetching accounts:", error);

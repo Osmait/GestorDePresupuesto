@@ -1,5 +1,4 @@
 "use client";
-import { useAccounts } from '@/hooks/useRepositories';
 import { useAuth } from '@/hooks/useRepositories';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -19,8 +18,15 @@ const accountSchema = z.object({
 });
 type AccountFormValues = z.infer<typeof accountSchema>;
 
-export function AccountFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boolean) => void }) {
-  const { createAccount, isLoading, error } = useAccounts();
+type AccountFormModalProps = {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  createAccount: (name: string, bank: string, initial_balance: number) => Promise<void>;
+  isLoading: boolean;
+  error: string | null;
+};
+
+export function AccountFormModal({ open, setOpen, createAccount, isLoading, error }: AccountFormModalProps) {
   const { user } = useAuth();
   const [success, setSuccess] = useState(false);
   const form = useForm<AccountFormValues>({

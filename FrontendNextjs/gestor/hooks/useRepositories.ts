@@ -25,7 +25,7 @@ export function useAccounts() {
 			setError(null)
 			const accountRepository = await getAccountRepository()
 			const data = await accountRepository.findAll()
-			setAccounts(data)
+			setAccounts(Array.isArray(data) ? [...data] : [])
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error loading accounts')
 		} finally {

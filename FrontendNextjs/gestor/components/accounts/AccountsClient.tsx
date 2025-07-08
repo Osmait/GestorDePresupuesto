@@ -34,7 +34,7 @@ import {
 } from 'lucide-react';
 
 export default function AccountsClient() {
-  const { accounts, isLoading } = useAccounts();
+  const { accounts, isLoading, createAccount, error } = useAccounts();
   const [modalOpen, setModalOpen] = useState(false);
 
   return (
@@ -56,7 +56,13 @@ export default function AccountsClient() {
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Nueva Cuenta
               </Button>
-              <AccountFormModal open={modalOpen} setOpen={setModalOpen} />
+              <AccountFormModal 
+                open={modalOpen} 
+                setOpen={setModalOpen}
+                createAccount={createAccount}
+                isLoading={isLoading}
+                error={error}
+              />
             </div>
           </div>
         </div>
