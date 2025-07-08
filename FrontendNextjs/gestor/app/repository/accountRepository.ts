@@ -6,6 +6,7 @@ export class AccountRepository {
 
   async findAll(): Promise<Account[]> {
     const token = Cookies.get("x-token");
+    console.log("token", token);
     const options = {
       headers: {
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
@@ -16,6 +17,7 @@ export class AccountRepository {
     try {
       const response = await fetch(`${this.url}/account`, options);
       const data = await response.json();
+      console.log("data", data);
       // Normalizar la respuesta para que sea un array de Account plano
       const accounts = data.map((item: any) => ({
         ...item.account_info,

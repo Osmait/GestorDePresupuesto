@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { getAuthRepository } from '@/lib/repositoryConfig'
+import { signIn } from "next-auth/react"
 
 // Schema de validación con Zod
 const loginSchema = z.object({
@@ -61,10 +61,18 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 			setError(null)
 
 			console.log('🔐 Iniciando login...')
-			const authRepository = await getAuthRepository()
-			const user = await authRepository.login(values.email, values.password)
+			const result = await signIn('credentials', {
+				email: values.email,
+				password: values.password,
+				redirect: false,
+			})
 
-			console.log('✅ Login exitoso:', user)
+			if (result?.error) {
+				setError('Credenciales inválidas')
+				return
+			}
+
+			console.log('✅ Login exitoso')
 			
 			// Redirigir al dashboard
 			router.push('/app')
