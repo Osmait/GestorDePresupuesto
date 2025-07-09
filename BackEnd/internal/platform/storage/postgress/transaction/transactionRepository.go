@@ -20,14 +20,14 @@ func NewTransactionRepository(db *sql.DB) *TransactionRepository {
 }
 
 func (repo *TransactionRepository) Save(ctx context.Context, transaction *transaction.Transaction) error {
-	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId)
+	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId)
 
 	return err
 }
 
 func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,created_at FROM transactions WHERE  user_id = $1 and created_at BETWEEN $2 and $3 ", id, date1, date2)
+		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,created_at FROM transactions WHERE  user_id = $1 and created_at BETWEEN $2 and $3 ", id, date1, date2)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +41,11 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, dat
 	var transactions []*transaction.Transaction
 	for rows.Next() {
 		transaction := transaction.Transaction{}
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CreatedAt); err == nil {
+		var budgetId sql.NullString
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetId, &transaction.CreatedAt); err == nil {
+			if budgetId.Valid {
+				transaction.BudgetId = budgetId.String
+			}
 			transactions = append(transactions, &transaction)
 		}
 
@@ -55,7 +59,7 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, dat
 
 func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,created_at FROM transactions WHERE  account_id = $1 and created_at BETWEEN $2 and $3 ", id, date1, date2)
+		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,created_at FROM transactions WHERE  account_id = $1 and created_at BETWEEN $2 and $3 ", id, date1, date2)
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +73,11 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	var transactions []*transaction.Transaction
 	for rows.Next() {
 		transaction := transaction.Transaction{}
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CreatedAt); err == nil {
+		var budgetId sql.NullString
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetId, &transaction.CreatedAt); err == nil {
+			if budgetId.Valid {
+				transaction.BudgetId = budgetId.String
+			}
 			transactions = append(transactions, &transaction)
 		}
 

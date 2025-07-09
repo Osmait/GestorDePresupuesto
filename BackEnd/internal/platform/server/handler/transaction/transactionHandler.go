@@ -21,7 +21,6 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			ctx.JSON(http.StatusBadRequest, "Error fields required ")
 			return
 		}
-		fmt.Println("transactionRequest", transactionRequest.TypeTransation)
 		err := transactionservice.CreateTransaction(
 			ctx,
 			transactionRequest.Name,
@@ -63,6 +62,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
+		fmt.Println("transactionsList", transactionsList[0].CategoryId)
 
 		ctx.JSON(http.StatusOK, transactionsList)
 	}

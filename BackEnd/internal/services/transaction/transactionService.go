@@ -40,7 +40,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpi
 	if budgetId != "" {
 		transaction.BudgetId = budgetId
 	}
-	fmt.Println("transaction", transaction.TypeTransation)
+	fmt.Println("transaction", transaction.CategoryId)
 
 	err = s.transactionRepository.Save(ctx, transaction)
 

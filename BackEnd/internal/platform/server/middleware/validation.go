@@ -88,12 +88,12 @@ func (vm *ValidationMiddleware) validateRequestBody(c *gin.Context, structType s
 		}{}
 	case "TransactionRequest":
 		requestStruct = &struct {
-			Name        string  `json:"name" validate:"required,min=1,max=200,printascii"`
-			Description string  `json:"description" validate:"max=500"`
-			Type        string  `json:"type" validate:"required,transaction_type"`
-			Amount      float64 `json:"amount" validate:"required,positive_amount"`
-			AccountId   string  `json:"account_id" validate:"required,min=1,max=100"`
-			CategoryId  string  `json:"category_id" validate:"required,min=1,max=100"`
+			Name           string  `json:"name" validate:"required,min=1,max=200,printascii"`
+			Description    string  `json:"description" validate:"max=500"`
+			TypeTransation string  `json:"type_transation" validate:"required,transaction_type"`
+			Amount         float64 `json:"amount" validate:"required,positive_amount"`
+			AccountId      string  `json:"account_id" validate:"required,min=1,max=100"`
+			CategoryId     string  `json:"category_id" validate:"required,min=1,max=100"`
 		}{}
 	case "CategoryRequest":
 		requestStruct = &struct {

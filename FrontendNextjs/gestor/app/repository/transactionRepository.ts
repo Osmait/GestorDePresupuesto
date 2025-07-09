@@ -52,6 +52,7 @@ export class TransactionRepository extends BaseRepository {
       const body = this.buildTransactionBody(
         name, description, amount, typeTransaction, account_id, category_id, budget_id
       );
+      console.log("body", body);
       const data = await this.post("/transaction", body);
       console.log("transaction created", data);
     } catch (error) {

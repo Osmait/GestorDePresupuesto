@@ -81,7 +81,6 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).lastName = token.lastName as string;
         (session as any).accessToken = token.accessToken as string
       }
-      console.log("session", session);
       return session
     },
   },
