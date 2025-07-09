@@ -1,6 +1,6 @@
 'use client'
 import { useState } from 'react'
-import { useCategories } from '@/hooks/useRepositories'
+import { useCategories, useTransactions } from '@/hooks/useRepositories'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -41,8 +41,13 @@ function LoadingSpinner() {
 
 // Server Component para CategoryCard
 function CategoryCard({ category, transactions }: CategoryCardProps) {
+	console.log("category", category)
+	console.log("transactions", transactions)
 	const categoryTransactions = transactions.filter(t => t.category_id === category.id)
-	const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
+	
+	console.log(`CategoryCard "${category.name}": ${categoryTransactions.length} transacciones encontradas`)
+	
+	const totalAmount = categoryTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
 	
 	return (
 		<Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
@@ -240,8 +245,57 @@ function CategoryFormModal({ open, setOpen }: { open: boolean, setOpen: (v: bool
 }
 
 export default function CategoriesPage() {
-	const { categories, isLoading } = useCategories()
+	const { categories, isLoading: isLoadingCategories } = useCategories()
+	const { transactions, isLoading: isLoadingTransactions } = useTransactions()
 	const [modalOpen, setModalOpen] = useState(false)
+
+	const isLoading = isLoadingCategories || isLoadingTransactions
+
+	// Debug logs detallados
+	console.log('=== DEBUGGING CATEGORIAS Y TRANSACCIONES ===')
+	console.log('Categories:', categories.map(c => ({ id: c.id, name: c.name })))
+	console.log('Transactions:', transactions.map(t => ({ 
+		id: t.id, 
+		name: t.name, 
+		category_id: t.category_id,
+		category_id_type: typeof t.category_id 
+	})))
+	
+	// Comparar IDs
+	if (categories.length > 0 && transactions.length > 0) {
+		console.log('=== COMPARACION DE IDS ===')
+		categories.forEach(category => {
+			const matchingTransactions = transactions.filter(t => t.category_id === category.id)
+			console.log(`Categoria "${category.name}" (ID: ${category.id}, type: ${typeof category.id}) tiene ${matchingTransactions.length} transacciones`)
+			if (matchingTransactions.length > 0) {
+				console.log('  - Transacciones:', matchingTransactions.map(t => t.name))
+			}
+		})
+		
+		// Verificar transacciones sin categoría válida
+		const transactionsWithoutValidCategory = transactions.filter(t => 
+			!categories.some(c => c.id === t.category_id)
+		)
+		if (transactionsWithoutValidCategory.length > 0) {
+			console.log('=== TRANSACCIONES SIN CATEGORIA VALIDA ===')
+			console.log('Transacciones sin categoría válida:', transactionsWithoutValidCategory.map(t => ({
+				name: t.name,
+				category_id: t.category_id,
+				category_id_type: typeof t.category_id
+			})))
+		}
+	}
+	
+	if (isLoading) {
+		return (
+			<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20 flex items-center justify-center">
+				<div className="text-center">
+					<Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
+					<p className="text-muted-foreground">Cargando categorías y transacciones...</p>
+				</div>
+			</div>
+		)
+	}
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
@@ -273,7 +327,7 @@ export default function CategoriesPage() {
 
 				{/* Resumen de categorías */}
 				<div className="mb-8">
-					<CategorySummaryCard categories={categories} transactions={[]} />
+					<CategorySummaryCard categories={categories} transactions={transactions} />
 				</div>
 
 				{/* Contenido principal con tabs */}
@@ -290,7 +344,7 @@ export default function CategoriesPage() {
 										<CategoryCard 
 											key={category.id} 
 											category={category} 
-											transactions={[]} 
+											transactions={transactions} 
 										/>
 									))}
 								</div>
