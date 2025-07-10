@@ -80,7 +80,7 @@ export default function TransactionsClient() {
     setFiltered(null);
   }
 
-  const shownTransactions = filtered ? filtered : (Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, 10) : []);
+  const shownTransactions = filtered ? filtered : (Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []);
 
   useEffect(() => {
     applyFilters();

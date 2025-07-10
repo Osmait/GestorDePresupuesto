@@ -120,11 +120,12 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
                 <FormItem>
                   <FormLabel>Tipo</FormLabel>
                   <FormControl>
-                    <Select value={String(field.value)} onValueChange={v => field.onChange(Number(v))}>
+                    <Select value={field.value} onValueChange={v => {
+                      field.onChange(v)}}>
                       <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={String(TypeTransaction.INCOME)}>Ingreso</SelectItem>
-                        <SelectItem value={String(TypeTransaction.BILL)}>Gasto</SelectItem>
+                        <SelectItem value={TypeTransaction.INCOME}>Ingreso</SelectItem>
+                        <SelectItem value={TypeTransaction.BILL}>Gasto</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>

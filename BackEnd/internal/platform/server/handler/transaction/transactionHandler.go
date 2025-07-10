@@ -50,7 +50,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 			currentTime := time.Now()
 			// Use proper date arithmetic to avoid negative days
 			date1Time := currentTime.AddDate(0, 0, -7) // 7 days ago
-			date2Time := currentTime.AddDate(0, 0, 1)  // 1 day from now
+			date2Time := currentTime.AddDate(0, 0, 2)  // 1 day from now
 
 			// Format dates properly
 			date1 = fmt.Sprintf("%d/%d/%d", date1Time.Year(), date1Time.Month(), date1Time.Day())
@@ -62,7 +62,12 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
-		fmt.Println("transactionsList", transactionsList[0].CategoryId)
+		fmt.Println("transactionsList", transactionsList)
+		for i := range transactionsList {
+			if transactionsList[i].TypeTransation == "income" {
+				fmt.Printf("Transaction %d: %+v\n", i, transactionsList[i])
+			}
+		}
 
 		ctx.JSON(http.StatusOK, transactionsList)
 	}
