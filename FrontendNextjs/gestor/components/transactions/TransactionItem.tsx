@@ -59,13 +59,14 @@ export default function TransactionItem({ transaction, category, onTransactionDe
             </div>
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
-                <p className="font-semibold text-foreground">{transaction.description}</p>
+                <p className="font-semibold text-foreground">{transaction.name}</p>
                 {category && (
                   <Badge variant="outline" className="text-xs border-muted-foreground/30 bg-muted/30 dark:bg-muted/20">
                     {category.icon} {category.name}
                   </Badge>
                 )}
               </div>
+              <p className="text-sm text-muted-foreground mb-1">{transaction.description}</p>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
                 <Calendar className="h-3 w-3" />
                 {new Date(transaction.created_at).toLocaleDateString('es-ES', {
@@ -114,7 +115,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
           <DialogHeader>
             <DialogTitle>Eliminar Transacción</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que quieres eliminar la transacción "{transaction.description}"? 
+              ¿Estás seguro de que quieres eliminar la transacción "{transaction.name}"? 
               Esta acción no se puede deshacer y eliminará todos los datos asociados.
             </DialogDescription>
           </DialogHeader>
