@@ -72,8 +72,8 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 	return trasanctionResponseList, nil
 }
 
-func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, date string, date2 string, id string) ([]*dto.TransactionResponse, error) {
-	transactionList, err := s.transactionRepository.FindAllOfAllAccounts(ctx, date, date2, id)
+func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, id string) ([]*dto.TransactionResponse, error) {
+	transactionList, err := s.transactionRepository.FindAllOfAllAccounts(ctx, id)
 	if err != nil {
 		return nil, err
 	}

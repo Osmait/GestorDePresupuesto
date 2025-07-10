@@ -57,7 +57,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 			date2 = fmt.Sprintf("%d/%d/%d", date2Time.Year(), date2Time.Month(), date2Time.Day())
 		}
 
-		transactionsList, err := transactionService.FindAllOfAllAccounts(ctx, date1, date2, userId)
+		transactionsList, err := transactionService.FindAllOfAllAccounts(ctx, userId)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
