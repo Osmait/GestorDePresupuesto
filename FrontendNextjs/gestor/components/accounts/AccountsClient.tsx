@@ -1,19 +1,10 @@
 "use client";
 import { useState } from 'react';
 import { useAccounts } from '@/hooks/useRepositories';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import * as z from 'zod';
-import { Input } from '@/components/ui/input';
-import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
-import { useAuth } from '@/hooks/useRepositories';
-import { AlertCircle, Loader2, PlusCircle } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { PlusCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AnimatedTabs } from '@/components/common/animated-tabs';
-import { Avatar, AvatarFallback} from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { AccountCard } from '@/components/accounts/AccountCard';
 import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard';
@@ -21,21 +12,96 @@ import { AccountFormModal } from '@/components/accounts/AccountFormModal';
 import { AccountSummarySkeleton } from '@/components/accounts/AccountSummarySkeleton';
 import { AccountCardSkeleton } from '@/components/accounts/AccountCardSkeleton';
 import { 
-	CreditCard, 
-	DollarSign, 
-	PlusCircle as LucidePlusCircle, 
-	Building, 
 	TrendingUp,
 	TrendingDown,
-	Wallet,
-	ArrowUpRight,
-	ArrowDownRight,
-	MoreHorizontal
-} from 'lucide-react';
+	Wallet} from 'lucide-react';
 
 export default function AccountsClient() {
-  const { accounts, isLoading, createAccount, error } = useAccounts();
+  const { accounts, isLoading, createAccount, deleteAccount, error } = useAccounts();
   const [modalOpen, setModalOpen] = useState(false);
+
+  // Helper function to get account balance
+  const getAccountBalance = (account: any) => 
+    account.current_balance ?? account.initial_balance ?? 0;
+
+  // Filter functions
+  const getFilteredAccounts = (filter: 'all' | 'positive' | 'negative') => {
+    if (!Array.isArray(accounts)) return [];
+    
+    switch (filter) {
+      case 'positive':
+        return accounts.filter(account => getAccountBalance(account) > 0);
+      case 'negative':
+        return accounts.filter(account => getAccountBalance(account) < 0);
+      default:
+        return accounts;
+    }
+  };
+
+  // Render content for each tab
+  const renderTabContent = (filter: 'all' | 'positive' | 'negative', skeletonCount = 3) => {
+    const filteredAccounts = getFilteredAccounts(filter);
+    const emptyMessages = {
+      all: 'No tienes cuentas registradas.',
+      positive: 'No tienes cuentas positivas.',
+      negative: 'No tienes cuentas negativas.'
+    };
+
+    if (isLoading) {
+      return (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[...Array(skeletonCount)].map((_, i) => (
+            <AccountCardSkeleton key={i} />
+          ))}
+        </div>
+      );
+    }
+
+    if (filteredAccounts.length === 0) {
+      return (
+        <div className="text-center text-muted-foreground py-8">
+          {emptyMessages[filter]}
+        </div>
+      );
+    }
+
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {filteredAccounts.map((account) => (
+          <AccountCard 
+            key={account.id} 
+            account={account} 
+            onAccountDeleted={() => deleteAccount(account.id!)} 
+          />
+        ))}
+      </div>
+    );
+  };
+
+  // Tab configuration
+  const tabsConfig = [
+    {
+      value: 'all',
+      label: 'Todas',
+      icon: <Wallet className="h-4 w-4" />,
+      filter: 'all' as const,
+      skeletonCount: 3
+    },
+    {
+      value: 'positive',
+      label: 'Positivas',
+      icon: <TrendingUp className="h-4 w-4" />,
+      filter: 'positive' as const,
+      skeletonCount: 2
+    },
+    {
+      value: 'negative',
+      label: 'Negativas',
+      icon: <TrendingDown className="h-4 w-4" />,
+      filter: 'negative' as const,
+      skeletonCount: 1
+    }
+  ];
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
@@ -82,62 +148,12 @@ export default function AccountsClient() {
         <AnimatedTabs
           defaultValue="all"
           className="space-y-6"
-          tabs={[
-            {
-              value: 'all',
-              label: 'Todas',
-              icon: <Wallet className="h-4 w-4" />, 
-              content: isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(3)].map((_, i) => <AccountCardSkeleton key={i} />)}
-                </div>
-              ) : Array.isArray(accounts) && accounts.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {accounts.map((account) => (
-                    <AccountCard key={account.id} account={account} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground py-8">No tienes cuentas registradas.</div>
-              )
-            },
-            {
-              value: 'positive',
-              label: 'Positivas',
-              icon: <TrendingUp className="h-4 w-4" />, 
-              content: isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(2)].map((_, i) => <AccountCardSkeleton key={i} />)}
-                </div>
-              ) : Array.isArray(accounts) && accounts.filter(account => (account.current_balance ?? account.initial_balance ?? 0) > 0).length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {accounts.filter(account => (account.current_balance ?? account.initial_balance ?? 0) > 0).map((account) => (
-                    <AccountCard key={account.id} account={account} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground py-8">No tienes cuentas positivas.</div>
-              )
-            },
-            {
-              value: 'negative',
-              label: 'Negativas',
-              icon: <TrendingDown className="h-4 w-4" />, 
-              content: isLoading ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {[...Array(1)].map((_, i) => <AccountCardSkeleton key={i} />)}
-                </div>
-              ) : Array.isArray(accounts) && accounts.filter(account => (account.current_balance ?? account.initial_balance ?? 0) < 0).length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {accounts.filter(account => (account.current_balance ?? account.initial_balance ?? 0) < 0).map((account) => (
-                    <AccountCard key={account.id} account={account} />
-                  ))}
-                </div>
-              ) : (
-                <div className="text-center text-muted-foreground py-8">No tienes cuentas negativas.</div>
-              )
-            },
-          ]}
+          tabs={tabsConfig.map(tab => ({
+            value: tab.value,
+            label: tab.label,
+            icon: tab.icon,
+            content: renderTabContent(tab.filter, tab.skeletonCount)
+          }))}
         />
 
         {/* Información de desarrollo */}

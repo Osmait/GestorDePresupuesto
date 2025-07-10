@@ -3,18 +3,51 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Building, ArrowUpRight, ArrowDownRight, MoreHorizontal } from 'lucide-react';
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Building, ArrowUpRight, ArrowDownRight, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { Account } from '@/types/account';
+import { useState } from 'react';
 
 interface AccountCardProps {
   account: Account;
+  onAccountDeleted?: () => void;
 }
 
-export function AccountCard({ account }: AccountCardProps) {
+export function AccountCard({ account, onAccountDeleted }: AccountCardProps) {
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  
   const currentBalance = account.current_balance ?? account.initial_balance ?? 0;
   const initialBalance = account.initial_balance ?? 0;
   const isPositive = currentBalance > 0;
   const hasGrowth = currentBalance > initialBalance;
+
+  const handleDeleteAccount = async () => {
+    if (!account.id || !onAccountDeleted) return;
+    
+    setIsDeleting(true);
+    try {
+      await onAccountDeleted();
+      setShowDeleteDialog(false);
+    } catch (error) {
+      console.error('Error deleting account:', error);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
     <Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
@@ -34,9 +67,26 @@ export function AccountCard({ account }: AccountCardProps) {
               </p>
             </div>
           </div>
-          <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+                <Edit className="h-4 w-4" />
+                Editar cuenta
+              </DropdownMenuItem>
+              <DropdownMenuItem 
+                className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                onClick={() => setShowDeleteDialog(true)}
+              >
+                <Trash2 className="h-4 w-4" />
+                Eliminar cuenta
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div className="space-y-3">
           <div className="flex justify-between items-center">
@@ -68,6 +118,34 @@ export function AccountCard({ account }: AccountCardProps) {
           </div>
         </div>
       </CardContent>
+
+      <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Eliminar Cuenta</DialogTitle>
+            <DialogDescription>
+              ¿Estás seguro de que quieres eliminar la cuenta "{account.name}"? 
+              Esta acción no se puede deshacer y eliminará todos los datos asociados.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => setShowDeleteDialog(false)}
+              disabled={isDeleting}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={handleDeleteAccount}
+              disabled={isDeleting}
+            >
+              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 } 
