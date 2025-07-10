@@ -3,7 +3,7 @@ import { useAccounts, useCategories, useTransactions, useBudgets } from '@/hooks
 import { useState, useEffect, useRef } from 'react';
 import { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
-import { Filter, PlusCircle } from 'lucide-react';
+import { Filter, PlusCircle, CreditCard, TrendingUp, TrendingDown } from 'lucide-react';
 import { CalendarDateRangePicker } from '@/components/date-range-picker';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
@@ -15,7 +15,7 @@ import TransactionFormModal from '@/components/transactions/TransactionFormModal
 import { Transaction, TypeTransaction } from '@/types/transaction';
 
 export default function TransactionsClient() {
-  const { transactions, isLoading: isLoadingTx, createTransaction, isLoading, error } = useTransactions();
+  const { transactions, isLoading: isLoadingTx, createTransaction, deleteTransaction, isLoading, error } = useTransactions();
   const { categories, isLoading: isLoadingCat } = useCategories();
   const { accounts, isLoading: isLoadingAcc } = useAccounts();
   const { budgets } = useBudgets();
@@ -81,6 +81,45 @@ export default function TransactionsClient() {
   }
 
   const shownTransactions = filtered ? filtered : (Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []);
+
+  // Helper function to render transaction list
+  const renderTransactionList = (transactionList: Transaction[]) => (
+    <div className="space-y-4">
+      {transactionList.map((transaction) => {
+        const category = categories.find(c => c.id === transaction.category_id);
+        return (
+          <TransactionItem
+            key={transaction.id}
+            transaction={transaction}
+            category={category}
+            onTransactionDeleted={() => deleteTransaction(transaction.id!)}
+          />
+        );
+      })}
+    </div>
+  );
+
+  // Tab configuration
+  const tabsConfig = [
+    {
+      value: 'all',
+      label: 'Todas',
+      icon: <CreditCard className="h-4 w-4" />,
+      transactionList: shownTransactions
+    },
+    {
+      value: 'income',
+      label: 'Ingresos',
+      icon: <TrendingUp className="h-4 w-4" />,
+      transactionList: incomeTransactions
+    },
+    {
+      value: 'expense',
+      label: 'Gastos',
+      icon: <TrendingDown className="h-4 w-4" />,
+      transactionList: expenseTransactions
+    }
+  ];
 
   useEffect(() => {
     applyFilters();
@@ -218,65 +257,12 @@ export default function TransactionsClient() {
         {/* Contenido principal con tabs */}
         <AnimatedTabs
           defaultValue="all"
-          tabs={[
-            {
-              value: 'all',
-              label: 'Todas',
-              icon: <span className="inline-block"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 3v18m9-9H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>,
-              content: (
-                <div className="space-y-4">
-                  {Array.isArray(shownTransactions) ? shownTransactions.map((transaction) => {
-                    const category = categories.find(c => c.id === transaction.category_id);
-                    return (
-                      <TransactionItem
-                        key={transaction.id}
-                        transaction={transaction}
-                        category={category}
-                      />
-                    );
-                  }) : []}
-                </div>
-              )
-            },
-            {
-              value: 'income',
-              label: 'Ingresos',
-              icon: <span className="inline-block"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 3v18m9-9H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>,
-              content: (
-                <div className="space-y-4">
-                  {Array.isArray(incomeTransactions) ? incomeTransactions.map((transaction) => {
-                    const category = categories.find(c => c.id === transaction.category_id);
-                    return (
-                      <TransactionItem
-                        key={transaction.id}
-                        transaction={transaction}
-                        category={category}
-                      />
-                    );
-                  }) : []}
-                </div>
-              )
-            },
-            {
-              value: 'expense',
-              label: 'Gastos',
-              icon: <span className="inline-block"><svg width="20" height="20" fill="none" viewBox="0 0 24 24"><path d="M12 3v18m9-9H3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/></svg></span>,
-              content: (
-                <div className="space-y-4">
-                  {Array.isArray(expenseTransactions) ? expenseTransactions.map((transaction) => {
-                    const category = categories.find(c => c.id === transaction.category_id);
-                    return (
-                      <TransactionItem
-                        key={transaction.id}
-                        transaction={transaction}
-                        category={category}
-                      />
-                    );
-                  }) : []}
-                </div>
-              )
-            },
-          ]}
+          tabs={tabsConfig.map(tab => ({
+            value: tab.value,
+            label: tab.label,
+            icon: tab.icon,
+            content: renderTransactionList(tab.transactionList)
+          }))}
         />
       </div>
     </div>
