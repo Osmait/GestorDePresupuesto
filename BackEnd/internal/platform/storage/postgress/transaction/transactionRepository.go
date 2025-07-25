@@ -3,10 +3,9 @@ package postgress
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/rs/zerolog/log"
 )
 
 type TransactionRepository struct {
@@ -34,7 +33,7 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id 
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 
@@ -66,7 +65,7 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 
@@ -99,7 +98,7 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 	var currentBudget float64
@@ -109,7 +108,7 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 		}
 	}
 	if err = rows.Err(); err != nil {
-		fmt.Println(err)
+		log.Error().Err(err).Msg("error iterating over budget rows")
 		return 0, err
 	}
 

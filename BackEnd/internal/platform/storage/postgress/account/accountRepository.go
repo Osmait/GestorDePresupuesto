@@ -3,10 +3,9 @@ package postgress
 import (
 	"context"
 	"database/sql"
-	"fmt"
-	"log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
+	"github.com/rs/zerolog/log"
 )
 
 type AccountRepository struct {
@@ -32,7 +31,7 @@ func (repo *AccountRepository) FindAll(ctx context.Context, userId string) ([]*a
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 	var accounts []*account.Account
@@ -63,7 +62,7 @@ func (repo *AccountRepository) Balance(ctx context.Context, id string) (float64,
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 	var total float64
@@ -73,7 +72,7 @@ func (repo *AccountRepository) Balance(ctx context.Context, id string) (float64,
 		}
 	}
 	if err = rows.Err(); err != nil {
-		fmt.Println(err)
+		log.Error().Err(err).Msg("error iterating over account balance rows")
 		return 0, err
 	}
 

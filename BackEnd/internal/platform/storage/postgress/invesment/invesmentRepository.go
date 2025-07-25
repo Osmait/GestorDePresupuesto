@@ -2,9 +2,9 @@ package postgress
 
 import (
 	"database/sql"
-	"log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/invesment"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/net/context"
 )
 
@@ -33,7 +33,7 @@ func (i *InvesmentRepository) FindAll(ctx context.Context, userId string) ([]*in
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 
@@ -59,7 +59,7 @@ func (i *InvesmentRepository) FindOne(ctx context.Context, id string) (*invesmen
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 

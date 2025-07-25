@@ -3,9 +3,9 @@ package postgress
 import (
 	"context"
 	"database/sql"
-	"log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
+	"github.com/rs/zerolog/log"
 )
 
 type BudgetRepository struct {
@@ -32,7 +32,7 @@ func (b *BudgetRepository) FindAll(ctx context.Context, userId string) ([]*budge
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 
@@ -59,7 +59,7 @@ func (b *BudgetRepository) FindOne(ctx context.Context, id string) (*budget.Budg
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 

@@ -2,13 +2,13 @@ package auth
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 	authRequest "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -38,7 +38,7 @@ func (a *AuthService) Login(ctx context.Context, authRequest *authRequest.AuthRe
 		return nil, errorhttp.ErrBadRequest
 	}
 
-	fmt.Println(user.Id)
+	log.Debug().Str("user_id", user.Id).Msg("user authenticated successfully")
 	token, err := utils.JwtCreate(user.Id, a.config.JWT.Secret)
 	if err != nil {
 		return nil, err

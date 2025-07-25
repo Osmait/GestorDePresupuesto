@@ -9,6 +9,7 @@ import (
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	errorHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
+	"github.com/rs/zerolog/log"
 )
 
 func CreateTransaction(transactionservice *transaction.TransactionService) gin.HandlerFunc {
@@ -62,12 +63,16 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
-		fmt.Println("transactionsList", transactionsList)
-		for i := range transactionsList {
-			if transactionsList[i].TypeTransation == "income" {
-				fmt.Printf("Transaction %d: %+v\n", i, transactionsList[i])
+		log.Debug().Int("total_transactions", len(transactionsList)).Msg("retrieved all transactions")
+		
+		// Count income transactions for debug
+		incomeCount := 0
+		for _, t := range transactionsList {
+			if t.TypeTransation == "income" {
+				incomeCount++
 			}
 		}
+		log.Debug().Int("income_transactions", incomeCount).Msg("income transactions found")
 
 		ctx.JSON(http.StatusOK, transactionsList)
 	}

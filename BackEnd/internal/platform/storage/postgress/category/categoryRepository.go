@@ -3,9 +3,9 @@ package postgress
 import (
 	"context"
 	"database/sql"
-	"log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
+	"github.com/rs/zerolog/log"
 )
 
 type CategoryRespository struct {
@@ -32,7 +32,7 @@ func (c *CategoryRespository) FindAll(ctx context.Context, userId string) ([]*ca
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 
@@ -58,7 +58,7 @@ func (c *CategoryRespository) FindOne(ctx context.Context, id string) (*category
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 

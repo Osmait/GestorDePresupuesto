@@ -2,11 +2,11 @@ package transaction
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
+	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 )
 
@@ -40,7 +40,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpi
 	if budgetId != "" {
 		transaction.BudgetId = budgetId
 	}
-	fmt.Println("transaction", transaction.CategoryId)
+	log.Debug().Str("category_id", transaction.CategoryId).Msg("creating transaction")
 
 	err = s.transactionRepository.Save(ctx, transaction)
 
@@ -67,8 +67,8 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 		trasanctionResponseList = append(trasanctionResponseList, transactionResponse)
 
 	}
-	fmt.Println("trasanctionResponseList", trasanctionResponseList)
 
+	log.Debug().Int("count", len(trasanctionResponseList)).Msg("found transactions")
 	return trasanctionResponseList, nil
 }
 
