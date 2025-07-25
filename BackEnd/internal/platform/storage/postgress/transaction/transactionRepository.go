@@ -41,10 +41,10 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id 
 	var transactions []*transaction.Transaction
 	for rows.Next() {
 		transaction := transaction.Transaction{}
-		var budgetId sql.NullString
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetId, &transaction.CreatedAt); err == nil {
-			if budgetId.Valid {
-				transaction.BudgetId = budgetId.String
+		var budgetID sql.NullString
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetID, &transaction.CreatedAt); err == nil {
+			if budgetID.Valid {
+				transaction.BudgetId = budgetID.String
 			}
 			transactions = append(transactions, &transaction)
 		}
@@ -73,10 +73,10 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	var transactions []*transaction.Transaction
 	for rows.Next() {
 		transaction := transaction.Transaction{}
-		var budgetId sql.NullString
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetId, &transaction.CreatedAt); err == nil {
-			if budgetId.Valid {
-				transaction.BudgetId = budgetId.String
+		var budgetID sql.NullString
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetID, &transaction.CreatedAt); err == nil {
+			if budgetID.Valid {
+				transaction.BudgetId = budgetID.String
 			}
 			transactions = append(transactions, &transaction)
 		}
@@ -90,9 +90,9 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	return transactions, nil
 }
 
-func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetId string) (float64, error) {
+func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string) (float64, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT   sum(amount)  as currentBudget FROM  transactions   WHERE  budget_id = $1  ", budgetId)
+		"SELECT   sum(amount)  as currentBudget FROM  transactions   WHERE  budget_id = $1  ", budgetID)
 	if err != nil {
 		return 0, err
 	}

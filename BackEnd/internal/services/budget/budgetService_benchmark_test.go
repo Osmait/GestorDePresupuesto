@@ -53,8 +53,8 @@ func (m *MockTransactionBench) FindAll(ctx context.Context, date1 string, date2 
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
-func (m *MockTransactionBench) FindAllOfAllAccounts(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
-	args := m.Called(ctx, date1, date2, id)
+func (m *MockTransactionBench) FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, id)
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 

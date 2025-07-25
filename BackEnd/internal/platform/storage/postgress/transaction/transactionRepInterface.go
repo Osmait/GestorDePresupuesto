@@ -6,7 +6,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 )
 
-type TransactionRepsitoryinterface interface {
+type TransactionRepositoryInterface interface {
 	Save(ctx context.Context, transaction *transaction.Transaction) error
 	FindAll(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error)
 	FindCurrentBudget(ctx context.Context, budgetId string) (float64, error)

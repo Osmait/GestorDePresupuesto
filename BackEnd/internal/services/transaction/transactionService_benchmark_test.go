@@ -26,8 +26,8 @@ func (m *MockTransactionBench) FindAll(ctx context.Context, date1 string, date2 
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
-func (m *MockTransactionBench) FindAllOfAllAccounts(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
-	args := m.Called(ctx, date1, date2, id)
+func (m *MockTransactionBench) FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, id)
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
@@ -110,12 +110,7 @@ func BenchmarkTransactionService_FindAllOfAllAccounts(b *testing.B) {
 		testTransactions[i] = utils.GetNewRandomTransaction()
 	}
 
-	mockRepo.On("FindAllOfAllAccounts", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(testTransactions, nil)
-
-	// Generate date ranges
-	currentTime := time.Now()
-	date1 := fmt.Sprintf("%d/%d/%d", currentTime.Year(), currentTime.Month(), currentTime.Day()-30)
-	date2 := fmt.Sprintf("%d/%d/%d", currentTime.Year(), currentTime.Month(), currentTime.Day()+1)
+	mockRepo.On("FindAllOfAllAccounts", mock.Anything, mock.AnythingOfType("string")).Return(testTransactions, nil)
 
 	// Generate test user IDs
 	userIDs := make([]string, b.N)
@@ -126,7 +121,7 @@ func BenchmarkTransactionService_FindAllOfAllAccounts(b *testing.B) {
 	b.ResetTimer()
 
 	for i := 0; i < b.N; i++ {
-		_, _ = transactionService.FindAllOfAllAccounts(ctx, date1, date2, userIDs[i])
+		_, _ = transactionService.FindAllOfAllAccounts(ctx, userIDs[i])
 	}
 }
 
@@ -263,7 +258,7 @@ func BenchmarkTransactionService_HighConcurrency(b *testing.B) {
 	// Setup mock responses
 	testTransactions := []*transaction.Transaction{utils.GetNewRandomTransaction(), utils.GetNewRandomTransaction()}
 	mockRepo.On("FindAll", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(testTransactions, nil)
-	mockRepo.On("FindAllOfAllAccounts", mock.Anything, mock.AnythingOfType("string"), mock.AnythingOfType("string"), mock.AnythingOfType("string")).Return(testTransactions, nil)
+	mockRepo.On("FindAllOfAllAccounts", mock.Anything, mock.AnythingOfType("string")).Return(testTransactions, nil)
 	mockRepo.On("Save", mock.Anything, mock.Anything).Return(nil)
 	mockRepo.On("Delete", mock.Anything, mock.AnythingOfType("string")).Return(nil)
 
@@ -287,7 +282,7 @@ func BenchmarkTransactionService_HighConcurrency(b *testing.B) {
 			case 2:
 				_ = transactionService.DeleteTransaction(ctx, "transaction-test")
 			case 3:
-				_, _ = transactionService.FindAllOfAllAccounts(ctx, date1, date2, "user-test")
+				_, _ = transactionService.FindAllOfAllAccounts(ctx, "user-test")
 			}
 			i++
 		}

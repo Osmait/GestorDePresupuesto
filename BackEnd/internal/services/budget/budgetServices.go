@@ -6,20 +6,20 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/budget"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
-	trasanctionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
+	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/segmentio/ksuid"
 )
 
 type BudgetServices struct {
 	repository      budgetRepo.BudgetRepoInterface
-	transactionRepo trasanctionRepo.TransactionRepsitoryinterface
+	transactionRepo transactionRepo.TransactionRepositoryInterface
 }
 
-func NewBudgetServices(repo budgetRepo.BudgetRepoInterface, trasanctionRepo trasanctionRepo.TransactionRepsitoryinterface) *BudgetServices {
+func NewBudgetServices(repo budgetRepo.BudgetRepoInterface, transactionRepo transactionRepo.TransactionRepositoryInterface) *BudgetServices {
 	return &BudgetServices{
 		repository:      repo,
-		transactionRepo: trasanctionRepo,
+		transactionRepo: transactionRepo,
 	}
 }
 

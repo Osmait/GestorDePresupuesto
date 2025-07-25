@@ -240,7 +240,7 @@ func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 // repositories holds all repository interfaces
 type repositories struct {
 	accountRepository     accountRepo.AccountRepositoryInterface
-	transactionRepository transactionRepo.TransactionRepsitoryinterface
+	transactionRepository transactionRepo.TransactionRepositoryInterface
 	userRepository        userRepo.UserRepositoryInterface
 	budgetRepository      budgetRepo.BudgetRepoInterface
 	categoryRepository    categoryRepo.CategoryRepoInteface

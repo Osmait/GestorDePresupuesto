@@ -1,3 +1,5 @@
+// Package routes provides HTTP route definitions for the Gestor de Presupuesto application.
+// It contains route handlers for different entities including transactions, accounts, budgets, and categories.
 package routes
 
 import (
