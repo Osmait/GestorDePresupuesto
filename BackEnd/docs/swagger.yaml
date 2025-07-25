@@ -60,6 +60,46 @@ definitions:
         example: 1250.75
         type: number
     type: object
+  dto.CategoryRequest:
+    properties:
+      color:
+        example: '#FF6B6B'
+        maxLength: 7
+        minLength: 4
+        type: string
+      icon:
+        example: "\U0001F354"
+        maxLength: 50
+        minLength: 1
+        type: string
+      name:
+        example: Food & Dining
+        maxLength: 50
+        minLength: 2
+        type: string
+    required:
+    - color
+    - icon
+    - name
+    type: object
+  dto.CategoryResponse:
+    properties:
+      color:
+        example: '#FF6B6B'
+        type: string
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      icon:
+        example: "\U0001F354"
+        type: string
+      id:
+        example: cat_123456789
+        type: string
+      name:
+        example: Food & Dining
+        type: string
+    type: object
   dto.TransactionRequest:
     properties:
       account_id:
@@ -241,6 +281,123 @@ paths:
       summary: Delete an account
       tags:
       - Accounts
+  /category:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all categories for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of user categories
+          schema:
+            items:
+              $ref: '#/definitions/dto.CategoryResponse'
+            type: array
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Get all user categories
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      description: Create a new expense/income category for the authenticated user
+      parameters:
+      - description: Category creation data
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Category created successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Create a new category
+      tags:
+      - Categories
+  /category/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Category not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Delete a category
+      tags:
+      - Categories
   /login:
     post:
       consumes:
