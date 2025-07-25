@@ -243,7 +243,7 @@ type repositories struct {
 	transactionRepository transactionRepo.TransactionRepositoryInterface
 	userRepository        userRepo.UserRepositoryInterface
 	budgetRepository      budgetRepo.BudgetRepoInterface
-	categoryRepository    categoryRepo.CategoryRepoInteface
+	categoryRepository    categoryRepo.CategoryRepoInterface
 	invesmentRepository   invesmentRepo.InvesmentRepoInterface
 }
 
@@ -252,7 +252,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 	return &repositories{
 		accountRepository:     accountRepo.NewAccountRepository(db),
 		transactionRepository: transactionRepo.NewTransactionRepository(db),
-		userRepository:        userRepo.NewUserRespository(db),
+		userRepository:        userRepo.NewUserRepository(db),
 		budgetRepository:      budgetRepo.NewBudgetRepository(db),
 		categoryRepository:    categoryRepo.NewCategoryRepository(db),
 		invesmentRepository:   invesmentRepo.NewInvesmentRepository(db),

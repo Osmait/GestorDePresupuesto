@@ -16,7 +16,7 @@ func TestBudgetRepository(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup dependencies
-	userRepository := userRepo.NewUserRespository(db)
+	userRepository := userRepo.NewUserRepository(db)
 	categoryRepository := categoryRepo.NewCategoryRepository(db)
 	budgetRepository := budgetRepo.NewBudgetRepository(db)
 
@@ -96,7 +96,7 @@ func TestBudgetRepository_Multiple_Budgets(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup dependencies
-	userRepository := userRepo.NewUserRespository(db)
+	userRepository := userRepo.NewUserRepository(db)
 	categoryRepository := categoryRepo.NewCategoryRepository(db)
 	budgetRepository := budgetRepo.NewBudgetRepository(db)
 
@@ -165,7 +165,7 @@ func TestBudgetRepository_User_Isolation(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup dependencies
-	userRepository := userRepo.NewUserRespository(db)
+	userRepository := userRepo.NewUserRepository(db)
 	categoryRepository := categoryRepo.NewCategoryRepository(db)
 	budgetRepository := budgetRepo.NewBudgetRepository(db)
 

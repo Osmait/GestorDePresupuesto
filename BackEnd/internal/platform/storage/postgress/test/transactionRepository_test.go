@@ -21,7 +21,7 @@ func TestTransactionRepository(t *testing.T) {
 	ctx := context.Background()
 	transactionRepo := postgress.NewTransactionRepository(db)
 	accountRepo := accountRepo.NewAccountRepository(db)
-	userRepo := userRepo.NewUserRespository(db)
+	userRepo := userRepo.NewUserRepository(db)
 	categoryRepo := categoryRepo.NewCategoryRepository(db)
 	transaction := utils.GetNewRandomTransaction()
 	account := utils.GetNewRandomAccount()

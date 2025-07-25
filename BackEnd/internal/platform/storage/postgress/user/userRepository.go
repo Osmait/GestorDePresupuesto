@@ -3,7 +3,7 @@ package postgress
 import (
 	"context"
 	"database/sql"
-	"log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
@@ -13,7 +13,7 @@ type UserRepository struct {
 	db *sql.DB
 }
 
-func NewUserRespository(db *sql.DB) *UserRepository {
+func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
@@ -30,7 +30,7 @@ func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*us
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 
@@ -57,7 +57,7 @@ func (u *UserRepository) FindUserById(ctx context.Context, id string) (*user.Use
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Fatal(err)
+			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 	user := user.User{}

@@ -190,7 +190,7 @@ func (suite *E2ETestSuite) SetupSuite() {
 // setupServices initializes all services required for testing
 func (suite *E2ETestSuite) setupServices() {
 	// Repository layer
-	userRepository := userRepo.NewUserRespository(suite.db) // Note: this is the actual function name
+	userRepository := userRepo.NewUserRepository(suite.db) // Note: this is the actual function name
 	accountRepository := accountRepo.NewAccountRepository(suite.db)
 	categoryRepository := categoryRepo.NewCategoryRepository(suite.db)
 	budgetRepository := budgetRepo.NewBudgetRepository(suite.db)

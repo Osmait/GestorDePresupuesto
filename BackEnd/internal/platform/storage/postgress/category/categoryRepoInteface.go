@@ -6,7 +6,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
 )
 
-type CategoryRepoInteface interface {
+type CategoryRepoInterface interface {
 	Save(ctx context.Context, category *category.Category) error
 	FindAll(ctx context.Context, userId string) ([]*category.Category, error)
 	FindOne(ctx context.Context, id string) (*category.Category, error)

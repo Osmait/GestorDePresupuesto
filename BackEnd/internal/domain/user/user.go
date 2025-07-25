@@ -3,14 +3,14 @@ package user
 import "time"
 
 type User struct {
-	CreatedAt  time.Time `json:"created_at"`
-	Id         string    `json:"id"`
-	Name       string    `json:"name"`
-	LastName   string    `json:"last_name"`
-	Email      string    `json:"email"`
-	Password   string    `json:"password"`
-	Token      string    `json:"token"`
-	Confirmend string    `json:"confirmend"`
+	CreatedAt time.Time `json:"created_at"`
+	Id        string    `json:"id"`
+	Name      string    `json:"name"`
+	LastName  string    `json:"last_name"`
+	Email     string    `json:"email"`
+	Password  string    `json:"password"`
+	Token     string    `json:"token"`
+	Confirmed string    `json:"confirmed"`
 }
 
 func NewUser(id, name, lastName, email, password string) *User {

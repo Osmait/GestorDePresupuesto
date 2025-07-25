@@ -11,7 +11,7 @@ import (
 
 func TestUserRespo(t *testing.T) {
 	db := SetUpTest()
-	repo := postgress.NewUserRespository(db)
+	repo := postgress.NewUserRepository(db)
 	ctx := context.Background()
 	user := utils.GetNewRandomUser()
 	err := repo.Save(ctx, user)

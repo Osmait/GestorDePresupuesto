@@ -14,7 +14,7 @@ import (
 func TestAccountRepository(t *testing.T) {
 	db := SetUpTest()
 	ctx := context.Background()
-	userRepo := userRepo.NewUserRespository(db)
+	userRepo := userRepo.NewUserRepository(db)
 	user := utils.GetNewRandomUser()
 	err := userRepo.Save(ctx, user)
 	assert.NoError(t, err)

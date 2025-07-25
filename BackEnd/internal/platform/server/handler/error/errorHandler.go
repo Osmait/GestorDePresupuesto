@@ -16,7 +16,7 @@ func ReponseByTypeOfErr(err error, ctx *gin.Context) {
 		return
 	case errorhttp.IsErrNotBadRequest(err):
 		errorResponse := errorhttp.NewErroApp(http.StatusBadRequest, ctx.Request.URL.Path, err.Error(), time.Now())
-		ctx.AbortWithStatusJSON(http.StatusConflict, errorResponse)
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, errorResponse)
 		return
 	case errorhttp.IsErrNotFound(err):
 		errorResponse := errorhttp.NewErroApp(http.StatusNotFound, ctx.Request.URL.Path, err.Error(), time.Now())

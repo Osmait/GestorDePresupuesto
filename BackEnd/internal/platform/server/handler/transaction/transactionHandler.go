@@ -64,7 +64,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 			return
 		}
 		log.Debug().Int("total_transactions", len(transactionsList)).Msg("retrieved all transactions")
-		
+
 		// Count income transactions for debug
 		incomeCount := 0
 		for _, t := range transactionsList {

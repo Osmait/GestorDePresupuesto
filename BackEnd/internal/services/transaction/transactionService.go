@@ -24,7 +24,7 @@ func NewTransactionService(transactionRepository transactionRepo.TransactionRepo
 	}
 }
 
-func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpition string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string) error {
+func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
@@ -34,7 +34,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrpi
 		amount = amount * -1
 	}
 
-	transaction := transaction.NewTransaction(id, name, descrpition, typeTransaction, accountId, categoryId, amount)
+	transaction := transaction.NewTransaction(id, name, description, typeTransaction, accountId, categoryId, amount)
 	transaction.UserId = userId
 
 	if budgetId != "" {
@@ -53,7 +53,7 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 		return nil, err
 	}
 
-	var trasanctionResponseList []*dto.TransactionResponse
+	var transactionResponseList []*dto.TransactionResponse
 	for _, transaction := range transactionList {
 		transactionResponse := dto.NewTransactionResponse(transaction.Id,
 			transaction.Name,
@@ -64,12 +64,12 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 			transaction.Amount,
 			transaction.CreatedAt)
 		transactionResponse.BudgetId = transaction.BudgetId
-		trasanctionResponseList = append(trasanctionResponseList, transactionResponse)
+		transactionResponseList = append(transactionResponseList, transactionResponse)
 
 	}
 
-	log.Debug().Int("count", len(trasanctionResponseList)).Msg("found transactions")
-	return trasanctionResponseList, nil
+	log.Debug().Int("count", len(transactionResponseList)).Msg("found transactions")
+	return transactionResponseList, nil
 }
 
 func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, id string) ([]*dto.TransactionResponse, error) {
@@ -78,7 +78,7 @@ func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, id string)
 		return nil, err
 	}
 
-	var trasanctionResponseList []*dto.TransactionResponse
+	var transactionResponseList []*dto.TransactionResponse
 	for _, transaction := range transactionList {
 		transactionResponse := dto.NewTransactionResponse(transaction.Id,
 			transaction.Name,
@@ -89,11 +89,11 @@ func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, id string)
 			transaction.Amount,
 			transaction.CreatedAt)
 		transactionResponse.BudgetId = transaction.BudgetId
-		trasanctionResponseList = append(trasanctionResponseList, transactionResponse)
+		transactionResponseList = append(transactionResponseList, transactionResponse)
 
 	}
 
-	return trasanctionResponseList, nil
+	return transactionResponseList, nil
 }
 
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string) error {

@@ -15,7 +15,7 @@ func TestCategoryRepository(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup dependencies
-	userRepository := userRepo.NewUserRespository(db)
+	userRepository := userRepo.NewUserRepository(db)
 	categoryRepository := categoryRepo.NewCategoryRepository(db)
 
 	// Create test user
@@ -94,7 +94,7 @@ func TestCategoryRepository_Multiple_Categories(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup dependencies
-	userRepository := userRepo.NewUserRespository(db)
+	userRepository := userRepo.NewUserRepository(db)
 	categoryRepository := categoryRepo.NewCategoryRepository(db)
 
 	// Create test user
@@ -157,7 +157,7 @@ func TestCategoryRepository_User_Isolation(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup dependencies
-	userRepository := userRepo.NewUserRespository(db)
+	userRepository := userRepo.NewUserRepository(db)
 	categoryRepository := categoryRepo.NewCategoryRepository(db)
 
 	// Create two test users

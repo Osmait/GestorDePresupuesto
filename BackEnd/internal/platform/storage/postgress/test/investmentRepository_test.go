@@ -16,7 +16,7 @@ func TestInvestmentRepository(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup dependencies
-	userRepository := userRepo.NewUserRespository(db)
+	userRepository := userRepo.NewUserRepository(db)
 	investmentRepository := investmentRepo.NewInvesmentRepository(db)
 
 	// Create test user
@@ -87,7 +87,7 @@ func TestInvestmentRepository_Multiple_Investments(t *testing.T) {
 	ctx := context.Background()
 
 	// Setup dependencies
-	userRepository := userRepo.NewUserRespository(db)
+	userRepository := userRepo.NewUserRepository(db)
 	investmentRepository := investmentRepo.NewInvesmentRepository(db)
 
 	// Create test user
