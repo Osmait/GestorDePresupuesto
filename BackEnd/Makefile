@@ -390,6 +390,25 @@ docs:
 	@godoc -http=:6060 &
 	@echo "$(GREEN)Documentation server started at http://localhost:6060$(RESET)"
 
+# Generate Swagger documentation
+swagger:
+	@echo "$(BLUE)Generating Swagger documentation...$(RESET)"
+	@$(shell go env GOPATH)/bin/swag init
+	@echo "$(GREEN)Swagger documentation generated$(RESET)"
+	@echo "$(YELLOW)Swagger UI will be available at: http://localhost:8080/swagger/index.html$(RESET)"
+
+# Format Swagger annotations
+swagger-fmt:
+	@echo "$(BLUE)Formatting Swagger annotations...$(RESET)"
+	@$(shell go env GOPATH)/bin/swag fmt
+	@echo "$(GREEN)Swagger annotations formatted$(RESET)"
+
+# Install Swagger CLI tool
+swagger-install:
+	@echo "$(BLUE)Installing Swagger CLI tool...$(RESET)"
+	@go install github.com/swaggo/swag/cmd/swag@latest
+	@echo "$(GREEN)Swagger CLI tool installed$(RESET)"
+
 # Check project health
 health:
 	@echo "$(BLUE)Checking project health...$(RESET)"
@@ -488,6 +507,9 @@ help:
 	@echo "$(YELLOW)Utility Commands:$(RESET)"
 	@echo "  clean         - Clean build artifacts"
 	@echo "  docs          - Generate documentation"
+	@echo "  swagger       - Generate Swagger documentation"
+	@echo "  swagger-fmt   - Format Swagger annotations"
+	@echo "  swagger-install - Install Swagger CLI tool"
 	@echo "  health        - Check project health"
 	@echo "  ci            - Run all CI checks"
 	@echo "  release       - Prepare for release"

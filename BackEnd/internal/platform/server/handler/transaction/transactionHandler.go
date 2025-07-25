@@ -12,6 +12,19 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// CreateTransaction godoc
+// @Summary Create a new transaction
+// @Description Create a new financial transaction (income or expense)
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security JWT
+// @Param transaction body dto.TransactionRequest true "Transaction creation data"
+// @Success 201 {object} map[string]string "Transaction created successfully"
+// @Failure 400 {object} map[string]string "Bad request - Invalid input"
+// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /transaction [post]
 func CreateTransaction(transactionservice *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
@@ -42,6 +55,19 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 	}
 }
 
+// FindAllTransactionOfAllAccount godoc
+// @Summary Get all transactions across all accounts
+// @Description Retrieve all transactions for the authenticated user across all their accounts
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security JWT
+// @Param date query string false "Start date (YYYY/MM/DD)"
+// @Param date2 query string false "End date (YYYY/MM/DD)"
+// @Success 200 {array} dto.TransactionResponse "List of transactions"
+// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /transaction [get]
 func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		date1 := ctx.Query("date")
@@ -78,6 +104,21 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 	}
 }
 
+// FindAllTransaction godoc
+// @Summary Get transactions for a specific account
+// @Description Retrieve transactions for a specific account within a date range
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security JWT
+// @Param id path string true "Account ID"
+// @Param date query string false "Start date (YYYY/MM/DD)"
+// @Param date2 query string false "End date (YYYY/MM/DD)"
+// @Success 200 {array} dto.TransactionResponse "List of transactions for the account"
+// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
+// @Failure 404 {object} map[string]string "Account not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /transaction/{id} [get]
 func FindAllTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		date1 := ctx.Query("date")
@@ -105,6 +146,19 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 	}
 }
 
+// DeleteTransaction godoc
+// @Summary Delete a transaction
+// @Description Delete a specific transaction by ID
+// @Tags Transactions
+// @Accept json
+// @Produce json
+// @Security JWT
+// @Param id path string true "Transaction ID"
+// @Success 200 {object} map[string]string "Transaction deleted successfully"
+// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
+// @Failure 404 {object} map[string]string "Transaction not found"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /transaction/{id} [delete]
 func DeleteTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")

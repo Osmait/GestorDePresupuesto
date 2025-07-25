@@ -22,6 +22,9 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 
 	cors "github.com/rs/cors/wrapper/gin"
+	ginSwagger "github.com/swaggo/gin-swagger"
+	swaggerFiles "github.com/swaggo/files"
+	_ "github.com/osmait/gestorDePresupuesto/docs"
 )
 
 type Server struct {
@@ -67,6 +70,9 @@ func (s *Server) registerRoutes() {
 	if s.config.FeatureFlags.EnableTracing {
 		s.Engine.Use(middleware.TracingMiddleware(s.config.OpenTelemetry.ServiceName))
 	}
+
+	// Swagger documentation route (before authentication)
+	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Health routes (before authentication)
 	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Server.Environment))

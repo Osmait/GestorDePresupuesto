@@ -10,6 +10,17 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 )
 
+// Login godoc
+// @Summary User login
+// @Description Authenticate user with email and password to get JWT token
+// @Tags Authentication
+// @Accept json
+// @Produce json
+// @Param credentials body authRequest.AuthRequest true "Login credentials"
+// @Success 200 {object} map[string]string "JWT token response"
+// @Failure 400 {object} map[string]string "Bad request - Invalid input"
+// @Failure 500 {object} map[string]string "Internal server error - Problem with credentials"
+// @Router /login [post]
 func Login(authService *auth.AuthService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var authRequest authRequest.AuthRequest
