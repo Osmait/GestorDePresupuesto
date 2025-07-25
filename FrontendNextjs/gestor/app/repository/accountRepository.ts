@@ -28,9 +28,9 @@ export class AccountRepository extends BaseRepository {
     }
   }
 
-  async update(id: string, name: string, bank: string, initial_balance: number): Promise<void> {
+  async update(id: string, name: string, bank: string): Promise<void> {
     try {
-      await this.put(`/account/${id}`, { name, bank, initial_balance });
+      await this.put(`/account/${id}`, { name, bank });
     } catch (error) {
       console.error("Error updating account:", error);
       throw error;

@@ -78,3 +78,33 @@ func (repo *AccountRepository) Balance(ctx context.Context, id string) (float64,
 
 	return total, nil
 }
+
+func (repo *AccountRepository) Update(ctx context.Context, id string, name string, bank string, userId string) error {
+	result, err := repo.db.ExecContext(ctx, "UPDATE account SET name_account = $1, bank = $2 WHERE id = $3 AND user_id = $4", name, bank, id, userId)
+	if err != nil {
+		return err
+	}
+	
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	
+	return nil
+}
+
+func (repo *AccountRepository) FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error) {
+	row := repo.db.QueryRowContext(ctx, "SELECT id, name_account, bank, balance, user_id, created_at FROM account WHERE id = $1 AND user_id = $2", id, userId)
+	
+	account := &account.Account{}
+	err := row.Scan(&account.Id, &account.Name, &account.Bank, &account.InitialBalance, &account.UserId, &account.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	
+	return account, nil
+}

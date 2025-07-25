@@ -84,3 +84,39 @@ func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 		ctx.JSON(http.StatusOK, "Deleted")
 	}
 }
+
+// UpdateAccount godoc
+// @Summary Update an existing account
+// @Description Update name and bank information for a specific account owned by the authenticated user
+// @Tags Accounts
+// @Accept json
+// @Produce json
+// @Security JWT
+// @Param id path string true "Account ID"
+// @Param account body dto.AccountUpdateRequest true "Account update data"
+// @Success 200 {object} map[string]string "Account updated successfully"
+// @Failure 400 {object} map[string]string "Bad request - Invalid input"
+// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
+// @Failure 404 {object} map[string]string "Account not found or not owned by user"
+// @Failure 500 {object} map[string]string "Internal server error"
+// @Router /account/{id} [put]
+func UpdateAccount(accountService *account.AccountService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		id := ctx.Param("id")
+		
+		var updateRequest dto.AccountUpdateRequest
+		if err := ctx.BindJSON(&updateRequest); err != nil {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			return
+		}
+		
+		err := accountService.UpdateAccount(ctx, id, &updateRequest, userId)
+		if err != nil {
+			errorHandler.ReponseByTypeOfErr(err, ctx)
+			return
+		}
+		
+		ctx.JSON(http.StatusOK, gin.H{"message": "Account updated successfully"})
+	}
+}

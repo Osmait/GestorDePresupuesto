@@ -11,4 +11,6 @@ type AccountRepositoryInterface interface {
 	FindAll(ctx context.Context, userId string) ([]*account.Account, error)
 	Delete(ctx context.Context, id string) error
 	Balance(ctx context.Context, id string) (float64, error)
+	Update(ctx context.Context, id string, name string, bank string, userId string) error
+	FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error)
 }

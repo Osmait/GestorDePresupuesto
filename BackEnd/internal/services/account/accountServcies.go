@@ -2,10 +2,13 @@ package account
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/account"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
+	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 
 	"github.com/segmentio/ksuid"
 )
@@ -65,4 +68,31 @@ func (s *AccountService) Balance(ctx context.Context, id string) (float64, error
 		return 0, err
 	}
 	return balance, nil
+}
+
+func (s *AccountService) UpdateAccount(ctx context.Context, id string, updateRequest *dto.AccountUpdateRequest, userId string) error {
+	// First validate the request
+	if err := updateRequest.Validate(); err != nil {
+		return errorhttp.ErrBadRequest
+	}
+
+	// Check if account exists and belongs to the user
+	_, err := s.accountRepository.FindByIdAndUserId(ctx, id, userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errorhttp.ErrNotFound
+		}
+		return err
+	}
+
+	// Update the account
+	err = s.accountRepository.Update(ctx, id, updateRequest.Name, updateRequest.Bank, userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errorhttp.ErrNotFound
+		}
+		return err
+	}
+
+	return nil
 }

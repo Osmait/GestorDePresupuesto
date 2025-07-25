@@ -24,9 +24,10 @@ import { useState } from 'react';
 interface AccountCardProps {
   account: Account;
   onAccountDeleted?: () => void;
+  onAccountEdit?: (account: Account) => void;
 }
 
-export function AccountCard({ account, onAccountDeleted }: AccountCardProps) {
+export function AccountCard({ account, onAccountDeleted, onAccountEdit }: AccountCardProps) {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   
@@ -74,7 +75,10 @@ export function AccountCard({ account, onAccountDeleted }: AccountCardProps) {
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+              <DropdownMenuItem 
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => onAccountEdit?.(account)}
+              >
                 <Edit className="h-4 w-4" />
                 Editar cuenta
               </DropdownMenuItem>

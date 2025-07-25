@@ -60,6 +60,22 @@ definitions:
         example: 1250.75
         type: number
     type: object
+  dto.AccountUpdateRequest:
+    properties:
+      bank:
+        example: Updated Bank Name
+        maxLength: 100
+        minLength: 2
+        type: string
+      name:
+        example: Updated Savings Account
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - bank
+    - name
+    type: object
   dto.CategoryRequest:
     properties:
       color:
@@ -279,6 +295,61 @@ paths:
       security:
       - JWT: []
       summary: Delete an account
+      tags:
+      - Accounts
+    put:
+      consumes:
+      - application/json
+      description: Update name and bank information for a specific account owned by
+        the authenticated user
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Account update data
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AccountUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Account updated successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Account not found or not owned by user
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Update an existing account
       tags:
       - Accounts
   /category:

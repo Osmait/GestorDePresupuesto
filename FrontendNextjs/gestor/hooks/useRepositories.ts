@@ -49,6 +49,22 @@ export function useAccounts() {
 		}
 	}, [loadAccounts])
 
+	const updateAccount = useCallback(async (
+		id: string,
+		name: string,
+		bank: string
+	) => {
+		try {
+			setError(null)
+			const accountRepository = await getAccountRepository()
+			await accountRepository.update(id, name, bank)
+			await loadAccounts() // Recargar después de actualizar
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Error updating account')
+			throw err
+		}
+	}, [loadAccounts])
+
 	const deleteAccount = useCallback(async (id: string) => {
 		try {
 			setError(null)
@@ -70,6 +86,7 @@ export function useAccounts() {
 		isLoading,
 		error,
 		createAccount,
+		updateAccount,
 		deleteAccount,
 		refetch: loadAccounts,
 	}

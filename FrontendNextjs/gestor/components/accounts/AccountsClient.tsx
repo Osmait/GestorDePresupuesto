@@ -1,6 +1,7 @@
 "use client";
 import { useState } from 'react';
 import { useAccounts } from '@/hooks/useRepositories';
+import { Account } from '@/types/account';
 import { PlusCircle } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { AccountCard } from '@/components/accounts/AccountCard';
 import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard';
 import { AccountFormModal } from '@/components/accounts/AccountFormModal';
+import { AccountUpdateModal } from '@/components/accounts/AccountUpdateModal';
 import { AccountSummarySkeleton } from '@/components/accounts/AccountSummarySkeleton';
 import { AccountCardSkeleton } from '@/components/accounts/AccountCardSkeleton';
 import { 
@@ -17,12 +19,20 @@ import {
 	Wallet} from 'lucide-react';
 
 export default function AccountsClient() {
-  const { accounts, isLoading, createAccount, deleteAccount, error } = useAccounts();
+  const { accounts, isLoading, createAccount, updateAccount, deleteAccount, error } = useAccounts();
   const [modalOpen, setModalOpen] = useState(false);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   // Helper function to get account balance
   const getAccountBalance = (account: any) => 
     account.current_balance ?? account.initial_balance ?? 0;
+
+  // Handle edit account
+  const handleEditAccount = (account: Account) => {
+    setSelectedAccount(account);
+    setUpdateModalOpen(true);
+  };
 
   // Filter functions
   const getFilteredAccounts = (filter: 'all' | 'positive' | 'negative') => {
@@ -71,7 +81,8 @@ export default function AccountsClient() {
           <AccountCard 
             key={account.id} 
             account={account} 
-            onAccountDeleted={() => deleteAccount(account.id!)} 
+            onAccountDeleted={() => deleteAccount(account.id!)}
+            onAccountEdit={handleEditAccount}
           />
         ))}
       </div>
@@ -126,6 +137,14 @@ export default function AccountsClient() {
                 open={modalOpen} 
                 setOpen={setModalOpen}
                 createAccount={createAccount}
+                isLoading={isLoading}
+                error={error}
+              />
+              <AccountUpdateModal
+                open={updateModalOpen}
+                setOpen={setUpdateModalOpen}
+                account={selectedAccount}
+                updateAccount={updateAccount}
                 isLoading={isLoading}
                 error={error}
               />
