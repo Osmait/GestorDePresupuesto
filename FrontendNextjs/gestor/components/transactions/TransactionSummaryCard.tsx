@@ -4,8 +4,8 @@ import { Transaction, TypeTransaction } from '@/types/transaction';
 
 export default function TransactionSummaryCard({ transactions }: { transactions: Transaction[] }) {
   const totalIncome = transactions.filter(t => t.type_transation === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenses = transactions.filter(t => t.type_transation === TypeTransaction.BILL).reduce((sum, t) => sum + t.amount, 0);
-  const netAmount = totalIncome - totalExpenses;
+  const totalExpenses = transactions.filter(t => t.type_transation === TypeTransaction.BILL).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const totalTransactions = transactions.length;
 
   return (
     <Card className="border-border/50 dark:border-border/20">
@@ -29,8 +29,8 @@ export default function TransactionSummaryCard({ transactions }: { transactions:
           </div>
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5">
             <DollarSign className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
-            <p className="text-sm font-medium text-muted-foreground">Balance Neto</p>
-            <p className={`text-2xl font-bold ${netAmount >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>${netAmount.toLocaleString()}</p>
+            <p className="text-sm font-medium text-muted-foreground">Total Transacciones</p>
+            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">{totalTransactions}</p>
           </div>
         </div>
       </CardContent>

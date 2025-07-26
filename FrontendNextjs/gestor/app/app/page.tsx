@@ -283,41 +283,26 @@ function StatsGrid({ accounts, transactions }: {
 	const totalExpenses = Array.isArray(transactions)
 		? transactions.filter(t => t.type_transation === TypeTransaction.BILL).reduce((sum, t) => sum + Math.abs(t.amount), 0)
 		: 0;
-	const netIncome = totalIncome - totalExpenses
 
 	return (
-		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
 			<StatCard
 				title="Balance Total"
 				value={`$${totalBalance.toLocaleString()}`}
 				icon={DollarSign}
-				trend="up"
-				trendValue="+12.5%"
 				color="blue"
 			/>
 			<StatCard
 				title="Ingresos"
 				value={`$${totalIncome.toLocaleString()}`}
 				icon={TrendingUp}
-				trend="up"
-				trendValue="+8.2%"
 				color="green"
 			/>
 			<StatCard
 				title="Gastos"
 				value={`$${totalExpenses.toLocaleString()}`}
 				icon={TrendingDown}
-				trend="down"
-				trendValue="-3.1%"
 				color="red"
-			/>
-			<StatCard
-				title="Ahorro Neto"
-				value={`$${netIncome.toLocaleString()}`}
-				icon={Wallet}
-				trend={netIncome > 0 ? 'up' : 'down'}
-				trendValue={netIncome > 0 ? '+15.3%' : '-5.2%'}
-				color="purple"
 			/>
 		</div>
 	)
@@ -531,7 +516,7 @@ export default async function DashboardPage() {
 							icon: <PieChart className="h-4 w-4" />,
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{budgets && budgets.map((budget) => {
+									{budgets && budgets.length > 0 ? budgets.map((budget) => {
 										const category = Array.isArray(categories) ? categories.find(c => c.id === budget.category_id) : undefined;
 										return (
 											<BudgetCard 
@@ -540,7 +525,13 @@ export default async function DashboardPage() {
 												category={category} 
 											/>
 										)
-									})}
+									}) : (
+										<div className="col-span-full text-center py-12 text-muted-foreground">
+											<Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
+											<h3 className="text-lg font-semibold mb-2">No hay presupuestos configurados</h3>
+											<p className="text-sm">Crea tu primer presupuesto para comenzar a controlar tus gastos por categoría.</p>
+										</div>
+									)}
 								</div>
 							)
 						}
