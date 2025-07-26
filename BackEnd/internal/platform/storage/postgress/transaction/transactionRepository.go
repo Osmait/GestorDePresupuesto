@@ -26,7 +26,7 @@ func (repo *TransactionRepository) Save(ctx context.Context, transaction *transa
 
 func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,created_at FROM transactions WHERE  user_id = $1  ", id)
+		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,created_at FROM transactions WHERE  user_id = $1 ORDER BY created_at DESC", id)
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +58,7 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id 
 
 func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,created_at FROM transactions WHERE  account_id = $1 and created_at BETWEEN $2 and $3 ", id, date1, date2)
+		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,created_at FROM transactions WHERE  account_id = $1 and created_at BETWEEN $2 and $3 ORDER BY created_at DESC", id, date1, date2)
 	if err != nil {
 		return nil, err
 	}
