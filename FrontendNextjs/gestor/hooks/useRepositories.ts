@@ -4,6 +4,7 @@ import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Budget } from '@/types/budget'
 import { User } from '@/types/user'
+import { CategoryExpense, MonthlySummary } from '@/types/analytics'
 import {
 	getAccountRepository,
 	getAuthRepository,
@@ -413,28 +414,57 @@ export const useAuth = () => {
 
 // Hook para manejar analíticas
 export const useAnalytics = () => {
-	// No state, just direct calls (puedes agregar loading/error si lo necesitas)
-	const getOverview = async (params: any) => {
-		const repo = await getAnalyticsRepository()
-		return repo.getOverview(params)
+	const [categoryExpenses, setCategoryExpenses] = useState<CategoryExpense[]>([])
+	const [monthlySummary, setMonthlySummary] = useState<MonthlySummary[]>([])
+	const [isLoadingCategoryExpenses, setIsLoadingCategoryExpenses] = useState(false)
+	const [isLoadingMonthlySummary, setIsLoadingMonthlySummary] = useState(false)
+	const [error, setError] = useState<string | null>(null)
+
+	const loadCategoryExpenses = useCallback(async () => {
+		try {
+			setIsLoadingCategoryExpenses(true)
+			setError(null)
+			const analyticsRepository = await getAnalyticsRepository()
+			const data = await analyticsRepository.getCategoryExpenses()
+			setCategoryExpenses(data)
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Error loading category expenses')
+		} finally {
+			setIsLoadingCategoryExpenses(false)
+		}
+	}, [])
+
+	const loadMonthlySummary = useCallback(async () => {
+		try {
+			setIsLoadingMonthlySummary(true)
+			setError(null)
+			const analyticsRepository = await getAnalyticsRepository()
+			const data = await analyticsRepository.getMonthlySummary()
+			setMonthlySummary(data)
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Error loading monthly summary')
+		} finally {
+			setIsLoadingMonthlySummary(false)
+		}
+	}, [])
+
+	const refetchAll = useCallback(async () => {
+		await Promise.all([
+			loadCategoryExpenses(),
+			loadMonthlySummary()
+		])
+	}, [loadCategoryExpenses, loadMonthlySummary])
+
+	return {
+		categoryExpenses,
+		monthlySummary,
+		isLoadingCategoryExpenses,
+		isLoadingMonthlySummary,
+		error,
+		loadCategoryExpenses,
+		loadMonthlySummary,
+		refetchAll
 	}
-	const getBar = async (params: any) => {
-		const repo = await getAnalyticsRepository()
-		return repo.getBar(params)
-	}
-	const getPie = async (params: any) => {
-		const repo = await getAnalyticsRepository()
-		return repo.getPie(params)
-	}
-	const getRadar = async (params: any) => {
-		const repo = await getAnalyticsRepository()
-		return repo.getRadar(params)
-	}
-	const getHeatmap = async (params: any) => {
-		const repo = await getAnalyticsRepository()
-		return repo.getHeatmap(params)
-	}
-	return { getOverview, getBar, getPie, getRadar, getHeatmap }
 }
 
 // Hook combinado para dashboard

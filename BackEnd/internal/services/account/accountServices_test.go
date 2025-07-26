@@ -34,6 +34,16 @@ func (m *MockAccountRepository) Balance(ctx context.Context, id string) (float64
 	return args.Get(0).(float64), args.Error(1)
 }
 
+func (m *MockAccountRepository) Update(ctx context.Context, id string, name string, bank string, userId string) error {
+	args := m.Called(ctx, id, name, bank, userId)
+	return args.Error(0)
+}
+
+func (m *MockAccountRepository) FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error) {
+	args := m.Called(ctx, id, userId)
+	return args.Get(0).(*account.Account), args.Error(1)
+}
+
 func TestCreateAccount(t *testing.T) {
 	mockRepo := &MockAccountRepository{}
 

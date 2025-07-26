@@ -7,7 +7,8 @@ import {
 	getAccountRepository, 
 	getTransactionRepository, 
 	getCategoryRepository, 
-	getBudgetRepository 
+	getBudgetRepository, 
+    getAnalyticsRepository
 } from '@/lib/repositoryConfig'
 import { User } from '@/types/user'
 import { Account } from '@/types/account'
@@ -26,6 +27,7 @@ import {
 	ArrowUpRight,
 	ArrowDownRight,
 	Zap,
+	Target,
 	LucideIcon
 } from 'lucide-react'
 import { DashboardCharts } from '@/components/transactions/DashboardCharts'
@@ -188,13 +190,14 @@ function AccountCard({ account }: { account: Account }) {
 }
 
 // Server Component para BudgetCard
-function BudgetCard({ budget, category, spent }: { 
+function BudgetCard({ budget, category }: { 
 	budget: Budget 
 	category?: Category 
-	spent: number 
 }) {
-	const percentage = (spent / budget.amount) * 100
-	const isOverBudget = spent > budget.amount
+	// Convert negative current_amount to positive for display
+	const spentAmount = Math.abs(budget.current_amount)
+	const percentage = (spentAmount / budget.amount) * 100
+	const isOverBudget = spentAmount > budget.amount
 
 	return (
 		<Card className="border-border/50 dark:border-border/20">
@@ -210,7 +213,7 @@ function BudgetCard({ budget, category, spent }: {
 						<div>
 							<h3 className="font-medium text-foreground">{category?.name || 'Sin categoría'}</h3>
 							<p className="text-sm text-muted-foreground">
-								${spent.toLocaleString()} de ${budget.amount.toLocaleString()}
+								${spentAmount.toLocaleString()} de ${budget.amount.toLocaleString()}
 							</p>
 						</div>
 					</div>
@@ -221,10 +224,16 @@ function BudgetCard({ budget, category, spent }: {
 						{percentage.toFixed(1)}%
 					</Badge>
 				</div>
-				<Progress 
-					value={Math.min(percentage, 100)} 
-					className="h-2"
-				/>
+				<div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+					<div 
+						className="h-full transition-all duration-500 rounded-full"
+						style={{ 
+							width: `${Math.max(Math.min(percentage, 100), percentage > 0 ? 5 : 0)}%`,
+							minWidth: percentage > 0 ? '8px' : '0px',
+							backgroundColor: percentage > 80 ? '#ef4444' : percentage > 60 ? '#eab308' : '#22c55e'
+						}}
+					/>
+				</div>
 			</CardContent>
 		</Card>
 	)
@@ -327,6 +336,7 @@ export default async function DashboardPage() {
 	const transactionRepository = await getTransactionRepository()
 	const categoryRepository = await getCategoryRepository()
 	const budgetRepository = await getBudgetRepository()
+  const analyticsRepository = await getAnalyticsRepository()
 	
 	// Obtener la sesión actual (sin hacer login)
 	const { getServerSession } = await import("next-auth");
@@ -341,11 +351,13 @@ export default async function DashboardPage() {
 
 	const user = session.user;
 
-	const [accounts, transactions, categories, budgets] = await Promise.all([
+	const [accounts, transactions, categories, budgets,categorysData,getMonthlySummary] = await Promise.all([
 		accountRepository.findAll(),
 		transactionRepository.findAll(),
 		categoryRepository.findAll(),
-		budgetRepository.findAll()
+		budgetRepository.findAll(),
+    analyticsRepository.getCategoryExpenses(),
+    analyticsRepository.getMonthlySummary()
 	])
   console.log(accounts, transactions, categories, budgets)
 
@@ -358,6 +370,9 @@ export default async function DashboardPage() {
 				<DashboardCharts 
 					categories={categories} 
 					transactions={Array.isArray(transactions) ? transactions : []}
+          categorysData={categorysData}
+          monthSummary={getMonthlySummary}
+
 				/>
 				<StatsGrid accounts={accounts} transactions={transactions} />
 				
@@ -370,49 +385,112 @@ export default async function DashboardPage() {
 							label: 'Resumen',
 							icon: <BarChart3 className="h-4 w-4" />,
 							content: (
-								<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-									<Card className="lg:col-span-2 border-border/50 dark:border-border/20">
-										<CardHeader>
-											<CardTitle className="flex items-center gap-2 text-foreground">
-												<Wallet className="h-5 w-5" />
-												Transacciones Recientes
-											</CardTitle>
-										</CardHeader>
-										<CardContent>
-											<div className="space-y-1">
-												{Array.isArray(recentTransactions) ? recentTransactions.map((transaction) => {
-													const category = categories.find(c => c.id === transaction.category_id)
-													return (
-														<TransactionItem 
-															key={transaction.id} 
-															transaction={transaction} 
-															category={category}
-														/>
-													)
-												}):[]}
-											</div>
-										</CardContent>
-									</Card>
+								<div className="space-y-6">
+									<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+										<Card className="border-border/50 dark:border-border/20">
+											<CardHeader>
+												<CardTitle className="flex items-center gap-2 text-foreground">
+													<Wallet className="h-5 w-5" />
+													Transacciones Recientes
+												</CardTitle>
+											</CardHeader>
+											<CardContent>
+												<div className="space-y-1">
+													{Array.isArray(recentTransactions) ? recentTransactions.slice(0, 4).map((transaction) => {
+														const category = categories.find(c => c.id === transaction.category_id)
+														return (
+															<TransactionItem 
+																key={transaction.id} 
+																transaction={transaction} 
+																category={category}
+															/>
+														)
+													}):[]}
+												</div>
+											</CardContent>
+										</Card>
 
-									<Card className="border-border/50 dark:border-border/20">
-										<CardHeader>
-											<CardTitle className="flex items-center gap-2 text-foreground">
-												<PieChart className="h-5 w-5" />
-												Categorías
-											</CardTitle>
-										</CardHeader>
-										<CardContent>
-											<div className="space-y-4">
-												{Array.isArray(categories) ? categories.slice(0, 6).map((category) => (
-													<CategoryCard 
-														key={category.id} 
-														category={category} 
-														transactions={transactions}
-													/>
-												)):[]}
-											</div>
-										</CardContent>
-									</Card>
+										<Card className="border-border/50 dark:border-border/20">
+											<CardHeader>
+												<CardTitle className="flex items-center gap-2 text-foreground">
+													<PieChart className="h-5 w-5" />
+													Categorías
+												</CardTitle>
+											</CardHeader>
+											<CardContent>
+												<div className="space-y-4">
+													{Array.isArray(categories) ? categories.slice(0, 4).map((category) => (
+														<CategoryCard 
+															key={category.id} 
+															category={category} 
+															transactions={transactions}
+														/>
+													)):[]}
+												</div>
+											</CardContent>
+										</Card>
+
+										<Card className="border-border/50 dark:border-border/20">
+											<CardHeader>
+												<CardTitle className="flex items-center gap-2 text-foreground">
+													<Target className="h-5 w-5" />
+													Resumen Presupuestos
+												</CardTitle>
+											</CardHeader>
+											<CardContent>
+												<div className="space-y-4">
+													{Array.isArray(budgets) && budgets.length > 0 ? (
+														<>
+															{budgets.slice(0, 3).map((budget) => {
+																const category = Array.isArray(categories) ? categories.find(c => c.id === budget.category_id) : undefined;
+																const spentAmount = Math.abs(budget.current_amount);
+																const percentage = (spentAmount / budget.amount) * 100;
+																
+																return (
+																	<div key={budget.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">
+																		<div className="flex items-center gap-3">
+																			<div 
+																				className="w-8 h-8 rounded-full flex items-center justify-center text-sm" 
+																				style={{ backgroundColor: category?.color || '#6B7280' }}
+																			>
+																				{category?.icon || '📊'}
+																			</div>
+																			<div>
+																				<p className="font-medium text-foreground">{category?.name || 'Sin categoría'}</p>
+																				<p className="text-xs text-muted-foreground">
+																					${spentAmount.toLocaleString()} / ${budget.amount.toLocaleString()}
+																				</p>
+																			</div>
+																		</div>
+																		<div className="text-right">
+																			<p className={`text-sm font-bold ${
+																				percentage > 80 ? 'text-red-600 dark:text-red-400' : 
+																				percentage > 60 ? 'text-yellow-600 dark:text-yellow-400' : 
+																				'text-green-600 dark:text-green-400'
+																			}`}>
+																				{percentage.toFixed(1)}%
+																			</p>
+																		</div>
+																	</div>
+																);
+															})}
+															{budgets.length > 3 && (
+																<div className="text-center pt-2">
+																	<p className="text-xs text-muted-foreground">
+																		+{budgets.length - 3} presupuestos más
+																	</p>
+																</div>
+															)}
+														</>
+													) : (
+														<div className="text-center py-4 text-muted-foreground">
+															<p className="text-sm">No hay presupuestos configurados</p>
+														</div>
+													)}
+												</div>
+											</CardContent>
+										</Card>
+									</div>
 								</div>
 							)
 						},
@@ -453,19 +531,13 @@ export default async function DashboardPage() {
 							icon: <PieChart className="h-4 w-4" />,
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-									{budgets.map((budget) => {
+									{budgets && budgets.map((budget) => {
 										const category = Array.isArray(categories) ? categories.find(c => c.id === budget.category_id) : undefined;
-										const spent = Array.isArray(transactions)
-											? transactions
-												.filter(t => t.budget_id === budget.id && t.type_transation === TypeTransaction.BILL)
-												.reduce((sum, t) => sum + Math.abs(t.amount), 0)
-											: 0;
 										return (
 											<BudgetCard 
 												key={budget.id} 
 												budget={budget} 
 												category={category} 
-												spent={spent}
 											/>
 										)
 									})}

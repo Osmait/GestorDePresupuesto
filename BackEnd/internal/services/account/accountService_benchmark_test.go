@@ -35,6 +35,16 @@ func (m *MockAccountRepositoryBench) Balance(ctx context.Context, id string) (fl
 	return args.Get(0).(float64), args.Error(1)
 }
 
+func (m *MockAccountRepositoryBench) Update(ctx context.Context, id string, name string, bank string, userId string) error {
+	args := m.Called(ctx, id, name, bank, userId)
+	return args.Error(0)
+}
+
+func (m *MockAccountRepositoryBench) FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error) {
+	args := m.Called(ctx, id, userId)
+	return args.Get(0).(*account.Account), args.Error(1)
+}
+
 // BenchmarkAccountService_CreateAccount tests the performance of account creation
 func BenchmarkAccountService_CreateAccount(b *testing.B) {
 	mockRepo := &MockAccountRepositoryBench{}

@@ -15,7 +15,6 @@ import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Button } from '@/components/ui/button'
-import { getBudgetRepository, getCategoryRepository, getTransactionRepository } from '@/lib/repositoryConfig'
 import { Budget } from '@/types/budget'
 import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
@@ -33,7 +32,6 @@ import {
 interface BudgetCardProps {
 	budget: Budget
 	category?: Category
-	spent: number
 	transactions: Transaction[]
 }
 
@@ -54,10 +52,12 @@ function LoadingSpinner() {
 }
 
 // Server Component para BudgetCard
-function BudgetCard({ budget, category, spent, transactions }: BudgetCardProps) {
-	const progressPercentage = (spent / budget.amount) * 100
-	const remaining = budget.amount - spent
-	const isOverBudget = spent > budget.amount
+function BudgetCard({ budget, category, transactions }: BudgetCardProps) {
+	// Convert negative current_amount to positive for calculations
+	const spentAmount = Math.abs(budget.current_amount)
+	const progressPercentage = (spentAmount / budget.amount) * 100
+	const remaining = budget.amount - spentAmount
+	const isOverBudget = spentAmount > budget.amount
 	
 	const getStatusColor = () => {
 		if (isOverBudget) return 'destructive'
@@ -114,7 +114,7 @@ function BudgetCard({ budget, category, spent, transactions }: BudgetCardProps) 
 					<div className="flex justify-between items-center">
 						<span className="text-sm text-muted-foreground">Gastado</span>
 						<span className={`font-bold text-lg ${isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`}>
-							${spent.toLocaleString()}
+							${spentAmount.toLocaleString()}
 						</span>
 					</div>
 					
@@ -132,10 +132,16 @@ function BudgetCard({ budget, category, spent, transactions }: BudgetCardProps) 
 								{Math.round(progressPercentage)}%
 							</span>
 						</div>
-						<Progress 
-							value={Math.min(progressPercentage, 100)} 
-							className="h-2"
-						/>
+						<div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
+							<div 
+								className="h-full transition-all duration-500 rounded-full"
+								style={{ 
+									width: `${Math.max(Math.min(progressPercentage, 100), progressPercentage > 0 ? 5 : 0)}%`,
+									minWidth: progressPercentage > 0 ? '8px' : '0px',
+									backgroundColor: progressPercentage > 80 ? '#ef4444' : progressPercentage > 60 ? '#eab308' : '#22c55e'
+								}}
+							/>
+						</div>
 					</div>
 					
 					<div className="flex justify-between items-center pt-2 border-t border-border/50">
@@ -152,17 +158,10 @@ function BudgetCard({ budget, category, spent, transactions }: BudgetCardProps) 
 
 // Server Component para BudgetSummaryCard
 function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], transactions: Transaction[] }) {
-	const totalBudget = budgets.reduce((sum, budget) => sum + budget.amount, 0)
-	const totalSpent = transactions
-		.filter(t => t.type_transaction === TypeTransaction.BILL)
-		.reduce((sum, t) => sum + t.amount, 0)
+	const totalBudget = budgets?.reduce((sum, budget) => sum + budget.amount, 0) || 0
+	const totalSpent = budgets?.reduce((sum, budget) => sum + Math.abs(budget.current_amount), 0) || 0
 	const totalRemaining = totalBudget - totalSpent
-	const overBudgetCount = budgets.filter(budget => {
-		const spent = transactions
-			.filter(t => t.budget_id === budget.id && t.type_transaction === TypeTransaction.BILL)
-			.reduce((spentSum, t) => spentSum + t.amount, 0)
-		return spent > budget.amount
-	}).length
+	const overBudgetCount = budgets?.filter(budget => Math.abs(budget.current_amount) > budget.amount).length || 0
 	
 	return (
 		<Card className="border-border/50 dark:border-border/20">
@@ -250,7 +249,7 @@ function BudgetFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boolea
 										<Select value={field.value} onValueChange={field.onChange}>
 											<SelectTrigger><SelectValue placeholder="Selecciona una categoría" /></SelectTrigger>
 											<SelectContent>
-												{categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>)}
+												{categories?.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>)}
 											</SelectContent>
 										</Select>
 									</FormControl>
@@ -288,18 +287,84 @@ function BudgetFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boolea
 }
 
 export default function BudgetPage() {
-	const { budgets, isLoading } = useBudgets()
+	const { budgets, isLoading, error } = useBudgets()
 	const { categories } = useCategories()
 	const { transactions } = useTransactions()
 	const [modalOpen, setModalOpen] = useState(false)
 
 	function getBudgetTransactions(budgetId: string) {
-		return transactions.filter(t => t.budget_id === budgetId)
+		return transactions?.filter(t => t.budget_id === budgetId) || []
 	}
-	function getBudgetSpent(budgetId: string) {
-		return transactions
-			.filter(t => t.budget_id === budgetId && t.type_transaction === TypeTransaction.BILL)
-			.reduce((sum, t) => sum + t.amount, 0)
+
+	if (isLoading) {
+		return <LoadingSpinner />
+	}
+
+	if (error) {
+		return (
+			<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
+				<div className="container mx-auto px-4 py-8">
+					<div className="flex flex-col items-center justify-center min-h-[400px]">
+						<AlertCircle className="h-16 w-16 text-red-500 mb-4" />
+						<h2 className="text-2xl font-bold text-foreground mb-2">Error al cargar presupuestos</h2>
+						<p className="text-muted-foreground text-center max-w-md">{error}</p>
+						<Button 
+							className="mt-4" 
+							onClick={() => window.location.reload()}
+						>
+							Intentar de nuevo
+						</Button>
+					</div>
+				</div>
+			</div>
+		)
+	}
+
+	if (!budgets || budgets.length === 0) {
+		return (
+			<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
+				<div className="container mx-auto px-4 py-8">
+					{/* Header */}
+					<div className="mb-8">
+						<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+							<div>
+								<h1 className="text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent">
+									Gestión de Presupuestos
+								</h1>
+								<p className="text-muted-foreground mt-2 text-lg">
+									Planifica y controla tus gastos por categoría
+								</p>
+							</div>
+							<div className="flex items-center gap-3">
+								<Button className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" onClick={() => setModalOpen(true)}>
+									<PlusCircle className="h-4 w-4 mr-2" />
+									Nuevo Presupuesto
+								</Button>
+								<BudgetFormModal open={modalOpen} setOpen={setModalOpen} />
+							</div>
+						</div>
+					</div>
+					{/* Empty State */}
+					<div className="flex flex-col items-center justify-center min-h-[400px]">
+						<div className="p-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/10 dark:to-purple-500/10 mb-6">
+							<PiggyBank className="h-16 w-16 text-blue-600 dark:text-blue-400" />
+						</div>
+						<h2 className="text-2xl font-bold text-foreground mb-2">No hay presupuestos creados</h2>
+						<p className="text-muted-foreground text-center max-w-md mb-6">
+							Comienza a planificar tus finanzas creando tu primer presupuesto. 
+							Podrás establecer límites de gasto por categoría y realizar un seguimiento de tus objetivos financieros.
+						</p>
+						<Button 
+							className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70" 
+							onClick={() => setModalOpen(true)}
+						>
+							<PlusCircle className="h-4 w-4 mr-2" />
+							Crear mi primer presupuesto
+						</Button>
+					</div>
+				</div>
+			</div>
+		)
 	}
 
 	return (
@@ -327,16 +392,15 @@ export default function BudgetPage() {
 				</div>
 				{/* Resumen de presupuestos */}
 				<div className="mb-8">
-					<BudgetSummaryCard budgets={budgets} transactions={transactions} />
+					<BudgetSummaryCard budgets={budgets || []} transactions={transactions || []} />
 				</div>
 				{/* Lista de presupuestos */}
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					{budgets.map(budget => {
-						const category = categories.find(c => c.id === budget.category_id)
-						const spent = getBudgetSpent(budget.id)
+					{budgets?.map(budget => {
+						const category = categories?.find(c => c.id === budget.category_id)
 						const txs = getBudgetTransactions(budget.id)
 						return (
-							<BudgetCard key={budget.id} budget={budget} category={category} spent={spent} transactions={txs} />
+							<BudgetCard key={budget.id} budget={budget} category={category} transactions={txs} />
 						)
 					})}
 				</div>

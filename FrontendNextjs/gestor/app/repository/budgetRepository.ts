@@ -22,14 +22,6 @@ export class BudgetRepository extends BaseRepository {
     }
   }
 
-  async update(id: string, category_id: string, amount: number): Promise<void> {
-    try {
-      await this.put(`/budget/${id}`, { category_id, amount });
-    } catch (error) {
-      console.error("Error updating budget:", error);
-      throw error;
-    }
-  }
 
   async delete(id: string): Promise<void> {
     try {

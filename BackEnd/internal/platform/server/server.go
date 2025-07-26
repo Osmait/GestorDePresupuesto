@@ -15,16 +15,17 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
+	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 
-	cors "github.com/rs/cors/wrapper/gin"
-	ginSwagger "github.com/swaggo/gin-swagger"
-	swaggerFiles "github.com/swaggo/files"
 	_ "github.com/osmait/gestorDePresupuesto/docs"
+	cors "github.com/rs/cors/wrapper/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 type Server struct {
@@ -36,12 +37,26 @@ type Server struct {
 	servicesAuth        *auth.AuthService
 	servicesBudget      *budget.BudgetServices
 	servicesCategory    *category.CategoryServices
+	analyticsService    *analytics.AnalyticsService
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
 }
 
-func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Duration, servicesAccount *account.AccountService, transactionService *transaction.TransactionService, userService *user.UserService, authService *auth.AuthService, budgetService *budget.BudgetServices, categoryServices *category.CategoryServices, db *sql.DB, cfg *config.Config) (context.Context, *Server) {
+func New(ctx context.Context,
+	host string,
+	port uint,
+	shutdownTimeout *time.Duration,
+	servicesAccount *account.AccountService,
+	transactionService *transaction.TransactionService,
+	userService *user.UserService,
+	authService *auth.AuthService,
+	budgetService *budget.BudgetServices,
+	categoryServices *category.CategoryServices,
+	analyticsService *analytics.AnalyticsService,
+	db *sql.DB,
+	cfg *config.Config,
+) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
 		httpAddr:            fmt.Sprintf("%s:%d", host, port),
@@ -51,6 +66,7 @@ func New(ctx context.Context, host string, port uint, shutdownTimeout *time.Dura
 		servicesAuth:        authService,
 		servicesBudget:      budgetService,
 		servicesCategory:    categoryServices,
+		analyticsService:    analyticsService,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -87,6 +103,7 @@ func (s *Server) registerRoutes() {
 	routes.TransactionRoutes(s.Engine, s.servicesTransaction)
 	routes.CategoryRoutes(s.Engine, s.servicesCategory)
 	routes.BudgetRoutes(s.Engine, s.servicesBudget)
+	routes.AnalyticsRoutes(s.Engine, s.analyticsService)
 }
 
 func (s *Server) Run(ctx context.Context) error {

@@ -76,6 +76,28 @@ definitions:
     - bank
     - name
     type: object
+  dto.BudgetRequest:
+    properties:
+      amount:
+        type: number
+      category_id:
+        type: string
+    type: object
+  dto.BudgetResponse:
+    properties:
+      amount:
+        type: number
+      category_id:
+        type: string
+      created_at:
+        type: string
+      current_amount:
+        type: number
+      id:
+        type: string
+      user_id:
+        type: string
+    type: object
   dto.CategoryRequest:
     properties:
       color:
@@ -352,6 +374,124 @@ paths:
       summary: Update an existing account
       tags:
       - Accounts
+  /budget:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all budget limits for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of user budgets
+          schema:
+            items:
+              $ref: '#/definitions/dto.BudgetResponse'
+            type: array
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Get all user budgets
+      tags:
+      - Budgets
+    post:
+      consumes:
+      - application/json
+      description: Create a new budget limit for a specific category for the authenticated
+        user
+      parameters:
+      - description: Budget creation data
+        in: body
+        name: budget
+        required: true
+        schema:
+          $ref: '#/definitions/dto.BudgetRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Budget created successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Create a new budget
+      tags:
+      - Budgets
+  /budget/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific budget by ID
+      parameters:
+      - description: Budget ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Budget deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Budget not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Delete a budget
+      tags:
+      - Budgets
   /category:
     get:
       consumes:

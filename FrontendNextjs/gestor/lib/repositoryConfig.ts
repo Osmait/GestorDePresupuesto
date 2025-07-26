@@ -7,6 +7,7 @@ const USE_MOCKS = false // Cambiado a false para usar el backend real
 import { AccountRepositoryMock } from '@/mocks/accountRepositoryMock'
 import { AuthRepositoryMock } from '@/mocks/authRepositoryMock'
 import { BudgetRepositoryMock } from '@/mocks/budgetRepositoryMock'
+import { BudgetRepository } from '@/app/repository/budgetRepository'
 import { CategoryRepositoryMock } from '@/mocks/categoryRepositoryMock'
 import { TransactionRepositoryMock } from '@/mocks/transactionRepositoryMock'
 import { AnalyticsRepositoryMock } from '@/mocks/analyticsRepositoryMock'
@@ -15,14 +16,15 @@ import { AuthRepository } from '@/app/repository/authRepository'
 import { AccountRepository } from '@/app/repository/accountRepository'
 import { TransactionRepository } from '@/app/repository/transactionRepository'
 import { CategoryRepository } from '@/app/repository/categoryRepository'
+import { AnalyticsRepository } from '@/app/repository/analyticsRepository'
 
 // Crear instancias únicas
 let accountRepositoryInstance: AccountRepository | null = null;
 let authRepositoryInstance: AuthRepository | null = null;
-let budgetRepositoryInstance: BudgetRepositoryMock | null = null;
+let budgetRepositoryInstance: BudgetRepository | null = null;
 let categoryRepositoryInstance: CategoryRepository | null = null;
 let transactionRepositoryInstance: TransactionRepository | null = null;
-let analyticsRepositoryInstance: AnalyticsRepositoryMock | null = null;
+let analyticsRepositoryInstance: AnalyticsRepository | null = null;
 
 // Funciones para obtener repositorios (con singleton pattern)
 export const getAccountRepository = async () => {
@@ -41,7 +43,7 @@ export const getAuthRepository = async () => {
 
 export const getBudgetRepository = async () => {
   if (!budgetRepositoryInstance) {
-    budgetRepositoryInstance = new BudgetRepositoryMock();
+    budgetRepositoryInstance = new BudgetRepository();
   }
   return budgetRepositoryInstance;
 };
@@ -62,7 +64,7 @@ export const getTransactionRepository = async () => {
 
 export const getAnalyticsRepository = async () => {
   if (!analyticsRepositoryInstance) {
-    analyticsRepositoryInstance = new AnalyticsRepositoryMock();
+    analyticsRepositoryInstance = new AnalyticsRepository();
   }
   return analyticsRepositoryInstance;
 };
@@ -70,10 +72,10 @@ export const getAnalyticsRepository = async () => {
 // Exportar instancias directas para compatibilidad
 export const accountRepository = new AccountRepository();
 export const authRepository = new AuthRepository();
-export const budgetRepository = new BudgetRepositoryMock();
+export const budgetRepository = new BudgetRepository();
 export const categoryRepository = new CategoryRepository();
 export const transactionRepository = new TransactionRepository();
-export const analyticsRepository = new AnalyticsRepositoryMock();
+export const analyticsRepository = new AnalyticsRepository();
 
 // Función para verificar si estamos en modo mock
 export const isMockMode = (): boolean => USE_MOCKS;
@@ -87,7 +89,7 @@ export const getRepositoryConfig = () => ({
 // Tipos
 export type IAccountRepository = AccountRepositoryMock;
 export type IAuthRepository = AuthRepositoryMock;
-export type IBudgetRepository = BudgetRepositoryMock;
+export type IBudgetRepository = BudgetRepository;
 export type ICategoryRepository = CategoryRepositoryMock;
 export type ITransactionRepository = TransactionRepositoryMock;
-export type IAnalyticsRepository = AnalyticsRepositoryMock; 
+export type IAnalyticsRepository = AnalyticsRepository; 

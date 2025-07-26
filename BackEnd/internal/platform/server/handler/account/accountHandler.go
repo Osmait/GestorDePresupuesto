@@ -10,18 +10,19 @@ import (
 )
 
 // CreateAccount godoc
-// @Summary Create a new account
-// @Description Create a new bank account for the authenticated user
-// @Tags Accounts
-// @Accept json
-// @Produce json
-// @Security JWT
-// @Param account body dto.AccountRequest true "Account creation data"
-// @Success 201 "Account created successfully"
-// @Failure 400 {object} map[string]string "Bad request - Invalid input"
-// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
-// @Failure 500 {object} map[string]string "Internal server error"
-// @Router /account [post]
+//
+//	@Summary		Create a new account
+//	@Description	Create a new bank account for the authenticated user
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			account	body	dto.AccountRequest	true	"Account creation data"
+//	@Success		201		"Account created successfully"
+//	@Failure		400		{object}	map[string]string	"Bad request - Invalid input"
+//	@Failure		401		{object}	map[string]string	"Unauthorized - Invalid JWT token"
+//	@Failure		500		{object}	map[string]string	"Internal server error"
+//	@Router			/account [post]
 func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
@@ -39,16 +40,17 @@ func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 }
 
 // FindAllAccount godoc
-// @Summary Get all user accounts
-// @Description Retrieve all bank accounts for the authenticated user
-// @Tags Accounts
-// @Accept json
-// @Produce json
-// @Security JWT
-// @Success 200 {array} dto.AccountResponse "List of user accounts"
-// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
-// @Failure 500 {object} map[string]string "Internal server error"
-// @Router /account [get]
+//
+//	@Summary		Get all user accounts
+//	@Description	Retrieve all bank accounts for the authenticated user
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Success		200	{array}		dto.AccountResponse	"List of user accounts"
+//	@Failure		401	{object}	map[string]string	"Unauthorized - Invalid JWT token"
+//	@Failure		500	{object}	map[string]string	"Internal server error"
+//	@Router			/account [get]
 func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
@@ -62,18 +64,19 @@ func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 }
 
 // DeleteAccount godoc
-// @Summary Delete an account
-// @Description Delete a specific bank account by ID
-// @Tags Accounts
-// @Accept json
-// @Produce json
-// @Security JWT
-// @Param id path string true "Account ID"
-// @Success 200 {object} map[string]string "Account deleted successfully"
-// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
-// @Failure 404 {object} map[string]string "Account not found"
-// @Failure 500 {object} map[string]string "Internal server error"
-// @Router /account/{id} [delete]
+//
+//	@Summary		Delete an account
+//	@Description	Delete a specific bank account by ID
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			id	path		string				true	"Account ID"
+//	@Success		200	{object}	map[string]string	"Account deleted successfully"
+//	@Failure		401	{object}	map[string]string	"Unauthorized - Invalid JWT token"
+//	@Failure		404	{object}	map[string]string	"Account not found"
+//	@Failure		500	{object}	map[string]string	"Internal server error"
+//	@Router			/account/{id} [delete]
 func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
@@ -86,37 +89,38 @@ func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 }
 
 // UpdateAccount godoc
-// @Summary Update an existing account
-// @Description Update name and bank information for a specific account owned by the authenticated user
-// @Tags Accounts
-// @Accept json
-// @Produce json
-// @Security JWT
-// @Param id path string true "Account ID"
-// @Param account body dto.AccountUpdateRequest true "Account update data"
-// @Success 200 {object} map[string]string "Account updated successfully"
-// @Failure 400 {object} map[string]string "Bad request - Invalid input"
-// @Failure 401 {object} map[string]string "Unauthorized - Invalid JWT token"
-// @Failure 404 {object} map[string]string "Account not found or not owned by user"
-// @Failure 500 {object} map[string]string "Internal server error"
-// @Router /account/{id} [put]
+//
+//	@Summary		Update an existing account
+//	@Description	Update name and bank information for a specific account owned by the authenticated user
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			id		path		string						true	"Account ID"
+//	@Param			account	body		dto.AccountUpdateRequest	true	"Account update data"
+//	@Success		200		{object}	map[string]string			"Account updated successfully"
+//	@Failure		400		{object}	map[string]string			"Bad request - Invalid input"
+//	@Failure		401		{object}	map[string]string			"Unauthorized - Invalid JWT token"
+//	@Failure		404		{object}	map[string]string			"Account not found or not owned by user"
+//	@Failure		500		{object}	map[string]string			"Internal server error"
+//	@Router			/account/{id} [put]
 func UpdateAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
 		id := ctx.Param("id")
-		
+
 		var updateRequest dto.AccountUpdateRequest
 		if err := ctx.BindJSON(&updateRequest); err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
 			return
 		}
-		
+
 		err := accountService.UpdateAccount(ctx, id, &updateRequest, userId)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return
 		}
-		
+
 		ctx.JSON(http.StatusOK, gin.H{"message": "Account updated successfully"})
 	}
 }

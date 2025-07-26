@@ -4,28 +4,20 @@ import { ResponsivePie } from '@nivo/pie'
 import { ResponsiveBar } from '@nivo/bar'
 import { useTheme } from 'next-themes'
 import { useMemo } from 'react'
+import { CategoryExpense, MonthlySummary } from '@/types/analytics'
 
-interface CategoryData {
-	id: string
-	label: string
-	value: number
-	color: string
-}
-
-interface BarData {
-	month: string
-	Ingresos: number
-	Gastos: number
-}
 
 interface DashboardChartsProps {
 	categories: { id: string, name: string, color: string }[]
 	transactions: { amount: number, type_transation: string, category_id: string, created_at: string }[]
+  categorysData: CategoryExpense[]
+  monthSummary: MonthlySummary[]
 }
 
-export function DashboardCharts({ categories, transactions }: DashboardChartsProps) {
+export function DashboardCharts({ categories, transactions,categorysData,monthSummary}: DashboardChartsProps) {
 	console.log('DashboardCharts categories:', categories)
 	console.log('DashboardCharts transactions:', transactions)
+  console.log('DashboardCharts categoríaData:', categorysData)
 	const { theme } = useTheme()
 
 	// Usar todas las transacciones disponibles (no solo del mes actual)
@@ -35,38 +27,22 @@ export function DashboardCharts({ categories, transactions }: DashboardChartsPro
 
 	console.log('Valid transactions:', validTransactions)
 
-	// Pie: Distribución de gastos por categoría
-	const pieData: CategoryData[] = useMemo(() => {
-		const gastos = validTransactions.filter(t => t.type_transation === 'bill')
-		const grouped: Record<string, number> = {}
-		gastos.forEach(t => {
-			// Los gastos vienen como números negativos, usamos Math.abs()
-			grouped[t.category_id] = (grouped[t.category_id] || 0) + Math.abs(t.amount)
-		})
-		const data = Array.isArray(categories) ? categories.map(cat => ({
-			id: cat.name,
-			label: cat.name,
-			value: grouped[cat.id] || 0,
-			color: cat.color
-		})).filter(d => d.value > 0) : [];
-		return data
-	}, [categories, validTransactions])
 
-	// Bar: Ingresos vs Gastos por mes
-	const barData: BarData[] = useMemo(() => {
-		const byMonth: Record<string, { Ingresos: number, Gastos: number }> = {}
-		validTransactions.forEach(t => {
-			const date = new Date(t.created_at)
-			const month = `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2,'0')}`
-			if (!byMonth[month]) byMonth[month] = { Ingresos: 0, Gastos: 0 }
-			if (t.type_transation === 'income') byMonth[month].Ingresos += t.amount
-			if (t.type_transation === 'bill') byMonth[month].Gastos += Math.abs(t.amount) // Convertir negativos a positivos para visualización
-		})
-		const data = Object.entries(byMonth).sort(([a],[b]) => a.localeCompare(b)).map(([month, vals]) => ({ month, ...vals }))
-		console.log('Bar chart data:', data)
-		return data
-	}, [validTransactions])
+  const pieData = categorysData.map(cat => {
+    return {
+      ...cat,
+      value: Math.abs(cat.value), 
+    }
+  })
 
+
+
+  const barData = monthSummary.map(month => {
+    return {
+      ...month,
+      Gastos : Math.abs(month.Gastos), // Asegurarse de que Gastos sea positivo
+    }
+  })
 	const nivoTheme = useMemo(() => ({
 		background: 'transparent',
 		textColor: theme === 'dark' ? '#e5e7eb' : '#222',

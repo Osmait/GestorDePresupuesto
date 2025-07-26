@@ -16,6 +16,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
+	analyticsRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/analytics"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
 	invesmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/invesment"
@@ -23,6 +24,7 @@ import (
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
+	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
@@ -100,6 +102,7 @@ func Run() error {
 		services.authService,
 		services.budgetService,
 		services.categoryService,
+		services.analyticsService,
 		db,
 		cfg,
 	)
@@ -245,6 +248,7 @@ type repositories struct {
 	budgetRepository      budgetRepo.BudgetRepoInterface
 	categoryRepository    categoryRepo.CategoryRepoInterface
 	invesmentRepository   invesmentRepo.InvesmentRepoInterface
+	analyticsRepository   *analyticsRepo.AnalyticsRepository
 }
 
 // initializeRepositories creates all repository instances
@@ -256,6 +260,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		budgetRepository:      budgetRepo.NewBudgetRepository(db),
 		categoryRepository:    categoryRepo.NewCategoryRepository(db),
 		invesmentRepository:   invesmentRepo.NewInvesmentRepository(db),
+		analyticsRepository:   analyticsRepo.NewAnalyticsRepository(db),
 	}
 }
 
@@ -268,6 +273,7 @@ type services struct {
 	budgetService      *budget.BudgetServices
 	categoryService    *category.CategoryServices
 	invesmentService   *invesment.InvesmentServices
+	analyticsService   *analytics.AnalyticsService
 }
 
 // initializeServices creates all service instances
@@ -280,5 +286,6 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		budgetService:      budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
 		categoryService:    category.NewCategoryServices(repos.categoryRepository),
 		invesmentService:   invesment.NewInvesmentServices(repos.invesmentRepository),
+		analyticsService:   analytics.NewAnalyticsService(repos.analyticsRepository),
 	}
 }
