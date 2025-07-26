@@ -161,19 +161,6 @@ const mockPie = [
   { id: 'Cuenta 3', label: 'Cuenta 3', value: 600, color: '#34d399' },
 ]
 
-// Datos de ejemplo para filtros
-const exampleAccounts = [
-  { id: '1', name: 'Cuenta Principal' },
-  { id: '2', name: 'Cuenta Ahorros' },
-  { id: '3', name: 'Cuenta Corriente' },
-]
-const exampleCategories = [
-  { id: 'category-1', name: 'Alimentación' },
-  { id: 'category-2', name: 'Transporte' },
-  { id: 'category-3', name: 'Entretenimiento' },
-  { id: 'category-4', name: 'Salud' },
-  { id: 'category-5', name: 'Educación' },
-]
 const typeOptions = [
   { value: 'INCOME', label: 'Ingreso' },
   { value: 'BILL', label: 'Gasto' },
@@ -291,7 +278,7 @@ function AnalysisFilters({ filters, setFilters }: {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value='all'>Todas</SelectItem>
-            {exampleAccounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+            {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -303,7 +290,7 @@ function AnalysisFilters({ filters, setFilters }: {
           </SelectTrigger>
           <SelectContent>
             <SelectItem value='all'>Todas</SelectItem>
-            {exampleCategories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+            {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
@@ -353,13 +340,10 @@ function AccountCard({ account }: { account: Account }) {
 
 export default function AnalysisPage() {
   const { theme } = useTheme()
-  const { accounts } = useAccounts()
-  const { categories } = useCategories()
-  const { transactions } = useTransactions()
-  const { getOverview, getBar, getPie, getRadar, getHeatmap } = useAnalytics()
-  const [selectedBar, setSelectedBar] = useState<string | null>(null)
-  const [selectedPie, setSelectedPie] = useState<string | null>(null)
-  const [selectedLine, setSelectedLine] = useState<{ serieId: string, pointIndex: number } | null>(null)
+  const { accounts, isLoading: accountsLoading } = useAccounts()
+  const { categories, isLoading: categoriesLoading } = useCategories()
+  const { transactions, isLoading: transactionsLoading } = useTransactions()
+  const { categoryExpenses, monthlySummary, isLoadingCategoryExpenses, isLoadingMonthlySummary, loadCategoryExpenses, loadMonthlySummary } = useAnalytics()
   const [filters, setFilters] = useState<AnalysisFiltersState>({
     filterMode: 'month',
     month: defaultMonth,
@@ -372,12 +356,8 @@ export default function AnalysisPage() {
     maxAmount: '',
     search: '',
   })
-  const [overviewData, setOverviewData] = useState<any>(null)
-  const [barData, setBarData] = useState<any>(null)
-  const [pieData, setPieData] = useState<any>(null)
-  const [radarData, setRadarData] = useState<any>(null)
-  const [heatmapData, setHeatmapData] = useState<any>(null)
-  const [loading, setLoading] = useState(false)
+  
+  const loading = accountsLoading || categoriesLoading || transactionsLoading || isLoadingCategoryExpenses || isLoadingMonthlySummary
 
   // Mapear filtros UI a filtros de API
   const apiFilters = useMemo(() => {
@@ -416,21 +396,9 @@ export default function AnalysisPage() {
   }, [filters])
 
   useEffect(() => {
-    setLoading(true)
-    Promise.all([
-      getOverview(apiFilters),
-      getBar(apiFilters),
-      getPie(apiFilters),
-      getRadar(apiFilters),
-      getHeatmap(apiFilters)
-    ]).then(([overview, bar, pie, radar, heatmap]) => {
-      setOverviewData(overview)
-      setBarData(bar)
-      setPieData(pie)
-      setRadarData(radar)
-      setHeatmapData(heatmap)
-    }).finally(() => setLoading(false))
-  }, [JSON.stringify(apiFilters)])
+    loadCategoryExpenses()
+    loadMonthlySummary()
+  }, [])
 
   const nivoTheme = useMemo(() => ({
     background: 'transparent',
@@ -507,11 +475,22 @@ export default function AnalysisPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
             <Card>
               <CardHeader>
-                <CardTitle>Saldo, Ingresos y Gastos</CardTitle>
+                <CardTitle>Ingresos y Gastos por Mes</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
                 <ResponsiveLine
-                  data={overviewData?.series || []}
+                  data={monthlySummary.length > 0 ? [
+                    {
+                      id: 'Ingresos',
+                      color: 'hsl(140, 70%, 50%)',
+                      data: monthlySummary.map(m => ({ x: m.month, y: m.Ingresos }))
+                    },
+                    {
+                      id: 'Gastos', 
+                      color: 'hsl(0, 70%, 50%)',
+                      data: monthlySummary.map(m => ({ x: m.month, y: Math.abs(m.Gastos) }))
+                    }
+                  ] : mockLine}
                   theme={nivoTheme}
                   margin={{ top: 30, right: 30, bottom: 60, left: 60 }}
                   xScale={{ type: 'point' }}
@@ -523,8 +502,8 @@ export default function AnalysisPage() {
                     legend: apiFilters.groupBy === 'day' ? 'Día' : apiFilters.groupBy === 'week' ? 'Semana' : apiFilters.groupBy === 'month' ? 'Mes' : 'Año',
                     legendOffset: 48,
                     legendPosition: 'middle',
-                    tickValues: overviewData?.series?.[0]?.data.length > 15
-                      ? overviewData.series[0].data.filter((_, i) => i % Math.ceil(overviewData.series[0].data.length / 10) === 0).map(d => d.x)
+                    tickValues: monthlySummary.length > 15
+                      ? monthlySummary.filter((_, i) => i % Math.ceil(monthlySummary.length / 10) === 0).map(d => d.month)
                       : undefined,
                     format: v => {
                       if (apiFilters.groupBy === 'day') return String(v).slice(0, 5)
@@ -550,9 +529,12 @@ export default function AnalysisPage() {
               </CardHeader>
               <CardContent style={{ height: 300 }}>
                 <ResponsiveBar
-                  data={barData?.data || []}
-                  keys={barData?.categories || []}
-                  indexBy='fecha'
+                  data={categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
+                    categoria: cat.label,
+                    monto: Math.abs(cat.value)
+                  })) : mockBar}
+                  keys={['monto']}
+                  indexBy='categoria'
                   margin={{ top: 30, right: 30, bottom: 60, left: 60 }}
                   padding={0.3}
                   valueScale={{ type: 'linear' }}
@@ -568,8 +550,8 @@ export default function AnalysisPage() {
                     legend: apiFilters.groupBy === 'day' ? 'Día' : apiFilters.groupBy === 'week' ? 'Semana' : apiFilters.groupBy === 'month' ? 'Mes' : 'Año',
                     legendOffset: 48,
                     legendPosition: 'middle',
-                    tickValues: barData?.data?.length > 15
-                      ? barData.data.filter((_, i) => i % Math.ceil(barData.data.length / 10) === 0).map(d => d.fecha)
+                    tickValues: categoryExpenses.length > 15
+                      ? categoryExpenses.filter((_, i) => i % Math.ceil(categoryExpenses.length / 10) === 0).map(d => d.label)
                       : undefined,
                     format: v => {
                       if (apiFilters.groupBy === 'day') return String(v).slice(0, 5)
@@ -590,10 +572,15 @@ export default function AnalysisPage() {
             </Card>
             <Card>
               <CardHeader>
-                <CardTitle>Distribución por Cuenta</CardTitle>
+                <CardTitle>Distribución por Categoría</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
-                <ResponsivePie data={pieData || []} margin={{ top: 30, right: 30, bottom: 50, left: 60 }} innerRadius={0.5} padAngle={0.7} cornerRadius={3} activeOuterRadiusOffset={8} borderWidth={1} borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }} arcLinkLabelsSkipAngle={10} arcLinkLabelsTextColor={theme === 'dark' ? '#e5e7eb' : '#222'} arcLinkLabelsThickness={2} arcLinkLabelsColor={{ from: 'color' }} arcLabelsSkipAngle={10} arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }} theme={nivoTheme} />
+                <ResponsivePie data={categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
+                    id: cat.id,
+                    label: cat.label,
+                    value: Math.abs(cat.value),
+                    color: cat.color
+                  })) : mockPie} margin={{ top: 30, right: 30, bottom: 50, left: 60 }} innerRadius={0.5} padAngle={0.7} cornerRadius={3} activeOuterRadiusOffset={8} borderWidth={1} borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }} arcLinkLabelsSkipAngle={10} arcLinkLabelsTextColor={theme === 'dark' ? '#e5e7eb' : '#222'} arcLinkLabelsThickness={2} arcLinkLabelsColor={{ from: 'color' }} arcLabelsSkipAngle={10} arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }} theme={nivoTheme} />
               </CardContent>
             </Card>
             <Card>
@@ -601,7 +588,11 @@ export default function AnalysisPage() {
                 <CardTitle>Radar de Categorías</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
-                <ResponsiveRadar data={radarData || []} keys={['Gastos', 'Ingresos']} indexBy='categoria' maxValue='auto' margin={{ top: 30, right: 30, bottom: 50, left: 60 }} curve='linearClosed' borderWidth={2} borderColor={{ from: 'color' }} gridLevels={5} gridShape='circular' gridLabelOffset={36} enableDots={true} dotSize={8} dotColor={{ theme: 'background' }} dotBorderWidth={2} dotBorderColor={{ from: 'color' }} enableDotLabel={true} dotLabel='value' dotLabelYOffset={-12} colors={{ scheme: 'nivo' }} fillOpacity={0.25} blendMode='multiply' animate={true} isInteractive={true} theme={nivoTheme} />
+                <ResponsiveRadar data={categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
+                    categoria: cat.label,
+                    Gastos: Math.abs(cat.value),
+                    Ingresos: 0
+                  })) : mockRadar} keys={['Gastos', 'Ingresos']} indexBy='categoria' maxValue='auto' margin={{ top: 30, right: 30, bottom: 50, left: 60 }} curve='linearClosed' borderWidth={2} borderColor={{ from: 'color' }} gridLevels={5} gridShape='circular' gridLabelOffset={36} enableDots={true} dotSize={8} dotColor={{ theme: 'background' }} dotBorderWidth={2} dotBorderColor={{ from: 'color' }} enableDotLabel={true} dotLabel='value' dotLabelYOffset={-12} colors={{ scheme: 'nivo' }} fillOpacity={0.25} blendMode='multiply' animate={true} isInteractive={true} theme={nivoTheme} />
               </CardContent>
             </Card>
             <Card className='md:col-span-2'>
@@ -610,7 +601,7 @@ export default function AnalysisPage() {
               </CardHeader>
               <CardContent style={{ height: 300 }}>
                 <ResponsiveHeatMap
-                  data={heatmapData || []}
+                  data={mockHeat}
                   margin={{ top: 30, right: 30, bottom: 50, left: 60 }}
                   forceSquare={true}
                   axisTop={null}
