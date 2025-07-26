@@ -23,7 +23,7 @@ import { Account } from '@/types/account'
 const mockLine = [
   {
     id: 'Saldo',
-    color: 'hsl(210, 70%, 50%)',
+    color: '#3b82f6',
     data: [
       { x: 'Ene', y: 1200 },
       { x: 'Feb', y: 1500 },
@@ -35,7 +35,7 @@ const mockLine = [
   },
   {
     id: 'Ingresos',
-    color: 'hsl(140, 70%, 50%)',
+    color: '#22c55e',
     data: [
       { x: 'Ene', y: 2000 },
       { x: 'Feb', y: 2200 },
@@ -47,7 +47,7 @@ const mockLine = [
   },
   {
     id: 'Gastos',
-    color: 'hsl(0, 70%, 50%)',
+    color: '#ef4444',
     data: [
       { x: 'Ene', y: 800 },
       { x: 'Feb', y: 700 },
@@ -156,9 +156,9 @@ const mockHeat = [
 ]
 
 const mockPie = [
-  { id: 'Cuenta 1', label: 'Cuenta 1', value: 1200, color: '#2563eb' },
-  { id: 'Cuenta 2', label: 'Cuenta 2', value: 800, color: '#f59e42' },
-  { id: 'Cuenta 3', label: 'Cuenta 3', value: 600, color: '#34d399' },
+  { id: 'Cuenta 1', label: 'Cuenta 1', value: 1200, color: '#3b82f6' },
+  { id: 'Cuenta 2', label: 'Cuenta 2', value: 800, color: '#22c55e' },
+  { id: 'Cuenta 3', label: 'Cuenta 3', value: 600, color: '#eab308' },
 ]
 
 const typeOptions = [
@@ -402,23 +402,69 @@ export default function AnalysisPage() {
 
   const nivoTheme = useMemo(() => ({
     background: 'transparent',
-    textColor: theme === 'dark' ? '#e5e7eb' : '#222',
-    fontSize: 14,
+    textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+    fontSize: 12,
+    fontFamily: 'Inter, system-ui, sans-serif',
     axis: {
-      legend: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#222' } },
-      ticks: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#222' } }
+      domain: {
+        line: {
+          stroke: theme === 'dark' ? '#4b5563' : '#d1d5db',
+          strokeWidth: 1
+        }
+      },
+      legend: { 
+        text: { 
+          fill: theme === 'dark' ? '#e5e7eb' : '#374151',
+          fontSize: 13,
+          fontWeight: 500
+        } 
+      },
+      ticks: { 
+        line: {
+          stroke: theme === 'dark' ? '#6b7280' : '#9ca3af',
+          strokeWidth: 1
+        },
+        text: { 
+          fill: theme === 'dark' ? '#d1d5db' : '#6b7280',
+          fontSize: 11
+        } 
+      }
     },
-    legends: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#222' } },
+    grid: {
+      line: {
+        stroke: theme === 'dark' ? '#374151' : '#e5e7eb',
+        strokeWidth: 1
+      }
+    },
+    legends: { 
+      text: { 
+        fill: theme === 'dark' ? '#e5e7eb' : '#374151',
+        fontSize: 12,
+        fontWeight: 500
+      } 
+    },
     tooltip: {
       container: {
-        background: theme === 'dark' ? '#222' : '#fff',
-        color: theme === 'dark' ? '#e5e7eb' : '#222',
-        borderRadius: 8,
-        boxShadow: '0 2px 12px 0 rgba(0,0,0,0.15)',
+        background: theme === 'dark' ? '#1f2937' : '#ffffff',
+        color: theme === 'dark' ? '#f9fafb' : '#111827',
+        borderRadius: '8px',
+        border: `1px solid ${theme === 'dark' ? '#374151' : '#e5e7eb'}`,
+        boxShadow: theme === 'dark' 
+          ? '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.2)'
+          : '0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04)',
         fontWeight: 500,
-        fontSize: 15,
+        fontSize: 13,
         padding: '12px 16px',
       },
+      basic: {
+        whiteSpace: 'pre',
+        display: 'flex',
+        alignItems: 'center'
+      },
+      table: {},
+      tableCell: {
+        padding: '3px 5px'
+      }
     },
   }), [theme])
 
@@ -482,12 +528,12 @@ export default function AnalysisPage() {
                   data={monthlySummary.length > 0 ? [
                     {
                       id: 'Ingresos',
-                      color: 'hsl(140, 70%, 50%)',
+                      color: theme === 'dark' ? '#22c55e' : '#16a34a',
                       data: monthlySummary.map(m => ({ x: m.month, y: m.Ingresos }))
                     },
                     {
                       id: 'Gastos', 
-                      color: 'hsl(0, 70%, 50%)',
+                      color: theme === 'dark' ? '#ef4444' : '#dc2626',
                       data: monthlySummary.map(m => ({ x: m.month, y: Math.abs(m.Gastos) }))
                     }
                   ] : mockLine}
@@ -519,7 +565,34 @@ export default function AnalysisPage() {
                   pointBorderColor={{ from: 'serieColor' }}
                   enablePointLabel={false}
                   useMesh={true}
-                  legends={[]}
+                  legends={[
+                    {
+                      anchor: 'bottom-right',
+                      direction: 'column',
+                      justify: false,
+                      translateX: 100,
+                      translateY: 0,
+                      itemsSpacing: 0,
+                      itemDirection: 'left-to-right',
+                      itemWidth: 80,
+                      itemHeight: 20,
+                      itemOpacity: 0.75,
+                      symbolSize: 12,
+                      symbolShape: 'circle',
+                      symbolBorderColor: 'rgba(0, 0, 0, .5)',
+                      itemTextColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+                      effects: [
+                        {
+                          on: 'hover',
+                          style: {
+                            itemBackground: theme === 'dark' ? 'rgba(255, 255, 255, .03)' : 'rgba(0, 0, 0, .03)',
+                            itemOpacity: 1,
+                            itemTextColor: theme === 'dark' ? '#ffffff' : '#000000'
+                          }
+                        }
+                      ]
+                    }
+                  ]}
                 />
               </CardContent>
             </Card>
@@ -539,7 +612,13 @@ export default function AnalysisPage() {
                   padding={0.3}
                   valueScale={{ type: 'linear' }}
                   indexScale={{ type: 'band', round: true }}
-                  colors={{ scheme: 'nivo' }}
+                  colors={theme === 'dark' ? [
+                    '#3b82f6', '#22c55e', '#eab308', '#ef4444', '#8b5cf6', 
+                    '#06b6d4', '#f97316', '#ec4899', '#84cc16', '#f59e0b'
+                  ] : [
+                    '#2563eb', '#16a34a', '#ca8a04', '#dc2626', '#7c3aed',
+                    '#0891b2', '#ea580c', '#db2777', '#65a30d', '#d97706'
+                  ]}
                   borderColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
                   axisTop={null}
                   axisRight={null}
@@ -564,7 +643,32 @@ export default function AnalysisPage() {
                   labelSkipWidth={12}
                   labelSkipHeight={12}
                   labelTextColor={{ from: 'color', modifiers: [['darker', 1.6]] }}
-                  legends={[]}
+                  legends={[
+                    {
+                      dataFrom: 'keys',
+                      anchor: 'bottom-right',
+                      direction: 'column',
+                      justify: false,
+                      translateX: 120,
+                      translateY: 0,
+                      itemsSpacing: 2,
+                      itemWidth: 100,
+                      itemHeight: 20,
+                      itemDirection: 'left-to-right',
+                      itemOpacity: 0.85,
+                      symbolSize: 20,
+                      itemTextColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+                      effects: [
+                        {
+                          on: 'hover',
+                          style: {
+                            itemOpacity: 1,
+                            itemTextColor: theme === 'dark' ? '#ffffff' : '#000000'
+                          }
+                        }
+                      ]
+                    }
+                  ]}
                   theme={nivoTheme}
                   groupMode='stacked'
                 />
@@ -592,7 +696,7 @@ export default function AnalysisPage() {
                     categoria: cat.label,
                     Gastos: Math.abs(cat.value),
                     Ingresos: 0
-                  })) : mockRadar} keys={['Gastos', 'Ingresos']} indexBy='categoria' maxValue='auto' margin={{ top: 30, right: 30, bottom: 50, left: 60 }} curve='linearClosed' borderWidth={2} borderColor={{ from: 'color' }} gridLevels={5} gridShape='circular' gridLabelOffset={36} enableDots={true} dotSize={8} dotColor={{ theme: 'background' }} dotBorderWidth={2} dotBorderColor={{ from: 'color' }} enableDotLabel={true} dotLabel='value' dotLabelYOffset={-12} colors={{ scheme: 'nivo' }} fillOpacity={0.25} blendMode='multiply' animate={true} isInteractive={true} theme={nivoTheme} />
+                  })) : mockRadar} keys={['Gastos', 'Ingresos']} indexBy='categoria' maxValue='auto' margin={{ top: 30, right: 30, bottom: 50, left: 60 }} curve='linearClosed' borderWidth={2} borderColor={{ from: 'color' }} gridLevels={5} gridShape='circular' gridLabelOffset={36} enableDots={true} dotSize={8} dotColor={{ theme: 'background' }} dotBorderWidth={2} dotBorderColor={{ from: 'color' }} enableDotLabel={true} dotLabel='value' dotLabelYOffset={-12} colors={theme === 'dark' ? ['#ef4444', '#22c55e'] : ['#dc2626', '#16a34a']} fillOpacity={0.25} blendMode='multiply' animate={true} isInteractive={true} theme={nivoTheme} />
               </CardContent>
             </Card>
             <Card className='md:col-span-2'>
