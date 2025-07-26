@@ -1,7 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { 
 	getAuthRepository, 
@@ -26,7 +25,6 @@ import {
 	BarChart3,
 	ArrowUpRight,
 	ArrowDownRight,
-	Target,
 	Zap,
 	LucideIcon
 } from 'lucide-react'
@@ -99,7 +97,7 @@ function TransactionItem({ transaction, category }: {
 	transaction: Transaction 
 	category?: Category 
 }) {
-	const isIncome = transaction.type_transaction === TypeTransaction.INCOME
+	const isIncome = transaction.type_transation === TypeTransaction.INCOME
 
 	return (
 		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">
@@ -117,7 +115,7 @@ function TransactionItem({ transaction, category }: {
 			</div>
 			<div className="text-right">
 				<p className={`font-bold ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-					{isIncome ? '+' : '-'}${transaction.amount.toLocaleString()}
+					{isIncome ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
 				</p>
 				<p className="text-xs text-muted-foreground">{category?.name || 'Sin categoría'}</p>
 			</div>
@@ -156,7 +154,8 @@ function CategoryCard({ category, transactions }: {
 
 // Server Component para AccountCard
 function AccountCard({ account }: { account: Account }) {
-	const isPositive = account.initial_balance > 0
+	const currentBalance = account.current_balance ?? account.initial_balance ?? 0;
+	const isPositive = currentBalance > 0
 
 	return (
 		<Card className="border-border/50 dark:border-border/20 hover:shadow-lg dark:hover:shadow-lg/25 transition-all duration-200">
@@ -170,11 +169,18 @@ function AccountCard({ account }: { account: Account }) {
 				</div>
 				<div className="space-y-2">
 					<p className={`text-2xl font-bold ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-						${(account.initial_balance ?? 0).toLocaleString('es-ES', { style: 'currency', currency: 'EUR' })}
+						${currentBalance.toLocaleString()}
 					</p>
-					<Badge variant="outline" className="text-xs">
-						{account.initial_balance > 10000 ? 'Alto' : account.initial_balance > 5000 ? 'Medio' : 'Bajo'}
-					</Badge>
+					<div className="flex gap-2">
+						<Badge variant="outline" className="text-xs">
+							{currentBalance > 10000 ? 'Alto' : currentBalance > 5000 ? 'Medio' : 'Bajo'}
+						</Badge>
+						{account.current_balance !== account.initial_balance && (
+							<Badge variant="secondary" className="text-xs">
+								Inicial: ${account.initial_balance.toLocaleString()}
+							</Badge>
+						)}
+					</div>
 				</div>
 			</CardContent>
 		</Card>
@@ -225,7 +231,7 @@ function BudgetCard({ budget, category, spent }: {
 }
 
 // Server Component para el header
-function DashboardHeader({ user }: { user: User | null }) {
+function DashboardHeader({ user }: { user: any }) {
 	return (
 		<div className="mb-8">
 			<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -234,7 +240,7 @@ function DashboardHeader({ user }: { user: User | null }) {
 						Dashboard Financiero
 					</h1>
 					<p className="text-muted-foreground mt-2 text-lg">
-						Bienvenido de vuelta, {user?.name} {user?.last_name} 👋
+						Bienvenido de vuelta, {user?.name} {user?.lastName || user?.last_name} 👋
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
@@ -261,12 +267,12 @@ function StatsGrid({ accounts, transactions }: {
 	accounts: Account[] 
 	transactions: Transaction[] 
 }) {
-	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + acc.initial_balance, 0)
+	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + (acc.current_balance ?? acc.initial_balance ?? 0), 0)
 	const totalIncome = Array.isArray(transactions)
-		? transactions.filter(t => t.type_transaction === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0)
+		? transactions.filter(t => t.type_transation === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0)
 		: 0;
 	const totalExpenses = Array.isArray(transactions)
-		? transactions.filter(t => t.type_transaction === TypeTransaction.BILL).reduce((sum, t) => sum + t.amount, 0)
+		? transactions.filter(t => t.type_transation === TypeTransaction.BILL).reduce((sum, t) => sum + Math.abs(t.amount), 0)
 		: 0;
 	const netIncome = totalIncome - totalExpenses
 
@@ -322,13 +328,26 @@ export default async function DashboardPage() {
 	const categoryRepository = await getCategoryRepository()
 	const budgetRepository = await getBudgetRepository()
 	
-	const [user, accounts, transactions, categories, budgets] = await Promise.all([
-		authRepository.login('juan.perez@example.com', 'password123'),
+	// Obtener la sesión actual (sin hacer login)
+	const { getServerSession } = await import("next-auth");
+	const { authOptions } = await import("@/auth");
+	const session = await getServerSession(authOptions);
+	
+	if (!session) {
+		// Redirigir al login si no hay sesión
+		const { redirect } = await import("next/navigation");
+		redirect('/login');
+	}
+
+	const user = session.user;
+
+	const [accounts, transactions, categories, budgets] = await Promise.all([
 		accountRepository.findAll(),
 		transactionRepository.findAll(),
 		categoryRepository.findAll(),
 		budgetRepository.findAll()
 	])
+  console.log(accounts, transactions, categories, budgets)
 
 	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
 
@@ -338,11 +357,7 @@ export default async function DashboardPage() {
 				<DashboardHeader user={user} />
 				<DashboardCharts 
 					categories={categories} 
-					transactions={(Array.isArray(transactions) ? transactions : []).map(t => ({
-						...t,
-						type_transaction: String(t.type_transaction),
-						created_at: (t.created_at && typeof t.created_at === 'object' && typeof (t.created_at as Date).toISOString === 'function') ? (t.created_at as Date).toISOString() : String(t.created_at)
-					}))} 
+					transactions={Array.isArray(transactions) ? transactions : []}
 				/>
 				<StatsGrid accounts={accounts} transactions={transactions} />
 				
@@ -442,8 +457,8 @@ export default async function DashboardPage() {
 										const category = Array.isArray(categories) ? categories.find(c => c.id === budget.category_id) : undefined;
 										const spent = Array.isArray(transactions)
 											? transactions
-												.filter(t => t.budget_id === budget.id && t.type_transaction === TypeTransaction.BILL)
-												.reduce((sum, t) => sum + t.amount, 0)
+												.filter(t => t.budget_id === budget.id && t.type_transation === TypeTransaction.BILL)
+												.reduce((sum, t) => sum + Math.abs(t.amount), 0)
 											: 0;
 										return (
 											<BudgetCard 
