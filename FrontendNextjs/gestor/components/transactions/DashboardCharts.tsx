@@ -45,13 +45,40 @@ export function DashboardCharts({ categories, transactions,categorysData,monthSu
   })
 	const nivoTheme = useMemo(() => ({
 		background: 'transparent',
-		textColor: theme === 'dark' ? '#e5e7eb' : '#222',
+		textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
 		fontSize: 14,
 		axis: {
-			legend: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#222' } },
-			ticks: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#222' } }
+			legend: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#374151' } },
+			ticks: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#374151' } }
 		},
-		legends: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#222' } }
+		legends: { 
+			text: { 
+				fill: theme === 'dark' ? '#e5e7eb' : '#374151',
+				fontSize: 13,
+				fontWeight: 500
+			} 
+		},
+		tooltip: {
+			container: {
+				background: theme === 'dark' ? '#1f2937' : '#ffffff',
+				color: theme === 'dark' ? '#e5e7eb' : '#374151',
+				fontSize: 14,
+				borderRadius: '8px',
+				border: `1px solid ${theme === 'dark' ? '#374151' : '#d1d5db'}`,
+				boxShadow: theme === 'dark' 
+					? '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1)'
+					: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
+			},
+			basic: {
+				whiteSpace: 'pre',
+				display: 'flex',
+				alignItems: 'center'
+			},
+			table: {},
+			tableCell: {
+				padding: '3px 5px'
+			}
+		}
 	}), [theme])
 
 	return (
@@ -70,7 +97,7 @@ export function DashboardCharts({ categories, transactions,categorysData,monthSu
 							borderWidth={2}
 							borderColor={{ from: 'color', modifiers: [['darker', 0.3]] }}
 							enableArcLabels={false}
-							arcLinkLabelsTextColor={theme === 'dark' ? '#e5e7eb' : '#222'}
+							arcLinkLabelsTextColor={theme === 'dark' ? '#e5e7eb' : '#374151'}
 							arcLinkLabelsColor={{ from: 'color' }}
 							activeOuterRadiusOffset={8}
 							theme={nivoTheme}
@@ -85,7 +112,16 @@ export function DashboardCharts({ categories, transactions,categorysData,monthSu
 									itemsSpacing: 8,
 									symbolSize: 18,
 									symbolShape: 'circle',
-									itemTextColor: theme === 'dark' ? '#e5e7eb' : '#222',
+									itemTextColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+									itemBackground: 'transparent',
+									effects: [
+										{
+											on: 'hover',
+											style: {
+												itemTextColor: theme === 'dark' ? '#ffffff' : '#000000'
+											}
+										}
+									]
 								}
 							]}
 						/>
@@ -140,7 +176,16 @@ export function DashboardCharts({ categories, transactions,categorysData,monthSu
 									itemHeight: 18,
 									itemsSpacing: 8,
 									symbolSize: 18,
-									itemTextColor: theme === 'dark' ? '#e5e7eb' : '#222',
+									itemTextColor: theme === 'dark' ? '#e5e7eb' : '#374151',
+									itemBackground: 'transparent',
+									effects: [
+										{
+											on: 'hover',
+											style: {
+												itemTextColor: theme === 'dark' ? '#ffffff' : '#000000'
+											}
+										}
+									]
 								}
 							]}
 						/>
