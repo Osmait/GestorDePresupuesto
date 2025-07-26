@@ -1,16 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { 
-	getAuthRepository, 
 	getAccountRepository, 
 	getTransactionRepository, 
 	getCategoryRepository, 
 	getBudgetRepository, 
     getAnalyticsRepository
 } from '@/lib/repositoryConfig'
-import { User } from '@/types/user'
 import { Account } from '@/types/account'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
@@ -41,21 +38,6 @@ interface StatCardProps {
 	color?: 'blue' | 'green' | 'red' | 'purple' | 'orange'
 }
 
-// Server Component para LoadingSpinner
-function LoadingSpinner() {
-	return (
-		<div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-background to-secondary/20 dark:from-background dark:to-secondary/10">
-			<div className="text-center">
-				<div className="relative">
-					<div className="animate-spin rounded-full h-16 w-16 border-4 border-muted border-t-primary mx-auto"></div>
-					<div className="absolute inset-0 rounded-full h-16 w-16 border-4 border-transparent border-t-primary/60 animate-spin mx-auto" style={{animationDelay: '0.3s', animationDuration: '1.2s'}}></div>
-				</div>
-				<div className="mt-6 text-xl font-semibold text-foreground">Cargando Dashboard</div>
-				<div className="mt-2 text-sm text-muted-foreground">Preparando tus datos financieros...</div>
-			</div>
-		</div>
-	)
-}
 
 // Server Component para StatCard
 function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' }: StatCardProps) {
@@ -308,15 +290,10 @@ function StatsGrid({ accounts, transactions }: {
 	)
 }
 
-// Server Component para AccountSummaryCard
-function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
-	// Implementation of AccountSummaryCard function
-}
+
 
 // Componente principal - Server Component que carga datos directamente
 export default async function DashboardPage() {
-	// Cargar datos en el servidor
-	const authRepository = await getAuthRepository()
 	const accountRepository = await getAccountRepository()
 	const transactionRepository = await getTransactionRepository()
 	const categoryRepository = await getCategoryRepository()
@@ -329,11 +306,11 @@ export default async function DashboardPage() {
 	const session = await getServerSession(authOptions);
 	
 	if (!session) {
-		// Redirigir al login si no hay sesión
 		const { redirect } = await import("next/navigation");
 		redirect('/login');
+    return
 	}
-
+  
 	const user = session.user;
 
 	const [accounts, transactions, categories, budgets,categorysData,getMonthlySummary] = await Promise.all([

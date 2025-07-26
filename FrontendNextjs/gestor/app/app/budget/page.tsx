@@ -12,18 +12,15 @@ import { AlertCircle, Loader2, PlusCircle, AlertTriangle } from 'lucide-react'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Progress } from '@/components/ui/progress'
-import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Button } from '@/components/ui/button'
 import { Budget } from '@/types/budget'
 import { Category } from '@/types/category'
-import { Transaction, TypeTransaction } from '@/types/transaction'
+import { Transaction} from '@/types/transaction'
 import { 
 	PiggyBank, 
 	TrendingUp, 
 	TrendingDown, 
 	Target,
-	Calendar,
 	DollarSign,
 	CheckCircle,
 	Clock
@@ -157,7 +154,7 @@ function BudgetCard({ budget, category, transactions }: BudgetCardProps) {
 }
 
 // Server Component para BudgetSummaryCard
-function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], transactions: Transaction[] }) {
+function BudgetSummaryCard({ budgets}: { budgets: Budget[], transactions: Transaction[] }) {
 	const totalBudget = budgets?.reduce((sum, budget) => sum + budget.amount, 0) || 0
 	const totalSpent = budgets?.reduce((sum, budget) => sum + Math.abs(budget.current_amount), 0) || 0
 	const totalRemaining = totalBudget - totalSpent

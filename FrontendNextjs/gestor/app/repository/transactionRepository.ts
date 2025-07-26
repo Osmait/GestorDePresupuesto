@@ -1,4 +1,4 @@
-import { Transaction, TypeTransaction } from "@/types/transaction";
+import { Transaction, TypeTransaction, PaginatedTransactionResponse, TransactionFilters } from "@/types/transaction";
 import { BaseRepository } from "@/lib/base-repository";
 
 export class TransactionRepository extends BaseRepository {
@@ -28,13 +28,47 @@ export class TransactionRepository extends BaseRepository {
     };
   }
 
-  async findAll(): Promise<Transaction[]> {
+  async findAll(filters?: TransactionFilters): Promise<PaginatedTransactionResponse> {
     try {
-      const transactions = await this.get<Transaction[]>("/transaction");
-      console.log("transactions data", transactions);
-      return transactions;
+      const queryParams = new URLSearchParams();
+      
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+      
+      const url = `/transaction${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await this.get<PaginatedTransactionResponse>(url);
+      console.log("paginated transactions data", response);
+      return response;
     } catch (error) {
       console.error("Error fetching transactions:", error);
+      return {
+        data: [],
+        pagination: {
+          current_page: 1,
+          has_next_page: false,
+          has_prev_page: false,
+          next_page: 1,
+          per_page: 20,
+          prev_page: 1,
+          total_pages: 1,
+          total_records: 0
+        }
+      };
+    }
+  }
+
+  async findAllSimple(): Promise<Transaction[]> {
+    try {
+      const response = await this.findAll({ limit: 1000 }); // Get a large limit for simple cases
+      console.log("simple transactions data", response);
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching simple transactions:", error);
       return [];
     }
   }

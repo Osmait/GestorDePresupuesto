@@ -712,7 +712,7 @@ const docTemplate = `{
                         "JWT": []
                     }
                 ],
-                "description": "Retrieve all transactions for the authenticated user across all their accounts",
+                "description": "Retrieve all transactions for the authenticated user across all their accounts with comprehensive filtering, sorting, and pagination options",
                 "consumes": [
                     "application/json"
                 ],
@@ -722,28 +722,165 @@ const docTemplate = `{
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Get all transactions across all accounts",
+                "summary": "Get all transactions across all accounts with filtering and pagination",
                 "parameters": [
                     {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Page number for pagination",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "example": 20,
+                        "description": "Number of records per page (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "example": 0,
+                        "description": "Number of records to skip",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "created_at",
+                            "amount",
+                            "name",
+                            "type_transation"
+                        ],
                         "type": "string",
-                        "description": "Start date (YYYY/MM/DD)",
-                        "name": "date",
+                        "example": "\"created_at\"",
+                        "description": "Field to sort by",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "example": "\"desc\"",
+                        "description": "Sort order",
+                        "name": "sort_order",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "income",
+                            "expense",
+                            "all"
+                        ],
+                        "type": "string",
+                        "example": "\"all\"",
+                        "description": "Transaction type filter",
+                        "name": "type",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "End date (YYYY/MM/DD)",
-                        "name": "date2",
+                        "example": "\"cat_123456789\"",
+                        "description": "Filter by category ID",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"cat_1,cat_2,cat_3\"",
+                        "description": "Filter by multiple categories (comma-separated)",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"acc_123456789\"",
+                        "description": "Filter by account ID",
+                        "name": "account_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"budget_555666777\"",
+                        "description": "Filter by budget ID",
+                        "name": "budget_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"2024/01/01\"",
+                        "description": "Start date (YYYY/MM/DD or YYYY-MM-DD)",
+                        "name": "date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"2024/12/31\"",
+                        "description": "End date (YYYY/MM/DD or YYYY-MM-DD)",
+                        "name": "date_to",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "today",
+                            "this_week",
+                            "this_month",
+                            "this_year",
+                            "last_week",
+                            "last_month",
+                            "last_year"
+                        ],
+                        "type": "string",
+                        "example": "\"this_month\"",
+                        "description": "Predefined period filter",
+                        "name": "period",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "example": 0,
+                        "description": "Minimum amount filter",
+                        "name": "amount_min",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "example": 1000,
+                        "description": "Maximum amount filter",
+                        "name": "amount_max",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"grocery\"",
+                        "description": "Search in name and description",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "example": true,
+                        "description": "Include summary statistics",
+                        "name": "include_summary",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of transactions",
+                        "description": "Paginated list of transactions",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.TransactionResponse"
+                            "$ref": "#/definitions/dto.PaginatedTransactionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - Invalid parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     },
@@ -842,7 +979,7 @@ const docTemplate = `{
                         "JWT": []
                     }
                 ],
-                "description": "Retrieve transactions for a specific account within a date range",
+                "description": "Retrieve transactions for a specific account with comprehensive filtering, sorting, and pagination options",
                 "consumes": [
                     "application/json"
                 ],
@@ -852,7 +989,7 @@ const docTemplate = `{
                 "tags": [
                     "Transactions"
                 ],
-                "summary": "Get transactions for a specific account",
+                "summary": "Get transactions for a specific account with filtering and pagination",
                 "parameters": [
                     {
                         "type": "string",
@@ -862,25 +999,155 @@ const docTemplate = `{
                         "required": true
                     },
                     {
+                        "type": "integer",
+                        "example": 1,
+                        "description": "Page number for pagination",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "example": 20,
+                        "description": "Number of records per page (max 100)",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "example": 0,
+                        "description": "Number of records to skip",
+                        "name": "offset",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "created_at",
+                            "amount",
+                            "name",
+                            "type_transation"
+                        ],
                         "type": "string",
-                        "description": "Start date (YYYY/MM/DD)",
-                        "name": "date",
+                        "example": "\"created_at\"",
+                        "description": "Field to sort by",
+                        "name": "sort_by",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "asc",
+                            "desc"
+                        ],
+                        "type": "string",
+                        "example": "\"desc\"",
+                        "description": "Sort order",
+                        "name": "sort_order",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "income",
+                            "expense",
+                            "all"
+                        ],
+                        "type": "string",
+                        "example": "\"all\"",
+                        "description": "Transaction type filter",
+                        "name": "type",
                         "in": "query"
                     },
                     {
                         "type": "string",
-                        "description": "End date (YYYY/MM/DD)",
-                        "name": "date2",
+                        "example": "\"cat_123456789\"",
+                        "description": "Filter by category ID",
+                        "name": "category_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"cat_1,cat_2,cat_3\"",
+                        "description": "Filter by multiple categories (comma-separated)",
+                        "name": "categories",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"budget_555666777\"",
+                        "description": "Filter by budget ID",
+                        "name": "budget_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"2024/01/01\"",
+                        "description": "Start date (YYYY/MM/DD or YYYY-MM-DD)",
+                        "name": "date_from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"2024/12/31\"",
+                        "description": "End date (YYYY/MM/DD or YYYY-MM-DD)",
+                        "name": "date_to",
+                        "in": "query"
+                    },
+                    {
+                        "enum": [
+                            "today",
+                            "this_week",
+                            "this_month",
+                            "this_year",
+                            "last_week",
+                            "last_month",
+                            "last_year"
+                        ],
+                        "type": "string",
+                        "example": "\"this_month\"",
+                        "description": "Predefined period filter",
+                        "name": "period",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "example": 0,
+                        "description": "Minimum amount filter",
+                        "name": "amount_min",
+                        "in": "query"
+                    },
+                    {
+                        "type": "number",
+                        "example": 1000,
+                        "description": "Maximum amount filter",
+                        "name": "amount_max",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "example": "\"grocery\"",
+                        "description": "Search in name and description",
+                        "name": "search",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "example": true,
+                        "description": "Include summary statistics",
+                        "name": "include_summary",
                         "in": "query"
                     }
                 ],
                 "responses": {
                     "200": {
-                        "description": "List of transactions for the account",
+                        "description": "Paginated list of transactions for the account",
                         "schema": {
-                            "type": "array",
-                            "items": {
-                                "$ref": "#/definitions/dto.TransactionResponse"
+                            "$ref": "#/definitions/dto.PaginatedTransactionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request - Invalid parameters",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
                             }
                         }
                     },
@@ -1168,6 +1435,57 @@ const docTemplate = `{
                 "name": {
                     "type": "string",
                     "example": "Food \u0026 Dining"
+                }
+            }
+        },
+        "dto.PaginatedTransactionResponse": {
+            "type": "object",
+            "properties": {
+                "data": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/dto.TransactionResponse"
+                    }
+                },
+                "pagination": {
+                    "$ref": "#/definitions/dto.PaginationMeta"
+                }
+            }
+        },
+        "dto.PaginationMeta": {
+            "type": "object",
+            "properties": {
+                "current_page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "has_next_page": {
+                    "type": "boolean",
+                    "example": true
+                },
+                "has_prev_page": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "next_page": {
+                    "type": "integer",
+                    "example": 2
+                },
+                "per_page": {
+                    "type": "integer",
+                    "example": 20
+                },
+                "prev_page": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "total_pages": {
+                    "type": "integer",
+                    "example": 5
+                },
+                "total_records": {
+                    "type": "integer",
+                    "example": 100
                 }
             }
         },

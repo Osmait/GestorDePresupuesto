@@ -96,6 +96,129 @@ func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, id string)
 	return transactionResponseList, nil
 }
 
+// FindAllOfAllAccountsWithFilters retrieves all transactions across all user accounts with filtering and pagination
+func (s TransactionService) FindAllOfAllAccountsWithFilters(
+	ctx context.Context,
+	userId string,
+	filter *dto.TransactionFilter,
+	includeSummary bool,
+) (interface{}, error) {
+	// Get total count first
+	totalCount, err := s.transactionRepository.CountWithFilters(ctx, userId, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get filtered and paginated transactions
+	transactionList, err := s.transactionRepository.FindAllOfAllAccountsWithFilters(ctx, userId, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to response DTOs
+	transactionResponseList := s.convertToResponseList(transactionList)
+
+	// Create paginated response
+	if includeSummary {
+		// Get all transactions for summary calculation (without pagination)
+		allTransactionsFilter := *filter
+		allTransactionsFilter.Limit = 0 // Remove pagination for summary
+		allTransactionsFilter.Offset = 0
+
+		allTransactions, err := s.transactionRepository.FindAllOfAllAccountsWithFilters(ctx, userId, &allTransactionsFilter)
+		if err != nil {
+			return nil, err
+		}
+
+		allTransactionResponses := s.convertToResponseList(allTransactions)
+		summary := dto.CalculateSummary(allTransactionResponses, totalCount)
+
+		return dto.NewPaginatedTransactionResponseWithSummary(
+			transactionResponseList,
+			filter,
+			totalCount,
+			summary,
+		), nil
+	}
+
+	return dto.NewPaginatedTransactionResponse(
+		transactionResponseList,
+		filter,
+		totalCount,
+	), nil
+}
+
+// FindAllWithFilters retrieves transactions for a specific account with filtering and pagination
+func (s TransactionService) FindAllWithFilters(
+	ctx context.Context,
+	filter *dto.TransactionFilter,
+	includeSummary bool,
+) (interface{}, error) {
+	// Get total count first
+	totalCount, err := s.transactionRepository.CountWithFilters(ctx, "", filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get filtered and paginated transactions
+	transactionList, err := s.transactionRepository.FindAllWithFilters(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert to response DTOs
+	transactionResponseList := s.convertToResponseList(transactionList)
+
+	// Create paginated response
+	if includeSummary {
+		// Get all transactions for summary calculation (without pagination)
+		allTransactionsFilter := *filter
+		allTransactionsFilter.Limit = 0 // Remove pagination for summary
+		allTransactionsFilter.Offset = 0
+
+		allTransactions, err := s.transactionRepository.FindAllWithFilters(ctx, &allTransactionsFilter)
+		if err != nil {
+			return nil, err
+		}
+
+		allTransactionResponses := s.convertToResponseList(allTransactions)
+		summary := dto.CalculateSummary(allTransactionResponses, totalCount)
+
+		return dto.NewPaginatedTransactionResponseWithSummary(
+			transactionResponseList,
+			filter,
+			totalCount,
+			summary,
+		), nil
+	}
+
+	return dto.NewPaginatedTransactionResponse(
+		transactionResponseList,
+		filter,
+		totalCount,
+	), nil
+}
+
+// convertToResponseList converts domain transactions to response DTOs
+func (s TransactionService) convertToResponseList(transactions []*transaction.Transaction) []*dto.TransactionResponse {
+	var transactionResponseList []*dto.TransactionResponse
+	for _, transaction := range transactions {
+		transactionResponse := dto.NewTransactionResponse(
+			transaction.Id,
+			transaction.Name,
+			transaction.Description,
+			transaction.TypeTransation,
+			transaction.AccountId,
+			transaction.CategoryId,
+			transaction.Amount,
+			transaction.CreatedAt,
+		)
+		transactionResponse.BudgetId = transaction.BudgetId
+		transactionResponseList = append(transactionResponseList, transactionResponse)
+	}
+	return transactionResponseList
+}
+
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string) error {
 	err := s.transactionRepository.Delete(ctx, id)
 	return err

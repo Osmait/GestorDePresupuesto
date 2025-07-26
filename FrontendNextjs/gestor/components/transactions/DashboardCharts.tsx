@@ -14,18 +14,9 @@ interface DashboardChartsProps {
   monthSummary: MonthlySummary[]
 }
 
-export function DashboardCharts({ categories, transactions,categorysData,monthSummary}: DashboardChartsProps) {
-	console.log('DashboardCharts categories:', categories)
-	console.log('DashboardCharts transactions:', transactions)
-  console.log('DashboardCharts categoríaData:', categorysData)
+export function DashboardCharts({ categorysData,monthSummary}: DashboardChartsProps) {
 	const { theme } = useTheme()
 
-	// Usar todas las transacciones disponibles (no solo del mes actual)
-	const validTransactions = useMemo(() => 
-		Array.isArray(transactions) ? transactions : [], 
-	[transactions])
-
-	console.log('Valid transactions:', validTransactions)
 
 
   const pieData = categorysData.map(cat => {

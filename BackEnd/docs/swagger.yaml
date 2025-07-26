@@ -138,6 +138,42 @@ definitions:
         example: Food & Dining
         type: string
     type: object
+  dto.PaginatedTransactionResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.TransactionResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/dto.PaginationMeta'
+    type: object
+  dto.PaginationMeta:
+    properties:
+      current_page:
+        example: 1
+        type: integer
+      has_next_page:
+        example: true
+        type: boolean
+      has_prev_page:
+        example: false
+        type: boolean
+      next_page:
+        example: 2
+        type: integer
+      per_page:
+        example: 20
+        type: integer
+      prev_page:
+        example: 1
+        type: integer
+      total_pages:
+        example: 5
+        type: integer
+      total_records:
+        example: 100
+        type: integer
+    type: object
   dto.TransactionRequest:
     properties:
       account_id:
@@ -650,25 +686,126 @@ paths:
       consumes:
       - application/json
       description: Retrieve all transactions for the authenticated user across all
-        their accounts
+        their accounts with comprehensive filtering, sorting, and pagination options
       parameters:
-      - description: Start date (YYYY/MM/DD)
+      - description: Page number for pagination
+        example: 1
         in: query
-        name: date
-        type: string
-      - description: End date (YYYY/MM/DD)
+        name: page
+        type: integer
+      - description: Number of records per page (max 100)
+        example: 20
         in: query
-        name: date2
+        name: limit
+        type: integer
+      - description: Number of records to skip
+        example: 0
+        in: query
+        name: offset
+        type: integer
+      - description: Field to sort by
+        enum:
+        - created_at
+        - amount
+        - name
+        - type_transation
+        example: '"created_at"'
+        in: query
+        name: sort_by
         type: string
+      - description: Sort order
+        enum:
+        - asc
+        - desc
+        example: '"desc"'
+        in: query
+        name: sort_order
+        type: string
+      - description: Transaction type filter
+        enum:
+        - income
+        - expense
+        - all
+        example: '"all"'
+        in: query
+        name: type
+        type: string
+      - description: Filter by category ID
+        example: '"cat_123456789"'
+        in: query
+        name: category_id
+        type: string
+      - description: Filter by multiple categories (comma-separated)
+        example: '"cat_1,cat_2,cat_3"'
+        in: query
+        name: categories
+        type: string
+      - description: Filter by account ID
+        example: '"acc_123456789"'
+        in: query
+        name: account_id
+        type: string
+      - description: Filter by budget ID
+        example: '"budget_555666777"'
+        in: query
+        name: budget_id
+        type: string
+      - description: Start date (YYYY/MM/DD or YYYY-MM-DD)
+        example: '"2024/01/01"'
+        in: query
+        name: date_from
+        type: string
+      - description: End date (YYYY/MM/DD or YYYY-MM-DD)
+        example: '"2024/12/31"'
+        in: query
+        name: date_to
+        type: string
+      - description: Predefined period filter
+        enum:
+        - today
+        - this_week
+        - this_month
+        - this_year
+        - last_week
+        - last_month
+        - last_year
+        example: '"this_month"'
+        in: query
+        name: period
+        type: string
+      - description: Minimum amount filter
+        example: 0
+        in: query
+        name: amount_min
+        type: number
+      - description: Maximum amount filter
+        example: 1000
+        in: query
+        name: amount_max
+        type: number
+      - description: Search in name and description
+        example: '"grocery"'
+        in: query
+        name: search
+        type: string
+      - description: Include summary statistics
+        example: true
+        in: query
+        name: include_summary
+        type: boolean
       produces:
       - application/json
       responses:
         "200":
-          description: List of transactions
+          description: Paginated list of transactions
           schema:
-            items:
-              $ref: '#/definitions/dto.TransactionResponse'
-            type: array
+            $ref: '#/definitions/dto.PaginatedTransactionResponse'
+        "400":
+          description: Bad request - Invalid parameters
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "401":
           description: Unauthorized - Invalid JWT token
           schema:
@@ -683,7 +820,7 @@ paths:
             type: object
       security:
       - JWT: []
-      summary: Get all transactions across all accounts
+      summary: Get all transactions across all accounts with filtering and pagination
       tags:
       - Transactions
     post:
@@ -775,30 +912,127 @@ paths:
     get:
       consumes:
       - application/json
-      description: Retrieve transactions for a specific account within a date range
+      description: Retrieve transactions for a specific account with comprehensive
+        filtering, sorting, and pagination options
       parameters:
       - description: Account ID
         in: path
         name: id
         required: true
         type: string
-      - description: Start date (YYYY/MM/DD)
+      - description: Page number for pagination
+        example: 1
         in: query
-        name: date
-        type: string
-      - description: End date (YYYY/MM/DD)
+        name: page
+        type: integer
+      - description: Number of records per page (max 100)
+        example: 20
         in: query
-        name: date2
+        name: limit
+        type: integer
+      - description: Number of records to skip
+        example: 0
+        in: query
+        name: offset
+        type: integer
+      - description: Field to sort by
+        enum:
+        - created_at
+        - amount
+        - name
+        - type_transation
+        example: '"created_at"'
+        in: query
+        name: sort_by
         type: string
+      - description: Sort order
+        enum:
+        - asc
+        - desc
+        example: '"desc"'
+        in: query
+        name: sort_order
+        type: string
+      - description: Transaction type filter
+        enum:
+        - income
+        - expense
+        - all
+        example: '"all"'
+        in: query
+        name: type
+        type: string
+      - description: Filter by category ID
+        example: '"cat_123456789"'
+        in: query
+        name: category_id
+        type: string
+      - description: Filter by multiple categories (comma-separated)
+        example: '"cat_1,cat_2,cat_3"'
+        in: query
+        name: categories
+        type: string
+      - description: Filter by budget ID
+        example: '"budget_555666777"'
+        in: query
+        name: budget_id
+        type: string
+      - description: Start date (YYYY/MM/DD or YYYY-MM-DD)
+        example: '"2024/01/01"'
+        in: query
+        name: date_from
+        type: string
+      - description: End date (YYYY/MM/DD or YYYY-MM-DD)
+        example: '"2024/12/31"'
+        in: query
+        name: date_to
+        type: string
+      - description: Predefined period filter
+        enum:
+        - today
+        - this_week
+        - this_month
+        - this_year
+        - last_week
+        - last_month
+        - last_year
+        example: '"this_month"'
+        in: query
+        name: period
+        type: string
+      - description: Minimum amount filter
+        example: 0
+        in: query
+        name: amount_min
+        type: number
+      - description: Maximum amount filter
+        example: 1000
+        in: query
+        name: amount_max
+        type: number
+      - description: Search in name and description
+        example: '"grocery"'
+        in: query
+        name: search
+        type: string
+      - description: Include summary statistics
+        example: true
+        in: query
+        name: include_summary
+        type: boolean
       produces:
       - application/json
       responses:
         "200":
-          description: List of transactions for the account
+          description: Paginated list of transactions for the account
           schema:
-            items:
-              $ref: '#/definitions/dto.TransactionResponse'
-            type: array
+            $ref: '#/definitions/dto.PaginatedTransactionResponse'
+        "400":
+          description: Bad request - Invalid parameters
+          schema:
+            additionalProperties:
+              type: string
+            type: object
         "401":
           description: Unauthorized - Invalid JWT token
           schema:
@@ -819,7 +1053,7 @@ paths:
             type: object
       security:
       - JWT: []
-      summary: Get transactions for a specific account
+      summary: Get transactions for a specific account with filtering and pagination
       tags:
       - Transactions
 securityDefinitions:

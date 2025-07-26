@@ -22,7 +22,7 @@ export default function CarouselSection({ data }: Props) {
       ]}
     >
       <CarouselContent>
-        {data.map((d) => (
+        {data.map((_) => (
           <CarouselItem>
             <Badge
               className="flex gap-x-4 text-lg bg-red-900/70"

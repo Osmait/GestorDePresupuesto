@@ -1,5 +1,5 @@
 "use client";
-import { useAccounts, useCategories, useTransactions, useBudgets } from '@/hooks/useRepositories';
+import { useAccounts, useCategories, useTransactions} from '@/hooks/useRepositories';
 import { useState, useEffect, useRef } from 'react';
 import { DateRange } from 'react-day-picker';
 import { Button } from '@/components/ui/button';
@@ -12,13 +12,13 @@ import { AnimatedTabs } from '@/components/common/animated-tabs';
 import TransactionItem from '@/components/transactions/TransactionItem';
 import TransactionSummaryCard from '@/components/transactions/TransactionSummaryCard';
 import TransactionFormModal from '@/components/transactions/TransactionFormModal';
-import { Transaction, TypeTransaction } from '@/types/transaction';
+import { Transaction, TypeTransaction, TransactionFilters } from '@/types/transaction';
 
 export default function TransactionsClient() {
-  const { transactions, isLoading: isLoadingTx, createTransaction, deleteTransaction, isLoading, error } = useTransactions();
+  const { transactions, pagination, isLoading: isLoadingTx, loadTransactions, createTransaction, deleteTransaction, isLoading, error } = useTransactions();
   const { categories, isLoading: isLoadingCat } = useCategories();
   const { accounts, isLoading: isLoadingAcc } = useAccounts();
-  const { budgets } = useBudgets();
+  console.log('Transactions Debug ', transactions)
 
   const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME);
   const expenseTransactions = transactions.filter(t => t.type_transation === TypeTransaction.BILL);
@@ -39,32 +39,46 @@ export default function TransactionsClient() {
   const formRef = useRef<{ reset: () => void } | null>(null);
 
   function applyFilters() {
-    let txs = transactions;
+    const apiFilters: TransactionFilters = {
+      page: 1,
+      limit: 50,
+      sort_by: 'created_at',
+      sort_order: 'desc'
+    };
+
+    // Map UI filters to API filters
     if (filters.dateRange.from && filters.dateRange.to) {
-      txs = txs.filter(tx => {
-        const d = new Date(tx.created_at);
-        return d >= filters.dateRange.from! && d <= filters.dateRange.to!;
-      });
+      apiFilters.date_from = filters.dateRange.from.toISOString().split('T')[0];
+      apiFilters.date_to = filters.dateRange.to.toISOString().split('T')[0];
     }
+    
     if (filters.type !== 'all') {
-      txs = txs.filter(tx => (filters.type === 'INCOME' ? tx.type_transation === TypeTransaction.INCOME : tx.type_transation === TypeTransaction.BILL));
+      apiFilters.type = filters.type === 'INCOME' ? 'income' : 'expense';
     }
+    
     if (filters.account !== 'all') {
-      txs = txs.filter(tx => tx.account_id === filters.account);
+      apiFilters.account_id = filters.account;
     }
+    
     if (filters.category !== 'all') {
-      txs = txs.filter(tx => tx.category_id === filters.category);
+      apiFilters.category_id = filters.category;
     }
+    
     if (filters.minAmount) {
-      txs = txs.filter(tx => tx.amount >= Number(filters.minAmount));
+      apiFilters.amount_min = Number(filters.minAmount);
     }
+    
     if (filters.maxAmount) {
-      txs = txs.filter(tx => tx.amount <= Number(filters.maxAmount));
+      apiFilters.amount_max = Number(filters.maxAmount);
     }
+    
     if (filters.search) {
-      txs = txs.filter(tx => tx.description.toLowerCase().includes(filters.search.toLowerCase()));
+      apiFilters.search = filters.search;
     }
-    setFiltered(txs);
+
+    // Load transactions with API filters
+    loadTransactions(apiFilters);
+    setFiltered(null); // Clear local filtered state since we're using API filtering
   }
 
   function clearFilters() {
@@ -78,6 +92,8 @@ export default function TransactionsClient() {
       search: '',
     });
     setFiltered(null);
+    // Load all transactions without filters
+    loadTransactions();
   }
 
   const shownTransactions = filtered ? filtered : (Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []);
@@ -121,9 +137,10 @@ export default function TransactionsClient() {
     }
   ];
 
-  useEffect(() => {
-    applyFilters();
-  }, [filters, transactions]);
+  // Remove this useEffect to prevent infinite loop
+  // useEffect(() => {
+  //   applyFilters();
+  // }, [filters, transactions]);
 
   useEffect(() => {
     if (modalSuccess) {
@@ -242,6 +259,14 @@ export default function TransactionsClient() {
                 <label className="block mb-1">Buscar</label>
                 <Input type="text" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Buscar por descripción..." />
               </div>
+              <div className="flex gap-2 pt-4">
+                <Button type="button" onClick={applyFilters} className="flex-1">
+                  Aplicar Filtros
+                </Button>
+                <Button type="button" variant="outline" onClick={clearFilters} className="flex-1">
+                  Limpiar
+                </Button>
+              </div>
               <DrawerClose asChild>
                 <Button type="button" variant="ghost" className="w-full">Cerrar</Button>
               </DrawerClose>
@@ -253,6 +278,21 @@ export default function TransactionsClient() {
         <div className="mb-8">
           <TransactionSummaryCard transactions={transactions} />
         </div>
+
+        {/* Información de paginación */}
+        {pagination && (
+          <div className="mb-4 flex justify-between items-center text-sm text-muted-foreground">
+            <span>
+              Mostrando {transactions.length} de {pagination.total_records} transacciones
+              {pagination.total_pages > 1 && ` (Página ${pagination.current_page} de ${pagination.total_pages})`}
+            </span>
+            {(filtered !== null || Object.values(filters).some(v => v && v !== 'all')) && (
+              <Button variant="outline" size="sm" onClick={clearFilters}>
+                Ver todas las transacciones
+              </Button>
+            )}
+          </div>
+        )}
 
         {/* Contenido principal con tabs */}
         <AnimatedTabs

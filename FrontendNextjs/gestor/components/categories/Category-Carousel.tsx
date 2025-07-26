@@ -6,7 +6,7 @@ import {
   CarouselNext,
   CarouselPrevious,
 } from "@/components/ui/carousel";
-import { Badge } from "./ui/badge";
+import { Badge } from "../ui/badge";
 import Autoplay from "embla-carousel-autoplay";
 
 export default function CategoryCarousel() {

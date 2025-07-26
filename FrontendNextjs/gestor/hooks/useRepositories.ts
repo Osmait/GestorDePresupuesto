@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Account } from '@/types/account'
 import { Category } from '@/types/category'
-import { Transaction, TypeTransaction } from '@/types/transaction'
+import { Transaction, TypeTransaction, PaginatedTransactionResponse, TransactionFilters, PaginationMeta } from '@/types/transaction'
 import { Budget } from '@/types/budget'
 import { User } from '@/types/user'
 import { CategoryExpense, MonthlySummary } from '@/types/analytics'
@@ -158,16 +158,33 @@ export const useCategories = () => {
 // Hook para manejar transacciones
 export const useTransactions = () => {
 	const [transactions, setTransactions] = useState<Transaction[]>([])
+	const [pagination, setPagination] = useState<PaginationMeta | null>(null)
 	const [isLoading, setIsLoading] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 
-	const loadTransactions = useCallback(async () => {
+	const loadTransactions = useCallback(async (filters?: TransactionFilters) => {
 		try {
 			setIsLoading(true)
 			setError(null)
 			const transactionRepository = await getTransactionRepository()
-			const data = await transactionRepository.findAll()
-			setTransactions(Array.isArray(data) ? data : [])
+			const response = await transactionRepository.findAll(filters)
+			setTransactions(response.data || [])
+			setPagination(response.pagination || null)
+		} catch (err) {
+			setError(err instanceof Error ? err.message : 'Error loading transactions')
+		} finally {
+			setIsLoading(false)
+		}
+	}, [])
+
+	const loadAllTransactions = useCallback(async () => {
+		try {
+			setIsLoading(true)
+			setError(null)
+			const transactionRepository = await getTransactionRepository()
+			const data = await transactionRepository.findAllSimple()
+			setTransactions(data || [])
+			setPagination(null) // No pagination for simple load
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error loading transactions')
 		} finally {
@@ -196,24 +213,24 @@ export const useTransactions = () => {
 				categoryId,
 				budgetId
 			)
-			await loadTransactions() // Recargar después de crear
+			await loadAllTransactions() // Recargar después de crear
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error creating transaction')
 			throw err
 		}
-	}, [loadTransactions])
+	}, [loadAllTransactions])
 
 	const deleteTransaction = useCallback(async (id: string) => {
 		try {
 			setError(null)
 			const transactionRepository = await getTransactionRepository()
 			await transactionRepository.delete(id)
-			await loadTransactions() // Recargar después de eliminar
+			await loadAllTransactions() // Recargar después de eliminar
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error deleting transaction')
 			throw err
 		}
-	}, [loadTransactions])
+	}, [loadAllTransactions])
 
 	// Métodos adicionales para mocks
 	const getTransactionsByAccount = useCallback(async (accountId: string) => {
@@ -262,19 +279,22 @@ export const useTransactions = () => {
 	}, [])
 
 	useEffect(() => {
-		loadTransactions()
-	}, [loadTransactions])
+		loadAllTransactions()
+	}, [loadAllTransactions])
 
 	return {
 		transactions,
+		pagination,
 		isLoading,
 		error,
+		loadTransactions,
+		loadAllTransactions,
 		createTransaction,
 		deleteTransaction,
 		getTransactionsByAccount,
 		getTransactionsByCategory,
 		getTransactionStatistics,
-		refetch: loadTransactions,
+		refetch: loadAllTransactions,
 	}
 }
 

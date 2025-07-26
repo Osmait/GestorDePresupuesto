@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { LoginForm } from './login-form'
 import { RegisterForm } from './register-form'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card} from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ModeToggle } from '@/components/common/ToggleMode'
 import { Home, LogIn, UserPlus } from 'lucide-react'

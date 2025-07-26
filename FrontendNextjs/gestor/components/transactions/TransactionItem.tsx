@@ -37,7 +37,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
     
     setIsDeleting(true);
     try {
-      await onTransactionDeleted();
+      onTransactionDeleted();
       setShowDeleteDialog(false);
     } catch (error) {
       console.error('Error deleting transaction:', error);

@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { useAccounts, useCategories, useBudgets } from '@/hooks/useRepositories';
-import { Transaction, TypeTransaction } from '@/types/transaction';
+import {  TypeTransaction } from '@/types/transaction';
 
 const transactionSchema = z.object({
   name: z.string().min(2, 'El nombre es requerido'),
