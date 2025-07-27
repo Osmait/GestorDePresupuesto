@@ -1,6 +1,6 @@
 "use client";
 import { useAccounts, useCategories, useTransactions } from '@/hooks/useRepositories';
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback} from 'react';
 import { DateRange } from 'react-day-picker';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -103,7 +103,7 @@ export default function TransactionsClient() {
       apiFilters.date_to = combinedFilters.dateRange.to.toISOString().split('T')[0];
     }
     if (combinedFilters.type !== 'all') {
-      apiFilters.type = combinedFilters.type === 'INCOME' ? 'income' : 'expense';
+      apiFilters.type = combinedFilters.type === 'INCOME' ? 'income' : 'bill';
     }
     if (combinedFilters.account !== 'all') {
       apiFilters.account_id = combinedFilters.account;
