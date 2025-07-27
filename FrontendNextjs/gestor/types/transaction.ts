@@ -37,7 +37,7 @@ export interface TransactionFilters {
   offset?: number;
   sort_by?: 'created_at' | 'amount' | 'name' | 'type_transation';
   sort_order?: 'asc' | 'desc';
-  type?: 'income' | 'expense' | 'all';
+  type?: 'income' | 'bill' | 'all';
   category_id?: string;
   categories?: string;
   account_id?: string;
