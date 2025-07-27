@@ -21,7 +21,7 @@ type TransactionFilter struct {
 	SortOrder string `json:"sort_order" example:"desc" enums:"asc,desc"`
 
 	// Type filter
-	Type string `json:"type" example:"income" enums:"income,expense,all"`
+	Type string `json:"type" example:"income" enums:"income,bill,all"`
 
 	// Category filters
 	CategoryId string   `json:"category_id" example:"cat_123456789"`
@@ -108,7 +108,7 @@ func (f *TransactionFilter) ParseFromQuery(ctx *gin.Context) error {
 
 	// Parse type filter
 	if typeFilter := ctx.Query("type"); typeFilter != "" {
-		if typeFilter == "income" || typeFilter == "expense" || typeFilter == "all" {
+		if typeFilter == "income" || typeFilter == "bill" || typeFilter == "all" {
 			f.Type = typeFilter
 		}
 	}
