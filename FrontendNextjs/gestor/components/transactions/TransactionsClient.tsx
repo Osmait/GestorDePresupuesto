@@ -1,6 +1,6 @@
 "use client";
 import { useAccounts, useCategories, useTransactions} from '@/hooks/useRepositories';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { DateRange } from 'react-day-picker';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,23 @@ import TransactionItem from '@/components/transactions/TransactionItem';
 import TransactionSummaryCard from '@/components/transactions/TransactionSummaryCard';
 import TransactionFormModal from '@/components/transactions/TransactionFormModal';
 import { Transaction, TypeTransaction, TransactionFilters } from '@/types/transaction';
+
+// Custom hook for debouncing values
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+
+    return () => {
+      clearTimeout(handler);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
+}
 
 export default function TransactionsClient() {
   const { transactions, pagination, isLoading: isLoadingTx, loadTransactions, createTransaction, deleteTransaction, isLoading, error } = useTransactions();
@@ -54,6 +71,11 @@ export default function TransactionsClient() {
   const [modalSuccess, setModalSuccess] = useState(false);
   const formRef = useRef<{ reset: () => void } | null>(null);
 
+  // Debounce search input to avoid too many API calls
+  const debouncedSearch = useDebounce(filters.search, 500);
+  const debouncedMinAmount = useDebounce(filters.minAmount, 300);
+  const debouncedMaxAmount = useDebounce(filters.maxAmount, 300);
+
   // Function to update URL with current filters
   const updateURLWithFilters = useCallback((newFilters: typeof filters) => {
     const params = new URLSearchParams();
@@ -89,9 +111,18 @@ export default function TransactionsClient() {
     router.replace(newURL);
   }, [router]);
 
-  function applyFilters() {
+  // Function to apply filters automatically (used by useEffect hooks)
+  const applyFiltersAutomatically = useCallback((currentFilters: typeof filters, searchText: string, minAmount: string, maxAmount: string) => {
+    // Create a combined filters object with debounced values
+    const combinedFilters = {
+      ...currentFilters,
+      search: searchText,
+      minAmount: minAmount,
+      maxAmount: maxAmount
+    };
+
     // Update URL with current filters
-    updateURLWithFilters(filters);
+    updateURLWithFilters(combinedFilters);
     
     const apiFilters: TransactionFilters = {
       page: 1,
@@ -101,39 +132,42 @@ export default function TransactionsClient() {
     };
 
     // Map UI filters to API filters
-    if (filters.dateRange.from && filters.dateRange.to) {
-      apiFilters.date_from = filters.dateRange.from.toISOString().split('T')[0];
-      apiFilters.date_to = filters.dateRange.to.toISOString().split('T')[0];
+    if (combinedFilters.dateRange.from && combinedFilters.dateRange.to) {
+      apiFilters.date_from = combinedFilters.dateRange.from.toISOString().split('T')[0];
+      apiFilters.date_to = combinedFilters.dateRange.to.toISOString().split('T')[0];
     }
     
-    if (filters.type !== 'all') {
-      apiFilters.type = filters.type === 'INCOME' ? 'income' : 'expense';
+    if (combinedFilters.type !== 'all') {
+      apiFilters.type = combinedFilters.type === 'INCOME' ? 'income' : 'expense';
     }
     
-    if (filters.account !== 'all') {
-      apiFilters.account_id = filters.account;
+    if (combinedFilters.account !== 'all') {
+      apiFilters.account_id = combinedFilters.account;
     }
     
-    if (filters.category !== 'all') {
-      apiFilters.category_id = filters.category;
+    if (combinedFilters.category !== 'all') {
+      apiFilters.category_id = combinedFilters.category;
     }
     
-    if (filters.minAmount) {
-      apiFilters.amount_min = Number(filters.minAmount);
+    if (combinedFilters.minAmount) {
+      apiFilters.amount_min = Number(combinedFilters.minAmount);
     }
     
-    if (filters.maxAmount) {
-      apiFilters.amount_max = Number(filters.maxAmount);
+    if (combinedFilters.maxAmount) {
+      apiFilters.amount_max = Number(combinedFilters.maxAmount);
     }
     
-    if (filters.search) {
-      apiFilters.search = filters.search;
+    if (combinedFilters.search) {
+      apiFilters.search = combinedFilters.search;
     }
 
+    // Debug: log the filters being sent to API
+    console.log('Applying filters to API:', apiFilters);
+    
     // Load transactions with API filters
     loadTransactions(apiFilters);
     setFiltered(null); // Clear local filtered state since we're using API filtering
-  }
+  }, [updateURLWithFilters, loadTransactions]);
 
   function clearFilters() {
     const clearedFilters = {
@@ -155,6 +189,29 @@ export default function TransactionsClient() {
     // Load all transactions without filters
     loadTransactions();
   }
+
+  // Keep track of initial load to avoid applying filters during mount
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
+  // Effect to handle automatic filtering when filters change
+  useEffect(() => {
+    // Skip during initial load
+    if (isInitialLoad) return;
+    
+    // Apply filters automatically when any filter changes
+    applyFiltersAutomatically(filters, debouncedSearch, debouncedMinAmount, debouncedMaxAmount);
+  }, [
+    filters.dateRange.from, 
+    filters.dateRange.to, 
+    filters.type, 
+    filters.account, 
+    filters.category,
+    debouncedSearch,
+    debouncedMinAmount,
+    debouncedMaxAmount,
+    applyFiltersAutomatically,
+    isInitialLoad
+  ]);
 
   const shownTransactions = filtered ? filtered : (Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []);
 
@@ -249,6 +306,9 @@ export default function TransactionsClient() {
 
       loadTransactions(apiFilters);
     }
+    
+    // Mark initial load as complete
+    setIsInitialLoad(false);
   }, []); // Only run on mount
 
   useEffect(() => {
@@ -369,11 +429,8 @@ export default function TransactionsClient() {
                 <Input type="text" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Buscar por descripción..." />
               </div>
               <div className="flex gap-2 pt-4">
-                <Button type="button" onClick={applyFilters} className="flex-1">
-                  Aplicar Filtros
-                </Button>
-                <Button type="button" variant="outline" onClick={clearFilters} className="flex-1">
-                  Limpiar
+                <Button type="button" variant="outline" onClick={clearFilters} className="w-full">
+                  Limpiar Filtros
                 </Button>
               </div>
               <DrawerClose asChild>
