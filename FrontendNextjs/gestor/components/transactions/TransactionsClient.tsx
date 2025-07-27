@@ -1,7 +1,8 @@
 "use client";
 import { useAccounts, useCategories, useTransactions} from '@/hooks/useRepositories';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { DateRange } from 'react-day-picker';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Filter, PlusCircle, CreditCard, TrendingUp, TrendingDown } from 'lucide-react';
 import { CalendarDateRangePicker } from '@/components/date-range-picker';
@@ -18,27 +19,80 @@ export default function TransactionsClient() {
   const { transactions, pagination, isLoading: isLoadingTx, loadTransactions, createTransaction, deleteTransaction, isLoading, error } = useTransactions();
   const { categories, isLoading: isLoadingCat } = useCategories();
   const { accounts, isLoading: isLoadingAcc } = useAccounts();
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  
   console.log('Transactions Debug ', transactions)
 
   const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME);
   const expenseTransactions = transactions.filter(t => t.type_transation === TypeTransaction.BILL);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  const [filters, setFilters] = useState({
-    dateRange: { from: undefined, to: undefined } as DateRange,
-    type: 'all',
-    account: 'all',
-    category: 'all',
-    minAmount: '',
-    maxAmount: '',
-    search: '',
-  });
+  
+  // Initialize filters from URL parameters
+  const initializeFiltersFromURL = useCallback(() => {
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
+    
+    return {
+      dateRange: {
+        from: dateFrom ? new Date(dateFrom) : undefined,
+        to: dateTo ? new Date(dateTo) : undefined,
+      } as DateRange,
+      type: searchParams.get('type') || 'all',
+      account: searchParams.get('account') || 'all',
+      category: searchParams.get('category') || 'all',
+      minAmount: searchParams.get('minAmount') || '',
+      maxAmount: searchParams.get('maxAmount') || '',
+      search: searchParams.get('search') || '',
+    };
+  }, [searchParams]);
+
+  const [filters, setFilters] = useState(() => initializeFiltersFromURL());
   const [filtered, setFiltered] = useState<Transaction[] | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [modalSuccess, setModalSuccess] = useState(false);
   const formRef = useRef<{ reset: () => void } | null>(null);
 
+  // Function to update URL with current filters
+  const updateURLWithFilters = useCallback((newFilters: typeof filters) => {
+    const params = new URLSearchParams();
+    
+    // Add filters to URL if they have values
+    if (newFilters.dateRange.from) {
+      params.set('dateFrom', newFilters.dateRange.from.toISOString().split('T')[0]);
+    }
+    if (newFilters.dateRange.to) {
+      params.set('dateTo', newFilters.dateRange.to.toISOString().split('T')[0]);
+    }
+    if (newFilters.type && newFilters.type !== 'all') {
+      params.set('type', newFilters.type);
+    }
+    if (newFilters.account && newFilters.account !== 'all') {
+      params.set('account', newFilters.account);
+    }
+    if (newFilters.category && newFilters.category !== 'all') {
+      params.set('category', newFilters.category);
+    }
+    if (newFilters.minAmount) {
+      params.set('minAmount', newFilters.minAmount);
+    }
+    if (newFilters.maxAmount) {
+      params.set('maxAmount', newFilters.maxAmount);
+    }
+    if (newFilters.search) {
+      params.set('search', newFilters.search);
+    }
+
+    // Update URL
+    const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname;
+    router.replace(newURL);
+  }, [router]);
+
   function applyFilters() {
+    // Update URL with current filters
+    updateURLWithFilters(filters);
+    
     const apiFilters: TransactionFilters = {
       page: 1,
       limit: 50,
@@ -82,7 +136,7 @@ export default function TransactionsClient() {
   }
 
   function clearFilters() {
-    setFilters({
+    const clearedFilters = {
       dateRange: { from: undefined, to: undefined },
       type: 'all',
       account: 'all',
@@ -90,8 +144,14 @@ export default function TransactionsClient() {
       minAmount: '',
       maxAmount: '',
       search: '',
-    });
+    };
+    
+    setFilters(clearedFilters);
     setFiltered(null);
+    
+    // Clear URL parameters
+    router.replace(window.location.pathname);
+    
     // Load all transactions without filters
     loadTransactions();
   }
@@ -137,10 +197,59 @@ export default function TransactionsClient() {
     }
   ];
 
-  // Remove this useEffect to prevent infinite loop
-  // useEffect(() => {
-  //   applyFilters();
-  // }, [filters, transactions]);
+  // Apply filters on component mount if URL has parameters
+  useEffect(() => {
+    const hasActiveFilters = searchParams.toString().length > 0;
+    if (hasActiveFilters) {
+      // Manually trigger API call with URL filters on mount
+      const apiFilters: TransactionFilters = {
+        page: 1,
+        limit: 50,
+        sort_by: 'created_at',
+        sort_order: 'desc'
+      };
+
+      // Map URL filters to API filters
+      const dateFrom = searchParams.get('dateFrom');
+      const dateTo = searchParams.get('dateTo');
+      if (dateFrom && dateTo) {
+        apiFilters.date_from = dateFrom;
+        apiFilters.date_to = dateTo;
+      }
+      
+      const type = searchParams.get('type');
+      if (type && type !== 'all') {
+        apiFilters.type = type === 'INCOME' ? 'income' : 'expense';
+      }
+      
+      const account = searchParams.get('account');
+      if (account && account !== 'all') {
+        apiFilters.account_id = account;
+      }
+      
+      const category = searchParams.get('category');
+      if (category && category !== 'all') {
+        apiFilters.category_id = category;
+      }
+      
+      const minAmount = searchParams.get('minAmount');
+      if (minAmount) {
+        apiFilters.amount_min = Number(minAmount);
+      }
+      
+      const maxAmount = searchParams.get('maxAmount');
+      if (maxAmount) {
+        apiFilters.amount_max = Number(maxAmount);
+      }
+      
+      const search = searchParams.get('search');
+      if (search) {
+        apiFilters.search = search;
+      }
+
+      loadTransactions(apiFilters);
+    }
+  }, []); // Only run on mount
 
   useEffect(() => {
     if (modalSuccess) {

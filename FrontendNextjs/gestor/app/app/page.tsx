@@ -313,14 +313,17 @@ export default async function DashboardPage() {
   
 	const user = session.user;
 
-	const [accounts, transactions, categories, budgets,categorysData,getMonthlySummary] = await Promise.all([
+	const [accounts, transactionResponse, categories, budgets,categorysData,getMonthlySummary] = await Promise.all([
 		accountRepository.findAll(),
-		transactionRepository.findAll(),
+		transactionRepository.findAllSimple(),
 		categoryRepository.findAll(),
 		budgetRepository.findAll(),
     analyticsRepository.getCategoryExpenses(),
     analyticsRepository.getMonthlySummary()
 	])
+	
+	// Extract transactions from the response
+	const transactions = transactionResponse || []
   console.log(accounts, transactions, categories, budgets)
 
 	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
