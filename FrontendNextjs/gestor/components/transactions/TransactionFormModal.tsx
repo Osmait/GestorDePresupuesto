@@ -62,9 +62,6 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
     },
   });
 
-  useEffect(() => {
-    formRef.current = { reset: form.reset };
-  }, [form, formRef]);
 
   async function onSubmit(values: TransactionFormValues) {
     try {

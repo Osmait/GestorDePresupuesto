@@ -181,13 +181,10 @@ export default function TransactionsClient() {
   }, []); // <--- CAMBIO: Lógica de carga inicial simplificada. Solo se ejecuta una vez.
 
   useEffect(() => {
-    if (modalSuccess) {
-      const timeout = setTimeout(() => {
+    if (modalSuccess) { 
         setModalOpen(false);
         setModalSuccess(false);
-        formRef.current?.reset();
-      }, 1200);
-      return () => clearTimeout(timeout);
+        formRef.current?.reset(); 
     }
   }, [modalSuccess]);
 
