@@ -234,11 +234,7 @@ function DashboardHeader({ user }: { user: any }) {
 						Bienvenido de vuelta, {user?.name} {user?.lastName || user?.last_name} 👋
 					</p>
 				</div>
-				<div className="flex items-center gap-3">
-					<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
-						<Zap className="h-3 w-3 mr-1" />
-						Modo Desarrollo
-					</Badge>
+				<div className="flex items-center gap-3">	
 					<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
 						<Calendar className="h-3 w-3 mr-1" />
 						{new Date().toLocaleDateString('es-ES', {
@@ -517,48 +513,6 @@ export default async function DashboardPage() {
 						}
 					]}
 				/>
-
-				{/* Información de desarrollo */}
-				<Card className="mt-8 bg-gradient-to-r from-blue-50/50 to-indigo-50/50 dark:from-blue-900/10 dark:to-indigo-900/10 border-blue-200/50 dark:border-blue-800/30">
-					<CardHeader>
-						<CardTitle className="flex items-center gap-2 text-blue-900 dark:text-blue-100">
-							<Zap className="h-5 w-5" />
-							Información de Desarrollo
-						</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Estado del Sistema:</p>
-								<div className="space-y-2">
-									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
-										✅ Componentes optimizados
-									</Badge>
-									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
-										✅ Server Components maximizados
-									</Badge>
-									<Badge variant="outline" className="bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400">
-										✅ Client Components eliminados
-									</Badge>
-								</div>
-							</div>
-							<div>
-								<p className="font-semibold text-blue-800 dark:text-blue-200 mb-3">Datos Disponibles:</p>
-								<div className="space-y-2">
-									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
-										👤 {user ? 'Usuario autenticado' : 'Sin usuario'}
-									</Badge>
-									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
-										🏦 {accounts?.length ?? 0} cuentas
-									</Badge>
-									<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
-										💳 {transactions.length} transacciones
-									</Badge>
-								</div>
-							</div>
-						</div>
-					</CardContent>
-				</Card>
 			</div>
 		</div>
 	)

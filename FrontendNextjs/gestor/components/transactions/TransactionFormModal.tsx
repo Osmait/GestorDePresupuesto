@@ -157,22 +157,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
                   <FormMessage />
                 </FormItem>
               )} />
-              <FormField control={form.control} name="budget_id" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Presupuesto (opcional)</FormLabel>
-                  <FormControl>
-                    <Select value={field.value || 'none'} onValueChange={v => field.onChange(v === 'none' ? undefined : v)}>
-                      <SelectTrigger><SelectValue placeholder="Sin presupuesto" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Sin presupuesto</SelectItem>
-                        {budgets.map((b: any) => <SelectItem key={b.id} value={b.id}>{b.category_id} - ${b.amount}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="created_at" render={({ field }) => (
+                            <FormField control={form.control} name="created_at" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Fecha</FormLabel>
                   <FormControl>
