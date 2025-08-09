@@ -8,6 +8,8 @@ import (
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
+
+	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 )
 
 const (
@@ -16,11 +18,13 @@ const (
 
 type TransactionService struct {
 	transactionRepository transactionRepo.TransactionRepositoryInterface
+	budgetRepository      budgetRepo.BudgetRepoInterface
 }
 
-func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface) *TransactionService {
+func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface) *TransactionService {
 	return &TransactionService{
 		transactionRepository: transactionRepository,
+		budgetRepository:      budgetReposiotry,
 	}
 }
 
@@ -37,9 +41,13 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 	transaction := transaction.NewTransaction(id, name, description, typeTransaction, accountId, categoryId, amount)
 	transaction.UserId = userId
 
-	if budgetId != "" {
-		transaction.BudgetId = budgetId
-	}
+	// if budgetId != "" {
+	// 	transaction.BudgetId = budgetId
+	// }
+
+	budget, _ := s.budgetRepository.FindByCategory(ctx, categoryId)
+	transaction.BudgetId = budget.Id
+
 	log.Debug().Str("category_id", transaction.CategoryId).Msg("creating transaction")
 
 	err = s.transactionRepository.Save(ctx, transaction)

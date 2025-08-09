@@ -280,7 +280,7 @@ type services struct {
 func initializeServices(repos *repositories, cfg *config.Config) *services {
 	return &services{
 		accountService:     account.NewAccountService(repos.accountRepository),
-		transactionService: transaction.NewTransactionService(repos.transactionRepository),
+		transactionService: transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository),
 		userService:        user.NewUserService(repos.userRepository),
 		authService:        auth.NewAuthService(repos.userRepository, cfg),
 		budgetService:      budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),

@@ -26,7 +26,7 @@ import (
 //	@Router			/transaction [post]
 func CreateTransaction(transactionservice *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		userId := ctx.GetString("X-User-Id")
+		userID := ctx.GetString("X-User-Id")
 
 		var transactionRequest dto.TransactionRequest
 
@@ -41,7 +41,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			transactionRequest.Amount,
 			transactionRequest.TypeTransation,
 			transactionRequest.AccountId,
-			userId,
+			userID,
 			transactionRequest.CategoryId,
 			transactionRequest.BudgetId,
 		)
@@ -86,7 +86,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 //	@Router			/transaction [get]
 func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		userId := ctx.GetString("X-User-Id")
+		userID := ctx.GetString("X-User-Id")
 
 		// Parse filter parameters
 		filter := dto.NewTransactionFilter()
@@ -107,7 +107,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		includeSummary := ctx.Query("include_summary") == "true"
 
 		// Get filtered and paginated transactions
-		result, err := transactionService.FindAllOfAllAccountsWithFilters(ctx, userId, filter, includeSummary)
+		result, err := transactionService.FindAllOfAllAccountsWithFilters(ctx, userID, filter, includeSummary)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return

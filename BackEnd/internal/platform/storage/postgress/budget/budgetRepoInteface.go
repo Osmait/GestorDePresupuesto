@@ -11,4 +11,5 @@ type BudgetRepoInterface interface {
 	FindAll(ctx context.Context, userId string) ([]*budget.Budget, error)
 	FindOne(ctx context.Context, id string) (*budget.Budget, error)
 	Delete(ctx context.Context, id string) error
+	FindByCategory(ctx context.Context, categoryID string) (*budget.Budget, error)
 }

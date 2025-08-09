@@ -79,3 +79,26 @@ func (b *BudgetRepository) Delete(ctx context.Context, id string) error {
 	_, err := b.db.ExecContext(ctx, "DELETE FROM budgets WHERE id = $1", id)
 	return err
 }
+
+func (b *BudgetRepository) FindByCategory(ctx context.Context, categoryID string) (*budget.Budget, error) {
+	rows, err := b.db.QueryContext(ctx, "SELECT id,category_id,user_id,amount,created_at FROM budgets WHERE category_id = $1 ", categoryID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+	var budget budget.Budget
+	for rows.Next() {
+		if err = rows.Scan(&budget.Id, &budget.CategoryId, &budget.UserId, &budget.Amount, &budget.CreatedAt); err != nil {
+			return nil, err
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return &budget, nil
+}
