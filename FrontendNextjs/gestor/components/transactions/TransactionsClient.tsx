@@ -17,7 +17,7 @@ import { Transaction, TypeTransaction, TransactionFilters } from '@/types/transa
 
 
 export default function TransactionsClient() {
-  const { transactions, pagination, isLoading: isLoadingTx, loadTransactions, createTransaction, deleteTransaction, isLoading, error } = useTransactions();
+  const { transactions, pagination, isLoading: isLoadingTx, loadTransactions, loadAllTransactions, createTransaction, deleteTransaction, isLoading, error } = useTransactions();
   const { categories, isLoading: isLoadingCat } = useCategories();
   const { accounts, isLoading: isLoadingAcc } = useAccounts();
   const searchParams = useSearchParams();
@@ -124,6 +124,16 @@ export default function TransactionsClient() {
     loadTransactions(apiFilters);
   }, [updateURLWithFilters, loadTransactions]);
 
+  // Nueva función para recargar manteniendo filtros actuales
+  const reloadCurrentView = useCallback(() => {
+    const hasActiveFilters = searchParams.toString().length > 0;
+    if (hasActiveFilters) {
+      applyFiltersAndFetch(filters);
+    } else {
+      loadAllTransactions();
+    }
+  }, [searchParams, applyFiltersAndFetch, filters, loadAllTransactions]);
+
   // <--- CAMBIO: Nueva función para manejar el click del botón
   const handleApplyFilters = () => {
     applyFiltersAndFetch(filters);
@@ -143,7 +153,7 @@ export default function TransactionsClient() {
     
     setFilters(clearedFilters);
     router.replace(window.location.pathname);
-    loadTransactions();
+    loadAllTransactions(); // Cargar todas las transacciones sin filtros
     setDrawerOpen(false); 
   }
 
@@ -159,7 +169,10 @@ export default function TransactionsClient() {
             key={transaction.id}
             transaction={transaction}
             category={category}
-            onTransactionDeleted={() => deleteTransaction(transaction.id!)}
+            onTransactionDeleted={async () => {
+              await deleteTransaction(transaction.id!);
+              reloadCurrentView(); // Usar nueva función de recarga
+            }}
           />
         );
       })}
@@ -224,9 +237,15 @@ export default function TransactionsClient() {
                   }
                 }}
                 createTransaction={async (...args) => {
-                  // @ts-ignore
-                  await createTransaction(...args);
-                  setModalSuccess(true);
+                  try {
+                    // @ts-ignore
+                    await createTransaction(...args);
+                    reloadCurrentView(); // Usar nueva función de recarga
+                    setModalSuccess(true);
+                  } catch (error) {
+                    // El error ya se maneja en el hook
+                    throw error;
+                  }
                 }}
                 isLoading={isLoading}
                 error={error}

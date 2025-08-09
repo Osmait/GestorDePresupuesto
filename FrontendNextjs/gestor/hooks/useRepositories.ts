@@ -213,24 +213,24 @@ export const useTransactions = () => {
 				categoryId,
 				budgetId
 			)
-			await loadAllTransactions() // Recargar después de crear
+			// No recargar automáticamente - delegamos al componente
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error creating transaction')
 			throw err
 		}
-	}, [loadAllTransactions])
+	}, [])
 
 	const deleteTransaction = useCallback(async (id: string) => {
 		try {
 			setError(null)
 			const transactionRepository = await getTransactionRepository()
 			await transactionRepository.delete(id)
-			await loadAllTransactions() // Recargar después de eliminar
+			// No recargar automáticamente - delegamos al componente
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error deleting transaction')
 			throw err
 		}
-	}, [loadAllTransactions])
+	}, [])
 
 	// Métodos adicionales para mocks
 	const getTransactionsByAccount = useCallback(async (accountId: string) => {
