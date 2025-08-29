@@ -525,7 +525,7 @@ export default function AnalysisPage() {
               </CardHeader>
               <CardContent style={{ height: 300 }}>
                 <ResponsiveLine
-                  data={monthlySummary.length > 0 ? [
+                  data={monthlySummary && monthlySummary.length > 0 ? [
                     {
                       id: 'Ingresos',
                       color: theme === 'dark' ? '#22c55e' : '#16a34a',
@@ -548,7 +548,7 @@ export default function AnalysisPage() {
                     legend: apiFilters.groupBy === 'day' ? 'Día' : apiFilters.groupBy === 'week' ? 'Semana' : apiFilters.groupBy === 'month' ? 'Mes' : 'Año',
                     legendOffset: 48,
                     legendPosition: 'middle',
-                    tickValues: monthlySummary.length > 15
+                    tickValues: monthlySummary && monthlySummary.length > 15
                       ? monthlySummary.filter((_, i) => i % Math.ceil(monthlySummary.length / 10) === 0).map(d => d.month)
                       : undefined,
                     format: v => {
@@ -602,7 +602,7 @@ export default function AnalysisPage() {
               </CardHeader>
               <CardContent style={{ height: 300 }}>
                 <ResponsiveBar
-                  data={categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
+                  data={ categoryExpenses && categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
                     categoria: cat.label,
                     monto: Math.abs(cat.value)
                   })) : mockBar}
@@ -629,7 +629,7 @@ export default function AnalysisPage() {
                     legend: apiFilters.groupBy === 'day' ? 'Día' : apiFilters.groupBy === 'week' ? 'Semana' : apiFilters.groupBy === 'month' ? 'Mes' : 'Año',
                     legendOffset: 48,
                     legendPosition: 'middle',
-                    tickValues: categoryExpenses.length > 15
+                    tickValues: categoryExpenses && categoryExpenses.length > 15
                       ? categoryExpenses.filter((_, i) => i % Math.ceil(categoryExpenses.length / 10) === 0).map(d => d.label)
                       : undefined,
                     format: v => {
@@ -679,7 +679,7 @@ export default function AnalysisPage() {
                 <CardTitle>Distribución por Categoría</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
-                <ResponsivePie data={categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
+                <ResponsivePie data={categoryExpenses && categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
                     id: cat.id,
                     label: cat.label,
                     value: Math.abs(cat.value),
@@ -692,7 +692,7 @@ export default function AnalysisPage() {
                 <CardTitle>Radar de Categorías</CardTitle>
               </CardHeader>
               <CardContent style={{ height: 300 }}>
-                <ResponsiveRadar data={categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
+                <ResponsiveRadar data={categoryExpenses && categoryExpenses.length > 0 ? categoryExpenses.map(cat => ({
                     categoria: cat.label,
                     Gastos: Math.abs(cat.value),
                     Ingresos: 0

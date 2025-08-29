@@ -45,6 +45,8 @@ export default function TransactionItem({ transaction, category, onTransactionDe
       setIsDeleting(false);
     }
   };
+  console.log({category});
+  console.log({transaction});
   return (
     <Card className="hover:shadow-md hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
       <CardContent className="p-6">
@@ -61,7 +63,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
               <div className="flex items-center gap-2 mb-1">
                 <p className="font-semibold text-foreground">{transaction.name}</p>
                 {category && (
-                  <Badge variant="outline" className="text-xs border-muted-foreground/30 bg-muted/30 dark:bg-muted/20">
+                  <Badge variant="outline" className={`text-xs`} style={{ backgroundColor: category.color }} >
                     {category.icon} {category.name}
                   </Badge>
                 )}

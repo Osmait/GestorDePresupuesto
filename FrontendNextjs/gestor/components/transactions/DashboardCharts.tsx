@@ -19,21 +19,21 @@ export function DashboardCharts({ categorysData,monthSummary}: DashboardChartsPr
 
 
 
-  const pieData = categorysData.map(cat => {
+  const pieData = categorysData ? categorysData.map(cat => {
     return {
       ...cat,
       value: Math.abs(cat.value), 
     }
-  })
+  }) : []
 
 
 
-  const barData = monthSummary.map(month => {
+  const barData = monthSummary ? monthSummary.map(month => {
     return {
       ...month,
       Gastos : Math.abs(month.Gastos), // Asegurarse de que Gastos sea positivo
     }
-  })
+  }) : []
 	const nivoTheme = useMemo(() => ({
 		background: 'transparent',
 		textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
