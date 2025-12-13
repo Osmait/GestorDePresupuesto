@@ -28,8 +28,8 @@ func (t *TransactionRequest) Validate() error {
 	if t.Amount <= 0 {
 		return errors.New("amount must be greater than 0")
 	}
-	if t.TypeTransation != "income" && t.TypeTransation != "expense" {
-		return errors.New("type_transation must be 'income' or 'expense'")
+	if t.TypeTransation != "income" && t.TypeTransation != "expense" && t.TypeTransation != "bill" {
+		return errors.New("type_transation must be 'income', 'expense' or 'bill'")
 	}
 	return nil
 }
