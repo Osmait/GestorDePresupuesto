@@ -8,6 +8,6 @@ import (
 
 func CategoryRoutes(s *gin.Engine, categoryService *category.CategoryServices) {
 	s.POST("/category", handler.CreateCategory(categoryService))
-	s.GET("/category", handler.FindAllCategorys(categoryService))
+	s.GET("/category", handler.FindAllCategories(categoryService))
 	s.DELETE("/category/:id", handler.DeleteCategory(categoryService))
 }

@@ -14,7 +14,7 @@ func GetCategoryExpenses(analyticsService *analytics.AnalyticsService) gin.Handl
 		userID := c.GetString("X-User-Id")
 		categoryExpenses, err := analyticsService.GetCategoryExpenses(c.Request.Context(), userID)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 
@@ -27,7 +27,7 @@ func GetMonthlySummary(analyticsService *analytics.AnalyticsService) gin.Handler
 		userID := c.GetString("X-User-Id")
 		monthlySummary, err := analyticsService.GetMonthlySummary(c.Request.Context(), userID)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 

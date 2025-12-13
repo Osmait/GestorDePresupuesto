@@ -26,18 +26,18 @@ import (
 func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		var account dto.AccountRequest
-		if err := ctx.BindJSON(&account); err != nil {
+		var req dto.AccountRequest
+		if err := ctx.BindJSON(&req); err != nil {
 			ctx.JSON(http.StatusBadRequest, "Error fields required")
 			return
 		}
-		if err := account.Validate(); err != nil {
+		if err := req.Validate(); err != nil {
 			ctx.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
-		err := accountService.CreateAccount(ctx, account.Name, account.Bank, account.InitialBalance, userId)
+		err := accountService.CreateAccount(ctx, req.Name, req.Bank, req.InitialBalance, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, ctx)
+			errorHandler.ResponseByTypeOfErr(err, ctx)
 		}
 		ctx.Status(http.StatusCreated)
 	}
@@ -60,7 +60,7 @@ func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		accounts, err := accountService.FindAll(ctx, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, ctx)
+			errorHandler.ResponseByTypeOfErr(err, ctx)
 		}
 
 		ctx.JSON(http.StatusOK, accounts)
@@ -87,7 +87,7 @@ func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		err := accountService.DeleteAccount(ctx, id, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, ctx)
+			errorHandler.ResponseByTypeOfErr(err, ctx)
 		}
 		ctx.JSON(http.StatusOK, "Deleted")
 	}
@@ -122,7 +122,7 @@ func UpdateAccount(accountService *account.AccountService) gin.HandlerFunc {
 
 		err := accountService.UpdateAccount(ctx, id, &updateRequest, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, ctx)
+			errorHandler.ResponseByTypeOfErr(err, ctx)
 			return
 		}
 

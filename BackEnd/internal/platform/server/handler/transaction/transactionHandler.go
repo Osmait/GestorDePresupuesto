@@ -50,7 +50,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			transactionRequest.BudgetId,
 		)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, ctx)
+			errorHandler.ResponseByTypeOfErr(err, ctx)
 			return
 		}
 
@@ -113,7 +113,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		// Get filtered and paginated transactions
 		result, err := transactionService.FindAllOfAllAccountsWithFilters(ctx, userID, filter, includeSummary)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, ctx)
+			errorHandler.ResponseByTypeOfErr(err, ctx)
 			return
 		}
 
@@ -203,7 +203,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		// Get filtered and paginated transactions
 		result, err := transactionService.FindAllWithFilters(ctx, filter, includeSummary)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, ctx)
+			errorHandler.ResponseByTypeOfErr(err, ctx)
 			return
 		}
 
@@ -255,7 +255,7 @@ func DeleteTransaction(transactionService *transaction.TransactionService) gin.H
 		userID := ctx.GetString("X-User-Id")
 		err := transactionService.DeleteTransaction(ctx, id, userID)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, ctx)
+			errorHandler.ResponseByTypeOfErr(err, ctx)
 			return
 		}
 		ctx.JSON(http.StatusOK, "Deleted")

@@ -26,18 +26,18 @@ import (
 //	@Router			/budget [post]
 func CreateBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var budget dto.BudgetRequest
+		var req dto.BudgetRequest
 
 		userId := c.GetString("X-User-Id")
-		err := c.Bind(&budget)
+		err := c.Bind(&req)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, err)
 			return
 		}
-		err = budgetServices.CreateBudget(c, &budget, userId)
+		err = budgetServices.CreateBudget(c, &req, userId)
 
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusCreated, "created")
@@ -61,7 +61,7 @@ func FindAllBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		budgets, err := budgetServices.FindAll(c, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusOK, budgets)
@@ -88,7 +88,7 @@ func DeleteBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		err := budgetServices.Delete(c, id, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusOK, "Deleted")

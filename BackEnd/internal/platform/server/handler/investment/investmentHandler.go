@@ -19,7 +19,7 @@ func CreateInvestment(investmentServices *investment.InvestmentServices) gin.Han
 		}
 		err = investmentServices.CreateInvestment(c, &investment)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusCreated, "created")
@@ -31,7 +31,7 @@ func FindAllInvestment(investmentServices *investment.InvestmentServices) gin.Ha
 		userId := c.GetString("X-user-Id")
 		investments, err := investmentServices.FindAll(c, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusOK, investments)
@@ -43,7 +43,7 @@ func DeleteInvestment(investmentServices *investment.InvestmentServices) gin.Han
 		id := c.Param("id")
 		err := investmentServices.Delete(c, id)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusOK, "Deleted")

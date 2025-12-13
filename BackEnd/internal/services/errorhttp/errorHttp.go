@@ -30,7 +30,7 @@ type ErrorApp struct {
 	Time   time.Time `json:"time"`
 }
 
-func NewErroApp(staus int, path string, msg string, time time.Time) *ErrorApp {
+func NewErrorApp(staus int, path string, msg string, time time.Time) *ErrorApp {
 	return &ErrorApp{
 		Path:   path,
 		Status: staus,

@@ -1492,8 +1492,11 @@ const docTemplate = `{
         "dto.TransactionRequest": {
             "type": "object",
             "required": [
+                "account_id",
                 "amount",
-                "name"
+                "category_id",
+                "name",
+                "type_transation"
             ],
             "properties": {
                 "account_id": {

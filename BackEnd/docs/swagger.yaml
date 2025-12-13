@@ -201,8 +201,11 @@ definitions:
         example: expense
         type: string
     required:
+    - account_id
     - amount
+    - category_id
     - name
+    - type_transation
     type: object
   dto.TransactionResponse:
     properties:

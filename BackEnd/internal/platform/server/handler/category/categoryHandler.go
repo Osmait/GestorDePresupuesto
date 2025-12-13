@@ -35,14 +35,14 @@ func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 		err = categoryServices.CreateCategory(c, &categoryRequest, userId)
 
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusCreated, "created")
 	}
 }
 
-// FindAllCategorys godoc
+// FindAllCategories godoc
 //
 //	@Summary		Get all user categories
 //	@Description	Retrieve all categories for the authenticated user
@@ -54,12 +54,12 @@ func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 //	@Failure		401	{object}	map[string]string		"Unauthorized - Invalid JWT token"
 //	@Failure		500	{object}	map[string]string		"Internal server error"
 //	@Router			/category [get]
-func FindAllCategorys(categoryServices *category.CategoryServices) gin.HandlerFunc {
+func FindAllCategories(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userId := c.GetString("X-User-Id")
 		categorys, err := categoryServices.FindAll(c, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusOK, categorys)
@@ -86,7 +86,7 @@ func DeleteCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 		userId := c.GetString("X-User-Id")
 		err := categoryServices.Delete(c, id, userId)
 		if err != nil {
-			errorHandler.ReponseByTypeOfErr(err, c)
+			errorHandler.ResponseByTypeOfErr(err, c)
 			return
 		}
 		c.JSON(http.StatusOK, "Deleted")
