@@ -1,7 +1,7 @@
 "use client";
 import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { useAccounts } from '@/hooks/useRepositories';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useAccountContext } from '@/components/accounts/AccountContext';
 import { Account } from '@/types/account';
 
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -20,7 +20,7 @@ import {
 import { AccountsPageSkeleton } from '@/components/accounts/AccountsPageSkeleton';
 
 export default function AccountsClient() {
-  const { accounts, isLoading, createAccount, updateAccount, deleteAccount, error } = useAccounts();
+  const { accounts, isLoading, updateAccount, deleteAccount, error } = useAccountContext();
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
@@ -71,14 +71,23 @@ export default function AccountsClient() {
 
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredAccounts.map((account) => (
-          <AccountCard
-            key={account.id}
-            account={account}
-            onAccountDeleted={() => deleteAccount(account.id!)}
-            onAccountEdit={handleEditAccount}
-          />
-        ))}
+        <AnimatePresence mode="popLayout" initial={false}>
+          {filteredAccounts.map((account) => (
+            <motion.div
+              key={account.id}
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ duration: 0.4, ease: "easeOut" }}
+            >
+              <AccountCard
+                account={account}
+                onAccountDeleted={() => deleteAccount(account.id!)}
+                onAccountEdit={handleEditAccount}
+              />
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     );
   };

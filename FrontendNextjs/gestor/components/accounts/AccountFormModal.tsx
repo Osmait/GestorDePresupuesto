@@ -28,7 +28,6 @@ type AccountFormModalProps = {
 
 export function AccountFormModal({ open, setOpen, createAccount, isLoading, error }: AccountFormModalProps) {
   const { user } = useAuth();
-  const [success, setSuccess] = useState(false);
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
     defaultValues: { name: '', bank: '', initial_balance: 0 },
@@ -37,13 +36,8 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
   async function onSubmit(values: AccountFormValues) {
     try {
       await createAccount(values.name, values.bank, values.initial_balance);
-      setSuccess(true);
       form.reset();
-      setTimeout(() => {
-        setSuccess(false);
-        setOpen(false);
-      }, 1200);
-    } catch {}
+    } catch { }
   }
 
   return (
@@ -52,47 +46,40 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
         <DialogHeader>
           <DialogTitle>Nueva Cuenta</DialogTitle>
         </DialogHeader>
-        {success ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-            <p className="text-green-600 font-semibold">¡Cuenta creada!</p>
-          </div>
-        ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre de la cuenta</FormLabel>
-                  <FormControl><Input {...field} placeholder="Ej: Cuenta Principal" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="bank" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Banco</FormLabel>
-                  <FormControl><Input {...field} placeholder="Ej: Banco Nacional" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="initial_balance" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Balance inicial</FormLabel>
-                  <FormControl><Input type="number" {...field} min={0} step={0.01} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <DialogFooter>
-                <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
-                  Crear Cuenta
-                </Button>
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost" className="w-full">Cancelar</Button>
-                </DialogClose>
-              </DialogFooter>
-            </form>
-          </Form>
-        )}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nombre de la cuenta</FormLabel>
+                <FormControl><Input {...field} placeholder="Ej: Cuenta Principal" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="bank" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Banco</FormLabel>
+                <FormControl><Input {...field} placeholder="Ej: Banco Nacional" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="initial_balance" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Balance inicial</FormLabel>
+                <FormControl><Input type="number" {...field} min={0} step={0.01} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <DialogFooter>
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
+                Crear Cuenta
+              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" className="w-full">Cancelar</Button>
+              </DialogClose>
+            </DialogFooter>
+          </form>
+        </Form>
         {error && (
           <Alert variant="destructive" className="mt-4">
             <AlertCircle className="h-4 w-4" />

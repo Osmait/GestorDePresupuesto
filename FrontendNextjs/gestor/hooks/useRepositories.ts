@@ -20,17 +20,20 @@ export function useAccounts() {
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
-	const loadAccounts = useCallback(async () => {
+	const loadAccounts = useCallback(async (showLoading = true) => {
 		try {
-			setIsLoading(true)
+			if (showLoading) setIsLoading(true)
 			setError(null)
 			const accountRepository = await getAccountRepository()
 			const data = await accountRepository.findAll()
-			setAccounts(Array.isArray(data) ? [...data] : [])
+			const sortedData = Array.isArray(data)
+				? [...data].reverse()
+				: []
+			setAccounts(sortedData)
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error loading accounts')
 		} finally {
-			setIsLoading(false)
+			if (showLoading) setIsLoading(false)
 		}
 	}, [])
 
@@ -43,7 +46,7 @@ export function useAccounts() {
 			setError(null)
 			const accountRepository = await getAccountRepository()
 			await accountRepository.create(name, bank, initial_balance)
-			await loadAccounts() // Recargar después de crear
+			await loadAccounts(false) // Recarga silenciosa
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error creating account')
 			throw err
@@ -59,7 +62,7 @@ export function useAccounts() {
 			setError(null)
 			const accountRepository = await getAccountRepository()
 			await accountRepository.update(id, name, bank)
-			await loadAccounts() // Recargar después de actualizar
+			await loadAccounts(false) // Recarga silenciosa
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error updating account')
 			throw err
@@ -71,7 +74,7 @@ export function useAccounts() {
 			setError(null)
 			const accountRepository = await getAccountRepository()
 			await accountRepository.delete(id)
-			await loadAccounts() // Recargar después de eliminar
+			await loadAccounts(false) // Recarga silenciosa
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error deleting account')
 			throw err
@@ -90,6 +93,7 @@ export function useAccounts() {
 		updateAccount,
 		deleteAccount,
 		refetch: loadAccounts,
+		addAccount: (acc: Account) => setAccounts(prev => [acc, ...prev])
 	}
 }
 

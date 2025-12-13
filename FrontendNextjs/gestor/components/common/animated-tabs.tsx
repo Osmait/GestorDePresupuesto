@@ -19,12 +19,12 @@ interface AnimatedTabsProps {
 	onValueChange?: (value: string) => void
 }
 
-export function AnimatedTabs({ 
-	tabs, 
-	defaultValue, 
-	className, 
+export function AnimatedTabs({
+	tabs,
+	defaultValue,
+	className,
 	orientation = 'horizontal',
-	onValueChange 
+	onValueChange
 }: AnimatedTabsProps) {
 	const [activeTab, setActiveTab] = useState(defaultValue)
 	const tabsRef = useRef<HTMLDivElement>(null)
@@ -45,11 +45,11 @@ export function AnimatedTabs({
 		if (activeIndex !== -1 && tabRefs.current[activeIndex] && tabsRef.current) {
 			const activeElement = tabRefs.current[activeIndex]
 			const tabsContainer = tabsRef.current
-			
+
 			if (activeElement) {
 				const containerRect = tabsContainer.getBoundingClientRect()
 				const activeRect = activeElement.getBoundingClientRect()
-				
+
 				if (orientation === 'horizontal') {
 					setIndicatorStyle({
 						left: activeRect.left - containerRect.left,
@@ -91,7 +91,7 @@ export function AnimatedTabs({
 	return (
 		<div className={cn('space-y-6', className)}>
 			{/* Tabs List */}
-			<div 
+			<div
 				ref={tabsRef}
 				className={cn(
 					'relative inline-flex h-10 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground backdrop-blur-sm border border-border/50',
@@ -111,7 +111,7 @@ export function AnimatedTabs({
 								boxShadow: indicatorStyle.opacity > 0 ? '0 0 8px rgba(var(--primary), 0.6)' : 'none'
 							}}
 						/>
-						
+
 						{/* Fondo del indicador */}
 						<div
 							className="absolute top-1 bottom-1 bg-gradient-to-r from-primary/15 to-primary/8 rounded-md border border-primary/30 transition-all duration-500 ease-out pointer-events-none z-0 shadow-sm"
@@ -148,7 +148,7 @@ export function AnimatedTabs({
 								boxShadow: indicatorStyle.opacity > 0 ? '0 0 8px rgba(var(--primary), 0.6)' : 'none'
 							}}
 						/>
-						
+
 						<div
 							className="absolute left-1 right-1 bg-gradient-to-r from-primary/15 to-primary/8 rounded-md border border-primary/30 transition-all duration-500 ease-out pointer-events-none z-0 shadow-sm"
 							style={{
@@ -176,36 +176,36 @@ export function AnimatedTabs({
 							disabled={isDisabled}
 							className={cn(
 								'relative inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group z-20',
-								isActive 
-									? 'text-primary font-semibold' 
+								isActive
+									? 'text-primary font-semibold'
 									: 'text-muted-foreground hover:text-foreground',
 								isDisabled && 'opacity-50 cursor-not-allowed'
 							)}
 						>
 							{/* Efecto de hover con gradiente */}
 							<div className="absolute inset-0 bg-gradient-to-r from-primary/8 via-primary/4 to-transparent rounded-md opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
-							
+
 							{/* Efecto de brillo en hover */}
 							<div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent rounded-md opacity-0 group-hover:opacity-100 transition-all duration-500 pointer-events-none" />
-							
+
 							{/* Icono */}
 							{tab.icon && (
 								<span className={cn(
 									'transition-all duration-300 relative z-10',
-									isActive 
-										? 'text-primary scale-110 animate-icon-bounce' 
+									isActive
+										? 'text-primary scale-110 animate-icon-bounce'
 										: 'group-hover:scale-110 group-hover:text-foreground group-hover:rotate-6'
 								)}>
 									{tab.icon}
 								</span>
 							)}
-							
+
 							{/* Label */}
 							<span className={cn(
 								'transition-all duration-300 relative z-10',
 								tab.icon && 'ml-2',
-								isActive 
-									? 'text-primary font-semibold' 
+								isActive
+									? 'text-primary font-semibold'
 									: 'group-hover:text-foreground group-hover:translate-x-1'
 							)}>
 								{tab.label}
@@ -216,7 +216,7 @@ export function AnimatedTabs({
 			</div>
 
 			{/* Tab Content */}
-			<div className="min-h-[200px] transition-all duration-300 ease-in-out animate-tab-content-fade">
+			<div className="min-h-[200px] transition-all duration-300 ease-in-out">
 				{activeTabContent}
 			</div>
 		</div>
