@@ -27,20 +27,7 @@ export function AccountActions() {
                     setModalOpen(false)
 
                     try {
-                        // Optimistic Add
-                        const optimisticAccount = {
-                            id: `temp-${Date.now()}`,
-                            name,
-                            bank,
-                            initial_balance,
-                            current_balance: initial_balance,
-                            user_id: 'current',
-                            created_at: new Date().toISOString(),
-                            updated_at: new Date().toISOString()
-                        }
-                        // @ts-ignore
-                        addAccount(optimisticAccount)
-
+                        // Silent Refresh handles the UI update
                         await createAccount(name, bank, initial_balance)
                     } catch (e) {
                         console.error("Failed to create account", e)
