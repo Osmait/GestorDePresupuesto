@@ -1,11 +1,12 @@
 import { Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import { TransactionsPageSkeleton } from '@/components/transactions/TransactionsPageSkeleton';
 
 const TransactionsClient = dynamic(() => import('@/components/transactions/TransactionsClient'), { ssr: false });
 
 function TransactionsClientWrapper() {
 	return (
-		<Suspense fallback={<div className="flex justify-center items-center min-h-screen"><span className="text-lg">Cargando...</span></div>}>
+		<Suspense fallback={<TransactionsPageSkeleton />}>
 			<TransactionsClient />
 		</Suspense>
 	);

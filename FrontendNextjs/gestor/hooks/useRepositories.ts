@@ -17,7 +17,7 @@ import {
 
 export function useAccounts() {
 	const [accounts, setAccounts] = useState<Account[]>([])
-	const [isLoading, setIsLoading] = useState(false)
+	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
 	const loadAccounts = useCallback(async () => {
@@ -96,7 +96,7 @@ export function useAccounts() {
 // Hook para manejar categorías
 export const useCategories = () => {
 	const [categories, setCategories] = useState<Category[]>([])
-	const [isLoading, setIsLoading] = useState(false)
+	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
 	const loadCategories = useCallback(async () => {
@@ -159,7 +159,7 @@ export const useCategories = () => {
 export const useTransactions = () => {
 	const [transactions, setTransactions] = useState<Transaction[]>([])
 	const [pagination, setPagination] = useState<PaginationMeta | null>(null)
-	const [isLoading, setIsLoading] = useState(false)
+	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
 	const loadTransactions = useCallback(async (filters?: TransactionFilters) => {
@@ -237,7 +237,7 @@ export const useTransactions = () => {
 		if (!isMockMode()) {
 			throw new Error('This method is only available in mock mode')
 		}
-		
+
 		try {
 			const transactionRepository = await getTransactionRepository()
 			const mockRepo = transactionRepository as any
@@ -252,7 +252,7 @@ export const useTransactions = () => {
 		if (!isMockMode()) {
 			throw new Error('This method is only available in mock mode')
 		}
-		
+
 		try {
 			const transactionRepository = await getTransactionRepository()
 			const mockRepo = transactionRepository as any
@@ -267,7 +267,7 @@ export const useTransactions = () => {
 		if (!isMockMode()) {
 			throw new Error('This method is only available in mock mode')
 		}
-		
+
 		try {
 			const transactionRepository = await getTransactionRepository()
 			const mockRepo = transactionRepository as any
@@ -495,18 +495,18 @@ export const useDashboard = () => {
 	const budgets = useBudgets()
 	const auth = useAuth()
 
-	const isLoading = 
-		accounts.isLoading || 
-		categories.isLoading || 
-		transactions.isLoading || 
-		budgets.isLoading || 
+	const isLoading =
+		accounts.isLoading ||
+		categories.isLoading ||
+		transactions.isLoading ||
+		budgets.isLoading ||
 		auth.isLoading
 
-	const hasError = 
-		accounts.error || 
-		categories.error || 
-		transactions.error || 
-		budgets.error || 
+	const hasError =
+		accounts.error ||
+		categories.error ||
+		transactions.error ||
+		budgets.error ||
 		auth.error
 
 	const refetchAll = useCallback(async () => {
