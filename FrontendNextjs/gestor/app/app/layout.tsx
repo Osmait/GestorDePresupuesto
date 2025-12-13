@@ -13,27 +13,16 @@ export const metadata: Metadata = {
 	description: 'Sistema de gestión financiera personal',
 }
 
-export default function RootLayout({
+export default function DashboardLayout({
 	children,
 }: {
 	children: React.ReactNode
 }) {
 	return (
-		<html lang="es">
-			<body className={cn(inter.className, 'antialiased')}>
-				<ThemeProvider
-					attribute="class"
-					defaultTheme="system"
-					enableSystem
-					disableTransitionOnChange
-				>
-					<SettingsProvider>
-						<Sidebar>
-							{children}
-						</Sidebar>
-					</SettingsProvider>
-				</ThemeProvider>
-			</body>
-		</html>
+		<SettingsProvider>
+			<Sidebar>
+				{children}
+			</Sidebar>
+		</SettingsProvider>
 	)
 }
