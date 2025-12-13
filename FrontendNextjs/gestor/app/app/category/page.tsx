@@ -330,6 +330,12 @@ function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryFormModa
 	)
 }
 
+import { CategoriesSkeleton } from '@/components/skeletons/categories-skeleton'
+
+// ... imports
+
+// Remove LoadingSpinner function if unused or used elsewhere, but here:
+
 export default function CategoriesPage() {
 	const { categories, createCategory, deleteCategory, isLoading: isLoadingCategories } = useCategories()
 	const { transactions, isLoading: isLoadingTransactions } = useTransactions()
@@ -340,14 +346,7 @@ export default function CategoriesPage() {
 	// Debug logs detallados (omitted for brevity in this view, keeping original structure logically)
 
 	if (isLoading) {
-		return (
-			<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20 flex items-center justify-center">
-				<div className="text-center">
-					<Loader2 className="h-8 w-8 animate-spin mx-auto mb-4 text-primary" />
-					<p className="text-muted-foreground">Cargando categorías y transacciones...</p>
-				</div>
-			</div>
-		)
+		return <CategoriesSkeleton />
 	}
 
 	return (

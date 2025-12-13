@@ -436,8 +436,8 @@ export const useAuth = () => {
 export const useAnalytics = () => {
 	const [categoryExpenses, setCategoryExpenses] = useState<CategoryExpense[]>([])
 	const [monthlySummary, setMonthlySummary] = useState<MonthlySummary[]>([])
-	const [isLoadingCategoryExpenses, setIsLoadingCategoryExpenses] = useState(false)
-	const [isLoadingMonthlySummary, setIsLoadingMonthlySummary] = useState(false)
+	const [isLoadingCategoryExpenses, setIsLoadingCategoryExpenses] = useState(true)
+	const [isLoadingMonthlySummary, setIsLoadingMonthlySummary] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
 	const loadCategoryExpenses = useCallback(async () => {
