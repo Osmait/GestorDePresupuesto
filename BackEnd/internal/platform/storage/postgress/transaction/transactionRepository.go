@@ -94,7 +94,7 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 
 func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string) (float64, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT   sum(amount)  as currentBudget FROM  transactions   WHERE  budget_id = $1  ", budgetID)
+		"SELECT   sum(amount)  as currentBudget FROM  transactions   WHERE  budget_id = $1 AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE) ", budgetID)
 	if err != nil {
 		return 0, err
 	}
@@ -120,7 +120,7 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 
 func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string) (map[string]float64, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT budget_id, sum(amount) as currentBudget FROM transactions WHERE user_id = $1 AND budget_id IS NOT NULL AND budget_id != '' GROUP BY budget_id", userId)
+		"SELECT budget_id, sum(amount) as currentBudget FROM transactions WHERE user_id = $1 AND budget_id IS NOT NULL AND budget_id != '' AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE) GROUP BY budget_id", userId)
 	if err != nil {
 		return nil, err
 	}
