@@ -184,8 +184,13 @@ function CategorySummaryCard({ categories, transactions }: { categories: Categor
     )
 }
 
+import { useCategoryContext } from '@/components/categories/CategoryContext'
+import { AnimatePresence } from 'framer-motion'
+
+// ... existing imports ...
+
 export function CategoryList() {
-    const { categories, deleteCategory, isLoading: isLoadingCategories } = useCategories()
+    const { categories, deleteCategory, isLoading: isLoadingCategories } = useCategoryContext()
     const { transactions, isLoading: isLoadingTransactions } = useTransactions()
 
     const isLoading = isLoadingCategories || isLoadingTransactions
@@ -215,14 +220,23 @@ export function CategoryList() {
                         icon: <Tag className="h-4 w-4" />,
                         content: (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                                {categories.map((category) => (
-                                    <CategoryCard
-                                        key={category.id}
-                                        category={category}
-                                        transactions={transactions}
-                                        onDelete={() => deleteCategory(category.id)}
-                                    />
-                                ))}
+                                <AnimatePresence mode="popLayout" initial={false}>
+                                    {categories.map((category) => (
+                                        <motion.div
+                                            key={category.id}
+                                            initial={{ opacity: 0, y: 15 }}
+                                            animate={{ opacity: 1, y: 0 }}
+                                            exit={{ opacity: 0, scale: 0.95 }}
+                                            transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                                        >
+                                            <CategoryCard
+                                                category={category}
+                                                transactions={transactions}
+                                                onDelete={() => deleteCategory(category.id)}
+                                            />
+                                        </motion.div>
+                                    ))}
+                                </AnimatePresence>
                             </div>
                         )
                     },

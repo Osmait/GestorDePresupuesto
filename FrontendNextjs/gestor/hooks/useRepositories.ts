@@ -103,17 +103,19 @@ export const useCategories = () => {
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
-	const loadCategories = useCallback(async () => {
+	const loadCategories = useCallback(async (showLoading = true) => {
 		try {
-			setIsLoading(true)
+			if (showLoading) setIsLoading(true)
 			setError(null)
 			const categoryRepository = await getCategoryRepository()
 			const data = await categoryRepository.findAll()
-			setCategories(Array.isArray(data) ? data : [])
+			// Ensure Newest First (Assuming standard insert order, reverse puts newest top)
+			const sortedData = Array.isArray(data) ? [...data].reverse() : []
+			setCategories(sortedData)
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error loading categories')
 		} finally {
-			setIsLoading(false)
+			if (showLoading) setIsLoading(false)
 		}
 	}, [])
 
@@ -126,7 +128,7 @@ export const useCategories = () => {
 			setError(null)
 			const categoryRepository = await getCategoryRepository()
 			await categoryRepository.create(name, icon, color)
-			await loadCategories() // Recargar después de crear
+			await loadCategories(false) // Recarga silenciosa
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error creating category')
 			throw err
@@ -138,7 +140,7 @@ export const useCategories = () => {
 			setError(null)
 			const categoryRepository = await getCategoryRepository()
 			await categoryRepository.delete(id)
-			await loadCategories() // Recargar después de eliminar
+			await loadCategories(false) // Recarga silenciosa
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error deleting category')
 			throw err
