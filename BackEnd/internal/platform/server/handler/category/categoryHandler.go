@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/category"
-	errorHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/error"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 )
 
@@ -29,13 +29,13 @@ func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 		userId := c.GetString("X-User-Id")
 		err := c.Bind(&categoryRequest)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
 		err = categoryServices.CreateCategory(c, &categoryRequest, userId)
 
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 		c.JSON(http.StatusCreated, "created")
@@ -59,7 +59,7 @@ func FindAllCategories(categoryServices *category.CategoryServices) gin.HandlerF
 		userId := c.GetString("X-User-Id")
 		categorys, err := categoryServices.FindAll(c, userId)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, categorys)
@@ -86,7 +86,7 @@ func DeleteCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 		userId := c.GetString("X-User-Id")
 		err := categoryServices.Delete(c, id, userId)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, "Deleted")

@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/account"
-	errorHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/error"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
 )
 
@@ -28,16 +28,17 @@ func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		var req dto.AccountRequest
 		if err := ctx.BindJSON(&req); err != nil {
-			ctx.JSON(http.StatusBadRequest, "Error fields required")
+			ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Error fields required"))
 			return
 		}
 		if err := req.Validate(); err != nil {
-			ctx.JSON(http.StatusBadRequest, err.Error())
+			ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
 		err := accountService.CreateAccount(ctx, req.Name, req.Bank, req.InitialBalance, userId)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, ctx)
+			ctx.Error(err)
+			return
 		}
 		ctx.Status(http.StatusCreated)
 	}
@@ -60,7 +61,8 @@ func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		accounts, err := accountService.FindAll(ctx, userId)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, ctx)
+			ctx.Error(err)
+			return
 		}
 
 		ctx.JSON(http.StatusOK, accounts)
@@ -87,7 +89,8 @@ func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		err := accountService.DeleteAccount(ctx, id, userId)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, ctx)
+			ctx.Error(err)
+			return
 		}
 		ctx.JSON(http.StatusOK, "Deleted")
 	}
@@ -116,13 +119,13 @@ func UpdateAccount(accountService *account.AccountService) gin.HandlerFunc {
 
 		var updateRequest dto.AccountUpdateRequest
 		if err := ctx.BindJSON(&updateRequest); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
+			ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
 			return
 		}
 
 		err := accountService.UpdateAccount(ctx, id, &updateRequest, userId)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, ctx)
+			ctx.Error(err)
 			return
 		}
 

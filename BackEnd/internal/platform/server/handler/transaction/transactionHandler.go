@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
-	errorHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/error"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/rs/zerolog/log"
 )
@@ -31,11 +31,11 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 		var transactionRequest dto.TransactionRequest
 
 		if err := ctx.BindJSON(&transactionRequest); err != nil {
-			ctx.JSON(http.StatusBadRequest, "Error fields required")
+			ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Error fields required"))
 			return
 		}
 		if err := transactionRequest.Validate(); err != nil {
-			ctx.JSON(http.StatusBadRequest, err.Error())
+			ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
 		err := transactionservice.CreateTransaction(
@@ -50,7 +50,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			transactionRequest.BudgetId,
 		)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, ctx)
+			ctx.Error(err)
 			return
 		}
 
@@ -96,14 +96,14 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		filter := dto.NewTransactionFilter()
 		if err := filter.ParseFromQuery(ctx); err != nil {
 			log.Error().Err(err).Msg("failed to parse filter parameters")
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter parameters: " + err.Error()})
+			ctx.Error(apperrors.NewValidationError("INVALID_QUERY_PARAMS", "Invalid filter parameters: "+err.Error()))
 			return
 		}
 
 		// Validate filter parameters
 		if err := filter.Validate(); err != nil {
 			log.Error().Err(err).Msg("filter validation failed")
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter parameters: " + err.Error()})
+			ctx.Error(apperrors.NewValidationError("INVALID_FILTER", "Invalid filter parameters: "+err.Error()))
 			return
 		}
 
@@ -113,7 +113,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		// Get filtered and paginated transactions
 		result, err := transactionService.FindAllOfAllAccountsWithFilters(ctx, userID, filter, includeSummary)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, ctx)
+			ctx.Error(err)
 			return
 		}
 
@@ -183,7 +183,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		filter := dto.NewTransactionFilter()
 		if err := filter.ParseFromQuery(ctx); err != nil {
 			log.Error().Err(err).Msg("failed to parse filter parameters")
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter parameters: " + err.Error()})
+			ctx.Error(apperrors.NewValidationError("INVALID_QUERY_PARAMS", "Invalid filter parameters: "+err.Error()))
 			return
 		}
 
@@ -193,7 +193,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		// Validate filter parameters
 		if err := filter.Validate(); err != nil {
 			log.Error().Err(err).Msg("filter validation failed")
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "Invalid filter parameters: " + err.Error()})
+			ctx.Error(apperrors.NewValidationError("INVALID_FILTER", "Invalid filter parameters: "+err.Error()))
 			return
 		}
 
@@ -203,7 +203,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		// Get filtered and paginated transactions
 		result, err := transactionService.FindAllWithFilters(ctx, filter, includeSummary)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, ctx)
+			ctx.Error(err)
 			return
 		}
 
@@ -255,7 +255,7 @@ func DeleteTransaction(transactionService *transaction.TransactionService) gin.H
 		userID := ctx.GetString("X-User-Id")
 		err := transactionService.DeleteTransaction(ctx, id, userID)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, ctx)
+			ctx.Error(err)
 			return
 		}
 		ctx.JSON(http.StatusOK, "Deleted")

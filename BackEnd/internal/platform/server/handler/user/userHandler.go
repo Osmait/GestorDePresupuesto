@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
-	errorHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/error"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
 
@@ -14,7 +14,7 @@ func GetUser(userService *user.UserService) gin.HandlerFunc {
 		id := c.Param("id")
 		user, err := userService.FindUserById(c, id)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, user)
@@ -26,7 +26,7 @@ func GetProfile(userService *user.UserService) gin.HandlerFunc {
 		userid := c.GetString("X-User-Id")
 		user, err := userService.FindUserById(c, userid)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, user)
@@ -38,13 +38,13 @@ func CreateUser(userService *user.UserService) gin.HandlerFunc {
 		var user dto.UserRequest
 		err := c.BindJSON(&user)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
 
 		err = userService.CreateUser(c, &user)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 

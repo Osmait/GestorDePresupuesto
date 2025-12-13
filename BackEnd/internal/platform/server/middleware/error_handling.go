@@ -10,6 +10,7 @@ import (
 
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
+	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 )
 
 // ErrorResponse represents the error response structure
@@ -110,6 +111,21 @@ func handleErrors(c *gin.Context, errors []*gin.Error, config ErrorHandlerConfig
 	var appErr *apperrors.AppError
 	if apperrors.IsAppError(lastError.Err) {
 		appErr, _ = apperrors.AsAppError(lastError.Err)
+	} else if errorhttp.IsErrNotFound(lastError.Err) {
+		appErr = apperrors.NewNotFoundError("Resource", "requested resource not found").
+			WithCause(lastError.Err).
+			WithContext(ctx).
+			WithOperation(c.Request.Method + " " + c.Request.URL.Path)
+	} else if errorhttp.IsErrNotDuplicate(lastError.Err) {
+		appErr = apperrors.NewConflictError("Resource", "duplicate entry").
+			WithCause(lastError.Err).
+			WithContext(ctx).
+			WithOperation(c.Request.Method + " " + c.Request.URL.Path)
+	} else if errorhttp.IsErrNotBadRequest(lastError.Err) {
+		appErr = apperrors.NewValidationError("BAD_REQUEST", lastError.Err.Error()).
+			WithCause(lastError.Err).
+			WithContext(ctx).
+			WithOperation(c.Request.Method + " " + c.Request.URL.Path)
 	} else {
 		// Wrap unknown errors
 		appErr = apperrors.NewInternalError("Internal server error", lastError.Err).

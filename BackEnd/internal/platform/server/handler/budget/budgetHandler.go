@@ -4,10 +4,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
-
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/budget"
-	errorHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/error"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
+	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 )
 
 // CreateBudget godoc
@@ -31,13 +30,13 @@ func CreateBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		err := c.Bind(&req)
 		if err != nil {
-			c.JSON(http.StatusBadRequest, err)
+			c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
 		err = budgetServices.CreateBudget(c, &req, userId)
 
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 		c.JSON(http.StatusCreated, "created")
@@ -61,7 +60,7 @@ func FindAllBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		budgets, err := budgetServices.FindAll(c, userId)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, budgets)
@@ -88,7 +87,7 @@ func DeleteBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		err := budgetServices.Delete(c, id, userId)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, "Deleted")
