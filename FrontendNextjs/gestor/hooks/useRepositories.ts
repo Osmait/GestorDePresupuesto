@@ -301,7 +301,7 @@ export const useTransactions = () => {
 // Hook para manejar presupuestos
 export const useBudgets = () => {
 	const [budgets, setBudgets] = useState<Budget[]>([])
-	const [isLoading, setIsLoading] = useState(false)
+	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
 	const loadBudgets = useCallback(async () => {
