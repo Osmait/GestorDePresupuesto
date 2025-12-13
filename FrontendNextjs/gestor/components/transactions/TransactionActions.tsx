@@ -16,7 +16,7 @@ export function TransactionActions() {
     const [modalOpen, setModalOpen] = useState(false)
     const formRef = useRef<{ reset: () => void } | null>(null)
 
-    const { filters, setFilters, applyFilters, clearFilters, reloadCurrentView, createTransaction, isLoading, error } = useTransactionContext()
+    const { filters, setFilters, applyFilters, clearFilters, reloadCurrentView, createTransaction, addTransaction, isLoading, error } = useTransactionContext()
     const { accounts } = useAccounts()
     const { categories } = useCategories()
 
@@ -48,16 +48,38 @@ export function TransactionActions() {
                     }
                 }}
                 createTransaction={async (...args) => {
-                    // Optimistic Close: Close modal immediately
+                    // Optimistic Close
                     setModalOpen(false)
+
                     try {
+                        // Construct Optimistic Transaction
+                        const [name, description, amount, type_transation, account_id, category_id] = args;
+                        const optimisticTx = {
+                            id: `temp-${Date.now()}`,
+                            name,
+                            description,
+                            amount,
+                            type_transation,
+                            account_id,
+                            category_id,
+                            created_at: new Date().toISOString(), // Use string to match typical API response or Date depending on type
+                            user_id: 'current-user', // Placeholder
+                            updated_at: new Date().toISOString()
+                        };
+
+                        // Add to list immediately (Context)
+                        // @ts-ignore
+                        addTransaction(optimisticTx);
+
+                        // Perform actual save
                         // @ts-ignore
                         await createTransaction(...args)
+
                         formRef.current?.reset()
-                        reloadCurrentView()
+                        // Optionally reload in background without UI loader if needed
+                        // reloadCurrentView() // Disabled to prevent full list refresh
                     } catch (error) {
                         console.error("Failed to create transaction:", error)
-                        // Optional: Re-open or show toast if needed in future
                     }
                 }}
                 isLoading={isLoading}

@@ -30,6 +30,7 @@ interface TransactionContextType {
     error: string | null
     createTransaction: (...args: any[]) => Promise<void>
     deleteTransaction: (id: string) => Promise<void>
+    addTransaction: (tx: any) => void
 }
 
 const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
@@ -69,7 +70,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         loadTransactions,
         loadAllTransactions,
         createTransaction,
-        deleteTransaction
+        deleteTransaction,
+        addTransaction
     } = useTransactions()
 
     const updateURLWithFilters = useCallback((newFilters: TransactionFiltersState) => {
@@ -152,7 +154,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
             isLoading: isLoadingTx,
             error: errorTx,
             createTransaction,
-            deleteTransaction
+            deleteTransaction,
+            addTransaction
         }}>
             {children}
         </TransactionContext.Provider>

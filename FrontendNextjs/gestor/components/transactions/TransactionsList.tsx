@@ -1,7 +1,7 @@
 'use client'
 
 import { useTransactions, useCategories, useAccounts } from '@/hooks/useRepositories'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { CreditCard, TrendingUp, TrendingDown } from 'lucide-react'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
@@ -33,20 +33,30 @@ export default function TransactionsList() {
 
     const renderTransactionList = (transactionList: Transaction[]) => (
         <div className="space-y-4">
-            {transactionList.map((transaction) => {
-                const category = categories.find(c => c.id === transaction.category_id)
-                return (
-                    <TransactionItem
-                        key={transaction.id}
-                        transaction={transaction}
-                        category={category}
-                        onTransactionDeleted={async () => {
-                            await deleteTransaction(transaction.id!)
-                            reloadCurrentView() // Use function from Context
-                        }}
-                    />
-                )
-            })}
+            <AnimatePresence mode="popLayout" initial={false}>
+                {transactionList.map((transaction) => {
+                    const category = categories.find(c => c.id === transaction.category_id)
+                    return (
+                        <motion.div
+                            key={transaction.id}
+                            initial={{ opacity: 0, height: 0, x: -20 }}
+                            animate={{ opacity: 1, height: 'auto', x: 0 }}
+                            exit={{ opacity: 0, height: 0, x: 20 }}
+                            transition={{ duration: 0.5, ease: "easeOut" }}
+                        >
+                            <TransactionItem
+                                transaction={transaction}
+                                category={category}
+                                onTransactionDeleted={async () => {
+                                    await deleteTransaction(transaction.id!)
+                                    // Local optimistic delete could be added here too
+                                    reloadCurrentView()
+                                }}
+                            />
+                        </motion.div>
+                    )
+                })}
+            </AnimatePresence>
         </div>
     )
 

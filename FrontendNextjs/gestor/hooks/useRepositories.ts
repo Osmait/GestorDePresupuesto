@@ -295,6 +295,7 @@ export const useTransactions = () => {
 		getTransactionsByCategory,
 		getTransactionStatistics,
 		refetch: loadAllTransactions,
+		addTransaction: (tx: Transaction) => setTransactions(prev => [tx, ...prev])
 	}
 }
 
