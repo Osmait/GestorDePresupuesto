@@ -33,7 +33,7 @@ func TestAccountRepository(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, 0.0, balance)
 
-	err = accountRepo.Delete(ctx, account.Id)
+	err = accountRepo.Delete(ctx, account.Id, user.Id)
 	assert.NoError(t, err)
 
 	novalue, err := accountRepo.FindAll(ctx, account.UserId)

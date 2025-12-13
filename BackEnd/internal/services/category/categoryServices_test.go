@@ -21,12 +21,12 @@ func (m *MockCategoryRepository) Save(ctx context.Context, category *category.Ca
 }
 
 func (m *MockCategoryRepository) FindAll(ctx context.Context, userId string) ([]*category.Category, error) {
-	args := m.Called(ctx)
+	args := m.Called(ctx, userId)
 	return args.Get(0).([]*category.Category), args.Error(1)
 }
 
-func (m *MockCategoryRepository) Delete(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
+func (m *MockCategoryRepository) Delete(ctx context.Context, id string, userId string) error {
+	args := m.Called(ctx, id, userId)
 	return args.Error(0)
 }
 
@@ -55,7 +55,7 @@ func TestFindAll(t *testing.T) {
 	for i := 0; i < 10; i++ {
 		expectedCategory = append(expectedCategory, utils.GetNewRandomCategory())
 	}
-	mockRepo.On("FindAll", mock.Anything).Return(expectedCategory, nil)
+	mockRepo.On("FindAll", ctx, "1").Return(expectedCategory, nil) // Corrected: added ctx and userId to Called arguments
 
 	categoryServices := NewCategoryServices(mockRepo)
 	_, err := categoryServices.FindAll(ctx, "1")
@@ -72,7 +72,7 @@ func TestDeleteCategory(t *testing.T) {
 	mockRepo.On("FindOne", ctx, mock.Anything).Return(category, nil)
 	mockRepo.On("Delete", ctx, mock.Anything, mock.Anything).Return(nil)
 	categoryServices := NewCategoryServices(mockRepo)
-	err := categoryServices.Delete(ctx, category.Id)
+	err := categoryServices.Delete(ctx, category.Id, category.UserId)
 	mockRepo.AssertExpectations(t)
 	assert.NoError(t, err, "DeleteAccount should not return an error")
 }

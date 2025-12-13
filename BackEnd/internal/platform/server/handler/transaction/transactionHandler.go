@@ -31,7 +31,11 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 		var transactionRequest dto.TransactionRequest
 
 		if err := ctx.BindJSON(&transactionRequest); err != nil {
-			ctx.JSON(http.StatusBadRequest, "Error fields required ")
+			ctx.JSON(http.StatusBadRequest, "Error fields required")
+			return
+		}
+		if err := transactionRequest.Validate(); err != nil {
+			ctx.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 		err := transactionservice.CreateTransaction(
@@ -248,7 +252,8 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 func DeleteTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		err := transactionService.DeleteTransaction(ctx, id)
+		userID := ctx.GetString("X-User-Id")
+		err := transactionService.DeleteTransaction(ctx, id, userID)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 			return

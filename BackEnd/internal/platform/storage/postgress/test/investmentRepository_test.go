@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/osmait/gestorDePresupuesto/internal/domain/invesment"
-	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/invesment"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
+	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,7 @@ func TestInvestmentRepository(t *testing.T) {
 
 	// Setup dependencies
 	userRepository := userRepo.NewUserRepository(db)
-	investmentRepository := investmentRepo.NewInvesmentRepository(db)
+	investmentRepository := investmentRepo.NewInvestmentRepository(db)
 
 	// Create test user
 	user := utils.GetNewRandomUser()
@@ -63,7 +63,7 @@ func TestInvestmentRepository(t *testing.T) {
 func TestInvestmentRepository_FindOne_NotFound(t *testing.T) {
 	db := SetUpTest()
 	ctx := context.Background()
-	investmentRepository := investmentRepo.NewInvesmentRepository(db)
+	investmentRepository := investmentRepo.NewInvestmentRepository(db)
 
 	// Test FindOne with non-existent ID
 	investment, err := investmentRepository.FindOne(ctx, "non-existent-id")
@@ -74,7 +74,7 @@ func TestInvestmentRepository_FindOne_NotFound(t *testing.T) {
 func TestInvestmentRepository_FindAll_EmptyResult(t *testing.T) {
 	db := SetUpTest()
 	ctx := context.Background()
-	investmentRepository := investmentRepo.NewInvesmentRepository(db)
+	investmentRepository := investmentRepo.NewInvestmentRepository(db)
 
 	// Test FindAll with non-existent user ID
 	investments, err := investmentRepository.FindAll(ctx, "non-existent-user-id")
@@ -88,7 +88,7 @@ func TestInvestmentRepository_Multiple_Investments(t *testing.T) {
 
 	// Setup dependencies
 	userRepository := userRepo.NewUserRepository(db)
-	investmentRepository := investmentRepo.NewInvesmentRepository(db)
+	investmentRepository := investmentRepo.NewInvestmentRepository(db)
 
 	// Create test user
 	user := utils.GetNewRandomUser()
@@ -96,7 +96,7 @@ func TestInvestmentRepository_Multiple_Investments(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Create multiple investments
-	var createdInvestments []*invesment.Invesment
+	var createdInvestments []*investment.Investment
 	for i := 0; i < 3; i++ {
 		investment := utils.GetNewRandomInvestment()
 		investment.UserId = user.Id

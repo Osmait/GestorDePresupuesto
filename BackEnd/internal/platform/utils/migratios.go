@@ -78,7 +78,7 @@ func SetupPostgreSQLSchema(db *sql.DB) error {
 	DROP TABLE IF EXISTS account CASCADE;
 	DROP TABLE IF EXISTS users CASCADE;
 	DROP TABLE IF EXISTS cryptos CASCADE;
-	DROP TABLE IF EXISTS invesments CASCADE;
+	DROP TABLE IF EXISTS investments CASCADE;
 	DROP TYPE IF EXISTS TypeTransaction CASCADE;
 
 	CREATE TYPE TypeTransaction AS ENUM (
@@ -156,7 +156,7 @@ func SetupPostgreSQLSchema(db *sql.DB) error {
 	);
 
 	-- Additional table for investment repository compatibility
-	CREATE TABLE invesments(
+	CREATE TABLE investments(
 		id VARCHAR PRIMARY KEY,
 		name VARCHAR(255) NOT NULL,
 		price float NOT NULL,
@@ -260,7 +260,7 @@ func SetupSQLiteSchema(db *sql.DB) error {
 	);
 
 	-- Additional table for investment repository compatibility
-	CREATE TABLE IF NOT EXISTS invesments(
+	CREATE TABLE IF NOT EXISTS investments(
 		id VARCHAR PRIMARY KEY,
 		name VARCHAR(255) NOT NULL,
 		price REAL NOT NULL,

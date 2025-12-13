@@ -85,7 +85,8 @@ func FindAllBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 func DeleteBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		err := budgetServices.Delete(c, id)
+		userId := c.GetString("X-User-Id")
+		err := budgetServices.Delete(c, id, userId)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, c)
 			return

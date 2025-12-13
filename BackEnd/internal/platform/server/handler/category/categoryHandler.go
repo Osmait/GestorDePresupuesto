@@ -83,7 +83,8 @@ func FindAllCategorys(categoryServices *category.CategoryServices) gin.HandlerFu
 func DeleteCategory(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		err := categoryServices.Delete(c, id)
+		userId := c.GetString("X-User-Id")
+		err := categoryServices.Delete(c, id, userId)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, c)
 			return

@@ -74,7 +74,17 @@ func (c *CategoryRespository) FindOne(ctx context.Context, id string) (*category
 	return &category, nil
 }
 
-func (c *CategoryRespository) Delete(ctx context.Context, id string) error {
-	_, err := c.db.ExecContext(ctx, "DELETE FROM categorys WHERE id = $1", id)
-	return err
+func (c *CategoryRespository) Delete(ctx context.Context, id string, userId string) error {
+	result, err := c.db.ExecContext(ctx, "DELETE FROM categorys WHERE id = $1 AND user_id = $2", id, userId)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

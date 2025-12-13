@@ -118,10 +118,48 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 	return currentBudget, nil
 }
 
-func (repo *TransactionRepository) Delete(ctx context.Context, id string) error {
-	_, err := repo.db.ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 ", id)
+func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string) (map[string]float64, error) {
+	rows, err := repo.db.QueryContext(ctx,
+		"SELECT budget_id, sum(amount) as currentBudget FROM transactions WHERE user_id = $1 AND budget_id IS NOT NULL AND budget_id != '' GROUP BY budget_id", userId)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
 
-	return err
+	budgets := make(map[string]float64)
+	for rows.Next() {
+		var budgetID string
+		var currentBudget float64
+		if err = rows.Scan(&budgetID, &currentBudget); err == nil {
+			budgets[budgetID] = currentBudget
+		}
+	}
+	if err = rows.Err(); err != nil {
+		log.Error().Err(err).Msg("error iterating over budget rows")
+		return nil, err
+	}
+
+	return budgets, nil
+}
+
+func (repo *TransactionRepository) Delete(ctx context.Context, id string, userId string) error {
+	result, err := repo.db.ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND user_id = $2", id, userId)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 // FindAllOfAllAccountsWithFilters retrieves all transactions across all user accounts with filtering and pagination

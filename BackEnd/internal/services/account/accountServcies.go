@@ -42,14 +42,14 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.Acc
 	if err != nil {
 		return nil, err
 	}
+	balances, err := s.accountRepository.Balances(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
 	var accountResponses []*dto.AccountResponse
 
 	for _, account := range accounts {
-		balance, err := s.accountRepository.Balance(ctx, account.Id)
-		if err != nil {
-			return nil, err
-		}
-
+		balance := balances[account.Id]
 		accountResponse := dto.NewAccountResponse(account, balance+account.InitialBalance)
 		accountResponses = append(accountResponses, accountResponse)
 	}
@@ -57,8 +57,8 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.Acc
 	return accountResponses, nil
 }
 
-func (s *AccountService) DeleteAccount(ctx context.Context, id string) error {
-	err := s.accountRepository.Delete(ctx, id)
+func (s *AccountService) DeleteAccount(ctx context.Context, id string, userId string) error {
+	err := s.accountRepository.Delete(ctx, id, userId)
 	return err
 }
 

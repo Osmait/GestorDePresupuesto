@@ -136,9 +136,9 @@ DELETE /category/:id       # Eliminar categoría
 
 ### Inversiones
 ```
-POST   /invesment          # Crear inversión
-GET    /invesment          # Listar inversiones
-DELETE /invesment/:id      # Eliminar inversión
+POST   /investment          # Crear inversión
+GET    /investment          # Listar inversiones
+DELETE /investment/:id      # Eliminar inversión
 ```
 
 ## 🧪 Testing

@@ -58,12 +58,12 @@ func TestBudgetRepository(t *testing.T) {
 
 	// Note: Test Delete has a bug in the repository (uses 'budget' table instead of 'budgets')
 	// This test documents the expected behavior when the bug is fixed
-	err = budgetRepository.Delete(ctx, budget.Id)
+	err = budgetRepository.Delete(ctx, budget.Id, user.Id)
 	// This will currently fail due to table name bug
 	// assert.NoError(t, err)
 
 	// Cleanup (manual since Delete might not work)
-	err = categoryRepository.Delete(ctx, category.Id)
+	err = categoryRepository.Delete(ctx, category.Id, user.Id)
 	assert.NoError(t, err)
 	err = userRepository.Delete(ctx, user.Id)
 	assert.NoError(t, err)
@@ -216,9 +216,9 @@ func TestBudgetRepository_User_Isolation(t *testing.T) {
 	assert.Equal(t, 2000.0, user2Budgets[0].Amount)
 
 	// Cleanup
-	err = categoryRepository.Delete(ctx, category1.Id)
+	err = categoryRepository.Delete(ctx, category1.Id, user1.Id)
 	assert.NoError(t, err)
-	err = categoryRepository.Delete(ctx, category2.Id)
+	err = categoryRepository.Delete(ctx, category2.Id, user2.Id)
 	assert.NoError(t, err)
 	err = userRepository.Delete(ctx, user1.Id)
 	assert.NoError(t, err)

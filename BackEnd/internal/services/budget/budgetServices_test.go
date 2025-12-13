@@ -7,6 +7,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/budget"
+	transactionDto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -25,13 +26,18 @@ func (m *MockBudgetRepository) FindAll(ctx context.Context, userId string) ([]*b
 	return args.Get(0).([]*budget.Budget), args.Error(1)
 }
 
-func (m *MockBudgetRepository) Delete(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
+func (m *MockBudgetRepository) Delete(ctx context.Context, id string, userId string) error {
+	args := m.Called(ctx, id, userId)
 	return args.Error(0)
 }
 
 func (m *MockBudgetRepository) FindOne(ctx context.Context, id string) (*budget.Budget, error) {
 	args := m.Called(ctx, id)
+	return args.Get(0).(*budget.Budget), args.Error(1)
+}
+
+func (m *MockBudgetRepository) FindByCategory(ctx context.Context, categoryId string) (*budget.Budget, error) {
+	args := m.Called(ctx, categoryId)
 	return args.Get(0).(*budget.Budget), args.Error(1)
 }
 
@@ -59,9 +65,29 @@ func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockTransaction) Delete(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
+func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string) (map[string]float64, error) {
+	args := m.Called(ctx, userId)
+	return args.Get(0).(map[string]float64), args.Error(1)
+}
+
+func (m *MockTransaction) Delete(ctx context.Context, id string, userId string) error {
+	args := m.Called(ctx, id, userId)
 	return args.Error(0)
+}
+
+func (m *MockTransaction) FindAllOfAllAccountsWithFilters(ctx context.Context, userId string, filter *transactionDto.TransactionFilter) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, userId, filter)
+	return args.Get(0).([]*transaction.Transaction), args.Error(1)
+}
+
+func (m *MockTransaction) FindAllWithFilters(ctx context.Context, filter *transactionDto.TransactionFilter) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, filter)
+	return args.Get(0).([]*transaction.Transaction), args.Error(1)
+}
+
+func (m *MockTransaction) CountWithFilters(ctx context.Context, userId string, filter *transactionDto.TransactionFilter) (int64, error) {
+	args := m.Called(ctx, userId, filter)
+	return args.Get(0).(int64), args.Error(1)
 }
 
 func TestCreateBudget(t *testing.T) {
@@ -86,9 +112,10 @@ func TestGetAllBudgets(t *testing.T) {
 		{Id: "123", CategoryId: "123", UserId: "123", Amount: 1000.0},
 		{Id: "123", CategoryId: "123", UserId: "123", Amount: 1000.0},
 	}
+	budgetsMap := map[string]float64{"123": 1000.0}
 
 	mockRepoBudget.On("FindAll", mock.Anything).Return(listBudget, nil)
-	mockRepoTransaction.On("FindCurrentBudget", mock.Anything, mock.Anything).Return(1000.0, nil)
+	mockRepoTransaction.On("FindCurrentBudgets", mock.Anything, mock.Anything).Return(budgetsMap, nil)
 	ctx := context.Background()
 	_, err := budgetService.FindAll(ctx, "123")
 	assert.NoError(t, err)
@@ -99,9 +126,11 @@ func TestDeleteBudget(t *testing.T) {
 	mockRepoTransaction := &MockTransaction{}
 	budgetService := NewBudgetServices(mockRepoBudget, mockRepoTransaction)
 	budget := budget.Budget{Id: "123", CategoryId: "123", UserId: "123", Amount: 1000.0}
+	budgetID := budget.Id
+	userID := budget.UserId
 	mockRepoBudget.On("FindOne", mock.Anything, mock.Anything).Return(&budget, nil)
-	mockRepoBudget.On("Delete", mock.Anything, mock.Anything).Return(nil)
+	mockRepoBudget.On("Delete", context.Background(), budgetID, userID).Return(nil)
 	ctx := context.Background()
-	err := budgetService.Delete(ctx, budget.Id)
+	err := budgetService.Delete(ctx, budgetID, userID)
 	assert.NoError(t, err)
 }

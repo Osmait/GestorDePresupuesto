@@ -7,7 +7,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
-	"github.com/osmait/gestorDePresupuesto/internal/domain/invesment"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
 )
@@ -47,12 +47,12 @@ func GetNewRandomBudget() *budget.Budget {
 		float64(balances[0]))
 }
 
-func GetNewRandomInvestment() *invesment.Invesment {
+func GetNewRandomInvestment() *investment.Investment {
 	prices, _ := faker.RandomInt(1, 100000)
 	currentPrices, _ := faker.RandomInt(1, 100000)
 	quantities, _ := faker.RandomInt(1, 1000)
 
-	return invesment.NewInvesment(
+	return investment.NewInvestment(
 		faker.UUIDDigit(),
 		faker.Name(),
 		float64(prices[0]),

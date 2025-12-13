@@ -20,18 +20,23 @@ func (m *MockAccountRepository) Save(ctx context.Context, acc *account.Account) 
 }
 
 func (m *MockAccountRepository) FindAll(ctx context.Context, userId string) ([]*account.Account, error) {
-	args := m.Called(ctx)
+	args := m.Called(ctx, userId)
 	return args.Get(0).([]*account.Account), args.Error(1)
 }
 
-func (m *MockAccountRepository) Delete(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
+func (m *MockAccountRepository) Delete(ctx context.Context, id string, userId string) error {
+	args := m.Called(ctx, id, userId)
 	return args.Error(0)
 }
 
 func (m *MockAccountRepository) Balance(ctx context.Context, id string) (float64, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).(float64), args.Error(1)
+}
+
+func (m *MockAccountRepository) Balances(ctx context.Context, userId string) (map[string]float64, error) {
+	args := m.Called(ctx, userId)
+	return args.Get(0).(map[string]float64), args.Error(1)
 }
 
 func (m *MockAccountRepository) Update(ctx context.Context, id string, name string, bank string, userId string) error {
@@ -65,13 +70,14 @@ func TestCreateAccount(t *testing.T) {
 func TestDeleteAccount(t *testing.T) {
 	mockRepo := &MockAccountRepository{}
 
-	mockRepo.On("Delete", mock.Anything, mock.Anything).Return(nil)
+	mockRepo.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 
 	accountSvc := NewAccountService(mockRepo)
 
 	ctx := context.Background()
 	id := "testID"
-	err := accountSvc.DeleteAccount(ctx, id)
+	userId := "testUserID"
+	err := accountSvc.DeleteAccount(ctx, id, userId)
 
 	mockRepo.AssertExpectations(t)
 	assert.NoError(t, err, "DeleteAccount should not return an error")
@@ -81,12 +87,15 @@ func TestFindAll(t *testing.T) {
 	mockRepo := &MockAccountRepository{}
 
 	expectedAccounts := []*account.Account{}
+	expectedBalances := make(map[string]float64)
 	for i := 0; i < 10; i++ {
-		expectedAccounts = append(expectedAccounts, utils.GetNewRandomAccount())
+		acc := utils.GetNewRandomAccount()
+		expectedAccounts = append(expectedAccounts, acc)
+		expectedBalances[acc.Id] = 1000.00
 	}
 
-	mockRepo.On("Balance", context.Background(), mock.Anything).Return(1000.00, nil)
-	mockRepo.On("FindAll", mock.Anything).Return(expectedAccounts, nil)
+	mockRepo.On("Balances", context.Background(), mock.Anything).Return(expectedBalances, nil)
+	mockRepo.On("FindAll", mock.Anything, mock.Anything).Return(expectedAccounts, nil)
 
 	accountSvc := NewAccountService(mockRepo)
 

@@ -49,7 +49,7 @@ func TestCategoryRepository(t *testing.T) {
 	assert.Equal(t, category.Id, categories[0].Id)
 
 	// Test Delete
-	err = categoryRepository.Delete(ctx, category.Id)
+	err = categoryRepository.Delete(ctx, category.Id, user.Id)
 	assert.NoError(t, err)
 
 	// Verify deletion
@@ -144,7 +144,7 @@ func TestCategoryRepository_Multiple_Categories(t *testing.T) {
 
 	// Cleanup
 	for _, categoryId := range createdCategories {
-		err = categoryRepository.Delete(ctx, categoryId)
+		err = categoryRepository.Delete(ctx, categoryId, user.Id)
 		assert.NoError(t, err)
 	}
 
@@ -194,9 +194,9 @@ func TestCategoryRepository_User_Isolation(t *testing.T) {
 	assert.Equal(t, "User2 Category", user2Categories[0].Name)
 
 	// Cleanup
-	err = categoryRepository.Delete(ctx, category1.Id)
+	err = categoryRepository.Delete(ctx, category1.Id, user1.Id)
 	assert.NoError(t, err)
-	err = categoryRepository.Delete(ctx, category2.Id)
+	err = categoryRepository.Delete(ctx, category2.Id, user2.Id)
 	assert.NoError(t, err)
 	err = userRepository.Delete(ctx, user1.Id)
 	assert.NoError(t, err)

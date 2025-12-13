@@ -28,7 +28,11 @@ func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		var account dto.AccountRequest
 		if err := ctx.BindJSON(&account); err != nil {
-			ctx.JSON(http.StatusBadRequest, "Error filds required")
+			ctx.JSON(http.StatusBadRequest, "Error fields required")
+			return
+		}
+		if err := account.Validate(); err != nil {
+			ctx.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
 		err := accountService.CreateAccount(ctx, account.Name, account.Bank, account.InitialBalance, userId)
@@ -80,7 +84,8 @@ func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		err := accountService.DeleteAccount(ctx, id)
+		userId := ctx.GetString("X-User-Id")
+		err := accountService.DeleteAccount(ctx, id, userId)
 		if err != nil {
 			errorHandler.ReponseByTypeOfErr(err, ctx)
 		}

@@ -50,18 +50,15 @@ func TestTransactionRepository(t *testing.T) {
 	assert.NoError(t, err)
 	assert.NotEmpty(t, transactionList)
 
-	err = transactionRepo.Delete(ctx, transaction.Id)
+	err = transactionRepo.Delete(ctx, transaction.Id, user.Id)
 	assert.NoError(t, err)
 
-	err = categoryRepo.Delete(ctx, transaction.Id)
-	assert.NoError(t, err)
-
-	err = accountRepo.Delete(ctx, account.Id)
+	err = accountRepo.Delete(ctx, account.Id, user.Id)
 	assert.NoError(t, err)
 
 	err = userRepo.Delete(ctx, user.Id)
 	assert.NoError(t, err)
 
-	err = categoryRepo.Delete(ctx, category.Id)
+	err = categoryRepo.Delete(ctx, category.Id, user.Id)
 	assert.NoError(t, err)
 }

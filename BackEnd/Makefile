@@ -83,7 +83,7 @@ dev:
 # Start development environment with database
 dev-start:
 	@echo "$(BLUE)Starting development environment with database...$(RESET)"
-	@docker-compose up -d postgres
+	@docker compose up -d postgres
 	@echo "$(GREEN)Waiting for PostgreSQL to be ready...$(RESET)"
 	@sleep 5
 	@echo "$(GREEN)PostgreSQL is ready!$(RESET)"
@@ -259,41 +259,7 @@ test-coverage:
 	@go tool cover -func=$(COVERAGE_DIR)/coverage.out | tail -n 1
 	@echo "$(GREEN)Coverage report generated: $(COVERAGE_DIR)/coverage.html$(RESET)"
 
-# Run all tests including slow benchmarks (complete but slow)
-test-all:
-	@echo "$(BLUE)Running all tests including slow benchmarks...$(RESET)"
-	@go test -race -v ./...
-	@echo "$(GREEN)All tests completed$(RESET)"
 
-# Run unit tests only (fastest)
-test-unit:
-	@echo "$(BLUE)Running unit tests...$(RESET)"
-	@go test -short -race ./...
-	@echo "$(GREEN)Unit tests completed$(RESET)"
-
-# Run integration tests
-test-integration:
-	@echo "$(BLUE)Running integration tests...$(RESET)"
-	@go test -tags=integration -race ./...
-	@echo "$(GREEN)Integration tests completed$(RESET)"
-
-# Run benchmarks (optimized for speed)
-benchmark:
-	@echo "$(BLUE)Running benchmarks...$(RESET)"
-	@go test -bench=. -benchtime=100ms -count=1 ./...
-	@echo "$(GREEN)Benchmarks completed$(RESET)"
-
-# Run comprehensive benchmarks (slower but complete)
-benchmark-full:
-	@echo "$(BLUE)Running comprehensive benchmarks...$(RESET)"
-	@go test -bench=. -benchmem -v ./...
-	@echo "$(GREEN)Comprehensive benchmarks completed$(RESET)"
-
-# Run tests with race detection
-test-race:
-	@echo "$(BLUE)Running tests with race detection...$(RESET)"
-	@go test -race -count=1 ./...
-	@echo "$(GREEN)Race detection tests completed$(RESET)"
 
 ## Database Commands
 
@@ -484,13 +450,7 @@ help:
 	@echo ""
 	@echo "$(YELLOW)Testing Commands:$(RESET)"
 	@echo "  test          - Run tests (fast, skips slow benchmarks)"
-	@echo "  test-all      - Run all tests including slow benchmarks"
-	@echo "  test-coverage - Run tests with coverage"
-	@echo "  test-unit     - Run unit tests only (fastest)"
-	@echo "  test-integration - Run integration tests"
-	@echo "  benchmark     - Run benchmarks (fast)"
-	@echo "  benchmark-full - Run comprehensive benchmarks"
-	@echo "  test-race     - Run tests with race detection"
+
 	@echo ""
 	@echo "$(YELLOW)Database Commands:$(RESET)"
 	@echo "  migrate-up    - Run database migrations"
@@ -602,14 +562,4 @@ e2e-setup:
 	@chmod +x scripts/e2e-test.sh
 	@echo "$(GREEN)E2E test environment setup completed$(RESET)"
 
-# Enhanced test targets
-test-all-comprehensive:
-	@echo "$(BLUE)🧪 Running comprehensive test suite...$(RESET)"
-	@make test
-	@make e2e-smoke
-
-test-ci-full:
-	@echo "$(BLUE)🚀 Running full CI test suite...$(RESET)"
-	@make test-coverage
-	@make test-race
-	@make e2e 
+ 

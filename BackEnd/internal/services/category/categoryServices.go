@@ -46,7 +46,7 @@ func (c *CategoryServices) FindAll(ctx context.Context, userId string) ([]*dto.C
 	return categoryResponseList, nil
 }
 
-func (c *CategoryServices) Delete(ctx context.Context, id string) error {
+func (c *CategoryServices) Delete(ctx context.Context, id string, userId string) error {
 	categoryToDelete, err := c.repository.FindOne(ctx, id)
 	if err != nil {
 		return err
@@ -54,6 +54,6 @@ func (c *CategoryServices) Delete(ctx context.Context, id string) error {
 	if categoryToDelete.Id != id {
 		return errorhttp.ErrNotFound
 	}
-	err = c.repository.Delete(ctx, id)
+	err = c.repository.Delete(ctx, id, userId)
 	return err
 }

@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -36,14 +38,66 @@ func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockTransaction) Delete(ctx context.Context, id string) error {
-	args := m.Called(ctx, id)
+func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string) (map[string]float64, error) {
+	args := m.Called(ctx, userId)
+	return args.Get(0).(map[string]float64), args.Error(1)
+}
+
+func (m *MockTransaction) Delete(ctx context.Context, id string, userId string) error {
+	args := m.Called(ctx, id, userId)
 	return args.Error(0)
+}
+
+func (m *MockTransaction) FindAllOfAllAccountsWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, userId, filter)
+	return args.Get(0).([]*transaction.Transaction), args.Error(1)
+}
+
+func (m *MockTransaction) FindAllWithFilters(ctx context.Context, filter *dto.TransactionFilter) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, filter)
+	return args.Get(0).([]*transaction.Transaction), args.Error(1)
+}
+
+func (m *MockTransaction) CountWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) (int64, error) {
+	args := m.Called(ctx, userId, filter)
+	return args.Get(0).(int64), args.Error(1)
+}
+
+type MockBudgetRepository struct {
+	mock.Mock
+}
+
+func (m *MockBudgetRepository) Save(ctx context.Context, budget *budget.Budget) error {
+	args := m.Called(ctx, budget)
+	return args.Error(0)
+}
+
+func (m *MockBudgetRepository) FindAll(ctx context.Context, userId string) ([]*budget.Budget, error) {
+	args := m.Called(ctx, userId)
+	return args.Get(0).([]*budget.Budget), args.Error(1)
+}
+
+func (m *MockBudgetRepository) FindOne(ctx context.Context, id string) (*budget.Budget, error) {
+	args := m.Called(ctx, id)
+	return args.Get(0).(*budget.Budget), args.Error(1)
+}
+
+func (m *MockBudgetRepository) Delete(ctx context.Context, id string, userId string) error {
+	args := m.Called(ctx, id, userId)
+	return args.Error(0)
+}
+
+func (m *MockBudgetRepository) FindByCategory(ctx context.Context, categoryId string) (*budget.Budget, error) {
+	args := m.Called(ctx, categoryId)
+	return args.Get(0).(*budget.Budget), args.Error(1)
 }
 
 func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
-	s := NewTransactionService(mockRepo)
+	mockBudgetRepo := &MockBudgetRepository{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo)
+
+	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
@@ -55,7 +109,8 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 
 func TestFindAllTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
-	s := NewTransactionService(mockRepo)
+	mockBudgetRepo := &MockBudgetRepository{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo)
 
 	expectedTransactions := []*transaction.Transaction{}
 	for i := 0; i < 10; i++ {
@@ -75,20 +130,22 @@ func TestFindAllTransaction(t *testing.T) {
 
 func TestDeleteTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
-	s := NewTransactionService(mockRepo)
+	mockBudgetRepo := &MockBudgetRepository{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo)
 
 	expectedTransactions := utils.GetNewRandomTransaction()
 
-	mockRepo.On("Delete", mock.Anything, mock.Anything).Return(nil)
+	mockRepo.On("Delete", mock.Anything, mock.Anything, mock.Anything).Return(nil)
 	ctx := context.Background()
-	err := s.DeleteTransaction(ctx, expectedTransactions.Id)
+	err := s.DeleteTransaction(ctx, expectedTransactions.Id, "testUser")
 	assert.NoError(t, err, "CreateAccount should not return an error")
 	mockRepo.AssertExpectations(t)
 }
 
 func TestFindAllTransactionofAllAccount(t *testing.T) {
 	mockRepo := &MockTransaction{}
-	s := NewTransactionService(mockRepo)
+	mockBudgetRepo := &MockBudgetRepository{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo)
 
 	expectedTransactions := []*transaction.Transaction{}
 	for i := 0; i < 5; i++ {

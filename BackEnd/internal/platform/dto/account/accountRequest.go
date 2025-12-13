@@ -1,5 +1,7 @@
 package dto
 
+import "errors"
+
 // AccountRequest represents the data required to create a new account.
 // All fields are validated for financial data security and business rules.
 type AccountRequest struct {
@@ -21,7 +23,8 @@ func NewAccountRequest(name, bank string, initialBalance float64) *AccountReques
 // Validate performs business logic validation on the AccountRequest.
 // It checks for additional constraints beyond basic field validation.
 func (a *AccountRequest) Validate() error {
-	// Additional custom validation logic can be added here
-	// e.g., valid bank names, balance limits, etc.
+	if a.InitialBalance < 0 {
+		return errors.New("initial balance cannot be negative")
+	}
 	return nil
 }

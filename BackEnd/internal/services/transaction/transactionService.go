@@ -227,7 +227,7 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 	return transactionResponseList
 }
 
-func (s TransactionService) DeleteTransaction(ctx context.Context, id string) error {
-	err := s.transactionRepository.Delete(ctx, id)
+func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {
+	err := s.transactionRepository.Delete(ctx, id, userId)
 	return err
 }
