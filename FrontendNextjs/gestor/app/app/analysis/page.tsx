@@ -7,6 +7,7 @@ import { ResponsiveHeatMap } from '@nivo/heatmap'
 import { ResponsivePie } from '@nivo/pie'
 import { useTheme } from 'next-themes'
 import { useMemo, useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card'
 import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
@@ -406,8 +407,15 @@ export default function AnalysisPage() {
 
   return (
     <>
-      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
-        <div className="container mx-auto px-4 py-8">
+      <div
+        className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20"
+      >
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+          className="container mx-auto px-4 py-8"
+        >
           {/* ... Header ... */}
           <div className="mb-8">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -521,8 +529,9 @@ export default function AnalysisPage() {
               </CardContent>
             </Card>
           </div>
-        </div>
+        </motion.div>
       </div>
     </>
   )
 }
+

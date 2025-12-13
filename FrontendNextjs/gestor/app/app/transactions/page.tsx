@@ -1,5 +1,5 @@
-import TransactionsClient from '@/components/transactions/TransactionsClient';
+import TransactionsClient from '@/components/transactions/TransactionsClient'
 
 export default function TransactionsPage() {
-	return <TransactionsClient />;
+	return <TransactionsClient />
 }

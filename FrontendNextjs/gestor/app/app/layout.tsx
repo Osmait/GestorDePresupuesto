@@ -13,6 +13,10 @@ export const metadata: Metadata = {
 	description: 'Sistema de gestión financiera personal',
 }
 
+import PageTransition from '@/components/common/page-transition'
+
+// ... existing imports
+
 export default function DashboardLayout({
 	children,
 }: {
@@ -21,7 +25,9 @@ export default function DashboardLayout({
 	return (
 		<SettingsProvider>
 			<Sidebar>
-				{children}
+				<PageTransition>
+					{children}
+				</PageTransition>
 			</Sidebar>
 		</SettingsProvider>
 	)

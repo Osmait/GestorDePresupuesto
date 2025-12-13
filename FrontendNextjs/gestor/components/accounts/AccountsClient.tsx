@@ -1,5 +1,6 @@
 "use client";
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useAccounts } from '@/hooks/useRepositories';
 import { Account } from '@/types/account';
 import { PlusCircle } from 'lucide-react';
@@ -11,8 +12,6 @@ import { AccountCard } from '@/components/accounts/AccountCard';
 import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard';
 import { AccountFormModal } from '@/components/accounts/AccountFormModal';
 import { AccountUpdateModal } from '@/components/accounts/AccountUpdateModal';
-import { AccountSummarySkeleton } from '@/components/accounts/AccountSummarySkeleton';
-import { AccountCardSkeleton } from '@/components/accounts/AccountCardSkeleton';
 import {
   TrendingUp,
   TrendingDown,
@@ -110,7 +109,12 @@ export default function AccountsClient() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
-      <div className="container mx-auto px-4 py-8">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="container mx-auto px-4 py-8"
+      >
         {/* Header */}
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -199,7 +203,7 @@ export default function AccountsClient() {
             </div>
           </CardContent>
         </Card>
-      </div>
+      </motion.div>
     </div>
   );
-} 
+}

@@ -1,6 +1,7 @@
 "use client";
 import { useAccounts, useCategories, useTransactions } from '@/hooks/useRepositories';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion } from 'framer-motion';
 import { DateRange } from 'react-day-picker';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -207,7 +208,12 @@ export default function TransactionsClient() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
-      <div className="container mx-auto px-4 py-8">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5 }}
+        className="container mx-auto px-4 py-8"
+      >
         <div className="mb-8">
           <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
             <div>
@@ -353,7 +359,7 @@ export default function TransactionsClient() {
             content: renderTransactionList(tab.transactionList)
           }))}
         />
-      </div>
+      </motion.div>
     </div>
   );
 }

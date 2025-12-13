@@ -1,5 +1,6 @@
 'use client'
 import { useState } from 'react'
+import { motion } from 'framer-motion'
 import { useCategories, useTransactions } from '@/hooks/useRepositories'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose, DialogDescription } from '@/components/ui/dialog'
 import { useForm } from 'react-hook-form'
@@ -350,8 +351,15 @@ export default function CategoriesPage() {
 	}
 
 	return (
-		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
-			<div className="container mx-auto px-4 py-8">
+		<div
+			className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20"
+		>
+			<motion.div
+				initial={{ opacity: 0 }}
+				animate={{ opacity: 1 }}
+				transition={{ duration: 0.5 }}
+				className="container mx-auto px-4 py-8"
+			>
 				{/* Header */}
 				<div className="mb-8">
 					<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -409,7 +417,8 @@ export default function CategoriesPage() {
 						},
 					]}
 				/>
-			</div>
+			</motion.div>
 		</div>
 	)
 }
+
