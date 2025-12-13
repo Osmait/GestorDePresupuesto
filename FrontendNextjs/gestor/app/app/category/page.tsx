@@ -4,9 +4,9 @@ import { CategoryList } from '@/components/categories/CategoryList'
 
 export default function CategoriesPage() {
 	return (
-		<CategoryProvider>
-			<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
-				<div className="container mx-auto px-4 py-8">
+		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
+			<div className="container mx-auto px-4 py-8">
+				<CategoryProvider>
 					{/* Header Estático - Server Side */}
 					<div className="mb-8">
 						<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
@@ -25,8 +25,8 @@ export default function CategoriesPage() {
 
 					{/* Contenido Dinámico - Client Side */}
 					<CategoryList />
-				</div>
+				</CategoryProvider>
 			</div>
-		</CategoryProvider>
+		</div>
 	)
 }
