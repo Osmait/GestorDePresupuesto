@@ -311,17 +311,18 @@ export const useBudgets = () => {
 	const [isLoading, setIsLoading] = useState(true)
 	const [error, setError] = useState<string | null>(null)
 
-	const loadBudgets = useCallback(async () => {
+	const loadBudgets = useCallback(async (showLoading = true) => {
 		try {
-			setIsLoading(true)
+			if (showLoading) setIsLoading(true)
 			setError(null)
 			const budgetRepository = await getBudgetRepository()
 			const data = await budgetRepository.findAll()
-			setBudgets(data)
+			// Newest First (Reverse)
+			setBudgets(Array.isArray(data) ? [...data].reverse() : [])
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error loading budgets')
 		} finally {
-			setIsLoading(false)
+			if (showLoading) setIsLoading(false)
 		}
 	}, [])
 
@@ -333,7 +334,7 @@ export const useBudgets = () => {
 			setError(null)
 			const budgetRepository = await getBudgetRepository()
 			await budgetRepository.create(categoryId, amount)
-			await loadBudgets() // Recargar después de crear
+			await loadBudgets(false) // Silent Refresh
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error creating budget')
 			throw err
@@ -345,7 +346,7 @@ export const useBudgets = () => {
 			setError(null)
 			const budgetRepository = await getBudgetRepository()
 			await budgetRepository.delete(id)
-			await loadBudgets() // Recargar después de eliminar
+			await loadBudgets(false) // Silent Refresh
 		} catch (err) {
 			setError(err instanceof Error ? err.message : 'Error deleting budget')
 			throw err
