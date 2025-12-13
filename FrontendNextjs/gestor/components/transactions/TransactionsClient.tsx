@@ -1,6 +1,6 @@
 "use client";
 import { useAccounts, useCategories, useTransactions } from '@/hooks/useRepositories';
-import { useState, useEffect, useRef, useCallback} from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { DateRange } from 'react-day-picker';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,8 @@ import TransactionItem from '@/components/transactions/TransactionItem';
 import TransactionSummaryCard from '@/components/transactions/TransactionSummaryCard';
 import TransactionFormModal from '@/components/transactions/TransactionFormModal';
 import { Transaction, TypeTransaction, TransactionFilters } from '@/types/transaction';
-
+import { Skeleton } from '@/components/ui/skeleton';
+import { TransactionSkeleton } from '@/components/transactions/TransactionSkeleton';
 
 export default function TransactionsClient() {
   const { transactions, pagination, isLoading: isLoadingTx, loadTransactions, loadAllTransactions, createTransaction, deleteTransaction, isLoading, error } = useTransactions();
@@ -22,16 +23,16 @@ export default function TransactionsClient() {
   const { accounts, isLoading: isLoadingAcc } = useAccounts();
   const searchParams = useSearchParams();
   const router = useRouter();
-  
+
   const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME);
   const expenseTransactions = transactions.filter(t => t.type_transation === TypeTransaction.BILL);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
-  
+
   const initializeFiltersFromURL = useCallback(() => {
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
-    
+
     return {
       dateRange: {
         from: dateFrom ? new Date(dateFrom) : undefined,
@@ -54,7 +55,7 @@ export default function TransactionsClient() {
 
   const updateURLWithFilters = useCallback((newFilters: typeof filters) => {
     const params = new URLSearchParams();
-    
+
     if (newFilters.dateRange.from) {
       params.set('dateFrom', newFilters.dateRange.from.toISOString().split('T')[0]);
     }
@@ -90,7 +91,7 @@ export default function TransactionsClient() {
     };
 
     updateURLWithFilters(combinedFilters);
-    
+
     const apiFilters: TransactionFilters = {
       page: 1,
       limit: 50,
@@ -120,7 +121,7 @@ export default function TransactionsClient() {
     if (combinedFilters.search) {
       apiFilters.search = combinedFilters.search;
     }
-    
+
     loadTransactions(apiFilters);
   }, [updateURLWithFilters, loadTransactions]);
 
@@ -150,11 +151,11 @@ export default function TransactionsClient() {
       maxAmount: '',
       search: '',
     };
-    
+
     setFilters(clearedFilters);
     router.replace(window.location.pathname);
     loadAllTransactions(); // Cargar todas las transacciones sin filtros
-    setDrawerOpen(false); 
+    setDrawerOpen(false);
   }
 
 
@@ -194,15 +195,42 @@ export default function TransactionsClient() {
   }, []); // <--- CAMBIO: Lógica de carga inicial simplificada. Solo se ejecuta una vez.
 
   useEffect(() => {
-    if (modalSuccess) { 
-        setModalOpen(false);
-        setModalSuccess(false);
-        formRef.current?.reset(); 
+    if (modalSuccess) {
+      setModalOpen(false);
+      setModalSuccess(false);
+      formRef.current?.reset();
     }
   }, [modalSuccess]);
 
   if (isLoadingTx || isLoadingCat || isLoadingAcc) {
-    return <div className="flex justify-center items-center min-h-screen"><span className="text-lg">Cargando datos...</span></div>;
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-8 space-y-4">
+            <div className="flex justify-between items-center">
+              <div className="space-y-2">
+                <Skeleton className="h-10 w-64" />
+                <Skeleton className="h-5 w-96" />
+              </div>
+              <div className="flex gap-3">
+                <Skeleton className="h-10 w-24" />
+                <Skeleton className="h-10 w-40" />
+              </div>
+            </div>
+          </div>
+
+          <div className="mb-8">
+            <Skeleton className="h-40 w-full rounded-xl" />
+          </div>
+
+          <div className="space-y-4">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <TransactionSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -325,7 +353,7 @@ export default function TransactionsClient() {
             </div>
           </DrawerContent>
         </Drawer>
-        
+
         <div className="mb-8">
           <TransactionSummaryCard transactions={transactions} />
         </div>
