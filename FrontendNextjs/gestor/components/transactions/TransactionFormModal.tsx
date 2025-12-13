@@ -12,7 +12,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { format } from 'date-fns';
 import { useAccounts, useCategories, useBudgets } from '@/hooks/useRepositories';
-import {  TypeTransaction } from '@/types/transaction';
+import { TypeTransaction } from '@/types/transaction';
 
 const transactionSchema = z.object({
   name: z.string().min(2, 'El nombre es requerido'),
@@ -40,11 +40,10 @@ type TransactionFormModalProps = {
   ) => Promise<void>;
   isLoading: boolean;
   error: string | null;
-  success: boolean;
   formRef: React.MutableRefObject<{ reset: () => void } | null>;
 };
 
-export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error, success, formRef }: TransactionFormModalProps) {
+export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error, formRef }: TransactionFormModalProps) {
   const { accounts } = useAccounts();
   const { categories } = useCategories();
   const { budgets } = useBudgets();
@@ -75,7 +74,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
         values.budget_id
       );
       form.reset();
-    } catch {}
+    } catch { }
   }
 
   return (
@@ -84,100 +83,94 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
         <DialogHeader>
           <DialogTitle>Nueva Transacción</DialogTitle>
         </DialogHeader>
-        {success ? (
-          <div className="flex flex-col items-center justify-center py-8">
-            <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
-            <p className="text-green-600 font-semibold">¡Transacción creada!</p>
-          </div>
-        ) : (
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField control={form.control} name="name" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Nombre</FormLabel>
-                  <FormControl><Input {...field} placeholder="Ej: Pago de luz" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="description" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Descripción</FormLabel>
-                  <FormControl><Input {...field} placeholder="Detalle de la transacción" /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="amount" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Monto</FormLabel>
-                  <FormControl><Input type="number" {...field} min={0.01} step={0.01} /></FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="type_transaction" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Tipo</FormLabel>
-                  <FormControl>
-                    <Select value={field.value} onValueChange={v => {
-                      field.onChange(v)}}>
-                      <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={TypeTransaction.INCOME}>Ingreso</SelectItem>
-                        <SelectItem value={TypeTransaction.BILL}>Gasto</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="account_id" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Cuenta</FormLabel>
-                  <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-                      <SelectContent>
-                        {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <FormField control={form.control} name="category_id" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Categoría</FormLabel>
-                  <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-                      <SelectContent>
-                        {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-                            <FormField control={form.control} name="created_at" render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Fecha</FormLabel>
-                  <FormControl>
-                    <Input type="date" value={format(field.value, 'yyyy-MM-dd')} onChange={e => field.onChange(new Date(e.target.value))} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )} />
-              <DialogFooter>
-                <Button type="submit" disabled={isLoading} className="w-full">
-                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
-                  Crear Transacción
-                </Button>
-                <DialogClose asChild>
-                  <Button type="button" variant="ghost" className="w-full">Cancelar</Button>
-                </DialogClose>
-              </DialogFooter>
-            </form>
-          </Form>
-        )}
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+            <FormField control={form.control} name="name" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Nombre</FormLabel>
+                <FormControl><Input {...field} placeholder="Ej: Pago de luz" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="description" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Descripción</FormLabel>
+                <FormControl><Input {...field} placeholder="Detalle de la transacción" /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="amount" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Monto</FormLabel>
+                <FormControl><Input type="number" {...field} min={0.01} step={0.01} /></FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="type_transaction" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Tipo</FormLabel>
+                <FormControl>
+                  <Select value={field.value} onValueChange={v => {
+                    field.onChange(v)
+                  }}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={TypeTransaction.INCOME}>Ingreso</SelectItem>
+                      <SelectItem value={TypeTransaction.BILL}>Gasto</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="account_id" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Cuenta</FormLabel>
+                <FormControl>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
+                    <SelectContent>
+                      {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="category_id" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Categoría</FormLabel>
+                <FormControl>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
+                    <SelectContent>
+                      {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <FormField control={form.control} name="created_at" render={({ field }) => (
+              <FormItem>
+                <FormLabel>Fecha</FormLabel>
+                <FormControl>
+                  <Input type="date" value={format(field.value, 'yyyy-MM-dd')} onChange={e => field.onChange(new Date(e.target.value))} />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )} />
+            <DialogFooter>
+              <Button type="submit" disabled={isLoading} className="w-full">
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
+                Crear Transacción
+              </Button>
+              <DialogClose asChild>
+                <Button type="button" variant="ghost" className="w-full">Cancelar</Button>
+              </DialogClose>
+            </DialogFooter>
+          </form>
+        </Form>
         {error && (
           <Alert variant="destructive" className="mt-4">
             <AlertCircle className="h-4 w-4" />
