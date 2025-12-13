@@ -13,10 +13,13 @@ import { AccountFormModal } from '@/components/accounts/AccountFormModal';
 import { AccountUpdateModal } from '@/components/accounts/AccountUpdateModal';
 import { AccountSummarySkeleton } from '@/components/accounts/AccountSummarySkeleton';
 import { AccountCardSkeleton } from '@/components/accounts/AccountCardSkeleton';
-import { 
-	TrendingUp,
-	TrendingDown,
-	Wallet} from 'lucide-react';
+import {
+  TrendingUp,
+  TrendingDown,
+  Wallet
+} from 'lucide-react';
+
+import { AccountsPageSkeleton } from '@/components/accounts/AccountsPageSkeleton';
 
 export default function AccountsClient() {
   const { accounts, isLoading, createAccount, updateAccount, deleteAccount, error } = useAccounts();
@@ -25,7 +28,7 @@ export default function AccountsClient() {
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
 
   // Helper function to get account balance
-  const getAccountBalance = (account: any) => 
+  const getAccountBalance = (account: any) =>
     account.current_balance ?? account.initial_balance ?? 0;
 
   // Handle edit account
@@ -37,7 +40,7 @@ export default function AccountsClient() {
   // Filter functions
   const getFilteredAccounts = (filter: 'all' | 'positive' | 'negative') => {
     if (!Array.isArray(accounts)) return [];
-    
+
     switch (filter) {
       case 'positive':
         return accounts.filter(account => getAccountBalance(account) > 0);
@@ -48,24 +51,18 @@ export default function AccountsClient() {
     }
   };
 
+  if (isLoading) {
+    return <AccountsPageSkeleton />;
+  }
+
   // Render content for each tab
-  const renderTabContent = (filter: 'all' | 'positive' | 'negative', skeletonCount = 3) => {
+  const renderTabContent = (filter: 'all' | 'positive' | 'negative') => {
     const filteredAccounts = getFilteredAccounts(filter);
     const emptyMessages = {
       all: 'No tienes cuentas registradas.',
       positive: 'No tienes cuentas positivas.',
       negative: 'No tienes cuentas negativas.'
     };
-
-    if (isLoading) {
-      return (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {[...Array(skeletonCount)].map((_, i) => (
-            <AccountCardSkeleton key={i} />
-          ))}
-        </div>
-      );
-    }
 
     if (filteredAccounts.length === 0) {
       return (
@@ -78,9 +75,9 @@ export default function AccountsClient() {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredAccounts.map((account) => (
-          <AccountCard 
-            key={account.id} 
-            account={account} 
+          <AccountCard
+            key={account.id}
+            account={account}
             onAccountDeleted={() => deleteAccount(account.id!)}
             onAccountEdit={handleEditAccount}
           />
@@ -96,21 +93,18 @@ export default function AccountsClient() {
       label: 'Todas',
       icon: <Wallet className="h-4 w-4" />,
       filter: 'all' as const,
-      skeletonCount: 3
     },
     {
       value: 'positive',
       label: 'Positivas',
       icon: <TrendingUp className="h-4 w-4" />,
       filter: 'positive' as const,
-      skeletonCount: 2
     },
     {
       value: 'negative',
       label: 'Negativas',
       icon: <TrendingDown className="h-4 w-4" />,
       filter: 'negative' as const,
-      skeletonCount: 1
     }
   ];
 
@@ -133,8 +127,8 @@ export default function AccountsClient() {
                 <PlusCircle className="h-4 w-4 mr-2" />
                 Nueva Cuenta
               </Button>
-              <AccountFormModal 
-                open={modalOpen} 
+              <AccountFormModal
+                open={modalOpen}
                 setOpen={setModalOpen}
                 createAccount={createAccount}
                 isLoading={isLoading}
@@ -154,9 +148,7 @@ export default function AccountsClient() {
 
         {/* Resumen de cuentas */}
         <div className="mb-8">
-          {isLoading ? (
-            <AccountSummarySkeleton />
-          ) : Array.isArray(accounts) && accounts.length > 0 ? (
+          {Array.isArray(accounts) && accounts.length > 0 ? (
             <AccountSummaryCard accounts={accounts} />
           ) : (
             <div className="text-center text-muted-foreground py-8">No tienes cuentas registradas.</div>
@@ -171,7 +163,7 @@ export default function AccountsClient() {
             value: tab.value,
             label: tab.label,
             icon: tab.icon,
-            content: renderTabContent(tab.filter, tab.skeletonCount)
+            content: renderTabContent(tab.filter)
           }))}
         />
 

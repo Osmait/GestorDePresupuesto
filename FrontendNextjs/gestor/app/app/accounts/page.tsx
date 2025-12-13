@@ -1,5 +1,4 @@
-import dynamic from 'next/dynamic';
-const AccountsClient = dynamic(() => import('@/components/accounts/AccountsClient'), { ssr: false });
+import AccountsClient from '@/components/accounts/AccountsClient';
 
 export default function AccountsPage() {
   return <AccountsClient />;
