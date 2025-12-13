@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"go.opentelemetry.io/otel/trace"
 
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
@@ -15,9 +14,7 @@ import (
 
 // ErrorResponse represents the error response structure
 type ErrorResponse struct {
-	Error   ErrorDetail `json:"error"`
-	TraceID string      `json:"trace_id,omitempty"`
-	SpanID  string      `json:"span_id,omitempty"`
+	Error ErrorDetail `json:"error"`
 }
 
 // ErrorDetail represents the error detail structure
@@ -98,14 +95,6 @@ func handlePanic(c *gin.Context, recovered interface{}, config ErrorHandlerConfi
 
 	logger.Error("Panic recovered in HTTP handler")
 
-	// Record panic in span
-	panicErr.RecordInSpan(ctx)
-
-	// Record panic metrics
-	if config.EnableMetrics {
-		observability.RecordPanicMetric(ctx, c.Request.Method, c.Request.URL.Path)
-	}
-
 	// Send error response
 	sendErrorResponse(c, panicErr, config)
 }
@@ -131,14 +120,7 @@ func handleErrors(c *gin.Context, errors []*gin.Error, config ErrorHandlerConfig
 	// Log the error
 	logError(ctx, c, appErr, config)
 
-	// Record error in span
-	appErr.RecordInSpan(ctx)
-
 	// Record error metrics
-	if config.EnableMetrics {
-		observability.RecordErrorMetric(ctx, c.Request.Method, c.Request.URL.Path,
-			string(appErr.Type), string(appErr.Severity))
-	}
 
 	// Send error response
 	sendErrorResponse(c, appErr, config)
@@ -207,17 +189,6 @@ func logError(ctx context.Context, c *gin.Context, appErr *apperrors.AppError, c
 
 // sendErrorResponse sends the error response to the client
 func sendErrorResponse(c *gin.Context, appErr *apperrors.AppError, config ErrorHandlerConfig) {
-	ctx := c.Request.Context()
-
-	// Get trace context
-	var traceID, spanID string
-	if span := trace.SpanFromContext(ctx); span != nil {
-		spanContext := span.SpanContext()
-		if spanContext.IsValid() {
-			traceID = spanContext.TraceID().String()
-			spanID = spanContext.SpanID().String()
-		}
-	}
 
 	// Create error response
 	errorResponse := ErrorResponse{
@@ -229,8 +200,6 @@ func sendErrorResponse(c *gin.Context, appErr *apperrors.AppError, config ErrorH
 			Timestamp: appErr.Timestamp,
 			Retryable: appErr.Retryable,
 		},
-		TraceID: traceID,
-		SpanID:  spanID,
 	}
 
 	// Add details for non-internal errors
@@ -247,10 +216,6 @@ func sendErrorResponse(c *gin.Context, appErr *apperrors.AppError, config ErrorH
 	c.Header("Content-Type", "application/json")
 	c.Header("X-Error-Type", string(appErr.Type))
 	c.Header("X-Error-Code", appErr.Code)
-
-	if traceID != "" {
-		c.Header("X-Trace-ID", traceID)
-	}
 
 	// Send response
 	c.JSON(appErr.ToHTTPStatus(), errorResponse)

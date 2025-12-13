@@ -125,18 +125,6 @@ func HealthRoutes(engine *gin.Engine, db *sql.DB, version, environment string) {
 		})
 	})
 
-	// Metrics endpoint (basic)
-	engine.GET("/metrics", func(c *gin.Context) {
-		// In a real application, you would integrate with Prometheus
-		// For now, we'll return basic metrics
-		c.JSON(http.StatusOK, gin.H{
-			"uptime_seconds":      time.Since(startTime).Seconds(),
-			"timestamp":           time.Now().Unix(),
-			"go_goroutines":       "metrics not implemented", // Would use runtime.NumGoroutine()
-			"go_memory_usage":     "metrics not implemented", // Would use runtime.ReadMemStats()
-			"http_requests_total": "metrics not implemented", // Would track request counts
-		})
-	})
 }
 
 // checkDatabase verifies database connectivity and basic functionality

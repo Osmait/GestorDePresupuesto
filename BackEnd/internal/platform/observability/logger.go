@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
-	"go.opentelemetry.io/otel/trace"
 )
 
 // Logger wraps zerolog with OpenTelemetry integration
@@ -87,22 +86,9 @@ func NewLogger(cfg *LoggerConfig) *Logger {
 	return &Logger{logger: logger}
 }
 
-// WithContext adds trace information to the logger context
+// WithContext adds context to the logger (currently no-op for traces)
 func (l *Logger) WithContext(ctx context.Context) *Logger {
-	logger := l.logger
-
-	// Add trace information if available
-	if span := trace.SpanFromContext(ctx); span != nil {
-		spanContext := span.SpanContext()
-		if spanContext.IsValid() {
-			logger = logger.With().
-				Str("trace_id", spanContext.TraceID().String()).
-				Str("span_id", spanContext.SpanID().String()).
-				Logger()
-		}
-	}
-
-	return &Logger{logger: logger}
+	return &Logger{logger: l.logger}
 }
 
 // WithFields adds structured fields to the logger
@@ -392,4 +378,12 @@ func ParseLogLevel(level string) zerolog.Level {
 	default:
 		return zerolog.InfoLevel
 	}
+}
+
+// getEnv gets an environment variable or returns a default value
+func getEnv(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
 }

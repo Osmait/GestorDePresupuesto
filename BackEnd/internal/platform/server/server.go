@@ -23,6 +23,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 
 	_ "github.com/osmait/gestorDePresupuesto/docs"
+
 	cors "github.com/rs/cors/wrapper/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -81,11 +82,6 @@ func (s *Server) registerRoutes() {
 
 	// Error handling middleware (must be first)
 	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
-
-	// Observability middleware
-	if s.config.FeatureFlags.EnableTracing {
-		s.Engine.Use(middleware.TracingMiddleware(s.config.OpenTelemetry.ServiceName))
-	}
 
 	// Swagger documentation route (before authentication)
 	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))

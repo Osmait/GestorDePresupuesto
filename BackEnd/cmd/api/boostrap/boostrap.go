@@ -44,20 +44,11 @@ func Run() error {
 		return fmt.Errorf("failed to load configuration: %w", err)
 	}
 
-	// Initialize observability
-	logger, otelProvider, _, err := initializeObservability(cfg)
+	// Initialize observability (logging only)
+	logger, err := initializeLogger(cfg)
 	if err != nil {
-		return fmt.Errorf("failed to initialize observability: %w", err)
+		return fmt.Errorf("failed to initialize logger: %w", err)
 	}
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if otelProvider != nil {
-			if err := otelProvider.Shutdown(ctx); err != nil {
-				logger.WithError(err).Error("Failed to shutdown OpenTelemetry provider")
-			}
-		}
-	}()
 
 	logger.WithField("config", map[string]interface{}{
 		"environment": cfg.Server.Environment,
@@ -118,8 +109,8 @@ func Run() error {
 	return nil
 }
 
-// initializeObservability sets up OpenTelemetry, logging, and metrics
-func initializeObservability(cfg *config.Config) (*observability.Logger, *observability.Provider, *observability.BusinessMetrics, error) {
+// initializeLogger sets up the logger
+func initializeLogger(cfg *config.Config) (*observability.Logger, error) {
 	// Initialize structured logger
 	loggerCfg := &observability.LoggerConfig{
 		Level:      cfg.Logging.Level,
@@ -131,52 +122,7 @@ func initializeObservability(cfg *config.Config) (*observability.Logger, *observ
 	logger := observability.NewLogger(loggerCfg)
 	observability.InitializeGlobalLogger(loggerCfg)
 
-	var otelProvider *observability.Provider
-	var businessMetrics *observability.BusinessMetrics
-
-	// Initialize OpenTelemetry if enabled
-	if cfg.FeatureFlags.EnableTracing || cfg.FeatureFlags.EnableMetrics {
-		otelCfg := &observability.Config{
-			ServiceName:        cfg.OpenTelemetry.ServiceName,
-			ServiceVersion:     cfg.OpenTelemetry.ServiceVersion,
-			Environment:        cfg.OpenTelemetry.Environment,
-			OTLPEndpoint:       cfg.OpenTelemetry.OTLPEndpoint,
-			JaegerEndpoint:     cfg.OpenTelemetry.JaegerEndpoint,
-			EnableStdout:       cfg.OpenTelemetry.EnableStdout,
-			EnableMetrics:      cfg.FeatureFlags.EnableMetrics,
-			EnableTracing:      cfg.FeatureFlags.EnableTracing,
-			SamplingRate:       cfg.OpenTelemetry.SamplingRate,
-			BatchTimeout:       cfg.OpenTelemetry.BatchTimeout,
-			MaxBatchSize:       cfg.OpenTelemetry.MaxBatchSize,
-			MaxQueueSize:       cfg.OpenTelemetry.MaxQueueSize,
-			PrometheusEndpoint: cfg.Prometheus.Endpoint,
-		}
-
-		var err error
-		otelProvider, err = observability.NewProvider(otelCfg)
-		if err != nil {
-			return nil, nil, nil, fmt.Errorf("failed to initialize OpenTelemetry: %w", err)
-		}
-
-		logger.Info("OpenTelemetry initialized successfully")
-
-		// Initialize business metrics
-		if cfg.FeatureFlags.EnableMetrics {
-			businessMetrics, err = observability.NewBusinessMetrics(cfg.OpenTelemetry.ServiceName)
-			if err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to initialize business metrics: %w", err)
-			}
-
-			// Initialize global metrics
-			if err := observability.InitializeGlobalMetrics(cfg.OpenTelemetry.ServiceName); err != nil {
-				return nil, nil, nil, fmt.Errorf("failed to initialize global metrics: %w", err)
-			}
-
-			logger.Info("Business metrics initialized successfully")
-		}
-	}
-
-	return logger, otelProvider, businessMetrics, nil
+	return logger, nil
 }
 
 // initializeDatabase connects to the database
@@ -247,7 +193,7 @@ type repositories struct {
 	userRepository        userRepo.UserRepositoryInterface
 	budgetRepository      budgetRepo.BudgetRepoInterface
 	categoryRepository    categoryRepo.CategoryRepoInterface
-	investmentRepository   investmentRepo.InvestmentRepoInterface
+	investmentRepository  investmentRepo.InvestmentRepoInterface
 	analyticsRepository   *analyticsRepo.AnalyticsRepository
 }
 
@@ -259,7 +205,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		userRepository:        userRepo.NewUserRepository(db),
 		budgetRepository:      budgetRepo.NewBudgetRepository(db),
 		categoryRepository:    categoryRepo.NewCategoryRepository(db),
-		investmentRepository:   investmentRepo.NewInvestmentRepository(db),
+		investmentRepository:  investmentRepo.NewInvestmentRepository(db),
 		analyticsRepository:   analyticsRepo.NewAnalyticsRepository(db),
 	}
 }
@@ -272,7 +218,7 @@ type services struct {
 	authService        *auth.AuthService
 	budgetService      *budget.BudgetServices
 	categoryService    *category.CategoryServices
-	investmentService   *investment.InvestmentServices
+	investmentService  *investment.InvestmentServices
 	analyticsService   *analytics.AnalyticsService
 }
 
@@ -285,7 +231,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		authService:        auth.NewAuthService(repos.userRepository, cfg),
 		budgetService:      budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
 		categoryService:    category.NewCategoryServices(repos.categoryRepository),
-		investmentService:   investment.NewInvestmentServices(repos.investmentRepository),
+		investmentService:  investment.NewInvestmentServices(repos.investmentRepository),
 		analyticsService:   analytics.NewAnalyticsService(repos.analyticsRepository),
 	}
 }
