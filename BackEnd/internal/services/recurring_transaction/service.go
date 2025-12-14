@@ -2,24 +2,28 @@ package recurring_transaction
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/recurring_transaction"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 )
 
 type RecurringTransactionService struct {
-	repo               *recurringRepo.RecurringTransactionRepository
-	transactionService *transaction.TransactionService
+	repo                *recurringRepo.RecurringTransactionRepository
+	transactionService  *transaction.TransactionService
+	notificationService *notification.NotificationService
 }
 
-func NewRecurringTransactionService(repo *recurringRepo.RecurringTransactionRepository, transactionService *transaction.TransactionService) *RecurringTransactionService {
+func NewRecurringTransactionService(repo *recurringRepo.RecurringTransactionRepository, transactionService *transaction.TransactionService, notificationService *notification.NotificationService) *RecurringTransactionService {
 	return &RecurringTransactionService{
-		repo:               repo,
-		transactionService: transactionService,
+		repo:                repo,
+		transactionService:  transactionService,
+		notificationService: notificationService,
 	}
 }
 
@@ -104,6 +108,9 @@ func (s *RecurringTransactionService) ProcessDueTransactions(ctx context.Context
 			log.Error().Err(err).Str("recurring_id", rt.ID).Msg("failed to update execution date")
 		} else {
 			log.Info().Str("recurring_id", rt.ID).Msg("successfully executed recurring transaction")
+			// Notify the user
+			msg := fmt.Sprintf(`{"type": "recurring_executed", "message": "Transaction '%s' executed", "amount": %.2f}`, rt.Name, rt.Amount)
+			s.notificationService.SendToUser(rt.UserID, msg)
 		}
 	}
 	return nil

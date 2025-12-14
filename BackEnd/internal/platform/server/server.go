@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
@@ -20,6 +21,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
@@ -47,6 +49,7 @@ type Server struct {
 	searchService       *search.SearchService
 	investmentService   *investmentService.InvestmentService
 	quoteService        *quote.QuoteService
+	notificationService *notification.NotificationService
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -69,6 +72,7 @@ func New(ctx context.Context,
 	db *sql.DB,
 	cfg *config.Config,
 	quoteService *quote.QuoteService,
+	notificationService *notification.NotificationService,
 ) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
@@ -84,6 +88,7 @@ func New(ctx context.Context,
 		searchService:       searchService,
 		investmentService:   investmentService,
 		quoteService:        quoteService,
+		notificationService: notificationService,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -108,6 +113,11 @@ func (s *Server) registerRoutes() {
 
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
+
+	// Notification Route (SSE)
+	notificationH := notificationHandler.NewNotificationHandler(s.notificationService)
+	s.Engine.GET("/notifications", notificationH.Subscribe)
+	s.Engine.POST("/notifications/test", notificationH.SendTestNotification)
 
 	// Application routes
 	routes.AuhtRoutes(s.Engine, s.servicesAuth)

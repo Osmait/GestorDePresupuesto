@@ -31,6 +31,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
@@ -108,6 +109,7 @@ func Run() error {
 		db,
 		cfg,
 		services.quoteService,
+		services.notificationService,
 	)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -226,17 +228,18 @@ func initializeRepositories(db *sql.DB) *repositories {
 
 // services holds all service instances
 type services struct {
-	accountService     *account.AccountService
-	transactionService *transaction.TransactionService
-	userService        *user.UserService
-	authService        *auth.AuthService
-	budgetService      *budget.BudgetServices
-	categoryService    *category.CategoryServices
-	investmentService  *investment.InvestmentService
-	analyticsService   *analytics.AnalyticsService
-	recurringService   *recurring_transaction.RecurringTransactionService
-	searchService      *search.SearchService
-	quoteService       *quote.QuoteService
+	accountService      *account.AccountService
+	transactionService  *transaction.TransactionService
+	userService         *user.UserService
+	authService         *auth.AuthService
+	budgetService       *budget.BudgetServices
+	categoryService     *category.CategoryServices
+	investmentService   *investment.InvestmentService
+	analyticsService    *analytics.AnalyticsService
+	recurringService    *recurring_transaction.RecurringTransactionService
+	searchService       *search.SearchService
+	quoteService        *quote.QuoteService
+	notificationService *notification.NotificationService
 }
 
 // initializeServices creates all service instances
@@ -244,17 +247,21 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 	// Services
 	quoteService := quote.NewQuoteService()
 
+	notificationService := notification.NewNotificationService()
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository)
+
 	return &services{
-		accountService:     account.NewAccountService(repos.accountRepository),
-		transactionService: transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository),
-		userService:        user.NewUserService(repos.userRepository),
-		authService:        auth.NewAuthService(repos.userRepository, cfg),
-		budgetService:      budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
-		categoryService:    category.NewCategoryServices(repos.categoryRepository),
-		investmentService:  investment.NewInvestmentService(repos.investmentRepository, quoteService),
-		analyticsService:   analytics.NewAnalyticsService(repos.analyticsRepository),
-		recurringService:   recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository)),
-		searchService:      search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),
-		quoteService:       quoteService,
+		accountService:      account.NewAccountService(repos.accountRepository),
+		transactionService:  transactionService,
+		userService:         user.NewUserService(repos.userRepository),
+		authService:         auth.NewAuthService(repos.userRepository, cfg),
+		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
+		categoryService:     category.NewCategoryServices(repos.categoryRepository),
+		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService),
+		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository),
+		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService),
+		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),
+		quoteService:        quoteService,
+		notificationService: notificationService,
 	}
 }

@@ -5,6 +5,8 @@ import { ThemeProvider } from '@/components/common/theme-provider'
 import { SettingsProvider } from '../../contexts'
 import { Sidebar } from '@/components/common/sidebar'
 import { GlobalActionProvider } from '@/contexts/GlobalActionContext'
+import { NotificationProvider } from '@/contexts/NotificationContext'
+import { Toaster } from '@/components/ui/sonner'
 import { cn } from '../../lib/utils'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -26,11 +28,14 @@ export default function DashboardLayout({
 	return (
 		<SettingsProvider>
 			<GlobalActionProvider>
-				<Sidebar>
-					<PageTransition>
-						{children}
-					</PageTransition>
-				</Sidebar>
+				<NotificationProvider>
+					<Sidebar>
+						<PageTransition>
+							{children}
+						</PageTransition>
+					</Sidebar>
+					<Toaster />
+				</NotificationProvider>
 			</GlobalActionProvider>
 		</SettingsProvider>
 	)
