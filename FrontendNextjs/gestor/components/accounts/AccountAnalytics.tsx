@@ -84,12 +84,26 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
         // Reverse to get chronological order (oldest -> newest) for Chart
         const balanceHistory = historyPoints.reverse().filter((_, index) => index % Math.ceil(historyPoints.length / 20) === 0 || index === historyPoints.length - 1) // Downsample simple logic
 
+        // Top Expenses by Concept Logic
+        const expenseByNameMap: Record<string, number> = {}
+        transactions.forEach(t => {
+            if (t.type_transation !== 'income') {
+                expenseByNameMap[t.name] = (expenseByNameMap[t.name] || 0) + Math.abs(t.amount)
+            }
+        })
+
+        const topExpenses = Object.entries(expenseByNameMap)
+            .map(([name, value]) => ({ name, value, color: '#ef4444' }))
+            .sort((a, b) => b.value - a.value)
+            .slice(0, 5)
+
         return {
             income,
             expense,
             incomeByCategory: formatCategoryData(incomeMap),
             expenseByCategory: formatCategoryData(expenseMap),
-            balanceHistory
+            balanceHistory,
+            topExpenses
         }
     }, [transactions, categories, currentBalance])
 
@@ -216,6 +230,26 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                                     wrapperStyle={{ fontSize: '12px' }}
                                 />
                             </PieChart>
+                        </ResponsiveContainer>
+                    ) : (
+                        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Sin datos</div>
+                    )}
+                </CardContent>
+            </Card>
+
+            <Card className="col-span-2">
+                <CardHeader>
+                    <CardTitle>Mayores Gastos</CardTitle>
+                </CardHeader>
+                <CardContent className="h-[200px]">
+                    {stats.topExpenses.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                            <BarChart data={stats.topExpenses} layout="vertical" margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
+                                <XAxis type="number" hide />
+                                <YAxis dataKey="name" type="category" width={90} tick={{ fontSize: 11 }} interval={0} />
+                                <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
+                                <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="#ef4444" barSize={20} />
+                            </BarChart>
                         </ResponsiveContainer>
                     ) : (
                         <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Sin datos</div>
