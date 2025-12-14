@@ -37,11 +37,11 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 		if (activeIndex !== -1 && itemRefs.current[activeIndex] && navRef.current) {
 			const activeElement = itemRefs.current[activeIndex]
 			const navElement = navRef.current
-			
+
 			if (activeElement) {
 				const navRect = navElement.getBoundingClientRect()
 				const activeRect = activeElement.getBoundingClientRect()
-				
+
 				setIndicatorStyle({
 					top: activeRect.top - navRect.top,
 					height: activeRect.height,
@@ -77,7 +77,7 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 					boxShadow: indicatorStyle.opacity > 0 ? '0 0 10px rgba(var(--primary), 0.4)' : 'none'
 				}}
 			/>
-			
+
 			{/* Fondo del indicador con efecto de brillo */}
 			<div
 				className="absolute left-3 right-3 bg-gradient-to-r from-primary/15 to-primary/8 rounded-lg border border-primary/30 transition-all duration-500 ease-out pointer-events-none z-0 shadow-sm"
@@ -114,46 +114,42 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 							}}
 							href={item.href}
 							onClick={handleLinkClick}
-							className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 group relative ${
-								isActive
+							className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 group relative ${isActive
 									? 'text-primary font-semibold'
 									: 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
-							} ${!isExpanded && 'justify-center px-2'}`}
+								} ${!isExpanded && 'justify-center px-2'}`}
 						>
 							{/* Efecto de hover con gradiente */}
-							<div className="absolute inset-0 bg-gradient-to-r from-primary/8 via-primary/4 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
-							
+							<div className={`absolute inset-0 bg-gradient-to-r from-primary/8 via-primary/4 to-transparent rounded-lg opacity-0 transition-all duration-300 pointer-events-none ${!isActive ? 'group-hover:opacity-100' : ''}`} />
+
 							{/* Efecto de brillo en hover */}
-							<div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent rounded-lg opacity-0 group-hover:opacity-100 transition-all duration-500 pointer-events-none" />
-							
-							<Icon className={`h-4 w-4 flex-shrink-0 transition-all duration-300 ${
-								isActive 
-									? 'text-primary scale-110 animate-icon-bounce' 
+							<div className={`absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent rounded-lg opacity-0 transition-all duration-500 pointer-events-none ${!isActive ? 'group-hover:opacity-100' : ''}`} />
+
+							<Icon className={`h-4 w-4 flex-shrink-0 transition-all duration-300 ${isActive
+									? 'text-primary scale-110 animate-icon-bounce'
 									: 'group-hover:scale-110 group-hover:text-foreground group-hover:rotate-3'
-							}`} />
-							
+								}`} />
+
 							{isExpanded && (
 								<>
-									<span className={`flex-1 truncate transition-all duration-300 ${
-										isActive ? 'text-primary font-semibold' : 'group-hover:text-foreground group-hover:translate-x-1'
-									}`}>
+									<span className={`flex-1 truncate transition-all duration-300 ${isActive ? 'text-primary font-semibold' : 'group-hover:text-foreground group-hover:translate-x-1'
+										}`}>
 										{item.title}
 									</span>
 									{item.badge && (
-										<Badge 
-											variant={isActive ? "default" : "secondary"} 
-											className={`text-xs transition-all duration-300 transform ${
-												isActive 
-													? 'bg-primary/25 text-primary border-primary/40 scale-105 shadow-sm' 
+										<Badge
+											variant={isActive ? "default" : "secondary"}
+											className={`text-xs transition-all duration-300 transform ${isActive
+													? 'bg-primary/25 text-primary border-primary/40 scale-105 shadow-sm'
 													: 'group-hover:bg-muted group-hover:scale-105 group-hover:shadow-sm'
-											}`}
+												}`}
 										>
 											{item.badge}
 										</Badge>
 									)}
 								</>
 							)}
-							
+
 							{/* Tooltip para sidebar colapsado */}
 							{!isExpanded && (
 								<div className="absolute left-full ml-3 px-3 py-2 bg-popover/95 backdrop-blur-sm text-popover-foreground text-xs rounded-lg shadow-xl border border-border/50 opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none z-50 whitespace-nowrap group-hover:translate-x-1 group-hover:scale-105">
