@@ -31,6 +31,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
@@ -106,6 +107,7 @@ func Run() error {
 		services.investmentService,
 		db,
 		cfg,
+		services.quoteService,
 	)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -234,10 +236,14 @@ type services struct {
 	analyticsService   *analytics.AnalyticsService
 	recurringService   *recurring_transaction.RecurringTransactionService
 	searchService      *search.SearchService
+	quoteService       *quote.QuoteService
 }
 
 // initializeServices creates all service instances
 func initializeServices(repos *repositories, cfg *config.Config) *services {
+	// Services
+	quoteService := quote.NewQuoteService()
+
 	return &services{
 		accountService:     account.NewAccountService(repos.accountRepository),
 		transactionService: transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository),
@@ -245,9 +251,10 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		authService:        auth.NewAuthService(repos.userRepository, cfg),
 		budgetService:      budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
 		categoryService:    category.NewCategoryServices(repos.categoryRepository),
-		investmentService:  investment.NewInvestmentService(repos.investmentRepository),
+		investmentService:  investment.NewInvestmentService(repos.investmentRepository, quoteService),
 		analyticsService:   analytics.NewAnalyticsService(repos.analyticsRepository),
 		recurringService:   recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository)),
 		searchService:      search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),
+		quoteService:       quoteService,
 	}
 }

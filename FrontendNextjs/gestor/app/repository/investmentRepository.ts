@@ -53,4 +53,13 @@ export class InvestmentRepository extends BaseRepository {
             throw error;
         }
     }
+
+    async getQuote(symbol: string): Promise<{ regular_market_price: number; symbol: string; name?: string } | null> {
+        try {
+            return await this.get<{ regular_market_price: number; symbol: string; name?: string }>(`/quotes/${symbol}`);
+        } catch (error) {
+            console.error("Error fetching quote:", error);
+            return null;
+        }
+    }
 }

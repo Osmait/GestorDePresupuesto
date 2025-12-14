@@ -47,7 +47,7 @@ func (m *MockInvestmentRepository) Delete(ctx context.Context, id string) error 
 
 func TestCreateInvestment(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo)
+	investmentService := NewInvestmentService(mockRepo, nil)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
@@ -70,7 +70,7 @@ func TestCreateInvestment(t *testing.T) {
 
 func TestCreateInvestment_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo)
+	investmentService := NewInvestmentService(mockRepo, nil)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
@@ -88,7 +88,7 @@ func TestCreateInvestment_RepositoryError(t *testing.T) {
 
 func TestFindAllInvestments(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo)
+	investmentService := NewInvestmentService(mockRepo, nil)
 
 	ctx := context.Background()
 	userId := "test-user-id"
@@ -111,7 +111,7 @@ func TestFindAllInvestments(t *testing.T) {
 
 func TestFindAllInvestments_EmptyResult(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo)
+	investmentService := NewInvestmentService(mockRepo, nil)
 
 	ctx := context.Background()
 	userId := "test-user-id"
@@ -128,7 +128,7 @@ func TestFindAllInvestments_EmptyResult(t *testing.T) {
 
 func TestFindAllInvestments_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo)
+	investmentService := NewInvestmentService(mockRepo, nil)
 
 	ctx := context.Background()
 	userId := "test-user-id"
@@ -145,7 +145,7 @@ func TestFindAllInvestments_RepositoryError(t *testing.T) {
 
 func TestDeleteInvestment(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo)
+	investmentService := NewInvestmentService(mockRepo, nil)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
@@ -160,7 +160,7 @@ func TestDeleteInvestment(t *testing.T) {
 
 func TestDeleteInvestment_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo)
+	investmentService := NewInvestmentService(mockRepo, nil)
 
 	ctx := context.Background()
 	investmentId := "test-id"

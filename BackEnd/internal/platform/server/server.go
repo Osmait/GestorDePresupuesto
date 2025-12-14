@@ -20,6 +20,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
@@ -45,6 +46,7 @@ type Server struct {
 	recurringService    *recurring_transaction.RecurringTransactionService
 	searchService       *search.SearchService
 	investmentService   *investmentService.InvestmentService
+	quoteService        *quote.QuoteService
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -66,6 +68,7 @@ func New(ctx context.Context,
 	investmentService *investmentService.InvestmentService,
 	db *sql.DB,
 	cfg *config.Config,
+	quoteService *quote.QuoteService,
 ) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
@@ -80,6 +83,7 @@ func New(ctx context.Context,
 		recurringService:    recurringService,
 		searchService:       searchService,
 		investmentService:   investmentService,
+		quoteService:        quoteService,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -100,6 +104,7 @@ func (s *Server) registerRoutes() {
 
 	// Health routes (before authentication)
 	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Server.Environment))
+	routes.QuoteRoutes(s.Engine, s.quoteService)
 
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))

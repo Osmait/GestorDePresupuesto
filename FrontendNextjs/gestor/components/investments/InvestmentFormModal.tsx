@@ -16,11 +16,12 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select"
-import { InvestmentType, CreateInvestmentDTO, UpdateInvestmentDTO, Investment } from "@/types/investment"
+import { InvestmentType, CreateInvestmentDTO, Investment } from "@/types/investment"
 import { useEffect, useState } from "react"
-import { useCreateInvestmentMutation, useUpdateInvestmentMutation } from "@/hooks/queries/useInvestmentsQuery"
-import { Loader2, AlertCircle } from "lucide-react"
+import { useCreateInvestmentMutation, useUpdateInvestmentMutation, useGetInvestments } from "@/hooks/queries/useInvestmentsQuery"
+import { Loader2, AlertCircle, Search } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
+import { investmentRepository } from "@/lib/repositoryConfig"
 
 interface InvestmentFormModalProps {
     isOpen: boolean
@@ -40,9 +41,9 @@ const initialData: CreateInvestmentDTO = {
 export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: InvestmentFormModalProps) {
     const [formData, setFormData] = useState<CreateInvestmentDTO>(initialData)
     const [error, setError] = useState<string | null>(null)
+    const [fetchLoading, setFetchLoading] = useState(false)
     const createMutation = useCreateInvestmentMutation()
     const updateMutation = useUpdateInvestmentMutation()
-    // const { toast } = useToast() - Removed as not available
 
     useEffect(() => {
         setError(null)
@@ -60,8 +61,34 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
         }
     }, [investmentToEdit, isOpen])
 
+    const handleFetchPrice = async () => {
+        if (!formData.symbol) return
+        setFetchLoading(true)
+        try {
+            const quote = await investmentRepository.getQuote(formData.symbol)
+            if (quote) {
+                setFormData(prev => ({
+                    ...prev,
+                    current_price: quote.regular_market_price,
+                    // Auto-fill name if fetching for a new investment or if name is empty
+                    name: (!prev.name || prev.name === "") && quote.name ? quote.name : prev.name,
+                    // If purchase price is 0, auto-fill it too (assuming new buy)
+                    purchase_price: prev.purchase_price === 0 ? quote.regular_market_price : prev.purchase_price
+                }))
+                setError(null)
+            } else {
+                setError("Could not fetch price for this symbol")
+            }
+        } catch (e) {
+            setError("Failed to fetch price")
+        } finally {
+            setFetchLoading(false)
+        }
+    }
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
+        setError(null)
 
         try {
             if (investmentToEdit) {
@@ -117,13 +144,21 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
                         <Label htmlFor="symbol" className="text-right">
                             Symbol
                         </Label>
-                        <Input
-                            id="symbol"
-                            value={formData.symbol}
-                            onChange={(e) => setFormData({ ...formData, symbol: e.target.value })}
-                            className="col-span-3"
-                            required
-                        />
+                        <div className="col-span-3 flex gap-2">
+                            <Input
+                                id="symbol"
+                                value={formData.symbol}
+                                onChange={(e) => setFormData({ ...formData, symbol: e.target.value.toUpperCase() })}
+                                placeholder="e.g. AAPL, BTC-USD"
+                                required
+                            />
+                            <Button type="button" size="icon" variant="outline" onClick={handleFetchPrice} disabled={fetchLoading || !formData.symbol}>
+                                {fetchLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Search className="h-4 w-4" />}
+                            </Button>
+                        </div>
+                        <div className="col-start-2 col-span-3 text-xs text-muted-foreground">
+                            Enter exact symbol (Search list unavailable due to API limits). Auto-fills name & price.
+                        </div>
                     </div>
                     <div className="grid grid-cols-4 items-center gap-4">
                         <Label htmlFor="type" className="text-right">
