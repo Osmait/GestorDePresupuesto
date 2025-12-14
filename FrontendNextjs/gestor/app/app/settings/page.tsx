@@ -1,11 +1,11 @@
 'use client'
 
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/common/ui/card'
-import { Button } from '@/components/common/ui/button'
-import { Badge } from '@/components/common/ui/badge'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/common/ui/tabs'
-import { Switch } from '@/components/common/ui/switch'
-import { Label } from '@/components/common/ui/label'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Switch } from '@/components/ui/switch'
+import { Label } from '@/components/ui/label'
 import { useSettings } from '../../../contexts'
 import {
 	Settings,
@@ -25,17 +25,17 @@ import {
 } from 'lucide-react'
 
 export default function SettingsPage() {
-	const { 
-		sidebarHoverEnabled, 
-		setSidebarHoverEnabled, 
-		theme, 
-		setTheme, 
-		language, 
-		setLanguage, 
-		currency, 
-		setCurrency, 
-		notifications, 
-		setNotifications 
+	const {
+		sidebarHoverEnabled,
+		setSidebarHoverEnabled,
+		theme,
+		setTheme,
+		language,
+		setLanguage,
+		currency,
+		setCurrency,
+		notifications,
+		setNotifications
 	} = useSettings()
 
 	return (
@@ -243,7 +243,7 @@ export default function SettingsPage() {
 									<Switch
 										id="email-notifications"
 										checked={notifications.email}
-										onCheckedChange={(checked) => 
+										onCheckedChange={(checked) =>
 											setNotifications({ ...notifications, email: checked })
 										}
 									/>
@@ -258,7 +258,7 @@ export default function SettingsPage() {
 									<Switch
 										id="push-notifications"
 										checked={notifications.push}
-										onCheckedChange={(checked) => 
+										onCheckedChange={(checked) =>
 											setNotifications({ ...notifications, push: checked })
 										}
 									/>
@@ -273,7 +273,7 @@ export default function SettingsPage() {
 									<Switch
 										id="sms-notifications"
 										checked={notifications.sms}
-										onCheckedChange={(checked) => 
+										onCheckedChange={(checked) =>
 											setNotifications({ ...notifications, sms: checked })
 										}
 									/>
