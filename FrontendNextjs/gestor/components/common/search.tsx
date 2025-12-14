@@ -155,7 +155,7 @@ export function Search() {
                         className="flex items-center justify-between px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
                         onClick={() => handleSelect('/app/budget')}
                       >
-                        <span>Presupuesto</span>
+                        <span>{bud.category_name || "Presupuesto"}</span>
                         <span className="font-mono text-xs">${bud.amount}</span>
                       </div>
                     ))}

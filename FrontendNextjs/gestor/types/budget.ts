@@ -5,4 +5,5 @@ export interface Budget {
   amount: number;
   current_amount: number;
   created_at: string;
+  category_name?: string;
 }

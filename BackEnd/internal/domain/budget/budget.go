@@ -3,11 +3,12 @@ package budget
 import "time"
 
 type Budget struct {
-	CreatedAt  time.Time
-	Id         string
-	CategoryId string
-	UserId     string
-	Amount     float64
+	CreatedAt    time.Time
+	Id           string
+	CategoryId   string
+	UserId       string
+	Amount       float64
+	CategoryName string `json:"category_name,omitempty"`
 }
 
 func NewBudget(id, categoryId, userId string, amount float64) *Budget {

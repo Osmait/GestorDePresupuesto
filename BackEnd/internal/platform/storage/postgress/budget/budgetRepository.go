@@ -122,7 +122,7 @@ func (b *BudgetRepository) Search(ctx context.Context, userId string, query stri
 	searchTerm := "%" + query + "%"
 	// Join with categories to search by category name since budgets don't have own names
 	querySQL := `
-		SELECT b.id, b.category_id, b.user_id, b.amount, b.created_at 
+		SELECT b.id, b.category_id, b.user_id, b.amount, b.created_at, c.name 
 		FROM budgets b
 		LEFT JOIN categorys c ON b.category_id = c.id
 		WHERE b.user_id = $1 AND c.name ILIKE $2
@@ -141,7 +141,7 @@ func (b *BudgetRepository) Search(ctx context.Context, userId string, query stri
 	var budgets []*budget.Budget
 	for rows.Next() {
 		var bud budget.Budget
-		if err = rows.Scan(&bud.Id, &bud.CategoryId, &bud.UserId, &bud.Amount, &bud.CreatedAt); err == nil {
+		if err = rows.Scan(&bud.Id, &bud.CategoryId, &bud.UserId, &bud.Amount, &bud.CreatedAt, &bud.CategoryName); err == nil {
 			budgets = append(budgets, &bud)
 		}
 	}
