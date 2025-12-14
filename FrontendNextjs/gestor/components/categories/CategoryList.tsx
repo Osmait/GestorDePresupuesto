@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/dialog'
 import { CategoriesSkeleton } from '@/components/skeletons/categories-skeleton'
 
+import { useRouter } from 'next/navigation'
+
 // Helper component extracted from original page
 interface CategoryCardProps {
     category: Category
@@ -37,6 +39,7 @@ interface CategoryCardProps {
 }
 
 function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCardProps) {
+    const router = useRouter()
     const categoryTransactions = transactions.filter(t => t.category_id === category.id)
     const totalAmount = categoryTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -54,9 +57,20 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
         }
     }
 
+    const handleCardClick = (e: React.MouseEvent) => {
+        // Prevent navigation if clicking on dropdown or interactive elements
+        if ((e.target as HTMLElement).closest('[role="menuitem"], button')) {
+            return
+        }
+        router.push(`/app/transactions?category=${category.id}`)
+    }
+
     return (
-        <Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20 relative group">
-            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity">
+        <Card
+            className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20 relative group cursor-pointer"
+            onClick={handleCardClick}
+        >
+            <div className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10">
                 <DropdownMenu>
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted">
