@@ -4,13 +4,13 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { 
-	ArrowRight, 
-	BarChart3, 
-	Shield, 
-	Smartphone, 
-	Zap, 
-	TrendingUp, 
+import {
+	ArrowRight,
+	BarChart3,
+	Shield,
+	Smartphone,
+	Zap,
+	TrendingUp,
 	PieChart,
 	Target,
 	Clock,
@@ -49,11 +49,10 @@ function Navigation() {
 	}
 
 	return (
-		<nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${
-			isScrolled 
-				? 'bg-background/80 backdrop-blur-md border-b border-border/50 shadow-lg' 
+		<nav className={`fixed top-0 w-full z-50 transition-all duration-300 ${isScrolled
+				? 'bg-background/80 backdrop-blur-md border-b border-border/50 shadow-lg'
 				: 'bg-transparent'
-		}`}>
+			}`}>
 			<div className="container mx-auto px-4">
 				<div className="flex items-center justify-between h-16">
 					{/* Logo */}
@@ -61,7 +60,7 @@ function Navigation() {
 						<div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center group-hover:scale-110 transition-transform duration-200">
 							<BarChart3 className="h-4 w-4 text-primary-foreground" />
 						</div>
-						<span className="font-bold text-xl bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+						<span className="font-bold text-xl text-primary">
 							FinanceApp
 						</span>
 					</Link>
@@ -179,7 +178,7 @@ function HeroSection() {
 	return (
 		<section className="relative min-h-screen flex items-center justify-center overflow-hidden">
 			{/* Gradient Background */}
-			<div 
+			<div
 				className="absolute inset-0 bg-gradient-to-br from-primary/20 via-background to-secondary/20 transition-all duration-1000"
 				style={{
 					background: `radial-gradient(circle at ${mousePosition.x}% ${mousePosition.y}%, 
@@ -188,7 +187,7 @@ function HeroSection() {
 						hsl(var(--background)) 70%)`
 				}}
 			/>
-			
+
 			{/* Floating Elements */}
 			<div className="absolute inset-0 overflow-hidden">
 				{[...Array(6)].map((_, i) => (
@@ -214,23 +213,23 @@ function HeroSection() {
 					</div>
 
 					{/* Main Heading */}
-					<h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 bg-gradient-to-r from-foreground via-primary to-foreground bg-clip-text text-transparent leading-tight animate-fade-in">
-						Domina tus 
-						<span className="block bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+					<h1 className="text-4xl md:text-6xl lg:text-7xl font-bold mb-6 text-foreground leading-tight animate-fade-in">
+						Domina tus
+						<span className="block text-primary">
 							Finanzas Personales
 						</span>
 					</h1>
 
 					{/* Subtitle */}
 					<p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-3xl mx-auto leading-relaxed animate-fade-in-delay">
-						La plataforma más inteligente para controlar gastos, crear presupuestos 
+						La plataforma más inteligente para controlar gastos, crear presupuestos
 						y alcanzar tus metas financieras. Todo en un solo lugar.
 					</p>
 
 					{/* CTA Buttons */}
 					<div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12 animate-fade-in-delay-2">
-						<Button 
-							size="lg" 
+						<Button
+							size="lg"
 							asChild
 							className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-lg px-8 py-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 group"
 						>
@@ -239,8 +238,8 @@ function HeroSection() {
 								<ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
 							</Link>
 						</Button>
-						<Button 
-							variant="outline" 
+						<Button
+							variant="outline"
 							size="lg"
 							asChild
 							className="text-lg px-8 py-6 rounded-full border-primary/20 hover:border-primary/40 hover:bg-primary/5 transition-all duration-300 group"
@@ -330,7 +329,7 @@ function FeaturesSection() {
 			<div className="container mx-auto px-4">
 				<div className="text-center mb-16">
 					<Badge variant="outline" className="mb-4">Características</Badge>
-					<h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+					<h2 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
 						Todo lo que necesitas para
 						<span className="block">gestionar tu dinero</span>
 					</h2>
@@ -342,7 +341,7 @@ function FeaturesSection() {
 
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
 					{features.map((feature, index) => (
-						<Card 
+						<Card
 							key={index}
 							className="group hover:shadow-lg transition-all duration-300 border-border/50 hover:border-primary/20 bg-background/50 backdrop-blur-sm"
 						>
@@ -400,7 +399,7 @@ function BenefitsSection() {
 						Resultados que verás desde el primer día
 					</h2>
 					<p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-						Nuestros usuarios experimentan mejoras significativas en su gestión 
+						Nuestros usuarios experimentan mejoras significativas en su gestión
 						financiera desde la primera semana.
 					</p>
 				</div>
@@ -623,7 +622,7 @@ function CTASection() {
 	return (
 		<section className="py-20 bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10">
 			<div className="container mx-auto px-4 text-center">
-				<h2 className="text-4xl md:text-5xl font-bold mb-6 bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+				<h2 className="text-4xl md:text-5xl font-bold mb-6 text-foreground">
 					¿Listo para transformar tus finanzas?
 				</h2>
 				<p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
@@ -631,8 +630,8 @@ function CTASection() {
 					Comienza gratis hoy mismo.
 				</p>
 				<div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-					<Button 
-						size="lg" 
+					<Button
+						size="lg"
 						asChild
 						className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-lg px-8 py-6 rounded-full"
 					>
@@ -641,8 +640,8 @@ function CTASection() {
 							<ArrowRight className="ml-2 h-5 w-5" />
 						</Link>
 					</Button>
-					<Button 
-						variant="outline" 
+					<Button
+						variant="outline"
 						size="lg"
 						asChild
 						className="text-lg px-8 py-6 rounded-full"
@@ -676,7 +675,7 @@ function Footer() {
 							<span className="font-bold text-xl">FinanceApp</span>
 						</Link>
 						<p className="text-muted-foreground mb-4 max-w-md">
-							La plataforma más completa para gestionar tus finanzas personales. 
+							La plataforma más completa para gestionar tus finanzas personales.
 							Toma control de tu dinero y alcanza tus metas financieras.
 						</p>
 						<div className="flex gap-4">

@@ -11,7 +11,7 @@ export default function TransactionsPage() {
 					<div className="mb-8">
 						<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 							<div>
-								<h1 className="text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent">
+								<h1 className="text-4xl font-bold tracking-tight text-foreground">
 									Gestión de Transacciones
 								</h1>
 								<p className="text-muted-foreground mt-2 text-lg">

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { LoginForm } from './login-form'
 import { RegisterForm } from './register-form'
-import { Card} from '@/components/ui/card'
+import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ModeToggle } from '@/components/common/ToggleMode'
 import { Home, LogIn, UserPlus } from 'lucide-react'
@@ -33,7 +33,7 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 								<Home className="h-6 w-6 text-primary-foreground" />
 							</div>
 							<div className="text-left">
-								<h1 className="text-2xl font-bold bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+								<h1 className="text-2xl font-bold text-foreground">
 									FinanceApp
 								</h1>
 								<p className="text-sm text-muted-foreground">Gestor Personal</p>
@@ -47,22 +47,20 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 							<div className="flex rounded-lg">
 								<button
 									onClick={() => setMode('login')}
-									className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-										mode === 'login'
+									className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${mode === 'login'
 											? 'bg-background text-foreground shadow-sm border border-border/50'
 											: 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-									}`}
+										}`}
 								>
 									<LogIn className="h-4 w-4" />
 									Iniciar Sesión
 								</button>
 								<button
 									onClick={() => setMode('register')}
-									className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-										mode === 'register'
+									className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${mode === 'register'
 											? 'bg-background text-foreground shadow-sm border border-border/50'
 											: 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-									}`}
+										}`}
 								>
 									<UserPlus className="h-4 w-4" />
 									Crear Cuenta

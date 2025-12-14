@@ -73,7 +73,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 			}
 
 			console.log('✅ Login exitoso')
-			
+
 			// Redirigir al dashboard
 			router.push('/app')
 			router.refresh()
@@ -103,7 +103,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 						<LogIn className="h-6 w-6 text-primary-foreground" />
 					</div>
 				</div>
-				<CardTitle className="text-2xl font-bold bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+				<CardTitle className="text-2xl font-bold text-center">
 					Iniciar Sesión
 				</CardTitle>
 				<CardDescription className="text-muted-foreground">

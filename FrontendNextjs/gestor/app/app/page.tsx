@@ -1,22 +1,22 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
-import { 
-	getAccountRepository, 
-	getTransactionRepository, 
-	getCategoryRepository, 
-	getBudgetRepository, 
-    getAnalyticsRepository
+import {
+	getAccountRepository,
+	getTransactionRepository,
+	getCategoryRepository,
+	getBudgetRepository,
+	getAnalyticsRepository
 } from '@/lib/repositoryConfig'
 import { Account } from '@/types/account'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
 import { Budget } from '@/types/budget'
-import { 
-	TrendingUp, 
-	TrendingDown, 
-	Wallet, 
-	CreditCard, 
+import {
+	TrendingUp,
+	TrendingDown,
+	Wallet,
+	CreditCard,
 	DollarSign,
 	Calendar,
 	PieChart,
@@ -56,9 +56,8 @@ function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' 
 					<div className="flex items-center justify-between mb-3">
 						<Icon className="h-6 w-6" />
 						{trend && trendValue && (
-							<div className={`flex items-center gap-1 text-xs font-medium ${
-								trend === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
-							}`}>
+							<div className={`flex items-center gap-1 text-xs font-medium ${trend === 'up' ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'
+								}`}>
 								{trend === 'up' ? (
 									<ArrowUpRight className="h-3 w-3" />
 								) : (
@@ -77,9 +76,9 @@ function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' 
 }
 
 // Server Component para TransactionItem
-function TransactionItem({ transaction, category }: { 
-	transaction: Transaction 
-	category?: Category 
+function TransactionItem({ transaction, category }: {
+	transaction: Transaction
+	category?: Category
 }) {
 	const isIncome = transaction.type_transation === TypeTransaction.INCOME
 
@@ -108,9 +107,9 @@ function TransactionItem({ transaction, category }: {
 }
 
 // Server Component para CategoryCard
-function CategoryCard({ category, transactions }: { 
-	category: Category 
-	transactions: Transaction[] 
+function CategoryCard({ category, transactions }: {
+	category: Category
+	transactions: Transaction[]
 }) {
 	const categoryTransactions = Array.isArray(transactions) ? transactions.filter(t => t.category_id === category.id) : [];
 	const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
@@ -118,8 +117,8 @@ function CategoryCard({ category, transactions }: {
 	return (
 		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">
 			<div className="flex items-center gap-3">
-				<div 
-					className="w-8 h-8 rounded-full flex items-center justify-center text-sm" 
+				<div
+					className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
 					style={{ backgroundColor: category.color }}
 				>
 					{category.icon}
@@ -172,9 +171,9 @@ function AccountCard({ account }: { account: Account }) {
 }
 
 // Server Component para BudgetCard
-function BudgetCard({ budget, category }: { 
-	budget: Budget 
-	category?: Category 
+function BudgetCard({ budget, category }: {
+	budget: Budget
+	category?: Category
 }) {
 	// Convert negative current_amount to positive for display
 	const spentAmount = Math.abs(budget.current_amount)
@@ -186,8 +185,8 @@ function BudgetCard({ budget, category }: {
 			<CardContent className="p-6">
 				<div className="flex items-center justify-between mb-4">
 					<div className="flex items-center gap-3">
-						<div 
-							className="w-8 h-8 rounded-full flex items-center justify-center text-sm" 
+						<div
+							className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
 							style={{ backgroundColor: category?.color || '#6B7280' }}
 						>
 							{category?.icon || '📊'}
@@ -199,7 +198,7 @@ function BudgetCard({ budget, category }: {
 							</p>
 						</div>
 					</div>
-					<Badge 
+					<Badge
 						variant={isOverBudget ? 'destructive' : percentage > 80 ? 'secondary' : 'outline'}
 						className="text-xs"
 					>
@@ -207,9 +206,9 @@ function BudgetCard({ budget, category }: {
 					</Badge>
 				</div>
 				<div className="relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-					<div 
+					<div
 						className="h-full transition-all duration-500 rounded-full"
-						style={{ 
+						style={{
 							width: `${Math.max(Math.min(percentage, 100), percentage > 0 ? 5 : 0)}%`,
 							minWidth: percentage > 0 ? '8px' : '0px',
 							backgroundColor: percentage > 80 ? '#ef4444' : percentage > 60 ? '#eab308' : '#22c55e'
@@ -227,14 +226,14 @@ function DashboardHeader({ user }: { user: any }) {
 		<div className="mb-8">
 			<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 				<div>
-					<h1 className="text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent">
+					<h1 className="text-4xl font-bold tracking-tight text-foreground">
 						Dashboard Financiero
 					</h1>
 					<p className="text-muted-foreground mt-2 text-lg">
 						Bienvenido de vuelta, {user?.name} {user?.lastName || user?.last_name} 👋
 					</p>
 				</div>
-				<div className="flex items-center gap-3">	
+				<div className="flex items-center gap-3">
 					<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
 						<Calendar className="h-3 w-3 mr-1" />
 						{new Date().toLocaleDateString('es-ES', {
@@ -250,9 +249,9 @@ function DashboardHeader({ user }: { user: any }) {
 }
 
 // Server Component para las estadísticas
-function StatsGrid({ accounts, transactions }: { 
-	accounts: Account[] 
-	transactions: Transaction[] 
+function StatsGrid({ accounts, transactions }: {
+	accounts: Account[]
+	transactions: Transaction[]
 }) {
 	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + (acc.current_balance ?? acc.initial_balance ?? 0), 0)
 	const totalIncome = Array.isArray(transactions)
@@ -294,33 +293,33 @@ export default async function DashboardPage() {
 	const transactionRepository = await getTransactionRepository()
 	const categoryRepository = await getCategoryRepository()
 	const budgetRepository = await getBudgetRepository()
-  const analyticsRepository = await getAnalyticsRepository()
-	
+	const analyticsRepository = await getAnalyticsRepository()
+
 	// Obtener la sesión actual (sin hacer login)
 	const { getServerSession } = await import("next-auth");
 	const { authOptions } = await import("@/auth");
 	const session = await getServerSession(authOptions);
-	
+
 	if (!session) {
 		const { redirect } = await import("next/navigation");
 		redirect('/login');
-    return
+		return
 	}
-  
+
 	const user = session.user;
 
-	const [accounts, transactionResponse, categories, budgets,categorysData,getMonthlySummary] = await Promise.all([
+	const [accounts, transactionResponse, categories, budgets, categorysData, getMonthlySummary] = await Promise.all([
 		accountRepository.findAll(),
 		transactionRepository.findAllSimple(),
 		categoryRepository.findAll(),
 		budgetRepository.findAll(),
-    analyticsRepository.getCategoryExpenses(),
-    analyticsRepository.getMonthlySummary()
+		analyticsRepository.getCategoryExpenses(),
+		analyticsRepository.getMonthlySummary()
 	])
-	
+
 	// Extract transactions from the response
 	const transactions = transactionResponse || []
-  console.log(accounts, transactions, categories, budgets)
+	console.log(accounts, transactions, categories, budgets)
 
 	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
 
@@ -328,15 +327,15 @@ export default async function DashboardPage() {
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
 			<div className="container mx-auto px-4 py-8">
 				<DashboardHeader user={user} />
-				<DashboardCharts 
-					categories={categories} 
+				<DashboardCharts
+					categories={categories}
 					transactions={Array.isArray(transactions) ? transactions : []}
-          categorysData={categorysData}
-          monthSummary={getMonthlySummary}
+					categorysData={categorysData}
+					monthSummary={getMonthlySummary}
 
 				/>
 				<StatsGrid accounts={accounts} transactions={transactions} />
-				
+
 				<AnimatedTabs
 					defaultValue="overview"
 					className="space-y-6"
@@ -360,13 +359,13 @@ export default async function DashboardPage() {
 													{Array.isArray(recentTransactions) ? recentTransactions.slice(0, 4).map((transaction) => {
 														const category = categories.find(c => c.id === transaction.category_id)
 														return (
-															<TransactionItem 
-																key={transaction.id} 
-																transaction={transaction} 
+															<TransactionItem
+																key={transaction.id}
+																transaction={transaction}
 																category={category}
 															/>
 														)
-													}):[]}
+													}) : []}
 												</div>
 											</CardContent>
 										</Card>
@@ -381,12 +380,12 @@ export default async function DashboardPage() {
 											<CardContent>
 												<div className="space-y-4">
 													{Array.isArray(categories) ? categories.slice(0, 4).map((category) => (
-														<CategoryCard 
-															key={category.id} 
-															category={category} 
+														<CategoryCard
+															key={category.id}
+															category={category}
 															transactions={transactions}
 														/>
-													)):[]}
+													)) : []}
 												</div>
 											</CardContent>
 										</Card>
@@ -406,12 +405,12 @@ export default async function DashboardPage() {
 																const category = Array.isArray(categories) ? categories.find(c => c.id === budget.category_id) : undefined;
 																const spentAmount = Math.abs(budget.current_amount);
 																const percentage = (spentAmount / budget.amount) * 100;
-																
+
 																return (
 																	<div key={budget.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">
 																		<div className="flex items-center gap-3">
-																			<div 
-																				className="w-8 h-8 rounded-full flex items-center justify-center text-sm" 
+																			<div
+																				className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
 																				style={{ backgroundColor: category?.color || '#6B7280' }}
 																			>
 																				{category?.icon || '📊'}
@@ -424,11 +423,10 @@ export default async function DashboardPage() {
 																			</div>
 																		</div>
 																		<div className="text-right">
-																			<p className={`text-sm font-bold ${
-																				percentage > 80 ? 'text-red-600 dark:text-red-400' : 
-																				percentage > 60 ? 'text-yellow-600 dark:text-yellow-400' : 
-																				'text-green-600 dark:text-green-400'
-																			}`}>
+																			<p className={`text-sm font-bold ${percentage > 80 ? 'text-red-600 dark:text-red-400' :
+																					percentage > 60 ? 'text-yellow-600 dark:text-yellow-400' :
+																						'text-green-600 dark:text-green-400'
+																				}`}>
 																				{percentage.toFixed(1)}%
 																			</p>
 																		</div>
@@ -476,13 +474,13 @@ export default async function DashboardPage() {
 									{Array.isArray(transactions) ? transactions.map((transaction) => {
 										const category = categories.find(c => c.id === transaction.category_id)
 										return (
-											<TransactionItem 
-												key={transaction.id} 
-												transaction={transaction} 
+											<TransactionItem
+												key={transaction.id}
+												transaction={transaction}
 												category={category}
 											/>
 										)
-									}):[]}
+									}) : []}
 								</div>
 							)
 						},
@@ -495,10 +493,10 @@ export default async function DashboardPage() {
 									{budgets && budgets.length > 0 ? budgets.map((budget) => {
 										const category = Array.isArray(categories) ? categories.find(c => c.id === budget.category_id) : undefined;
 										return (
-											<BudgetCard 
-												key={budget.id} 
-												budget={budget} 
-												category={category} 
+											<BudgetCard
+												key={budget.id}
+												budget={budget}
+												category={category}
 											/>
 										)
 									}) : (

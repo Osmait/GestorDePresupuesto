@@ -99,7 +99,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 			console.log('📝 Iniciando registro...')
 			const authRepository = await getAuthRepository()
-			
+
 			// Crear cuenta
 			await authRepository.signUp(
 				values.name,
@@ -171,7 +171,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 						<UserPlus className="h-6 w-6 text-primary-foreground" />
 					</div>
 				</div>
-				<CardTitle className="text-2xl font-bold bg-gradient-to-r from-foreground to-primary bg-clip-text text-transparent">
+				<CardTitle className="text-2xl font-bold text-center">
 					Crear Cuenta
 				</CardTitle>
 				<CardDescription className="text-muted-foreground">
@@ -290,7 +290,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 											</Button>
 										</div>
 									</FormControl>
-									
+
 									{/* Indicadores de validación de contraseña */}
 									{passwordValue && (
 										<div className="mt-2 space-y-1">
@@ -314,7 +314,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 											</div>
 										</div>
 									)}
-									
+
 									<FormMessage />
 								</FormItem>
 							)}

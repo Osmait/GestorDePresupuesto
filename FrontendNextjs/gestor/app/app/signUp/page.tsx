@@ -1,18 +1,18 @@
 'use client'
 
 import { useState } from 'react'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/common/ui/card'
-import { Button } from '@/components/common/ui/button'
-import { Input } from '@/components/common/ui/input'
-import { Label } from '@/components/common/ui/label'
-import { Badge } from '@/components/common/ui/badge'
-import { 
-	UserPlus, 
-	Mail, 
-	Lock, 
-	User, 
-	Eye, 
-	EyeOff, 
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import {
+	UserPlus,
+	Mail,
+	Lock,
+	User,
+	Eye,
+	EyeOff,
 	CheckCircle,
 	AlertCircle,
 	ArrowRight,
@@ -111,11 +111,11 @@ export default function SignUpPage() {
 
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
-		
+
 		if (!validateForm()) return
 
 		setIsLoading(true)
-		
+
 		try {
 			// Simular API call
 			await new Promise(resolve => setTimeout(resolve, 2000))
@@ -157,7 +157,7 @@ export default function SignUpPage() {
 			<div className="container mx-auto px-4 py-8">
 				{/* Header */}
 				<div className="text-center mb-8">
-					<h1 className="text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent mb-4">
+					<h1 className="text-4xl font-bold text-foreground mb-4">
 						Crear Nueva Cuenta
 					</h1>
 					<p className="text-muted-foreground text-lg">
@@ -282,15 +282,14 @@ export default function SignUpPage() {
 												{[...Array(5)].map((_, i) => (
 													<div
 														key={i}
-														className={`h-1 w-6 rounded ${
-															i < passwordStrength.strength 
-																? passwordStrength.color.includes('red') 
-																	? 'bg-red-500' 
-																	: passwordStrength.color.includes('orange')
+														className={`h-1 w-6 rounded ${i < passwordStrength.strength
+															? passwordStrength.color.includes('red')
+																? 'bg-red-500'
+																: passwordStrength.color.includes('orange')
 																	? 'bg-orange-500'
 																	: 'bg-green-500'
-																: 'bg-muted'
-														}`}
+															: 'bg-muted'
+															}`}
 													/>
 												))}
 											</div>
@@ -351,7 +350,7 @@ export default function SignUpPage() {
 													Información de Seguridad
 												</p>
 												<p className="text-xs text-blue-700 dark:text-blue-300 mt-1">
-													Tu información está protegida con encriptación de nivel bancario. 
+													Tu información está protegida con encriptación de nivel bancario.
 													Nunca compartimos tus datos con terceros.
 												</p>
 											</div>

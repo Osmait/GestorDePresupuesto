@@ -2,11 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Button } from '@/components/ui/button'
-import { 
-	Bitcoin, 
-	TrendingUp, 
-	TrendingDown, 
-	DollarSign, 
+import {
+	Bitcoin,
+	TrendingUp,
+	TrendingDown,
+	DollarSign,
 	BarChart3,
 	Zap,
 	Shield,
@@ -107,7 +107,7 @@ function LoadingSpinner() {
 			<div className="text-center">
 				<div className="relative">
 					<div className="animate-spin rounded-full h-16 w-16 border-4 border-muted border-t-primary mx-auto"></div>
-					<div className="absolute inset-0 rounded-full h-16 w-16 border-4 border-transparent border-t-primary/60 animate-spin mx-auto" style={{animationDelay: '0.3s', animationDuration: '1.2s'}}></div>
+					<div className="absolute inset-0 rounded-full h-16 w-16 border-4 border-transparent border-t-primary/60 animate-spin mx-auto" style={{ animationDelay: '0.3s', animationDuration: '1.2s' }}></div>
 				</div>
 				<div className="mt-6 text-xl font-semibold text-foreground">Cargando Criptomonedas</div>
 				<div className="mt-2 text-sm text-muted-foreground">Conectando con el mercado crypto...</div>
@@ -120,7 +120,7 @@ function LoadingSpinner() {
 function CryptoCard({ asset }: CryptoCardProps) {
 	const isPositive = asset.priceChange24h > 0
 	const totalValue = asset.price * asset.holdings
-	
+
 	return (
 		<Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
 			<CardContent className="p-6">
@@ -148,7 +148,7 @@ function CryptoCard({ asset }: CryptoCardProps) {
 						</div>
 					</div>
 				</div>
-				
+
 				<div className="space-y-3 pt-3 border-t border-border/50">
 					<div className="flex justify-between items-center">
 						<span className="text-sm text-muted-foreground">Holdings</span>
@@ -156,14 +156,14 @@ function CryptoCard({ asset }: CryptoCardProps) {
 							{asset.holdings.toFixed(4)} {asset.symbol}
 						</span>
 					</div>
-					
+
 					<div className="flex justify-between items-center">
 						<span className="text-sm text-muted-foreground">Valor Total</span>
 						<span className="font-bold text-lg text-foreground">
 							${totalValue.toLocaleString(undefined, { maximumFractionDigits: 2 })}
 						</span>
 					</div>
-					
+
 					<div className="flex justify-between items-center">
 						<span className="text-sm text-muted-foreground">Market Cap</span>
 						<span className="text-sm text-muted-foreground">
@@ -185,7 +185,7 @@ function CryptoSummaryCard({ assets }: { assets: CryptoAsset[] }) {
 		return sum + change
 	}, 0)
 	const profitableAssets = assets.filter(asset => asset.priceChange24h > 0).length
-	
+
 	return (
 		<Card className="border-border/50 dark:border-border/20">
 			<CardHeader>
@@ -229,7 +229,7 @@ function CryptoSummaryCard({ assets }: { assets: CryptoAsset[] }) {
 export default async function CryptoPage() {
 	// Simular delay de carga en el servidor (opcional para Server Components)
 	// await new Promise(resolve => setTimeout(resolve, 100))
-	
+
 	// En un caso real, aquí cargarías datos de una API externa
 	const assets = mockCryptoAssets
 
@@ -243,7 +243,7 @@ export default async function CryptoPage() {
 				<div className="mb-8">
 					<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 						<div>
-							<h1 className="text-4xl font-bold bg-gradient-to-r from-foreground via-primary to-primary bg-clip-text text-transparent">
+							<h1 className="text-4xl font-bold tracking-tight text-foreground">
 								Portfolio de Criptomonedas
 							</h1>
 							<p className="text-muted-foreground mt-2 text-lg">
