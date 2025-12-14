@@ -92,3 +92,37 @@ func DeleteCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 		c.JSON(http.StatusOK, "Deleted")
 	}
 }
+
+// UpdateCategory godoc
+//
+//	@Summary		Update a category
+//	@Description	Update a specific category by ID
+//	@Tags			Categories
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			id			path		string				true	"Category ID"
+//	@Param			category	body		dto.CategoryRequest	true	"Category update data"
+//	@Success		200			{object}	map[string]string	"Category updated successfully"
+//	@Failure		400			{object}	map[string]string	"Bad request - Invalid input"
+//	@Failure		401			{object}	map[string]string	"Unauthorized - Invalid JWT token"
+//	@Failure		500			{object}	map[string]string	"Internal server error"
+//	@Router			/category/{id} [put]
+func UpdateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		userId := c.GetString("X-User-Id")
+		var categoryRequest dto.CategoryRequest
+		err := c.Bind(&categoryRequest)
+		if err != nil {
+			c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
+			return
+		}
+		err = categoryServices.UpdateCategory(c, &categoryRequest, id, userId)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, "Updated")
+	}
+}

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { useGetCategories, useDeleteCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
+import { useCategoryContext } from '@/components/categories/CategoryContext'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
@@ -32,9 +33,10 @@ interface CategoryCardProps {
     category: Category
     transactions: Transaction[]
     onDelete: () => Promise<void>
+    onEdit: () => void
 }
 
-function CategoryCard({ category, transactions, onDelete }: CategoryCardProps) {
+function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCardProps) {
     const categoryTransactions = transactions.filter(t => t.category_id === category.id)
     const totalAmount = categoryTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
@@ -63,7 +65,7 @@ function CategoryCard({ category, transactions, onDelete }: CategoryCardProps) {
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+                        <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={onEdit}>
                             <Edit className="h-4 w-4" />
                             Editar categoría
                         </DropdownMenuItem>
@@ -188,6 +190,7 @@ function CategorySummaryCard({ categories, transactions }: { categories: Categor
 export function CategoryList() {
     const { data: categories = [], isLoading: isLoadingCategories, error } = useGetCategories()
     const { data: transactions = [], isLoading: isLoadingTransactions } = useGetAllTransactions()
+    const { setEditingCategory, setModalOpen } = useCategoryContext()
 
     const deleteCategoryMutation = useDeleteCategoryMutation()
 
@@ -195,7 +198,11 @@ export function CategoryList() {
 
     const handleDeleteCategory = async (categoryId: string) => {
         await deleteCategoryMutation.mutateAsync(categoryId)
-        // Optionally refetch categories or invalidate queries here if needed
+    }
+
+    const handleEditCategory = (category: Category) => {
+        setEditingCategory(category)
+        setModalOpen(true)
     }
 
     if (isLoading) {
@@ -236,6 +243,7 @@ export function CategoryList() {
                                                 category={category}
                                                 transactions={transactions}
                                                 onDelete={() => handleDeleteCategory(category.id!)}
+                                                onEdit={() => handleEditCategory(category)}
                                             />
                                         </motion.div>
                                     ))}

@@ -88,3 +88,8 @@ func (c *CategoryRespository) Delete(ctx context.Context, id string, userId stri
 	}
 	return nil
 }
+
+func (c *CategoryRespository) Update(ctx context.Context, category *category.Category) error {
+	_, err := c.db.ExecContext(ctx, "UPDATE categorys SET name = $1, icon = $2, color = $3 WHERE id = $4 AND user_id = $5", category.Name, category.Icon, category.Color, category.Id, category.UserId)
+	return err
+}

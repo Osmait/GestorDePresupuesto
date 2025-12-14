@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
-import { useGetCategories, useCreateCategoryMutation, useDeleteCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
+import { createContext, useContext, ReactNode, useState } from 'react'
+import { useGetCategories, useCreateCategoryMutation, useDeleteCategoryMutation, useUpdateCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
 import { Category } from '@/types/category'
 
 interface CategoryContextType {
@@ -9,8 +9,13 @@ interface CategoryContextType {
     isLoading: boolean
     error: string | null
     createCategory: (name: string, icon: string, color: string) => Promise<void>
+    updateCategory: (id: string, name: string, icon: string, color: string) => Promise<void>
     deleteCategory: (id: string) => Promise<void>
     refetch: () => Promise<void>
+    editingCategory: Category | null
+    setEditingCategory: (category: Category | null) => void
+    isModalOpen: boolean
+    setModalOpen: (open: boolean) => void
 }
 
 const CategoryContext = createContext<CategoryContextType | undefined>(undefined)
@@ -20,11 +25,18 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
     const { data: categories = [], isLoading, error: queryError, refetch } = useGetCategories()
     const createMutation = useCreateCategoryMutation()
     const deleteMutation = useDeleteCategoryMutation()
+    const [editingCategory, setEditingCategory] = useState<Category | null>(null)
+    const [isModalOpen, setModalOpen] = useState(false)
+    const updateMutation = useUpdateCategoryMutation()
 
     const error = queryError ? (queryError as Error).message : null
 
     const createCategory = async (name: string, icon: string, color: string) => {
         await createMutation.mutateAsync({ name, icon, color })
+    }
+
+    const updateCategory = async (id: string, name: string, icon: string, color: string) => {
+        await updateMutation.mutateAsync({ id, name, icon, color })
     }
 
     const deleteCategory = async (id: string) => {
@@ -37,8 +49,13 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
             isLoading,
             error,
             createCategory,
+            updateCategory,
             deleteCategory,
-            refetch: async () => { await refetch() }
+            refetch: async () => { await refetch() },
+            editingCategory,
+            setEditingCategory,
+            isModalOpen,
+            setModalOpen
         }}>
             {children}
         </CategoryContext.Provider>

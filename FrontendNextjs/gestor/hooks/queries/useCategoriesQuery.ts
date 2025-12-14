@@ -52,3 +52,23 @@ export function useDeleteCategoryMutation() {
         },
     })
 }
+
+// Update Mutation
+export function useUpdateCategoryMutation() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async (data: {
+            id: string
+            name: string
+            icon: string
+            color: string
+        }) => {
+            const repo = await getCategoryRepository()
+            return repo.update(data.id, data.name, data.icon, data.color)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
+        },
+    })
+}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
     Dialog,
     DialogContent,
@@ -20,6 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select'
 import { Tag, Coffee, Home, Car, Smartphone, Plane, ShoppingBag, Heart, MoreHorizontal, Briefcase, GraduationCap, DollarSign, Wallet } from 'lucide-react'
+import { useCategoryContext } from '@/components/categories/CategoryContext'
 
 interface CategoryFormModalProps {
     open: boolean
@@ -76,10 +77,25 @@ const COLORS = [
 ]
 
 export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryFormModalProps) {
+    const { editingCategory, updateCategory } = useCategoryContext()
     const [name, setName] = useState('')
     const [icon, setIcon] = useState('🏷️')
     const [color, setColor] = useState('#3B82F6')
     const [isSubmitting, setIsSubmitting] = useState(false)
+
+    const isEditing = !!editingCategory
+
+    useEffect(() => {
+        if (editingCategory) {
+            setName(editingCategory.name)
+            setIcon(editingCategory.icon)
+            setColor(editingCategory.color)
+        } else {
+            setName('')
+            setIcon('🏷️')
+            setColor('#3B82F6')
+        }
+    }, [editingCategory])
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault()
@@ -87,13 +103,16 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
 
         setIsSubmitting(true)
         try {
-            await onCreateCategory(name, icon, color)
+            if (isEditing && editingCategory) {
+                await updateCategory(editingCategory.id, name, icon, color)
+            } else {
+                await onCreateCategory(name, icon, color)
+            }
             setOpen(false)
-            setName('')
-            setIcon('🏷️')
-            setColor('#3B82F6')
+            // Form reset via useEffect when mode changes, or explicit here?
+            // Rely on useEffect clearing or explicit clear on next open if state is external
         } catch (error) {
-            console.error('Error creating category:', error)
+            console.error('Error saving category:', error)
         } finally {
             setIsSubmitting(false)
         }
@@ -103,9 +122,9 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>Nueva Categoría</DialogTitle>
+                    <DialogTitle>{isEditing ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
                     <DialogDescription>
-                        Crea una nueva categoría para organizar tus transacciones.
+                        {isEditing ? 'Modifica los detalles de tu categoría.' : 'Crea una nueva categoría para organizar tus transacciones.'}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
@@ -166,7 +185,7 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
                         Cancelar
                     </Button>
                     <Button onClick={handleSubmit} disabled={isSubmitting || !name}>
-                        {isSubmitting ? 'Creando...' : 'Crear Categoría'}
+                        {isSubmitting ? 'Guardando...' : (isEditing ? 'Guardar Cambios' : 'Crear Categoría')}
                     </Button>
                 </DialogFooter>
             </DialogContent>

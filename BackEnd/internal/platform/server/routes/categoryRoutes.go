@@ -10,4 +10,5 @@ func CategoryRoutes(s *gin.Engine, categoryService *category.CategoryServices) {
 	s.POST("/category", handler.CreateCategory(categoryService))
 	s.GET("/category", handler.FindAllCategories(categoryService))
 	s.DELETE("/category/:id", handler.DeleteCategory(categoryService))
+	s.PUT("/category/:id", handler.UpdateCategory(categoryService))
 }

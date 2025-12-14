@@ -57,3 +57,10 @@ func (c *CategoryServices) Delete(ctx context.Context, id string, userId string)
 	err = c.repository.Delete(ctx, id, userId)
 	return err
 }
+
+func (c *CategoryServices) UpdateCategory(ctx context.Context, categoryRequest *dto.CategoryRequest, id string, userId string) error {
+	categoryToUpdate := category.NewCategory(id, categoryRequest.Name, categoryRequest.Icon, categoryRequest.Color)
+	categoryToUpdate.UserId = userId
+	err := c.repository.Update(ctx, categoryToUpdate)
+	return err
+}

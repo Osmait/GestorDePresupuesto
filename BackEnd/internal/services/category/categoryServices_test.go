@@ -35,6 +35,11 @@ func (m *MockCategoryRepository) FindOne(ctx context.Context, id string) (*categ
 	return args.Get(0).(*category.Category), args.Error(1)
 }
 
+func (m *MockCategoryRepository) Update(ctx context.Context, category *category.Category) error {
+	args := m.Called(ctx, category)
+	return args.Error(0)
+}
+
 func TestCreateCategory(t *testing.T) {
 	mockRepo := &MockCategoryRepository{}
 	ctx := context.Background()
