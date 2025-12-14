@@ -1,31 +1,48 @@
 import { TransactionProvider } from '@/components/transactions/TransactionContext'
 import { TransactionActions } from '@/components/transactions/TransactionActions'
 import TransactionsList from '@/components/transactions/TransactionsList'
+import { RecurringTransactionProvider } from '@/components/recurring/RecurringTransactionContext'
+import { RecurringTransactionList } from '@/components/recurring/RecurringTransactionList'
+import { RecurringTransactionActions } from '@/components/recurring/RecurringTransactionActions'
+import { RecurringTransactionFormModal } from '@/components/recurring/RecurringTransactionFormModal'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 export default function TransactionsPage() {
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
 			<div className="container mx-auto px-4 py-8">
-				<TransactionProvider>
-					{/* Header Estático - Server Side */}
-					<div className="mb-8">
-						<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-							<div>
-								<h1 className="text-4xl font-bold tracking-tight text-foreground">
-									Gestión de Transacciones
-								</h1>
-								<p className="text-muted-foreground mt-2 text-lg">
-									Supervisa y analiza todas tus transacciones financieras
-								</p>
-							</div>
-							{/* Acciones */}
-							<TransactionActions />
-						</div>
-					</div>
+				<div className="mb-8">
+					<h1 className="text-4xl font-bold tracking-tight text-foreground">
+						Gestión de Transacciones
+					</h1>
+					<p className="text-muted-foreground mt-2 text-lg">
+						Supervisa y analiza todas tus transacciones financieras
+					</p>
+				</div>
 
-					{/* Contenido Dinámico */}
-					<TransactionsList />
-				</TransactionProvider>
+				<Tabs defaultValue="history" className="space-y-4">
+					<TabsList>
+						<TabsTrigger value="history">Historial</TabsTrigger>
+						<TabsTrigger value="recurring">Recurrentes</TabsTrigger>
+					</TabsList>
+
+					<TabsContent value="history" className="space-y-4">
+						<TransactionProvider>
+							<div className="flex justify-end mb-4">
+								<TransactionActions />
+							</div>
+							<TransactionsList />
+						</TransactionProvider>
+					</TabsContent>
+
+					<TabsContent value="recurring" className="space-y-4">
+						<RecurringTransactionProvider>
+							<RecurringTransactionActions />
+							<RecurringTransactionList />
+							<RecurringTransactionFormModal />
+						</RecurringTransactionProvider>
+					</TabsContent>
+				</Tabs>
 			</div>
 		</div>
 	)

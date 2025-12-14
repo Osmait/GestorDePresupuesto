@@ -20,15 +20,18 @@ import (
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
+	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/worker"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
@@ -82,6 +85,9 @@ func Run() error {
 	services := initializeServices(repositories, cfg)
 
 	// Initialize and start server
+	scheduler := worker.NewTransactionScheduler(services.recurringService)
+	scheduler.Start(ctx)
+
 	serverCtx, srv := server.New(
 		ctx,
 		cfg.Server.Host,
@@ -94,6 +100,7 @@ func Run() error {
 		services.budgetService,
 		services.categoryService,
 		services.analyticsService,
+		services.recurringService,
 		db,
 		cfg,
 	)
@@ -195,6 +202,7 @@ type repositories struct {
 	categoryRepository    categoryRepo.CategoryRepoInterface
 	investmentRepository  investmentRepo.InvestmentRepoInterface
 	analyticsRepository   *analyticsRepo.AnalyticsRepository
+	recurringRepository   *recurringRepo.RecurringTransactionRepository
 }
 
 // initializeRepositories creates all repository instances
@@ -207,6 +215,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		categoryRepository:    categoryRepo.NewCategoryRepository(db),
 		investmentRepository:  investmentRepo.NewInvestmentRepository(db),
 		analyticsRepository:   analyticsRepo.NewAnalyticsRepository(db),
+		recurringRepository:   recurringRepo.NewRecurringTransactionRepository(db),
 	}
 }
 
@@ -220,6 +229,7 @@ type services struct {
 	categoryService    *category.CategoryServices
 	investmentService  *investment.InvestmentServices
 	analyticsService   *analytics.AnalyticsService
+	recurringService   *recurring_transaction.RecurringTransactionService
 }
 
 // initializeServices creates all service instances
@@ -233,5 +243,6 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		categoryService:    category.NewCategoryServices(repos.categoryRepository),
 		investmentService:  investment.NewInvestmentServices(repos.investmentRepository),
 		analyticsService:   analytics.NewAnalyticsService(repos.analyticsRepository),
+		recurringService:   recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository)),
 	}
 }

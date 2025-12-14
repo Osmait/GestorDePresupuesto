@@ -19,6 +19,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
+	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 
@@ -39,6 +40,7 @@ type Server struct {
 	servicesBudget      *budget.BudgetServices
 	servicesCategory    *category.CategoryServices
 	analyticsService    *analytics.AnalyticsService
+	recurringService    *recurring_transaction.RecurringTransactionService
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -55,6 +57,7 @@ func New(ctx context.Context,
 	budgetService *budget.BudgetServices,
 	categoryServices *category.CategoryServices,
 	analyticsService *analytics.AnalyticsService,
+	recurringService *recurring_transaction.RecurringTransactionService,
 	db *sql.DB,
 	cfg *config.Config,
 ) (context.Context, *Server) {
@@ -68,6 +71,7 @@ func New(ctx context.Context,
 		servicesBudget:      budgetService,
 		servicesCategory:    categoryServices,
 		analyticsService:    analyticsService,
+		recurringService:    recurringService,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -100,6 +104,7 @@ func (s *Server) registerRoutes() {
 	routes.CategoryRoutes(s.Engine, s.servicesCategory)
 	routes.BudgetRoutes(s.Engine, s.servicesBudget)
 	routes.AnalyticsRoutes(s.Engine, s.analyticsService)
+	routes.RecurringTransactionRoutes(s.Engine, s.recurringService)
 }
 
 func (s *Server) Run(ctx context.Context) error {
