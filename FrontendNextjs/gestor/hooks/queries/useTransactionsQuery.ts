@@ -1,6 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { getTransactionRepository } from '@/lib/repositoryConfig'
 import { TransactionFilters, TypeTransaction } from '@/types/transaction'
+import { CATEGORY_KEYS } from './useCategoriesQuery'
+import { BUDGET_KEYS } from './useBudgetsQuery'
 
 export const TRANSACTION_KEYS = {
     all: ['transactions'] as const,
@@ -64,6 +66,9 @@ export function useCreateTransactionMutation() {
         onSuccess: () => {
             // Invalidate all transaction lists to force refresh
             queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() })
+            // Invalidate categories and budgets to reflect spending changes
+            queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
+            queryClient.invalidateQueries({ queryKey: BUDGET_KEYS.lists() })
             // Optional: Invalidate account balance queries if they existed
         },
     })
@@ -98,6 +103,8 @@ export function useUpdateTransactionMutation() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() })
+            queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
+            queryClient.invalidateQueries({ queryKey: BUDGET_KEYS.lists() })
         },
     })
 }
@@ -114,6 +121,8 @@ export function useDeleteTransactionMutation() {
         onSuccess: () => {
             // Invalidate all transaction lists to force refresh
             queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() })
+            queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
+            queryClient.invalidateQueries({ queryKey: BUDGET_KEYS.lists() })
         },
     })
 }

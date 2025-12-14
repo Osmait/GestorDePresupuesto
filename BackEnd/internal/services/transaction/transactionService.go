@@ -228,6 +228,10 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 }
 
 func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, transaction *transaction.Transaction) error {
+	budget, _ := s.budgetRepository.FindByCategory(ctx, transaction.CategoryId)
+	if budget != nil {
+		transaction.BudgetId = budget.Id
+	}
 	return s.transactionRepository.Update(ctx, id, transaction)
 }
 
