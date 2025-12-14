@@ -18,26 +18,60 @@ import {
     CheckCircle,
     Clock,
     AlertTriangle,
-    PlusCircle
+    PlusCircle,
+    Trash2,
+    MoreHorizontal,
+    Edit
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { BudgetFormModal } from './BudgetFormModal'
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 
 
 // --- Helper Components copied from original BudgetsClient or improved ---
 
+// Update BudgetCard props
 interface BudgetCardProps {
     budget: Budget
     category?: Category
     transactions: Transaction[]
+    onDelete: (id: string) => void
 }
 
-function BudgetCard({ budget, category, transactions }: BudgetCardProps) {
+function BudgetCard({ budget, category, transactions, onDelete }: BudgetCardProps) {
     const spentAmount = Math.abs(budget.current_amount)
     const progressPercentage = (spentAmount / budget.amount) * 100
     const remaining = budget.amount - spentAmount
     const isOverBudget = spentAmount > budget.amount
+
+    const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+    const [isDeleting, setIsDeleting] = useState(false)
+
+    const handleDelete = async () => {
+        setIsDeleting(true)
+        try {
+            await onDelete(budget.id)
+            setShowDeleteDialog(false)
+        } catch (error) {
+            console.error("Failed to delete budget", error)
+        } finally {
+            setIsDeleting(false)
+        }
+    }
 
     const getStatusColor = () => {
         if (isOverBudget) return 'destructive'
@@ -54,15 +88,15 @@ function BudgetCard({ budget, category, transactions }: BudgetCardProps) {
     }
 
     return (
-        <Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
+        <Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20 group">
             <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
                         <div className="p-3 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/10 dark:to-purple-500/10">
                             <PiggyBank className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                         </div>
-                        <div>
-                            <p className="font-semibold text-foreground text-lg">
+                        <div className="pr-2">
+                            <p className="font-semibold text-foreground text-lg truncate max-w-[150px]">
                                 {category ? `Presupuesto ${category.name}` : `Presupuesto #${budget.id}`}
                             </p>
                             <p className="text-sm text-muted-foreground flex items-center gap-1">
@@ -75,12 +109,35 @@ function BudgetCard({ budget, category, transactions }: BudgetCardProps) {
                             </p>
                         </div>
                     </div>
-                    <Badge variant={getStatusColor()} className="flex items-center gap-1">
-                        {getStatusIcon()}
-                        <span className="text-xs">
-                            {isOverBudget ? 'Excedido' : progressPercentage > 80 ? 'Crítico' : 'Activo'}
-                        </span>
-                    </Badge>
+
+                    <div className="flex items-center gap-2">
+                        <Badge variant={getStatusColor()} className="flex items-center gap-1 hidden sm:flex">
+                            {getStatusIcon()}
+                            <span className="text-xs">
+                                {isOverBudget ? 'Excedido' : progressPercentage > 80 ? 'Crítico' : 'Activo'}
+                            </span>
+                        </Badge>
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+                                    <Edit className="h-4 w-4" />
+                                    Editar presupuesto
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                    onClick={() => setShowDeleteDialog(true)}
+                                >
+                                    <Trash2 className="h-4 w-4" />
+                                    Eliminar presupuesto
+                                </DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
                 </div>
 
                 <div className="space-y-4">
@@ -132,6 +189,34 @@ function BudgetCard({ budget, category, transactions }: BudgetCardProps) {
                     </div>
                 </div>
             </CardContent>
+
+            <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>Eliminar Presupuesto</DialogTitle>
+                        <DialogDescription>
+                            ¿Estás seguro de que quieres eliminar este presupuesto?
+                            Esta acción no se puede deshacer.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                        <Button
+                            variant="outline"
+                            onClick={() => setShowDeleteDialog(false)}
+                            disabled={isDeleting}
+                        >
+                            Cancelar
+                        </Button>
+                        <Button
+                            variant="destructive"
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                        >
+                            {isDeleting ? 'Eliminando...' : 'Eliminar'}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </Card>
     )
 }
@@ -181,7 +266,7 @@ function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], trans
 }
 
 export function BudgetList() {
-    const { budgets, isLoading, error } = useBudgetContext()
+    const { budgets, isLoading, error, deleteBudget } = useBudgetContext()
     const { categories } = useCategories()
     const { transactions } = useTransactions()
     const [modalOpen, setModalOpen] = useState(false) // For empty state button
@@ -250,7 +335,12 @@ export function BudgetList() {
                                 exit={{ opacity: 0, scale: 0.95 }}
                                 transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
                             >
-                                <BudgetCard budget={budget} category={category} transactions={txs} />
+                                <BudgetCard
+                                    budget={budget}
+                                    category={category}
+                                    transactions={txs}
+                                    onDelete={deleteBudget}
+                                />
                             </motion.div>
                         )
                     })}
