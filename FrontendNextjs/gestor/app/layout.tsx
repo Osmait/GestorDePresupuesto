@@ -3,12 +3,13 @@ import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import '../styles/globals.css'
 import { ThemeProvider } from '@/components/common/theme-provider'
 import { AuthSessionProvider } from '@/components/auth/session-provider'
+import { ProgressBarProvider } from '@/components/common/progress-bar-provider'
 import { cn } from '@/lib/utils'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
-const plusJakarta = Plus_Jakarta_Sans({ 
-	subsets: ['latin'], 
-	variable: '--font-plus-jakarta' 
+const plusJakarta = Plus_Jakarta_Sans({
+	subsets: ['latin'],
+	variable: '--font-plus-jakarta'
 })
 
 export const metadata: Metadata = {
@@ -70,7 +71,9 @@ export default function RootLayout({
 						enableSystem
 						disableTransitionOnChange
 					>
-						{children}
+						<ProgressBarProvider>
+							{children}
+						</ProgressBarProvider>
 					</ThemeProvider>
 				</AuthSessionProvider>
 			</body>
