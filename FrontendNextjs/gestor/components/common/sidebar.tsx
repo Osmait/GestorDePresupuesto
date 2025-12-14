@@ -8,7 +8,7 @@ import { UserNav } from '@/components/common/user-nav'
 import { Search } from '@/components/common/search'
 import { SidebarController } from '@/components/common/sidebar-controller'
 import { AnimatedSidebarNav } from '@/components/common/sidebar-nav-animated'
-import { 
+import {
 	LayoutDashboard,
 	CreditCard,
 	ArrowUpDown,
@@ -25,7 +25,8 @@ import {
 	Bell,
 	Plus,
 	Mouse,
-	BarChart
+	BarChart,
+	TrendingUp
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -72,11 +73,11 @@ const navItems: NavItem[] = [
 		description: 'Planificación financiera'
 	},
 	{
-		title: 'Crypto',
-		href: '/app/crypto',
-		icon: Bitcoin,
-		badge: 'Beta',
-		description: 'Portafolio de criptomonedas'
+		title: 'Inversiones',
+		href: '/app/investments',
+		icon: TrendingUp,
+		badge: 'New',
+		description: 'Portafolio de inversiones'
 	},
 	{
 		title: 'Analíticas',
@@ -126,14 +127,14 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 }
 
 // Wrapper para la navegación animada
-function SidebarNavWrapper({ items, isExpanded, onMobileClose }: { 
-	items: NavItem[] 
-	isExpanded: boolean 
+function SidebarNavWrapper({ items, isExpanded, onMobileClose }: {
+	items: NavItem[]
+	isExpanded: boolean
 	onMobileClose?: () => void
 }) {
 	return (
 		<nav className="flex-1 p-4 space-y-2">
-			<AnimatedSidebarNav 
+			<AnimatedSidebarNav
 				items={items}
 				isExpanded={isExpanded}
 				onMobileClose={onMobileClose}
@@ -143,28 +144,28 @@ function SidebarNavWrapper({ items, isExpanded, onMobileClose }: {
 }
 
 // Server Component para el footer del sidebar
-function SidebarFooter({ 
-	items, 
-	isExpanded, 
-	sidebarHoverEnabled, 
-	toggleCollapsed 
-}: { 
-	items: NavItem[] 
-	isExpanded: boolean 
+function SidebarFooter({
+	items,
+	isExpanded,
+	sidebarHoverEnabled,
+	toggleCollapsed
+}: {
+	items: NavItem[]
+	isExpanded: boolean
 	sidebarHoverEnabled: boolean
 	toggleCollapsed: () => void
 }) {
 	return (
 		<div className="border-t border-border/50 p-4 space-y-2">
-			<AnimatedSidebarNav 
+			<AnimatedSidebarNav
 				items={items}
 				isExpanded={isExpanded}
 			/>
-			
+
 			<div className="pt-2">
-				<Button 
-					variant="ghost" 
-					size="sm" 
+				<Button
+					variant="ghost"
+					size="sm"
 					onClick={toggleCollapsed}
 					className={`w-full transition-all duration-300 ${!isExpanded && 'px-2'} group`}
 				>
@@ -186,9 +187,9 @@ function SidebarFooter({
 }
 
 // Server Component para el header principal
-function MainHeader({ isExpanded, toggleMobile }: { 
-	isExpanded: boolean 
-	toggleMobile: () => void 
+function MainHeader({ isExpanded, toggleMobile }: {
+	isExpanded: boolean
+	toggleMobile: () => void
 }) {
 	return (
 		<header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg">
@@ -202,7 +203,7 @@ function MainHeader({ isExpanded, toggleMobile }: {
 					>
 						<Menu className="h-4 w-4" />
 					</Button>
-					
+
 					{isExpanded && (
 						<div>
 							<h1 className="text-xl font-semibold text-foreground">Dashboard</h1>
@@ -210,10 +211,10 @@ function MainHeader({ isExpanded, toggleMobile }: {
 						</div>
 					)}
 				</div>
-				
+
 				<div className="flex items-center gap-4">
 					<Search />
-					
+
 					<div className="flex items-center gap-2">
 						<Button variant="ghost" size="sm">
 							<Bell className="h-4 w-4" />
@@ -222,7 +223,7 @@ function MainHeader({ isExpanded, toggleMobile }: {
 							<Plus className="h-4 w-4" />
 						</Button>
 					</div>
-					
+
 					<UserNav />
 				</div>
 			</div>
@@ -249,7 +250,7 @@ export function Sidebar({ children }: SidebarProps) {
 				<div className="flex h-screen bg-background">
 					{/* Mobile Overlay */}
 					{isMobileOpen && (
-						<div 
+						<div
 							className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
 							onClick={toggleMobile}
 						/>
@@ -263,16 +264,16 @@ export function Sidebar({ children }: SidebarProps) {
 					>
 						<div className="flex h-full flex-col">
 							<SidebarHeader isExpanded={isExpanded} />
-							
-							<SidebarNavWrapper 
-								items={navItems} 
-								isExpanded={isExpanded} 
+
+							<SidebarNavWrapper
+								items={navItems}
+								isExpanded={isExpanded}
 								onMobileClose={toggleMobile}
 							/>
-							
-							<SidebarFooter 
+
+							<SidebarFooter
 								items={bottomNavItems}
-								isExpanded={isExpanded} 
+								isExpanded={isExpanded}
 								sidebarHoverEnabled={sidebarHoverEnabled}
 								toggleCollapsed={toggleCollapsed}
 							/>
@@ -281,11 +282,11 @@ export function Sidebar({ children }: SidebarProps) {
 
 					{/* Main content */}
 					<div className="flex-1 flex flex-col min-w-0">
-						<MainHeader 
-							isExpanded={isExpanded} 
-							toggleMobile={toggleMobile} 
+						<MainHeader
+							isExpanded={isExpanded}
+							toggleMobile={toggleMobile}
 						/>
-						
+
 						<main className="flex-1 overflow-auto">
 							{children}
 						</main>

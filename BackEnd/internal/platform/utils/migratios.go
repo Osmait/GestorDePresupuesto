@@ -278,11 +278,14 @@ func SetupSQLiteSchema(db *sql.DB) error {
 	-- Additional table for investment repository compatibility
 	CREATE TABLE IF NOT EXISTS investments(
 		id VARCHAR PRIMARY KEY,
+		investment_type VARCHAR NOT NULL CHECK (investment_type IN ('stock', 'crypto', 'fixed_income')),
 		name VARCHAR(255) NOT NULL,
-		price REAL NOT NULL,
-		current_price REAL NOT NULL,
+		symbol VARCHAR(10) NOT NULL,
 		quantity REAL NOT NULL,
+		purchase_price REAL NOT NULL,
+		current_price REAL NOT NULL,
 		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		updated_at DATETIME,
 		user_id VARCHAR NOT NULL,
 		FOREIGN KEY (user_id) REFERENCES users (id)
 	);

@@ -54,10 +54,12 @@ func GetNewRandomInvestment() *investment.Investment {
 
 	return investment.NewInvestment(
 		faker.UUIDDigit(),
+		faker.UUIDDigit(),
+		investment.Stock,
 		faker.Name(),
+		"SYM",
+		float64(quantities[0]),
 		float64(prices[0]),
 		float64(currentPrices[0]),
-		float64(quantities[0]),
-		faker.UUIDDigit(),
 	)
 }

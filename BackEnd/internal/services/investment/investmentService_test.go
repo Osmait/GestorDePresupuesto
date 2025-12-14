@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
+	domainInvestment "github.com/osmait/gestorDePresupuesto/internal/domain/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
-	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 )
@@ -27,12 +27,17 @@ func (m *MockInvestmentRepository) Save(ctx context.Context, investment *investm
 
 func (m *MockInvestmentRepository) FindAll(ctx context.Context, userId string) ([]*investment.Investment, error) {
 	args := m.Called(ctx, userId)
-	return args.Get(0).([]*investment.Investment), args.Error(1)
+	return args.Get(0).([]*domainInvestment.Investment), args.Error(1)
 }
 
-func (m *MockInvestmentRepository) FindOne(ctx context.Context, id string) (*investment.Investment, error) {
+func (m *MockInvestmentRepository) FindByID(ctx context.Context, id string) (*domainInvestment.Investment, error) {
 	args := m.Called(ctx, id)
-	return args.Get(0).(*investment.Investment), args.Error(1)
+	return args.Get(0).(*domainInvestment.Investment), args.Error(1)
+}
+
+func (m *MockInvestmentRepository) Update(ctx context.Context, investment *domainInvestment.Investment) error {
+	args := m.Called(ctx, investment)
+	return args.Error(0)
 }
 
 func (m *MockInvestmentRepository) Delete(ctx context.Context, id string) error {
@@ -42,14 +47,22 @@ func (m *MockInvestmentRepository) Delete(ctx context.Context, id string) error 
 
 func TestCreateInvestment(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
+	investmentService := NewInvestmentService(mockRepo)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
 
-	mockRepo.On("Save", ctx, investment).Return(nil)
+	mockRepo.On("Save", ctx, mock.MatchedBy(func(inv *domainInvestment.Investment) bool {
+		return inv.ID == investment.ID &&
+			inv.UserID == investment.UserID &&
+			inv.Name == investment.Name &&
+			inv.Symbol == investment.Symbol &&
+			inv.Quantity == investment.Quantity &&
+			inv.PurchasePrice == investment.PurchasePrice &&
+			inv.CurrentPrice == investment.CurrentPrice
+	})).Return(nil)
 
-	err := investmentService.CreateInvestment(ctx, investment)
+	err := investmentService.Create(ctx, investment.ID, investment.UserID, "stock", investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice)
 
 	assert.NoError(t, err, "CreateInvestment should not return an error")
 	mockRepo.AssertExpectations(t)
@@ -57,14 +70,16 @@ func TestCreateInvestment(t *testing.T) {
 
 func TestCreateInvestment_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
+	investmentService := NewInvestmentService(mockRepo)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
 
-	mockRepo.On("Save", ctx, investment).Return(ErrRepositoryFailure)
+	mockRepo.On("Save", ctx, mock.MatchedBy(func(inv *domainInvestment.Investment) bool {
+		return inv.ID == investment.ID
+	})).Return(ErrRepositoryFailure)
 
-	err := investmentService.CreateInvestment(ctx, investment)
+	err := investmentService.Create(ctx, investment.ID, investment.UserID, "stock", investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice)
 
 	assert.Error(t, err, "CreateInvestment should return an error when repository fails")
 	assert.Equal(t, ErrRepositoryFailure, err)
@@ -73,14 +88,14 @@ func TestCreateInvestment_RepositoryError(t *testing.T) {
 
 func TestFindAllInvestments(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
+	investmentService := NewInvestmentService(mockRepo)
 
 	ctx := context.Background()
 	userId := "test-user-id"
 	expectedInvestments := []*investment.Investment{}
 	for i := 0; i < 5; i++ {
 		investment := utils.GetNewRandomInvestment()
-		investment.UserId = userId
+		investment.UserID = userId
 		expectedInvestments = append(expectedInvestments, investment)
 	}
 
@@ -96,7 +111,7 @@ func TestFindAllInvestments(t *testing.T) {
 
 func TestFindAllInvestments_EmptyResult(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
+	investmentService := NewInvestmentService(mockRepo)
 
 	ctx := context.Background()
 	userId := "test-user-id"
@@ -113,7 +128,7 @@ func TestFindAllInvestments_EmptyResult(t *testing.T) {
 
 func TestFindAllInvestments_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
+	investmentService := NewInvestmentService(mockRepo)
 
 	ctx := context.Background()
 	userId := "test-user-id"
@@ -130,67 +145,31 @@ func TestFindAllInvestments_RepositoryError(t *testing.T) {
 
 func TestDeleteInvestment(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
+	investmentService := NewInvestmentService(mockRepo)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
 
-	mockRepo.On("FindOne", ctx, investment.Id).Return(investment, nil)
-	mockRepo.On("Delete", ctx, investment.Id).Return(nil)
+	mockRepo.On("Delete", ctx, investment.ID).Return(nil)
 
-	err := investmentService.Delete(ctx, investment.Id)
+	err := investmentService.Delete(ctx, investment.ID)
 
 	assert.NoError(t, err, "Delete should not return an error")
 	mockRepo.AssertExpectations(t)
 }
 
-func TestDeleteInvestment_NotFound(t *testing.T) {
+func TestDeleteInvestment_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
-
-	ctx := context.Background()
-	investmentId := "non-existent-id"
-	investment := utils.GetNewRandomInvestment()
-	investment.Id = "different-id" // Simulate not found scenario
-
-	mockRepo.On("FindOne", ctx, investmentId).Return(investment, nil)
-
-	err := investmentService.Delete(ctx, investmentId)
-
-	assert.Error(t, err, "Delete should return an error when investment not found")
-	assert.Equal(t, errorhttp.ErrNotFound, err)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestDeleteInvestment_FindOneError(t *testing.T) {
-	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
+	investmentService := NewInvestmentService(mockRepo)
 
 	ctx := context.Background()
 	investmentId := "test-id"
 
-	mockRepo.On("FindOne", ctx, investmentId).Return((*investment.Investment)(nil), ErrRepositoryFailure)
+	mockRepo.On("Delete", ctx, investmentId).Return(ErrRepositoryFailure)
 
 	err := investmentService.Delete(ctx, investmentId)
 
-	assert.Error(t, err, "Delete should return an error when FindOne fails")
-	assert.Equal(t, ErrRepositoryFailure, err)
-	mockRepo.AssertExpectations(t)
-}
-
-func TestDeleteInvestment_DeleteError(t *testing.T) {
-	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentServices(mockRepo)
-
-	ctx := context.Background()
-	investment := utils.GetNewRandomInvestment()
-
-	mockRepo.On("FindOne", ctx, investment.Id).Return(investment, nil)
-	mockRepo.On("Delete", ctx, investment.Id).Return(ErrRepositoryFailure)
-
-	err := investmentService.Delete(ctx, investment.Id)
-
-	assert.Error(t, err, "Delete should return an error when repository delete fails")
+	assert.Error(t, err, "Delete should return an error when repository fails")
 	assert.Equal(t, ErrRepositoryFailure, err)
 	mockRepo.AssertExpectations(t)
 }

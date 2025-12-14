@@ -89,17 +89,17 @@ func TestGetNewRandomInvestment(t *testing.T) {
 	investment := GetNewRandomInvestment()
 
 	assert.NotNil(t, investment, "Investment should not be nil")
-	assert.NotEmpty(t, investment.Id, "Investment ID should not be empty")
+	assert.NotEmpty(t, investment.ID, "Investment ID should not be empty")
 	assert.NotEmpty(t, investment.Name, "Investment name should not be empty")
-	assert.NotEmpty(t, investment.UserId, "Investment user ID should not be empty")
-	assert.Greater(t, investment.Price, 0.0, "Investment price should be positive")
+	assert.NotEmpty(t, investment.UserID, "Investment user ID should not be empty")
+	assert.Greater(t, investment.PurchasePrice, 0.0, "Investment price should be positive")
 	assert.Greater(t, investment.CurrentPrice, 0.0, "Investment current price should be positive")
 	assert.Greater(t, investment.Quantity, 0.0, "Investment quantity should be positive")
 
 	// Test that multiple calls generate different investments
 	investment2 := GetNewRandomInvestment()
-	assert.NotEqual(t, investment.Id, investment2.Id, "Different calls should generate different IDs")
-	assert.NotEqual(t, investment.UserId, investment2.UserId, "Different calls should generate different user IDs")
+	assert.NotEqual(t, investment.ID, investment2.ID, "Different calls should generate different IDs")
+	assert.NotEqual(t, investment.UserID, investment2.UserID, "Different calls should generate different user IDs")
 }
 
 func TestRandomDataConsistency(t *testing.T) {
@@ -133,7 +133,7 @@ func TestRandomDataConsistency(t *testing.T) {
 		assert.NotEmpty(t, transaction.Id, "Transaction ID should always be non-empty")
 		assert.NotEmpty(t, category.Id, "Category ID should always be non-empty")
 		assert.NotEmpty(t, budget.Id, "Budget ID should always be non-empty")
-		assert.NotEmpty(t, investment.Id, "Investment ID should always be non-empty")
+		assert.NotEmpty(t, investment.ID, "Investment ID should always be non-empty")
 	}
 }
 

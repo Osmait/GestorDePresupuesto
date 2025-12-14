@@ -2,12 +2,17 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
-	handler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/investment"
-	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	investmentHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/investment"
+	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
 )
 
-func InvestmentRoutes(s *gin.Engine, investmentServices *investment.InvestmentServices) {
-	s.POST("/investment", handler.CreateInvestment(investmentServices))
-	s.GET("/investment", handler.FindAllInvestment(investmentServices))
-	s.DELETE("/investment/:id", handler.DeleteInvestment(investmentServices))
+func InvestmentRoutes(r *gin.Engine, service *investmentService.InvestmentService) {
+	handler := investmentHandler.NewInvestmentHandler(service)
+	routes := r.Group("/investments")
+	{
+		routes.POST("", handler.Create)
+		routes.GET("", handler.FindAll)
+		routes.PUT("", handler.Update)
+		routes.DELETE("/:id", handler.Delete)
+	}
 }

@@ -103,6 +103,7 @@ func Run() error {
 		services.analyticsService,
 		services.recurringService,
 		services.searchService,
+		services.investmentService,
 		db,
 		cfg,
 	)
@@ -229,7 +230,7 @@ type services struct {
 	authService        *auth.AuthService
 	budgetService      *budget.BudgetServices
 	categoryService    *category.CategoryServices
-	investmentService  *investment.InvestmentServices
+	investmentService  *investment.InvestmentService
 	analyticsService   *analytics.AnalyticsService
 	recurringService   *recurring_transaction.RecurringTransactionService
 	searchService      *search.SearchService
@@ -244,7 +245,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		authService:        auth.NewAuthService(repos.userRepository, cfg),
 		budgetService:      budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
 		categoryService:    category.NewCategoryServices(repos.categoryRepository),
-		investmentService:  investment.NewInvestmentServices(repos.investmentRepository),
+		investmentService:  investment.NewInvestmentService(repos.investmentRepository),
 		analyticsService:   analytics.NewAnalyticsService(repos.analyticsRepository),
 		recurringService:   recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository)),
 		searchService:      search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),

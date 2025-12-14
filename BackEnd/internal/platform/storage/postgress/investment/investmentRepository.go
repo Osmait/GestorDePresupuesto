@@ -1,11 +1,12 @@
 package postgress
 
 import (
+	"context"
 	"database/sql"
+	"fmt"
+	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
-	"github.com/rs/zerolog/log"
-	"golang.org/x/net/context"
 )
 
 type InvestmentRepository struct {
@@ -13,69 +14,66 @@ type InvestmentRepository struct {
 }
 
 func NewInvestmentRepository(db *sql.DB) *InvestmentRepository {
-	return &InvestmentRepository{
-		db: db,
-	}
+	return &InvestmentRepository{db: db}
 }
 
-func (i *InvestmentRepository) Save(ctx context.Context, investment *investment.Investment) error {
-	_, err := i.db.ExecContext(ctx, "INSERT INTO investments (id, name, price, current_price, quantity, user_id) VALUES ($1,$2,$3,$4,$5,$6)",
-		investment.Id, investment.Name, investment.Price, investment.CurrentPrice, investment.Quantity, investment.UserId)
-	return err
-}
-
-func (i *InvestmentRepository) FindAll(ctx context.Context, userId string) ([]*investment.Investment, error) {
-	rows, err := i.db.QueryContext(ctx, "SELECT id, name, price, current_price, quantity, user_id, created_at FROM investments WHERE user_id = $1 ", userId)
+func (r *InvestmentRepository) Save(ctx context.Context, investment *investment.Investment) error {
+	query := `INSERT INTO investments (id, user_id, investment_type, name, symbol, quantity, purchase_price, current_price, created_at, updated_at) 
+              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+	_, err := r.db.ExecContext(ctx, query, investment.ID, investment.UserID, investment.Type, investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice, investment.CreatedAt, investment.UpdatedAt)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("error saving investment: %w", err)
 	}
+	return nil
+}
 
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close database rows")
-		}
-	}()
+func (r *InvestmentRepository) FindAll(ctx context.Context, userId string) ([]*investment.Investment, error) {
+	query := `SELECT id, user_id, investment_type, name, symbol, quantity, purchase_price, current_price, created_at, updated_at FROM investments WHERE user_id = $1`
+	rows, err := r.db.QueryContext(ctx, query, userId)
+	if err != nil {
+		return nil, fmt.Errorf("error finding investments: %w", err)
+	}
+	defer rows.Close()
 
 	var investments []*investment.Investment
 	for rows.Next() {
-		var investment investment.Investment
-		if err = rows.Scan(&investment.Id, &investment.Name, &investment.Price, &investment.CurrentPrice, &investment.Quantity, &investment.UserId, &investment.CreatedAt); err == nil {
-			investments = append(investments, &investment)
+		var i investment.Investment
+		if err := rows.Scan(&i.ID, &i.UserID, &i.Type, &i.Name, &i.Symbol, &i.Quantity, &i.PurchasePrice, &i.CurrentPrice, &i.CreatedAt, &i.UpdatedAt); err != nil {
+			return nil, fmt.Errorf("error scanning investment: %w", err)
 		}
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
+		investments = append(investments, &i)
 	}
 	return investments, nil
 }
 
-func (i *InvestmentRepository) FindOne(ctx context.Context, id string) (*investment.Investment, error) {
-	rows, err := i.db.QueryContext(ctx, "SELECT id, name, price, current_price, quantity, user_id, created_at FROM investments WHERE id = $1 ", id)
-	if err != nil {
-		return nil, err
-	}
+func (r *InvestmentRepository) FindByID(ctx context.Context, id string) (*investment.Investment, error) {
+	query := `SELECT id, user_id, investment_type, name, symbol, quantity, purchase_price, current_price, created_at, updated_at FROM investments WHERE id = $1`
+	row := r.db.QueryRowContext(ctx, query, id)
 
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close database rows")
+	var i investment.Investment
+	if err := row.Scan(&i.ID, &i.UserID, &i.Type, &i.Name, &i.Symbol, &i.Quantity, &i.PurchasePrice, &i.CurrentPrice, &i.CreatedAt, &i.UpdatedAt); err != nil {
+		if err == sql.ErrNoRows {
+			return nil, nil // Or custom error
 		}
-	}()
-
-	var investment investment.Investment
-	for rows.Next() {
-		if err = rows.Scan(&investment.Id, &investment.Name, &investment.Price, &investment.CurrentPrice, &investment.Quantity, &investment.UserId, &investment.CreatedAt); err != nil {
-			return nil, err
-		}
+		return nil, fmt.Errorf("error finding investment by id: %w", err)
 	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return &investment, nil
+	return &i, nil
 }
 
-func (i *InvestmentRepository) Delete(ctx context.Context, id string) error {
-	_, err := i.db.ExecContext(ctx, "DELETE FROM investments WHERE id = $1", id)
-	return err
+func (r *InvestmentRepository) Update(ctx context.Context, investment *investment.Investment) error {
+	query := `UPDATE investments SET investment_type = $1, name = $2, symbol = $3, quantity = $4, purchase_price = $5, current_price = $6, updated_at = $7 WHERE id = $8`
+	_, err := r.db.ExecContext(ctx, query, investment.Type, investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice, time.Now(), investment.ID)
+	if err != nil {
+		return fmt.Errorf("error updating investment: %w", err)
+	}
+	return nil
+}
+
+func (r *InvestmentRepository) Delete(ctx context.Context, id string) error {
+	query := `DELETE FROM investments WHERE id = $1`
+	_, err := r.db.ExecContext(ctx, query, id)
+	if err != nil {
+		return fmt.Errorf("error deleting investment: %w", err)
+	}
+	return nil
 }

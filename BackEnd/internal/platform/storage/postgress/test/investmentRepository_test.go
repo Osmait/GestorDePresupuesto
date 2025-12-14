@@ -26,34 +26,34 @@ func TestInvestmentRepository(t *testing.T) {
 
 	// Create test investment
 	investment := utils.GetNewRandomInvestment()
-	investment.UserId = user.Id
+	investment.UserID = user.Id
 
 	// Test Save
 	err = investmentRepository.Save(ctx, investment)
 	assert.NoError(t, err)
 
-	// Test FindOne
-	foundInvestment, err := investmentRepository.FindOne(ctx, investment.Id)
+	// Test FindByID
+	foundInvestment, err := investmentRepository.FindByID(ctx, investment.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, investment.Id, foundInvestment.Id)
+	assert.Equal(t, investment.ID, foundInvestment.ID)
 	assert.Equal(t, investment.Name, foundInvestment.Name)
-	assert.Equal(t, investment.Price, foundInvestment.Price)
+	assert.Equal(t, investment.PurchasePrice, foundInvestment.PurchasePrice) // Price -> PurchasePrice
 	assert.Equal(t, investment.CurrentPrice, foundInvestment.CurrentPrice)
 	assert.Equal(t, investment.Quantity, foundInvestment.Quantity)
 
 	// Test FindAll - Now using correct user_id after fixing the bug
-	investments, err := investmentRepository.FindAll(ctx, investment.UserId)
+	investments, err := investmentRepository.FindAll(ctx, investment.UserID)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, investments)
 
 	// Test Delete
-	err = investmentRepository.Delete(ctx, investment.Id)
+	err = investmentRepository.Delete(ctx, investment.ID)
 	assert.NoError(t, err)
 
 	// Verify deletion
-	deletedInvestment, err := investmentRepository.FindOne(ctx, investment.Id)
+	foundInvestment, err = investmentRepository.FindByID(ctx, investment.ID)
 	assert.NoError(t, err)
-	assert.Equal(t, "", deletedInvestment.Id) // Should be empty after deletion
+	assert.Nil(t, foundInvestment) // Should be nil after deletion
 
 	// Cleanup
 	err = userRepository.Delete(ctx, user.Id)
@@ -65,10 +65,10 @@ func TestInvestmentRepository_FindOne_NotFound(t *testing.T) {
 	ctx := context.Background()
 	investmentRepository := investmentRepo.NewInvestmentRepository(db)
 
-	// Test FindOne with non-existent ID
-	investment, err := investmentRepository.FindOne(ctx, "non-existent-id")
-	assert.NoError(t, err)             // Current implementation doesn't return error for not found
-	assert.Equal(t, "", investment.Id) // Should be empty when not found
+	// Test FindByID with non-existent ID
+	investment, err := investmentRepository.FindByID(ctx, "non-existent-id")
+	assert.NoError(t, err)
+	assert.Nil(t, investment) // Should be nil when not found
 }
 
 func TestInvestmentRepository_FindAll_EmptyResult(t *testing.T) {
@@ -99,7 +99,7 @@ func TestInvestmentRepository_Multiple_Investments(t *testing.T) {
 	var createdInvestments []*investment.Investment
 	for i := 0; i < 3; i++ {
 		investment := utils.GetNewRandomInvestment()
-		investment.UserId = user.Id
+		investment.UserID = user.Id
 		err = investmentRepository.Save(ctx, investment)
 		assert.NoError(t, err)
 		createdInvestments = append(createdInvestments, investment)
@@ -107,15 +107,15 @@ func TestInvestmentRepository_Multiple_Investments(t *testing.T) {
 
 	// Test that we can find each investment individually
 	for _, investment := range createdInvestments {
-		foundInvestment, err := investmentRepository.FindOne(ctx, investment.Id)
+		foundInvestment, err := investmentRepository.FindByID(ctx, investment.ID)
 		assert.NoError(t, err)
-		assert.Equal(t, investment.Id, foundInvestment.Id)
+		assert.Equal(t, investment.ID, foundInvestment.ID)
 		assert.Equal(t, investment.Name, foundInvestment.Name)
 	}
 
 	// Cleanup
 	for _, investment := range createdInvestments {
-		err = investmentRepository.Delete(ctx, investment.Id)
+		err = investmentRepository.Delete(ctx, investment.ID)
 		assert.NoError(t, err)
 	}
 

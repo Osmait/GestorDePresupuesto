@@ -33,12 +33,12 @@ export abstract class BaseRepository {
   }
 
   protected async authenticatedFetch(
-    endpoint: string, 
+    endpoint: string,
     options: RequestInit = {}
   ): Promise<Response> {
     const headers = await this.getAuthHeaders();
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -48,7 +48,16 @@ export abstract class BaseRepository {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status} - ${response.statusText}`);
+      let errorMessage = `HTTP error! status: ${response.status} - ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        if (errorData.error) {
+          errorMessage = errorData.error;
+        }
+      } catch (e) {
+        // ignore json parse error
+      }
+      throw new Error(errorMessage);
     }
 
     return response;
@@ -64,7 +73,7 @@ export abstract class BaseRepository {
       method: "POST",
       body: data ? JSON.stringify(data) : undefined,
     });
-    
+
     if (response.headers.get("content-type")?.includes("application/json")) {
       return response.json();
     }
@@ -75,7 +84,7 @@ export abstract class BaseRepository {
       method: "PUT",
       body: data ? JSON.stringify(data) : undefined,
     });
-    
+
     if (response.headers.get("content-type")?.includes("application/json")) {
       return response.json();
     }
