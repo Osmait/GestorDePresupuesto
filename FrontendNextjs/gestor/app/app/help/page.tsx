@@ -1,7 +1,7 @@
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/common/ui/card'
-import { Button } from '@/components/common/ui/button'
-import { Badge } from '@/components/common/ui/badge'
-import { Input } from '@/components/common/ui/input'
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Input } from '@/components/ui/input'
 import {
 	HelpCircle,
 	Search,

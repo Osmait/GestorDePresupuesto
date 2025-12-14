@@ -292,7 +292,7 @@ export function BudgetList() {
     const { data: transactions = [] } = useGetAllTransactions()
 
     function getBudgetTransactions(budgetId: string) {
-        return transactions?.filter((t: Transaction) => t.budget_id === budgetId) || []
+        return transactions?.filter((t: Transaction) => t.budget_id === budgetId && t.type_transation === 'bill') || []
     }
 
     const handleEdit = (budget: Budget) => {
