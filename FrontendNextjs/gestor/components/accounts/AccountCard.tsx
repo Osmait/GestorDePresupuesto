@@ -3,7 +3,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -21,6 +21,8 @@ import { Building, ArrowUpRight, ArrowDownRight, MoreHorizontal, Trash2, Edit } 
 import { Account } from '@/types/account';
 import { useState } from 'react';
 
+import { useRouter } from 'next/navigation';
+
 interface AccountCardProps {
   account: Account;
   onAccountDeleted?: () => void;
@@ -28,9 +30,10 @@ interface AccountCardProps {
 }
 
 export function AccountCard({ account, onAccountDeleted, onAccountEdit }: AccountCardProps) {
+  const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   const currentBalance = account.current_balance ?? account.initial_balance ?? 0;
   const initialBalance = account.initial_balance ?? 0;
   const isPositive = currentBalance > 0;
@@ -38,7 +41,7 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
 
   const handleDeleteAccount = async () => {
     if (!account.id || !onAccountDeleted) return;
-    
+
     setIsDeleting(true);
     try {
       await onAccountDeleted();
@@ -50,8 +53,19 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
     }
   };
 
+  const handleCardClick = (e: React.MouseEvent) => {
+    // Prevent navigation if clicking on dropdown or interactive elements
+    if ((e.target as HTMLElement).closest('[role="menuitem"], button')) {
+      return
+    }
+    router.push(`/app/accounts/${account.id}`)
+  }
+
   return (
-    <Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
+    <Card
+      className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20 cursor-pointer"
+      onClick={handleCardClick}
+    >
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center space-x-4">
@@ -75,14 +89,14 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="flex items-center gap-2 cursor-pointer"
                 onClick={() => onAccountEdit?.(account)}
               >
                 <Edit className="h-4 w-4" />
                 Editar cuenta
               </DropdownMenuItem>
-              <DropdownMenuItem 
+              <DropdownMenuItem
                 className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
                 onClick={() => setShowDeleteDialog(true)}
               >
@@ -128,20 +142,20 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
           <DialogHeader>
             <DialogTitle>Eliminar Cuenta</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que quieres eliminar la cuenta "{account.name}"? 
+              ¿Estás seguro de que quieres eliminar la cuenta "{account.name}"?
               Esta acción no se puede deshacer y eliminará todos los datos asociados.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowDeleteDialog(false)}
               disabled={isDeleting}
             >
               Cancelar
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDeleteAccount}
               disabled={isDeleting}
             >

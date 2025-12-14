@@ -38,7 +38,7 @@ interface TransactionContextType {
     setModalOpen: (open: boolean) => void
 }
 
-const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
+export const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
 
 export function TransactionProvider({ children }: { children: ReactNode }) {
     const searchParams = useSearchParams()

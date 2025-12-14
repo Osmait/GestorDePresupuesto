@@ -18,17 +18,20 @@ import {
 import { Calendar, ArrowUpRight, ArrowDownRight, MoreHorizontal, Trash2, Edit } from 'lucide-react';
 import { Transaction, TypeTransaction } from '@/types/transaction';
 import { Category } from '@/types/category';
-import { useState } from 'react';
-import { useTransactionContext } from './TransactionContext';
+import { useContext, useState } from 'react';
+import { TransactionContext } from './TransactionContext';
 
 interface TransactionItemProps {
   transaction: Transaction;
   category?: Category;
   onTransactionDeleted?: () => void;
+  onEdit?: (transaction: Transaction) => void;
 }
 
-export default function TransactionItem({ transaction, category, onTransactionDeleted }: TransactionItemProps) {
-  const { setEditingTransaction, setModalOpen } = useTransactionContext()
+export default function TransactionItem({ transaction, category, onTransactionDeleted, onEdit }: TransactionItemProps) {
+  const context = useContext(TransactionContext);
+  const setEditingTransaction = context?.setEditingTransaction;
+  const setModalOpen = context?.setModalOpen;
   // ... rest of the code ...
   // Inside the dropdown menu or button actions:
   // <DropdownMenuItem onClick={() => setEditingTransaction(transaction)}>
@@ -102,13 +105,19 @@ export default function TransactionItem({ transaction, category, onTransactionDe
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => {
-                  setEditingTransaction(transaction)
-                  setModalOpen(true)
-                }}>
-                  <Edit className="h-4 w-4" />
-                  Editar transacción
-                </DropdownMenuItem>
+                {(setEditingTransaction && setModalOpen) || onEdit ? (
+                  <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => {
+                    if (onEdit) {
+                      onEdit(transaction);
+                    } else if (setEditingTransaction && setModalOpen) {
+                      setEditingTransaction(transaction)
+                      setModalOpen(true)
+                    }
+                  }}>
+                    <Edit className="h-4 w-4" />
+                    Editar transacción
+                  </DropdownMenuItem>
+                ) : null}
                 <DropdownMenuItem
                   className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
                   onClick={() => setShowDeleteDialog(true)}

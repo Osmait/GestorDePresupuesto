@@ -5,6 +5,7 @@ import { Account } from '@/types/account'
 export const ACCOUNT_KEYS = {
     all: ['accounts'] as const,
     lists: () => [...ACCOUNT_KEYS.all, 'list'] as const,
+    detail: (id: string) => [...ACCOUNT_KEYS.all, 'detail', id] as const,
 }
 
 // Read Hook
@@ -17,6 +18,17 @@ export function useGetAccounts() {
             // Ensure Newest First (Assuming standard insert order, reverse puts newest top)
             return Array.isArray(data) ? [...data].reverse() : []
         },
+    })
+}
+
+export function useGetAccount(id: string) {
+    return useQuery({
+        queryKey: ACCOUNT_KEYS.detail(id),
+        queryFn: async () => {
+            const repo = await getAccountRepository()
+            return repo.findById(id)
+        },
+        enabled: !!id,
     })
 }
 

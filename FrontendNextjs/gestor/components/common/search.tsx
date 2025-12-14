@@ -109,7 +109,7 @@ export function Search() {
                       <div
                         key={acc.id}
                         className="flex items-center px-2 py-1.5 text-sm rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                        onClick={() => handleSelect('/app/accounts')}
+                        onClick={() => handleSelect(`/app/accounts/${acc.id}`)}
                       >
                         <span>{acc.name}</span>
                         <Badge variant="outline" className="ml-auto text-[10px] h-5">{acc.bank}</Badge>

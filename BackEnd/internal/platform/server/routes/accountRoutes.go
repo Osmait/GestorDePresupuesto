@@ -10,5 +10,6 @@ func AccountRotes(s *gin.Engine, acountService *account.AccountService) {
 	s.POST("/account", handler.CreateAccount(acountService))
 	s.GET("/account", handler.FindAllAccount(acountService))
 	s.DELETE("/account/:id", handler.DeleteAccount(acountService))
+	s.GET("/account/:id", handler.FindAccount(acountService))
 	s.PUT("/account/:id", handler.UpdateAccount(acountService))
 }

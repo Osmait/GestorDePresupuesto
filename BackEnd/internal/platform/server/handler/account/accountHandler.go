@@ -132,3 +132,28 @@ func UpdateAccount(accountService *account.AccountService) gin.HandlerFunc {
 		ctx.JSON(http.StatusOK, gin.H{"message": "Account updated successfully"})
 	}
 }
+
+// FindAccount godoc
+//
+//	@Summary		Get account details
+//	@Description	Get specific account details by ID
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			id	path		string		true	"Account ID"
+//	@Success		200	{object}	dto.AccountResponse
+//	@Failure		404	{object}	map[string]string	"Account not found"
+//	@Router			/account/{id} [get]
+func FindAccount(accountService *account.AccountService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		id := ctx.Param("id")
+		userId := ctx.GetString("X-User-Id")
+		account, err := accountService.FindById(ctx, id, userId)
+		if err != nil {
+			ctx.Error(err)
+			return
+		}
+		ctx.JSON(http.StatusOK, account)
+	}
+}

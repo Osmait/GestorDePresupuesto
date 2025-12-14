@@ -96,3 +96,20 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id string, updateReq
 
 	return nil
 }
+
+func (s *AccountService) FindById(ctx context.Context, id, userId string) (*dto.AccountResponse, error) {
+	acc, err := s.accountRepository.FindByIdAndUserId(ctx, id, userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errorhttp.ErrNotFound
+		}
+		return nil, err
+	}
+
+	balance, err := s.accountRepository.Balance(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+
+	return dto.NewAccountResponse(acc, balance+acc.InitialBalance), nil
+}
