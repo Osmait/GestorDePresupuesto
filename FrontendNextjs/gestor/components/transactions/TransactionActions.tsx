@@ -28,7 +28,7 @@ export function TransactionActions() {
     return (
         <div className="flex items-center gap-3">
             <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
-                <Filter className="h-4 w-4 mr-2" />
+                <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
                 Filtrar
             </Button>
             <Button
@@ -38,7 +38,7 @@ export function TransactionActions() {
                     setModalOpen(true)
                 }}
             >
-                <PlusCircle className="h-4 w-4 mr-2" />
+                <PlusCircle className="h-4 w-4 mr-2" aria-hidden="true" />
                 Nueva Transacción
             </Button>
 

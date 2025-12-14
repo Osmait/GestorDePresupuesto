@@ -33,17 +33,18 @@ export default function TransactionsList() {
     const shownTransactions = Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []
 
     const renderTransactionList = (transactionList: Transaction[]) => (
-        <div className="space-y-4">
+        <ul className="space-y-4">
             <AnimatePresence mode="popLayout" initial={false}>
                 {transactionList.map((transaction) => {
                     const category = categories.find(c => c.id === transaction.category_id)
                     return (
-                        <motion.div
+                        <motion.li
                             key={transaction.id}
                             initial={{ opacity: 0, height: 0, x: -20 }}
                             animate={{ opacity: 1, height: 'auto', x: 0 }}
                             exit={{ opacity: 0, height: 0, x: 20 }}
                             transition={{ duration: 0.5, ease: "easeOut" }}
+                            className="list-none"
                         >
                             <TransactionItem
                                 transaction={transaction}
@@ -54,11 +55,11 @@ export default function TransactionsList() {
                                     reloadCurrentView()
                                 }}
                             />
-                        </motion.div>
+                        </motion.li>
                     )
                 })}
             </AnimatePresence>
-        </div>
+        </ul>
     )
 
     const tabsConfig = [

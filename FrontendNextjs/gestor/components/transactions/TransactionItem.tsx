@@ -61,9 +61,9 @@ export default function TransactionItem({ transaction, category, onTransactionDe
           <div className="flex items-center space-x-4">
             <div className={`p-3 rounded-full ${isIncome ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
               {isIncome ? (
-                <ArrowUpRight className="h-5 w-5 text-green-600 dark:text-green-400" />
+                <ArrowUpRight className="h-5 w-5 text-green-600 dark:text-green-400" aria-hidden="true" />
               ) : (
-                <ArrowDownRight className="h-5 w-5 text-red-600 dark:text-red-400" />
+                <ArrowDownRight className="h-5 w-5 text-red-600 dark:text-red-400" aria-hidden="true" />
               )}
             </div>
             <div className="flex-1">
@@ -71,13 +71,13 @@ export default function TransactionItem({ transaction, category, onTransactionDe
                 <p className="font-semibold text-foreground">{transaction.name}</p>
                 {category && (
                   <Badge variant="outline" className={`text-xs`} style={{ backgroundColor: category.color }} >
-                    {category.icon} {category.name}
+                    <span aria-hidden="true">{category.icon}</span> {category.name}
                   </Badge>
                 )}
               </div>
               <p className="text-sm text-muted-foreground mb-1">{transaction.description}</p>
               <p className="text-sm text-muted-foreground flex items-center gap-1">
-                <Calendar className="h-3 w-3" />
+                <Calendar className="h-3 w-3" aria-hidden="true" />
                 {new Date(transaction.created_at).toLocaleDateString('es-ES', {
                   day: 'numeric',
                   month: 'long',
@@ -91,14 +91,14 @@ export default function TransactionItem({ transaction, category, onTransactionDe
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className={`font-bold text-xl ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {isIncome ? '+' : '-'}${Math.abs(transaction.amount).toLocaleString()}
+                <span aria-hidden="true">{isIncome ? '+' : '-'}</span>${Math.abs(transaction.amount).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">USD</p>
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                  <MoreHorizontal className="h-4 w-4" />
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Opciones de transacción">
+                  <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
