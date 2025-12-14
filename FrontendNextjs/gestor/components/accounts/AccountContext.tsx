@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, ReactNode } from 'react'
-import { useAccounts } from '@/hooks/useRepositories'
+import { useGetAccounts, useCreateAccountMutation, useUpdateAccountMutation, useDeleteAccountMutation } from '@/hooks/queries/useAccountsQuery'
 import { Account } from '@/types/account'
 
 interface AccountContextType {
@@ -18,16 +18,29 @@ interface AccountContextType {
 const AccountContext = createContext<AccountContextType | undefined>(undefined)
 
 export function AccountProvider({ children }: { children: ReactNode }) {
-    const {
-        accounts,
-        isLoading,
-        error,
-        createAccount,
-        updateAccount,
-        deleteAccount,
-        addAccount,
-        refetch
-    } = useAccounts()
+    // React Query Hooks
+    const { data: accounts = [], isLoading, error: queryError, refetch } = useGetAccounts()
+    const createMutation = useCreateAccountMutation()
+    const updateMutation = useUpdateAccountMutation()
+    const deleteMutation = useDeleteAccountMutation()
+
+    const error = queryError ? (queryError as Error).message : null
+
+    const createAccount = async (name: string, bank: string, initial_balance: number) => {
+        await createMutation.mutateAsync({ name, bank, initial_balance })
+    }
+
+    const updateAccount = async (id: string, name: string, bank: string) => {
+        await updateMutation.mutateAsync({ id, name, bank })
+    }
+
+    const deleteAccount = async (id: string) => {
+        await deleteMutation.mutateAsync(id)
+    }
+
+    const addAccount = () => {
+        // No-op: Cache invalidation handles this
+    }
 
     return (
         <AccountContext.Provider value={{
@@ -38,7 +51,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
             updateAccount,
             deleteAccount,
             addAccount,
-            refetch
+            refetch: async () => { await refetch() }
         }}>
             {children}
         </AccountContext.Provider>

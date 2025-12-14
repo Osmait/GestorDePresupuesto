@@ -1,6 +1,7 @@
 'use client'
 
-import { useTransactions, useCategories, useAccounts } from '@/hooks/useRepositories'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { CreditCard, TrendingUp, TrendingDown } from 'lucide-react'
@@ -22,8 +23,8 @@ export default function TransactionsList() {
         reloadCurrentView
     } = useTransactionContext()
 
-    const { categories, isLoading: isLoadingCat } = useCategories()
-    const { isLoading: isLoadingAcc } = useAccounts()
+    const { data: categories = [], isLoading: isLoadingCat } = useGetCategories()
+    const { isLoading: isLoadingAcc } = useGetAccounts()
     const searchParams = useSearchParams()
 
     const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME)

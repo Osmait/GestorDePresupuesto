@@ -9,7 +9,9 @@ import { Input } from '@/components/ui/input'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import TransactionFormModal from '@/components/transactions/TransactionFormModal'
 import { useTransactionContext } from './TransactionContext'
-import { useAccounts, useCategories, useTransactions } from '@/hooks/useRepositories'
+import { useTransactions } from '@/hooks/useRepositories'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 
 export function TransactionActions() {
     const [drawerOpen, setDrawerOpen] = useState(false)
@@ -17,8 +19,8 @@ export function TransactionActions() {
     const formRef = useRef<{ reset: () => void } | null>(null)
 
     const { filters, setFilters, applyFilters, clearFilters, reloadCurrentView, createTransaction, addTransaction, isLoading, error } = useTransactionContext()
-    const { accounts } = useAccounts()
-    const { categories } = useCategories()
+    const { data: accounts = [] } = useGetAccounts()
+    const { data: categories = [] } = useGetCategories()
 
     const handleApplyFilters = () => {
         applyFilters()

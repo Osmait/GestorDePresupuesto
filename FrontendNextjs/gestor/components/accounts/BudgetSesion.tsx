@@ -9,7 +9,8 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useBudgets, useCategories } from "@/hooks/useRepositories";
+import { useBudgets } from "@/hooks/useRepositories";
+import { useGetCategories } from "@/hooks/queries/useCategoriesQuery";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
 
@@ -26,7 +27,7 @@ function getProgressColor(percentage: number): string {
 
 export function BudgetSesion() {
   const { budgets, isLoading: budgetsLoading, error: budgetsError } = useBudgets();
-  const { categories, isLoading: categoriesLoading, error: categoriesError } = useCategories();
+  const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useGetCategories();
 
   const isLoading = budgetsLoading || categoriesLoading;
   const hasError = budgetsError || categoriesError;
@@ -95,9 +96,9 @@ export function BudgetSesion() {
               <TableCell className="w-3/6">
                 <div className="space-y-1">
                   <div className="relative h-3 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700">
-                    <div 
+                    <div
                       className="h-full transition-all duration-500 rounded-full"
-                      style={{ 
+                      style={{
                         width: `${Math.max(percentage, percentage > 0 ? 5 : 0)}%`,
                         minWidth: percentage > 0 ? '8px' : '0px',
                         backgroundColor: progressColor

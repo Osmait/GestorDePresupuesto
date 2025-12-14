@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
-import { useCategories, useTransactions } from '@/hooks/useRepositories'
+import { motion, AnimatePresence } from 'framer-motion'
+import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
+import { useGetCategories, useDeleteCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
@@ -184,16 +185,18 @@ function CategorySummaryCard({ categories, transactions }: { categories: Categor
     )
 }
 
-import { useCategoryContext } from '@/components/categories/CategoryContext'
-import { AnimatePresence } from 'framer-motion'
-
-// ... existing imports ...
-
 export function CategoryList() {
-    const { categories, deleteCategory, isLoading: isLoadingCategories } = useCategoryContext()
-    const { transactions, isLoading: isLoadingTransactions } = useTransactions()
+    const { data: categories = [], isLoading: isLoadingCategories, error } = useGetCategories()
+    const { data: transactions = [], isLoading: isLoadingTransactions } = useGetAllTransactions()
+
+    const deleteCategoryMutation = useDeleteCategoryMutation()
 
     const isLoading = isLoadingCategories || isLoadingTransactions
+
+    const handleDeleteCategory = async (categoryId: string) => {
+        await deleteCategoryMutation.mutateAsync(categoryId)
+        // Optionally refetch categories or invalidate queries here if needed
+    }
 
     if (isLoading) {
         return <CategoriesSkeleton />
@@ -232,7 +235,7 @@ export function CategoryList() {
                                             <CategoryCard
                                                 category={category}
                                                 transactions={transactions}
-                                                onDelete={() => deleteCategory(category.id)}
+                                                onDelete={() => handleDeleteCategory(category.id!)}
                                             />
                                         </motion.div>
                                     ))}

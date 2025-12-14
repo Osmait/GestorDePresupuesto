@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, ReactNode } from 'react'
-import { useBudgets } from '@/hooks/useRepositories'
+import { useGetBudgets, useCreateBudgetMutation, useDeleteBudgetMutation } from '@/hooks/queries/useBudgetsQuery'
 import { Budget } from '@/types/budget'
 
 interface BudgetContextType {
@@ -16,14 +16,20 @@ interface BudgetContextType {
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined)
 
 export function BudgetProvider({ children }: { children: ReactNode }) {
-    const {
-        budgets,
-        isLoading,
-        error,
-        createBudget,
-        deleteBudget,
-        refetch
-    } = useBudgets()
+    // React Query Hooks
+    const { data: budgets = [], isLoading, error: queryError, refetch } = useGetBudgets()
+    const createMutation = useCreateBudgetMutation()
+    const deleteMutation = useDeleteBudgetMutation()
+
+    const error = queryError ? (queryError as Error).message : null
+
+    const createBudget = async (categoryId: string, amount: number) => {
+        await createMutation.mutateAsync({ categoryId, amount })
+    }
+
+    const deleteBudget = async (id: string) => {
+        await deleteMutation.mutateAsync(id)
+    }
 
     return (
         <BudgetContext.Provider value={{
@@ -32,7 +38,7 @@ export function BudgetProvider({ children }: { children: ReactNode }) {
             error,
             createBudget,
             deleteBudget,
-            refetch
+            refetch: async () => { await refetch() }
         }}>
             {children}
         </BudgetContext.Provider>

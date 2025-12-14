@@ -11,7 +11,10 @@ import { Loader2, PlusCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
 import { format } from 'date-fns';
-import { useAccounts, useCategories, useBudgets } from '@/hooks/useRepositories';
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery';
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery';
+import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery';
+import { useTransactionContext } from './TransactionContext';
 import { TypeTransaction } from '@/types/transaction';
 
 const transactionSchema = z.object({
@@ -44,9 +47,9 @@ type TransactionFormModalProps = {
 };
 
 export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error, formRef }: TransactionFormModalProps) {
-  const { accounts } = useAccounts();
-  const { categories } = useCategories();
-  const { budgets } = useBudgets();
+  const { data: accounts = [] } = useGetAccounts();
+  const { data: categories = [] } = useGetCategories();
+  const { data: budgets = [] } = useGetBudgets();
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {

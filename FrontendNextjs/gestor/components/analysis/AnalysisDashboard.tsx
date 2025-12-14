@@ -9,7 +9,10 @@ import { ResponsiveRadar } from '@nivo/radar'
 import { ResponsiveHeatMap } from '@nivo/heatmap'
 import { ResponsivePie } from '@nivo/pie'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAnalytics, useAccounts, useCategories, useTransactions } from '@/hooks/useRepositories'
+import { useAnalytics } from '@/hooks/useRepositories'
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { AnalyticsSkeleton } from '@/components/skeletons/analytics-skeleton'
 import { useAnalysisContext } from './AnalysisContext'
 
@@ -38,9 +41,9 @@ const mockHeat = [
 export function AnalysisDashboard() {
     const { theme } = useTheme()
     const { filters } = useAnalysisContext()
-    const { accounts, isLoading: accountsLoading } = useAccounts()
-    const { categories, isLoading: categoriesLoading } = useCategories()
-    const { transactions, isLoading: transactionsLoading } = useTransactions()
+    const { data: accounts = [], isLoading: accountsLoading } = useGetAccounts()
+    const { data: categories = [], isLoading: categoriesLoading } = useGetCategories()
+    const { data: transactions = [], isLoading: transactionsLoading } = useGetAllTransactions()
     const { categoryExpenses, monthlySummary, isLoadingCategoryExpenses, isLoadingMonthlySummary, loadCategoryExpenses, loadMonthlySummary } = useAnalytics()
 
     // Map filters

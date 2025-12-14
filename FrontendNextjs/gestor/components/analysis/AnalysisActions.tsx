@@ -5,7 +5,8 @@ import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
 import { useAnalysisContext } from './AnalysisContext'
 import { AnalysisFiltersForm } from './AnalysisFilters'
-import { useAccounts, useCategories } from '@/hooks/useRepositories'
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 
 const now = new Date()
 const defaultMonth = String(now.getMonth() + 1).padStart(2, '0')
@@ -14,8 +15,8 @@ const defaultYear = String(now.getFullYear())
 export function AnalysisActions() {
     const [drawerOpen, setDrawerOpen] = useState(false)
     const { filters, setFilters } = useAnalysisContext()
-    const { accounts } = useAccounts()
-    const { categories } = useCategories()
+    const { data: accounts = [] } = useGetAccounts()
+    const { data: categories = [] } = useGetCategories()
 
     return (
         <div className="flex items-center gap-3">

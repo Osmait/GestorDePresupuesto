@@ -18,7 +18,7 @@ import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Loader2, PlusCircle, AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
-import { useCategories } from '@/hooks/useRepositories'
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
 
 const budgetSchema = z.object({
@@ -34,7 +34,7 @@ interface BudgetFormModalProps {
 
 export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
     const { createBudget, isLoading, error } = useBudgetContext()
-    const { categories } = useCategories()
+    const { data: categories = [] } = useGetCategories()
 
     const form = useForm<BudgetFormValues>({
         resolver: zodResolver(budgetSchema),

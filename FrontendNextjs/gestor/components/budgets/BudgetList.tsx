@@ -1,7 +1,8 @@
 'use client'
 
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
-import { useCategories, useTransactions } from '@/hooks/useRepositories' // Need categories for mapping
+import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { BudgetsPageSkeleton } from './BudgetsPageSkeleton'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
@@ -267,12 +268,12 @@ function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], trans
 
 export function BudgetList() {
     const { budgets, isLoading, error, deleteBudget } = useBudgetContext()
-    const { categories } = useCategories()
-    const { transactions } = useTransactions()
+    const { data: categories = [] } = useGetCategories()
+    const { data: transactions = [] } = useGetAllTransactions()
     const [modalOpen, setModalOpen] = useState(false) // For empty state button
 
     function getBudgetTransactions(budgetId: string) {
-        return transactions?.filter(t => t.budget_id === budgetId) || []
+        return transactions?.filter((t: Transaction) => t.budget_id === budgetId) || []
     }
 
     if (isLoading) {

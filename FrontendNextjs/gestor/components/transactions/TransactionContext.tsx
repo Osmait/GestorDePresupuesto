@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { DateRange } from 'react-day-picker'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useTransactions } from '@/hooks/useRepositories'
+import { useGetTransactions, useCreateTransactionMutation, useDeleteTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { TransactionFilters } from '@/types/transaction'
 
 // Filter Type
@@ -61,18 +61,59 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     // Filter State
     const [filters, setFilters] = useState<TransactionFiltersState>(() => initializeFiltersFromURL())
 
-    // Transactions State (Global for this page)
-    const {
-        transactions,
-        pagination,
-        isLoading: isLoadingTx,
-        error: errorTx,
-        loadTransactions,
-        loadAllTransactions,
-        createTransaction,
-        deleteTransaction,
-        addTransaction
-    } = useTransactions()
+    // React Query Hooks
+    const [activeFilters, setActiveFilters] = useState<TransactionFilters>({})
+
+    // Map Context Filters -> API Filters
+    useEffect(() => {
+        const apiFilters: TransactionFilters = {
+            page: 1, limit: 50, sort_by: 'created_at', sort_order: 'desc'
+        }
+
+        if (filters.dateRange.from && filters.dateRange.to) {
+            apiFilters.date_from = filters.dateRange.from.toISOString().split('T')[0]
+            apiFilters.date_to = filters.dateRange.to.toISOString().split('T')[0]
+        }
+        if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
+        if (filters.account !== 'all') apiFilters.account_id = filters.account
+        if (filters.category !== 'all') apiFilters.category_id = filters.category
+        if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
+        if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
+        if (filters.search) apiFilters.search = filters.search
+
+        setActiveFilters(apiFilters)
+    }, [filters])
+
+    // Query Data
+    const { data, isLoading: isLoadingTx, error: errorTx, refetch } = useGetTransactions(activeFilters)
+
+    // Mutations
+    const createMutation = useCreateTransactionMutation()
+    const deleteMutation = useDeleteTransactionMutation()
+
+    // Adapters for Legacy Interface
+    const transactions = data?.transactions || []
+    const pagination = data?.pagination || null
+
+    const createTransaction = async (...args: any[]) => {
+        // Adapt arguments to object expected by mutation
+        const [name, description, amount, type, accountId, categoryId, budgetId] = args
+        await createMutation.mutateAsync({
+            name, description, amount, type, accountId, categoryId, budgetId
+        })
+    }
+
+    const deleteTransaction = async (id: string) => {
+        await deleteMutation.mutateAsync(id)
+    }
+
+    const addTransaction = () => {
+        // No-op: Cache invalidation handles this automatically now
+    }
+
+    // Legacy load functions no longer needed, mapped to refetch or no-ops
+    const loadTransactions = () => refetch()
+    const loadAllTransactions = () => refetch()
 
     const updateURLWithFilters = useCallback((newFilters: TransactionFiltersState) => {
         const params = new URLSearchParams()
@@ -93,23 +134,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     const applyFilters = useCallback(() => {
         updateURLWithFilters(filters)
 
-        const apiFilters: TransactionFilters = {
-            page: 1, limit: 50, sort_by: 'created_at', sort_order: 'desc'
-        }
-
-        if (filters.dateRange.from && filters.dateRange.to) {
-            apiFilters.date_from = filters.dateRange.from.toISOString().split('T')[0]
-            apiFilters.date_to = filters.dateRange.to.toISOString().split('T')[0]
-        }
-        if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
-        if (filters.account !== 'all') apiFilters.account_id = filters.account
-        if (filters.category !== 'all') apiFilters.category_id = filters.category
-        if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
-        if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
-        if (filters.search) apiFilters.search = filters.search
-
-        loadTransactions(apiFilters)
-    }, [filters, updateURLWithFilters, loadTransactions])
+    }, [filters, updateURLWithFilters])
 
     const clearFilters = useCallback(() => {
         const clearedFilters = {
@@ -118,8 +143,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         }
         setFilters(clearedFilters)
         router.replace(window.location.pathname)
-        loadAllTransactions()
-    }, [router, loadAllTransactions])
+        // Effect will handle refetching "all" since filters reset to empty equivalent
+    }, [router])
 
     const reloadCurrentView = useCallback(() => {
         const hasActiveFilters = searchParams.toString().length > 0
@@ -137,7 +162,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
             applyFilters()
         } else {
             // Ensure data is loaded initially
-            loadAllTransactions()
+            // Ensure data is loaded initially
+            // Query automatically runs, so we just set defaults if needed
         }
     }, [])
 
@@ -152,7 +178,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
             transactions,
             pagination,
             isLoading: isLoadingTx,
-            error: errorTx,
+            error: errorTx ? (errorTx as Error).message : null,
             createTransaction,
             deleteTransaction,
             addTransaction

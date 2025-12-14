@@ -1,7 +1,7 @@
 'use client'
 
 import { createContext, useContext, ReactNode } from 'react'
-import { useCategories } from '@/hooks/useRepositories'
+import { useGetCategories, useCreateCategoryMutation, useDeleteCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
 import { Category } from '@/types/category'
 
 interface CategoryContextType {
@@ -16,14 +16,20 @@ interface CategoryContextType {
 const CategoryContext = createContext<CategoryContextType | undefined>(undefined)
 
 export function CategoryProvider({ children }: { children: ReactNode }) {
-    const {
-        categories,
-        isLoading,
-        error,
-        createCategory,
-        deleteCategory,
-        refetch
-    } = useCategories()
+    // React Query Hooks
+    const { data: categories = [], isLoading, error: queryError, refetch } = useGetCategories()
+    const createMutation = useCreateCategoryMutation()
+    const deleteMutation = useDeleteCategoryMutation()
+
+    const error = queryError ? (queryError as Error).message : null
+
+    const createCategory = async (name: string, icon: string, color: string) => {
+        await createMutation.mutateAsync({ name, icon, color })
+    }
+
+    const deleteCategory = async (id: string) => {
+        await deleteMutation.mutateAsync(id)
+    }
 
     return (
         <CategoryContext.Provider value={{
@@ -32,7 +38,7 @@ export function CategoryProvider({ children }: { children: ReactNode }) {
             error,
             createCategory,
             deleteCategory,
-            refetch
+            refetch: async () => { await refetch() }
         }}>
             {children}
         </CategoryContext.Provider>

@@ -27,10 +27,6 @@ export {
 
 // Exportar hooks
 export {
-  useAccounts,
   useAuth,
-  useBudgets,
-  useCategories,
-  useTransactions,
-  useDashboard,
+  useAnalytics,
 } from "../hooks/useRepositories"; 

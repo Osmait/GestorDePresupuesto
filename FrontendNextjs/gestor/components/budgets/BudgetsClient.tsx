@@ -1,6 +1,7 @@
 "use client"
 import { useState } from 'react'
-import { useBudgets, useCategories, useTransactions } from '@/hooks/useRepositories'
+import { useBudgets, useTransactions } from '@/hooks/useRepositories'
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
@@ -268,7 +269,7 @@ function BudgetFormModal({ open, setOpen }: { open: boolean, setOpen: (v: boolea
 
 export default function BudgetsClient() {
     const { budgets, isLoading, error } = useBudgets()
-    const { categories } = useCategories()
+    const { data: categories = [] } = useGetCategories()
     const { transactions } = useTransactions()
     const [modalOpen, setModalOpen] = useState(false)
 
