@@ -76,7 +76,11 @@ export default function AccountDetailsPage() {
                     </div>
                 </div>
 
-                <AccountAnalytics transactions={transactions} />
+                <AccountAnalytics
+                    transactions={transactions}
+                    categories={categories}
+                    currentBalance={account.current_balance ?? account.initial_balance}
+                />
 
                 <div className="grid gap-6 md:grid-cols-3">
                     <div className="md:col-span-2">
