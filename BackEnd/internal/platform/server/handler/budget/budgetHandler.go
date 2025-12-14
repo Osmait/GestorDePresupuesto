@@ -93,3 +93,37 @@ func DeleteBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		c.JSON(http.StatusOK, "Deleted")
 	}
 }
+
+// UpdateBudget godoc
+//
+//	@Summary		Update a budget
+//	@Description	Update an existing budget by ID
+//	@Tags			Budgets
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			id		path		string				true	"Budget ID"
+//	@Param			budget	body		dto.BudgetRequest	true	"Budget update data"
+//	@Success		200		{object}	map[string]string	"Budget updated successfully"
+//	@Failure		400		{object}	map[string]string	"Bad request - Invalid input"
+//	@Failure		401		{object}	map[string]string	"Unauthorized - Invalid JWT token"
+//	@Failure		500		{object}	map[string]string	"Internal server error"
+//	@Router			/budget/{id} [put]
+func UpdateBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		userId := c.GetString("X-User-Id")
+		var req dto.BudgetRequest
+		if err := c.Bind(&req); err != nil {
+			c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
+			return
+		}
+
+		err := budgetServices.UpdateBudget(c, &req, id, userId)
+		if err != nil {
+			c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, "Updated")
+	}
+}

@@ -36,6 +36,11 @@ func (b *BudgetServices) CreateBudget(ctx context.Context, budgetRequest *dto.Bu
 	return err
 }
 
+func (b *BudgetServices) UpdateBudget(ctx context.Context, budgetRequest *dto.BudgetRequest, id string, userId string) error {
+	budgetToUpdate := budget.NewBudget(id, budgetRequest.CategoryId, userId, budgetRequest.Amount)
+	return b.repository.Update(ctx, budgetToUpdate)
+}
+
 func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.BudgetResponse, error) {
 	budgets, err := b.repository.FindAll(ctx, userId)
 	if err != nil {

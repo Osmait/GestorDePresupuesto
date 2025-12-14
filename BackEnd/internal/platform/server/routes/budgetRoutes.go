@@ -10,4 +10,5 @@ func BudgetRoutes(s *gin.Engine, budgetServices *budget.BudgetServices) {
 	s.POST("/budget", budgetHandler.CreateBudget(budgetServices))
 	s.GET("/budget", budgetHandler.FindAllBudget(budgetServices))
 	s.DELETE("/budget/:id", budgetHandler.DeleteBudget(budgetServices))
+	s.PUT("/budget/:id", budgetHandler.UpdateBudget(budgetServices))
 }

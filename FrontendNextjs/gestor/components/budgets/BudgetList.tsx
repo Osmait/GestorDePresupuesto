@@ -51,9 +51,10 @@ interface BudgetCardProps {
     category?: Category
     transactions: Transaction[]
     onDelete: (id: string) => void
+    onEdit: (budget: Budget) => void
 }
 
-function BudgetCard({ budget, category, transactions, onDelete }: BudgetCardProps) {
+function BudgetCard({ budget, category, transactions, onDelete, onEdit }: BudgetCardProps) {
     const spentAmount = Math.abs(budget.current_amount)
     const progressPercentage = (spentAmount / budget.amount) * 100
     const remaining = budget.amount - spentAmount
@@ -125,7 +126,7 @@ function BudgetCard({ budget, category, transactions, onDelete }: BudgetCardProp
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+                                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => onEdit(budget)}>
                                     <Edit className="h-4 w-4" />
                                     Editar presupuesto
                                 </DropdownMenuItem>
@@ -267,13 +268,17 @@ function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], trans
 }
 
 export function BudgetList() {
-    const { budgets, isLoading, error, deleteBudget } = useBudgetContext()
+    const { budgets, isLoading, error, deleteBudget, setEditingBudget, isModalOpen, setModalOpen } = useBudgetContext()
     const { data: categories = [] } = useGetCategories()
     const { data: transactions = [] } = useGetAllTransactions()
-    const [modalOpen, setModalOpen] = useState(false) // For empty state button
 
     function getBudgetTransactions(budgetId: string) {
         return transactions?.filter((t: Transaction) => t.budget_id === budgetId) || []
+    }
+
+    const handleEdit = (budget: Budget) => {
+        setEditingBudget(budget)
+        setModalOpen(true)
     }
 
     if (isLoading) {
@@ -308,7 +313,7 @@ export function BudgetList() {
                     <PlusCircle className="h-4 w-4 mr-2" />
                     Crear mi primer presupuesto
                 </Button>
-                <BudgetFormModal open={modalOpen} setOpen={setModalOpen} />
+                <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} />
             </div>
         )
     }
@@ -341,12 +346,16 @@ export function BudgetList() {
                                     category={category}
                                     transactions={txs}
                                     onDelete={deleteBudget}
+                                    onEdit={handleEdit}
                                 />
                             </motion.div>
                         )
                     })}
                 </AnimatePresence>
             </div>
+
+            {/* Context-controlled Modal for Edit/Create */}
+            <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} />
         </motion.div>
     )
 }

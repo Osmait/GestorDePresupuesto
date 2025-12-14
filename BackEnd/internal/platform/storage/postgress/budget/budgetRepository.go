@@ -23,6 +23,11 @@ func (b *BudgetRepository) Save(ctx context.Context, budget *budget.Budget) erro
 	return err
 }
 
+func (b *BudgetRepository) Update(ctx context.Context, budget *budget.Budget) error {
+	_, err := b.db.ExecContext(ctx, "UPDATE budgets SET amount = $1, category_id = $2 WHERE id = $3 AND user_id = $4", budget.Amount, budget.CategoryId, budget.Id, budget.UserId)
+	return err
+}
+
 func (b *BudgetRepository) FindAll(ctx context.Context, userId string) ([]*budget.Budget, error) {
 	rows, err := b.db.QueryContext(ctx, "SELECT id,category_id,user_id,amount,created_at FROM budgets WHERE user_id = $1 ", userId)
 	if err != nil {

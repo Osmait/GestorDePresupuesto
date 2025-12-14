@@ -51,3 +51,22 @@ export function useDeleteBudgetMutation() {
         },
     })
 }
+
+// Update Mutation
+export function useUpdateBudgetMutation() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async (data: {
+            id: string // Add ID for update
+            categoryId: string
+            amount: number
+        }) => {
+            const repo = await getBudgetRepository()
+            return repo.update(data.id, data.categoryId, data.amount)
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: BUDGET_KEYS.lists() })
+        },
+    })
+}

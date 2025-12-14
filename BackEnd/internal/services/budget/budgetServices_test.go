@@ -41,6 +41,11 @@ func (m *MockBudgetRepository) FindByCategory(ctx context.Context, categoryId st
 	return args.Get(0).(*budget.Budget), args.Error(1)
 }
 
+func (m *MockBudgetRepository) Update(ctx context.Context, budget *budget.Budget) error {
+	args := m.Called(ctx, budget)
+	return args.Error(0)
+}
+
 type MockTransaction struct {
 	mock.Mock
 }
