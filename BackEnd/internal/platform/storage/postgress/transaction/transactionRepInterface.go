@@ -14,6 +14,8 @@ type TransactionRepositoryInterface interface {
 	FindCurrentBudgets(ctx context.Context, userId string) (map[string]float64, error)
 	FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error)
 	Delete(ctx context.Context, id string, userId string) error
+	// Update updates a transaction
+	Update(ctx context.Context, id string, transaction *transaction.Transaction) error
 
 	// New methods for filtering and pagination
 	FindAllOfAllAccountsWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)

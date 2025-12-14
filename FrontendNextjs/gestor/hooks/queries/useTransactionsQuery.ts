@@ -69,6 +69,39 @@ export function useCreateTransactionMutation() {
     })
 }
 
+// Update Mutation
+export function useUpdateTransactionMutation() {
+    const queryClient = useQueryClient()
+
+    return useMutation({
+        mutationFn: async (data: {
+            id: string
+            name: string
+            description: string
+            amount: number
+            type: TypeTransaction
+            accountId: string
+            categoryId: string
+            budgetId?: string
+        }) => {
+            const repo = await getTransactionRepository()
+            return repo.update(
+                data.id,
+                data.name,
+                data.description,
+                data.amount,
+                data.type,
+                data.accountId,
+                data.categoryId,
+                data.budgetId
+            )
+        },
+        onSuccess: () => {
+            queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() })
+        },
+    })
+}
+
 // Delete Mutation
 export function useDeleteTransactionMutation() {
     const queryClient = useQueryClient()

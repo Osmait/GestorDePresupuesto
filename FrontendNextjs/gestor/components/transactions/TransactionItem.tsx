@@ -1,7 +1,7 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -19,6 +19,7 @@ import { Calendar, ArrowUpRight, ArrowDownRight, MoreHorizontal, Trash2, Edit } 
 import { Transaction, TypeTransaction } from '@/types/transaction';
 import { Category } from '@/types/category';
 import { useState } from 'react';
+import { useTransactionContext } from './TransactionContext';
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -27,14 +28,20 @@ interface TransactionItemProps {
 }
 
 export default function TransactionItem({ transaction, category, onTransactionDeleted }: TransactionItemProps) {
+  const { setEditingTransaction, setModalOpen } = useTransactionContext()
+  // ... rest of the code ...
+  // Inside the dropdown menu or button actions:
+  // <DropdownMenuItem onClick={() => setEditingTransaction(transaction)}>
+  //     <Edit className="mr-2 h-4 w-4" />
+  //     Editar
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  
+
   const isIncome = transaction.type_transation === TypeTransaction.INCOME;
 
   const handleDeleteTransaction = async () => {
     if (!transaction.id || !onTransactionDeleted) return;
-    
+
     setIsDeleting(true);
     try {
       onTransactionDeleted();
@@ -45,8 +52,8 @@ export default function TransactionItem({ transaction, category, onTransactionDe
       setIsDeleting(false);
     }
   };
-  console.log({category});
-  console.log({transaction});
+  console.log({ category });
+  console.log({ transaction });
   return (
     <Card className="hover:shadow-md hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
       <CardContent className="p-6">
@@ -84,7 +91,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className={`font-bold text-xl ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {isIncome ? '+' : '-'}${transaction.amount.toLocaleString()}
+                {isIncome ? '+' : '-'}${Math.abs(transaction.amount).toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">USD</p>
             </div>
@@ -95,11 +102,14 @@ export default function TransactionItem({ transaction, category, onTransactionDe
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => {
+                  setEditingTransaction(transaction)
+                  setModalOpen(true)
+                }}>
                   <Edit className="h-4 w-4" />
                   Editar transacción
                 </DropdownMenuItem>
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
                   onClick={() => setShowDeleteDialog(true)}
                 >
@@ -117,20 +127,20 @@ export default function TransactionItem({ transaction, category, onTransactionDe
           <DialogHeader>
             <DialogTitle>Eliminar Transacción</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que quieres eliminar la transacción "{transaction.name}"? 
+              ¿Estás seguro de que quieres eliminar la transacción "{transaction.name}"?
               Esta acción no se puede deshacer y eliminará todos los datos asociados.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button 
-              variant="outline" 
+            <Button
+              variant="outline"
               onClick={() => setShowDeleteDialog(false)}
               disabled={isDeleting}
             >
               Cancelar
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={handleDeleteTransaction}
               disabled={isDeleting}
             >

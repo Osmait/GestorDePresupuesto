@@ -9,7 +9,7 @@ import { ResponsiveRadar } from '@nivo/radar'
 import { ResponsiveHeatMap } from '@nivo/heatmap'
 import { ResponsivePie } from '@nivo/pie'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAnalytics } from '@/hooks/useRepositories'
+import { useGetCategoryExpenses, useGetMonthlySummary } from '@/hooks/queries/useAnalyticsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
@@ -18,15 +18,11 @@ import { useAnalysisContext } from './AnalysisContext'
 
 // Mocks
 const mockLine = [
-    { id: 'Saldo', color: '#3b82f6', data: [{ x: 'Ene', y: 1200 }, { x: 'Feb', y: 1500 }] }, // Shortened for brevity
+    { id: 'Saldo', color: '#3b82f6', data: [{ x: 'Ene', y: 1200 }, { x: 'Feb', y: 1500 }] },
 ]
 const mockBar = [{ categoria: 'Alimentación', monto: 500 }]
 const mockRadar = [{ categoria: 'Alimentación', Gastos: 500, Ingresos: 0 }]
-const mockHeats = [] // ... mocked in original file, keeping it simple or importing? 
-// Ideally we should move mocks to a separate file or keep them here.
-// I'll assume for now we use empty or simple mocks to save space, or use the original ones if critical.
 const mockPie = [{ id: 'Cuenta 1', label: 'Cuenta 1', value: 1200, color: '#3b82f6' }]
-
 const mockHeat = [
     {
         id: 'Lun',
@@ -35,7 +31,6 @@ const mockHeat = [
             { x: 'Feb', y: 3 },
         ]
     },
-    // ... rest of heat map data
 ]
 
 export function AnalysisDashboard() {
@@ -44,66 +39,17 @@ export function AnalysisDashboard() {
     const { data: accounts = [], isLoading: accountsLoading } = useGetAccounts()
     const { data: categories = [], isLoading: categoriesLoading } = useGetCategories()
     const { data: transactions = [], isLoading: transactionsLoading } = useGetAllTransactions()
-    const { categoryExpenses, monthlySummary, isLoadingCategoryExpenses, isLoadingMonthlySummary, loadCategoryExpenses, loadMonthlySummary } = useAnalytics()
 
-    // Map filters
-    const apiFilters = useMemo(() => {
-        const f: any = {}
-        if (filters.account && filters.account !== 'all') f.accountId = filters.account
-        if (filters.category && filters.category !== 'all') f.categoryId = filters.category
-        if (filters.type && filters.type !== 'all') f.type = filters.type
-        if (filters.filterMode === 'month') {
-            if (filters.month && filters.month !== 'all') {
-                f.dateFrom = `${filters.year}-${filters.month}-01`
-                f.dateTo = `${filters.year}-${filters.month}-31`
-            } else if (filters.year) {
-                f.dateFrom = `${filters.year}-01-01`
-                f.dateTo = `${filters.year}-12-31`
-            }
-        } else if (filters.filterMode === 'range' && filters.dateRange.from && filters.dateRange.to) {
-            f.dateFrom = filters.dateRange.from.toISOString().slice(0, 10)
-            f.dateTo = filters.dateRange.to.toISOString().slice(0, 10)
-        }
-        if (filters.minAmount) f.minAmount = Number(filters.minAmount)
-        if (filters.maxAmount) f.maxAmount = Number(filters.maxAmount)
-        if (filters.search) f.search = filters.search
-
-        // Grouping logic
-        if (f.dateFrom && f.dateTo) {
-            const start = new Date(f.dateFrom)
-            const end = new Date(f.dateTo)
-            const days = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-            if (days <= 31) f.groupBy = 'day'
-            else if (days <= 90) f.groupBy = 'week'
-            else if (days < 365 * 2) f.groupBy = 'month'
-            else f.groupBy = 'year'
-        } else {
-            f.groupBy = 'month'
-        }
-        return f
-    }, [filters])
-
-    useEffect(() => {
-        loadCategoryExpenses() // You might want to pass apiFilters here if the hook supports it?
-        loadMonthlySummary()
-        // Original code called these without args? Check useRepositories.
-        // Assuming the hook reads from somewhere or we need to pass them.
-        // BUT strict reading of original code:
-        // useEffect(() => { loadCategoryExpenses(); loadMonthlySummary(); }, [])
-        // It WAS EMPTY dependency array. It seemingly didn't refetch on filter change in the original code? 
-        // Wait, looking at original file lines 391-394:
-        // useEffect(() => { loadCategoryExpenses(); loadMonthlySummary(); }, [])
-        // And apiFilters was calculated but... NOT USED in the useEffect?
-        // Ah, maybe the hook uses some internal state or maybe the original code was incomplete?
-        // If I look at line 356 `apiFilters` constant... it's not passed anywhere.
-        // This suggests the original code might have had a bug or I missed where `apiFilters` is used.
-        // I will preserve exact behavior for now to avoid side-effects, but it looks suspicious.
-    }, [])
+    // New TanStack Query Hooks
+    const { data: categoryExpenses = [], isLoading: isLoadingCategoryExpenses } = useGetCategoryExpenses()
+    const { data: monthlySummary = [], isLoading: isLoadingMonthlySummary } = useGetMonthlySummary()
 
     const nivoTheme = useMemo(() => ({
         background: 'transparent',
         textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
     }), [theme])
+
+    // ... (rest of the code)
 
     const loading = accountsLoading || categoriesLoading || transactionsLoading || isLoadingCategoryExpenses || isLoadingMonthlySummary
 

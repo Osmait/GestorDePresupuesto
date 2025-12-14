@@ -50,6 +50,10 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
   const { data: accounts = [] } = useGetAccounts();
   const { data: categories = [] } = useGetCategories();
   const { data: budgets = [] } = useGetBudgets();
+  const { editingTransaction, updateTransaction } = useTransactionContext();
+
+  const isEditing = !!editingTransaction;
+
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
     defaultValues: {
@@ -64,19 +68,60 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
     },
   });
 
+  // Effect to populate form when editing
+  useEffect(() => {
+    if (editingTransaction) {
+      form.reset({
+        name: editingTransaction.name,
+        description: editingTransaction.description,
+        amount: Math.abs(editingTransaction.amount),
+        type_transaction: editingTransaction.type_transation === 'income' ? TypeTransaction.INCOME : TypeTransaction.BILL,
+        account_id: editingTransaction.account_id,
+        category_id: editingTransaction.category_id,
+        budget_id: editingTransaction.budget_id || undefined,
+        created_at: new Date(editingTransaction.created_at || new Date()),
+      });
+    } else {
+      form.reset({
+        name: '',
+        description: '',
+        amount: 0,
+        type_transaction: TypeTransaction.BILL,
+        account_id: '',
+        category_id: '',
+        budget_id: undefined,
+        created_at: new Date(),
+      });
+    }
+  }, [editingTransaction, form]);
+
 
   async function onSubmit(values: TransactionFormValues) {
     try {
-      await createTransaction(
-        values.name,
-        values.description,
-        values.amount,
-        values.type_transaction,
-        values.account_id,
-        values.category_id,
-        values.budget_id
-      );
+      if (isEditing) {
+        await updateTransaction(
+          editingTransaction.id,
+          values.name,
+          values.description,
+          values.amount,
+          values.type_transaction,
+          values.account_id,
+          values.category_id,
+          values.budget_id
+        );
+      } else {
+        await createTransaction(
+          values.name,
+          values.description,
+          values.amount,
+          values.type_transaction,
+          values.account_id,
+          values.category_id,
+          values.budget_id
+        );
+      }
       form.reset();
+      setOpen(false);
     } catch { }
   }
 
@@ -84,7 +129,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nueva Transacción</DialogTitle>
+          <DialogTitle>{isEditing ? 'Editar Transacción' : 'Nueva Transacción'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -166,7 +211,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
             <DialogFooter>
               <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
-                Crear Transacción
+                {isEditing ? 'Guardar Cambios' : 'Crear Transacción'}
               </Button>
               <DialogClose asChild>
                 <Button type="button" variant="ghost" className="w-full">Cancelar</Button>

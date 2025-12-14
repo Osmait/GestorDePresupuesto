@@ -3,7 +3,7 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { DateRange } from 'react-day-picker'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { useGetTransactions, useCreateTransactionMutation, useDeleteTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
+import { useGetTransactions, useCreateTransactionMutation, useDeleteTransactionMutation, useUpdateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { TransactionFilters } from '@/types/transaction'
 
 // Filter Type
@@ -29,8 +29,13 @@ interface TransactionContextType {
     isLoading: boolean
     error: string | null
     createTransaction: (...args: any[]) => Promise<void>
+    updateTransaction: (id: string, ...args: any[]) => Promise<void>
     deleteTransaction: (id: string) => Promise<void>
     addTransaction: (tx: any) => void
+    editingTransaction: any | null
+    setEditingTransaction: (tx: any | null) => void
+    isModalOpen: boolean
+    setModalOpen: (open: boolean) => void
 }
 
 const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
@@ -90,6 +95,10 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     // Mutations
     const createMutation = useCreateTransactionMutation()
     const deleteMutation = useDeleteTransactionMutation()
+    const updateMutation = useUpdateTransactionMutation()
+
+    // Edit State
+    const [editingTransaction, setEditingTransaction] = useState<any | null>(null) // Replace 'any' with Transaction type in future
 
     // Adapters for Legacy Interface
     const transactions = data?.transactions || []
@@ -101,6 +110,14 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         await createMutation.mutateAsync({
             name, description, amount, type, accountId, categoryId, budgetId
         })
+    }
+
+    const updateTransaction = async (id: string, ...args: any[]) => {
+        const [name, description, amount, type, accountId, categoryId, budgetId] = args
+        await updateMutation.mutateAsync({
+            id, name, description, amount, type, accountId, categoryId, budgetId
+        })
+        setEditingTransaction(null) // Close edit mode after success
     }
 
     const deleteTransaction = async (id: string) => {
@@ -167,6 +184,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         }
     }, [])
 
+    const [isModalOpen, setModalOpen] = useState(false)
+
     return (
         <TransactionContext.Provider value={{
             filters,
@@ -180,8 +199,14 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
             isLoading: isLoadingTx,
             error: errorTx ? (errorTx as Error).message : null,
             createTransaction,
+            updateTransaction,
             deleteTransaction,
-            addTransaction
+            addTransaction,
+            // Edit State
+            editingTransaction,
+            setEditingTransaction,
+            isModalOpen,
+            setModalOpen,
         }}>
             {children}
         </TransactionContext.Provider>

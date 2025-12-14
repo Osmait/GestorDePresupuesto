@@ -227,6 +227,10 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 	return transactionResponseList
 }
 
+func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, transaction *transaction.Transaction) error {
+	return s.transactionRepository.Update(ctx, id, transaction)
+}
+
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {
 	err := s.transactionRepository.Delete(ctx, id, userId)
 	return err

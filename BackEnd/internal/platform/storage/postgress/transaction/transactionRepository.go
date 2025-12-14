@@ -147,6 +147,12 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 	return budgets, nil
 }
 
+func (r *TransactionRepository) Update(ctx context.Context, id string, transaction *transaction.Transaction) error {
+	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3, type_transation = $4, account_id = $5, category_id = $6 WHERE id = $7`
+	_, err := r.db.ExecContext(ctx, query, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.CategoryId, id)
+	return err
+}
+
 func (repo *TransactionRepository) Delete(ctx context.Context, id string, userId string) error {
 	result, err := repo.db.ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND user_id = $2", id, userId)
 	if err != nil {

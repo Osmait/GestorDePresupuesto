@@ -14,4 +14,5 @@ func TransactionRoutes(s *gin.Engine, transactionService *transaction.Transactio
 	s.GET("/transaction/:id", handler.FindAllTransaction(transactionService))
 	s.GET("/transaction", handler.FindAllTransactionOfAllAccount(transactionService))
 	s.DELETE("/transaction/:id", handler.DeleteTransaction(transactionService))
+	s.PUT("/transaction/:id", handler.UpdateTransaction(transactionService))
 }

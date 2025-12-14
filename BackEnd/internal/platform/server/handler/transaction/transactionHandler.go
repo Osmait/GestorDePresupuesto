@@ -1,9 +1,11 @@
 package transaction
 
 import (
+	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	domain "github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
@@ -252,12 +254,33 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 func DeleteTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		userID := ctx.GetString("X-User-Id")
-		err := transactionService.DeleteTransaction(ctx, id, userID)
+		userId := ctx.MustGet("X-User-Id").(string)
+		err := transactionService.DeleteTransaction(ctx, id, userId)
 		if err != nil {
-			ctx.Error(err)
+			fmt.Println(err)
+			ctx.JSON(http.StatusInternalServerError, err.Error())
 			return
 		}
 		ctx.JSON(http.StatusOK, "Deleted")
+	}
+}
+
+func UpdateTransaction(s *transaction.TransactionService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		id := ctx.Param("id")
+		var transactionRequest dto.TransactionRequest
+		if err := ctx.ShouldBindJSON(&transactionRequest); err != nil {
+			ctx.JSON(http.StatusBadRequest, err.Error())
+			return
+		}
+		userId := ctx.MustGet("X-User-Id").(string)
+		transactionObj := domain.NewTransaction(id, transactionRequest.Name, transactionRequest.Description, transactionRequest.TypeTransation, transactionRequest.AccountId, transactionRequest.CategoryId, transactionRequest.Amount)
+		transactionObj.UserId = userId
+
+		if err := s.UpdateTransaction(ctx, id, transactionObj); err != nil {
+			ctx.JSON(http.StatusInternalServerError, err.Error())
+			return
+		}
+		ctx.Status(http.StatusOK)
 	}
 }
