@@ -251,7 +251,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 	quoteService := quote.NewQuoteService()
 
 	notificationService := notification.NewNotificationService(repos.notificationRepository)
-	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository)
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService)
 
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),

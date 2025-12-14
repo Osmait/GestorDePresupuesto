@@ -2,10 +2,13 @@ package transaction
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 
@@ -19,12 +22,14 @@ const (
 type TransactionService struct {
 	transactionRepository transactionRepo.TransactionRepositoryInterface
 	budgetRepository      budgetRepo.BudgetRepoInterface
+	notificationService   *notification.NotificationService
 }
 
-func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface) *TransactionService {
+func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService) *TransactionService {
 	return &TransactionService{
 		transactionRepository: transactionRepository,
 		budgetRepository:      budgetReposiotry,
+		notificationService:   notificationService,
 	}
 }
 
@@ -41,18 +46,74 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 	transaction := transaction.NewTransaction(id, name, description, typeTransaction, accountId, categoryId, amount)
 	transaction.UserId = userId
 
-	// if budgetId != "" {
-	// 	transaction.BudgetId = budgetId
-	// }
-
 	budget, _ := s.budgetRepository.FindByCategory(ctx, categoryId)
-	transaction.BudgetId = budget.Id
+	if budget != nil {
+		transaction.BudgetId = budget.Id
+	}
 
 	log.Debug().Str("category_id", transaction.CategoryId).Msg("creating transaction")
 
 	err = s.transactionRepository.Save(ctx, transaction)
+	if err != nil {
+		return err
+	}
 
-	return err
+	// Check Budget Thresholds
+	log.Debug().Msgf("Checking Alert Conditions: BudgetFound=(%v), Type=(%s), BillConst=(%s)", budget != nil, typeTransaction, BILL)
+	if budget != nil {
+		log.Debug().Msgf("Budget Details: ID=%s, Amount=%f", budget.Id, budget.Amount)
+	}
+
+	if budget != nil && typeTransaction == BILL {
+		log.Debug().Str("budget_id", budget.Id).Msg("checking budget thresholds for transaction")
+		go func() {
+			currentSpent, err := s.transactionRepository.FindCurrentBudget(context.Background(), budget.Id)
+			if err != nil {
+				log.Error().Err(err).Msg("failed to get current budget details for alert")
+				return
+			}
+
+			// budget.Amount is positive, currentSpent is negative (bills). Make it positive for calculation.
+			spentPositive := currentSpent * -1
+			limit := budget.Amount
+
+			log.Debug().Float64("current_spent", spentPositive).Float64("limit", limit).Msg("budget status")
+
+			if limit > 0 {
+				percentage := spentPositive / limit
+				previousSpent := spentPositive - (amount * -1) // remove current transaction
+				previousPercentage := previousSpent / limit
+
+				log.Debug().Float64("percentage", percentage).Float64("previous_percentage", previousPercentage).Msg("budget percentages")
+
+				var alertType string
+				var alertMessage string
+
+				if percentage >= 1.0 && previousPercentage < 1.0 {
+					alertType = "budget_critical"
+					alertMessage = fmt.Sprintf("🚨 Critical: You have exceeded your budget for this category! (%.0f%% used)", percentage*100)
+				} else if percentage >= 0.7 && percentage < 1.0 && previousPercentage < 0.7 {
+					alertType = "budget_warning"
+					alertMessage = fmt.Sprintf("⚠️ Warning: You have used %.0f%% of your budget for this category.", percentage*100)
+				}
+
+				if alertType != "" {
+					log.Info().Str("alert_type", alertType).Msg("triggering budget alert")
+					notificationPayload := map[string]interface{}{
+						"type":    alertType,
+						"message": alertMessage,
+						"amount":  spentPositive,
+					}
+					payloadBytes, _ := json.Marshal(notificationPayload)
+					s.notificationService.SendToUser(userId, string(payloadBytes))
+				} else {
+					log.Debug().Msg("no alert threshold crossed")
+				}
+			}
+		}()
+	}
+
+	return nil
 }
 
 func (s TransactionService) FindAll(ctx context.Context, date string, date2 string, id string) ([]*dto.TransactionResponse, error) {
