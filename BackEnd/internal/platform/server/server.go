@@ -118,6 +118,10 @@ func (s *Server) registerRoutes() {
 	notificationH := notificationHandler.NewNotificationHandler(s.notificationService)
 	s.Engine.GET("/notifications", notificationH.Subscribe)
 	s.Engine.POST("/notifications/test", notificationH.SendTestNotification)
+	s.Engine.GET("/notifications/history", notificationH.GetHistory)
+	s.Engine.PATCH("/notifications/:id/read", notificationH.MarkAsRead)
+	s.Engine.PATCH("/notifications/read-all", notificationH.MarkAllAsRead)
+	s.Engine.DELETE("/notifications", notificationH.DeleteAll)
 
 	// Application routes
 	routes.AuhtRoutes(s.Engine, s.servicesAuth)

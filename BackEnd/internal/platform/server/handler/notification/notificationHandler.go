@@ -78,3 +78,78 @@ func (h *NotificationHandler) SendTestNotification(ctx *gin.Context) {
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "Notification sent"})
 }
+
+func (h *NotificationHandler) GetHistory(ctx *gin.Context) {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := userID.(string)
+
+	history, err := h.service.GetHistory(userIDStr)
+	if err != nil {
+		log.Printf("Error getting notification history: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, history)
+}
+
+func (h *NotificationHandler) MarkAsRead(ctx *gin.Context) {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := userID.(string)
+
+	notificationID := ctx.Param("id")
+	if notificationID == "" {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Notification ID is required"})
+		return
+	}
+
+	if err := h.service.MarkAsRead(notificationID, userIDStr); err != nil {
+		log.Printf("Error marking notification as read: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "Notification marked as read"})
+}
+
+func (h *NotificationHandler) MarkAllAsRead(ctx *gin.Context) {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := userID.(string)
+
+	if err := h.service.MarkAllAsRead(userIDStr); err != nil {
+		log.Printf("Error marking all notifications as read: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "All notifications marked as read"})
+}
+
+func (h *NotificationHandler) DeleteAll(ctx *gin.Context) {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
+		return
+	}
+	userIDStr := userID.(string)
+
+	if err := h.service.DeleteAll(userIDStr); err != nil {
+		log.Printf("Error deleting all notifications: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, gin.H{"message": "All notifications deleted"})
+}

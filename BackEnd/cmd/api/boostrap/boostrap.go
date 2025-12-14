@@ -20,6 +20,7 @@ import (
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
+	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
@@ -202,27 +203,29 @@ func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 
 // repositories holds all repository interfaces
 type repositories struct {
-	accountRepository     accountRepo.AccountRepositoryInterface
-	transactionRepository transactionRepo.TransactionRepositoryInterface
-	userRepository        userRepo.UserRepositoryInterface
-	budgetRepository      budgetRepo.BudgetRepoInterface
-	categoryRepository    categoryRepo.CategoryRepoInterface
-	investmentRepository  investmentRepo.InvestmentRepoInterface
-	analyticsRepository   *analyticsRepo.AnalyticsRepository
-	recurringRepository   *recurringRepo.RecurringTransactionRepository
+	accountRepository      accountRepo.AccountRepositoryInterface
+	transactionRepository  transactionRepo.TransactionRepositoryInterface
+	userRepository         userRepo.UserRepositoryInterface
+	budgetRepository       budgetRepo.BudgetRepoInterface
+	categoryRepository     categoryRepo.CategoryRepoInterface
+	investmentRepository   investmentRepo.InvestmentRepoInterface
+	analyticsRepository    *analyticsRepo.AnalyticsRepository
+	recurringRepository    *recurringRepo.RecurringTransactionRepository
+	notificationRepository *notificationRepo.NotificationRepository
 }
 
 // initializeRepositories creates all repository instances
 func initializeRepositories(db *sql.DB) *repositories {
 	return &repositories{
-		accountRepository:     accountRepo.NewAccountRepository(db),
-		transactionRepository: transactionRepo.NewTransactionRepository(db),
-		userRepository:        userRepo.NewUserRepository(db),
-		budgetRepository:      budgetRepo.NewBudgetRepository(db),
-		categoryRepository:    categoryRepo.NewCategoryRepository(db),
-		investmentRepository:  investmentRepo.NewInvestmentRepository(db),
-		analyticsRepository:   analyticsRepo.NewAnalyticsRepository(db),
-		recurringRepository:   recurringRepo.NewRecurringTransactionRepository(db),
+		accountRepository:      accountRepo.NewAccountRepository(db),
+		transactionRepository:  transactionRepo.NewTransactionRepository(db),
+		userRepository:         userRepo.NewUserRepository(db),
+		budgetRepository:       budgetRepo.NewBudgetRepository(db),
+		categoryRepository:     categoryRepo.NewCategoryRepository(db),
+		investmentRepository:   investmentRepo.NewInvestmentRepository(db),
+		analyticsRepository:    analyticsRepo.NewAnalyticsRepository(db),
+		recurringRepository:    recurringRepo.NewRecurringTransactionRepository(db),
+		notificationRepository: notificationRepo.NewNotificationRepository(db),
 	}
 }
 
@@ -247,7 +250,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 	// Services
 	quoteService := quote.NewQuoteService()
 
-	notificationService := notification.NewNotificationService()
+	notificationService := notification.NewNotificationService(repos.notificationRepository)
 	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository)
 
 	return &services{

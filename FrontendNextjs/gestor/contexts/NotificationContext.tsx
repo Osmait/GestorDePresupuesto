@@ -23,32 +23,52 @@ interface NotificationContexttype {
 
 const NotificationContext = createContext<NotificationContexttype | undefined>(undefined)
 
+import { useSession } from "next-auth/react"
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
+    const { data: session } = useSession()
     const { lastMessage, isConnected } = useNotification()
     const [notifications, setNotifications] = useState<NotificationItem[]>([])
 
-    // Load from local storage on mount
+    // Fetch history on mount
     useEffect(() => {
-        const saved = localStorage.getItem('notifications')
-        if (saved) {
+        // @ts-ignore
+        const token = session?.accessToken || (session?.user as any)?.accessToken
+        if (!token) return
+
+        const fetchHistory = async () => {
             try {
-                setNotifications(JSON.parse(saved))
-            } catch (e) {
-                console.error("Failed to load notifications", e)
+                const res = await fetch('http://localhost:8080/notifications/history', {
+                    headers: {
+                        Authorization: `Bearer ${token}`
+                    }
+                })
+                if (res.ok) {
+                    const data = await res.json()
+                    // Map backend data to frontend model
+                    const mapped = data.map((n: any) => ({
+                        id: n.id,
+                        type: n.type,
+                        message: n.message,
+                        amount: n.amount,
+                        timestamp: new Date(n.created_at).getTime(),
+                        read: n.is_read
+                    }))
+                    setNotifications(mapped)
+                }
+            } catch (error) {
+                console.error("Failed to fetch notification history", error)
             }
         }
-    }, [])
 
-    // Save to local storage on change
-    useEffect(() => {
-        localStorage.setItem('notifications', JSON.stringify(notifications))
-    }, [notifications])
+        fetchHistory()
+    }, [session])
 
-    // Add new notification when lastMessage changes
+    // Add new notification when lastMessage changes (Real-time)
     useEffect(() => {
         if (lastMessage) {
             const newItem: NotificationItem = {
-                id: Date.now().toString(), // Simple ID
+                id: Date.now().toString(), // Helper ID until we sync back with DB IDs for real-time
                 type: lastMessage.type,
                 message: lastMessage.message,
                 amount: lastMessage.amount,
@@ -61,17 +81,62 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
     const unreadCount = notifications.filter(n => !n.read).length
 
-    const markAsRead = useCallback((id: string) => {
+    const markAsRead = useCallback(async (id: string) => {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
-    }, [])
 
-    const markAllAsRead = useCallback(() => {
+        // @ts-ignore
+        const token = session?.accessToken || (session?.user as any)?.accessToken
+        if (!token) return
+
+        try {
+            await fetch(`http://localhost:8080/notifications/${id}/read`, {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            })
+        } catch (error) {
+            console.error("Failed to mark notification as read", error)
+        }
+    }, [session])
+
+    const markAllAsRead = useCallback(async () => {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })))
-    }, [])
 
-    const clearNotifications = useCallback(() => {
+        // @ts-ignore
+        const token = session?.accessToken || (session?.user as any)?.accessToken
+        if (!token) return
+
+        try {
+            await fetch('http://localhost:8080/notifications/read-all', {
+                method: 'PATCH',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            })
+        } catch (error) {
+            console.error("Failed to mark all as read", error)
+        }
+    }, [session])
+
+    const clearNotifications = useCallback(async () => {
         setNotifications([])
-    }, [])
+
+        // @ts-ignore
+        const token = session?.accessToken || (session?.user as any)?.accessToken
+        if (!token) return
+
+        try {
+            await fetch('http://localhost:8080/notifications', {
+                method: 'DELETE',
+                headers: {
+                    Authorization: `Bearer ${token}`
+                }
+            })
+        } catch (error) {
+            console.error("Failed to delete all notifications", error)
+        }
+    }, [session])
 
     return (
         <NotificationContext.Provider value={{ notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications }}>
