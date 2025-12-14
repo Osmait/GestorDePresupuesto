@@ -169,12 +169,16 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
                                     title={c.label}
                                 />
                             ))}
-                            <div className="relative w-6 h-6 rounded-full overflow-hidden border border-gray-200 transition-transform hover:scale-110" title="Personalizado">
+                            <div
+                                className="relative w-6 h-6 rounded-full overflow-hidden border border-gray-200 transition-transform hover:scale-110"
+                                title="Personalizado"
+                                style={{ background: 'conic-gradient(from 0deg, red, orange, yellow, green, blue, indigo, violet, red)' }}
+                            >
                                 <Input
                                     type="color"
                                     value={color}
                                     onChange={(e) => setColor(e.target.value)}
-                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 border-0 cursor-pointer"
+                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 border-0 cursor-pointer opacity-0"
                                 />
                             </div>
                         </div>
