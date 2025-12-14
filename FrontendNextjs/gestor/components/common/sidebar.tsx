@@ -26,8 +26,18 @@ import {
 	Plus,
 	Mouse,
 	BarChart,
-	TrendingUp
+	TrendingUp,
+	Wallet
 } from 'lucide-react'
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuSeparator,
+	DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
+import { useGlobalAction } from '@/contexts/GlobalActionContext'
 
 interface SidebarProps {
 	children: React.ReactNode
@@ -191,6 +201,7 @@ function MainHeader({ isExpanded, toggleMobile }: {
 	isExpanded: boolean
 	toggleMobile: () => void
 }) {
+	const { openModal } = useGlobalAction()
 	return (
 		<header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg">
 			<div className="flex h-16 items-center justify-between px-4 lg:px-6">
@@ -219,9 +230,37 @@ function MainHeader({ isExpanded, toggleMobile }: {
 						<Button variant="ghost" size="sm">
 							<Bell className="h-4 w-4" />
 						</Button>
-						<Button variant="ghost" size="sm">
-							<Plus className="h-4 w-4" />
-						</Button>
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button variant="ghost" size="sm">
+									<Plus className="h-4 w-4" />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align="end" className="w-56">
+								<DropdownMenuLabel>Acciones Rápidas</DropdownMenuLabel>
+								<DropdownMenuSeparator />
+								<DropdownMenuItem onClick={() => openModal('TRANSACTION')}>
+									<ArrowUpDown className="mr-2 h-4 w-4" />
+									<span>Nueva Transacción</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => openModal('CATEGORY')}>
+									<Tags className="mr-2 h-4 w-4" />
+									<span>Nueva Categoría</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => openModal('BUDGET')}>
+									<PiggyBank className="mr-2 h-4 w-4" />
+									<span>Nuevo Presupuesto</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => openModal('ACCOUNT')}>
+									<Wallet className="mr-2 h-4 w-4" />
+									<span>Nueva Cuenta</span>
+								</DropdownMenuItem>
+								<DropdownMenuItem onClick={() => openModal('INVESTMENT')}>
+									<TrendingUp className="mr-2 h-4 w-4" />
+									<span>Nueva Inversión</span>
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
 
 					<UserNav />
