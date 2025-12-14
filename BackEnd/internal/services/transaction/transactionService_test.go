@@ -102,6 +102,11 @@ func (m *MockBudgetRepository) Update(ctx context.Context, budget *budget.Budget
 	return args.Error(0)
 }
 
+func (m *MockBudgetRepository) Search(ctx context.Context, userId string, query string) ([]*budget.Budget, error) {
+	args := m.Called(ctx, userId, query)
+	return args.Get(0).([]*budget.Budget), args.Error(1)
+}
+
 func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}

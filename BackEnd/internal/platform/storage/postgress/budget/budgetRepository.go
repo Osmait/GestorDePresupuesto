@@ -117,3 +117,36 @@ func (b *BudgetRepository) FindByCategory(ctx context.Context, categoryID string
 	}
 	return &budget, nil
 }
+
+func (b *BudgetRepository) Search(ctx context.Context, userId string, query string) ([]*budget.Budget, error) {
+	searchTerm := "%" + query + "%"
+	// Join with categories to search by category name since budgets don't have own names
+	querySQL := `
+		SELECT b.id, b.category_id, b.user_id, b.amount, b.created_at 
+		FROM budgets b
+		LEFT JOIN categorys c ON b.category_id = c.id
+		WHERE b.user_id = $1 AND c.name ILIKE $2
+	`
+	rows, err := b.db.QueryContext(ctx, querySQL, userId, searchTerm)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	var budgets []*budget.Budget
+	for rows.Next() {
+		var bud budget.Budget
+		if err = rows.Scan(&bud.Id, &bud.CategoryId, &bud.UserId, &bud.Amount, &bud.CreatedAt); err == nil {
+			budgets = append(budgets, &bud)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return budgets, nil
+}

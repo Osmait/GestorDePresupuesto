@@ -12,4 +12,5 @@ type CategoryRepoInterface interface {
 	FindOne(ctx context.Context, id string) (*category.Category, error)
 	Delete(ctx context.Context, id string, userId string) error
 	Update(ctx context.Context, category *category.Category) error
+	Search(ctx context.Context, userId string, query string) ([]*category.Category, error)
 }

@@ -32,6 +32,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/services/search"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
@@ -101,6 +102,7 @@ func Run() error {
 		services.categoryService,
 		services.analyticsService,
 		services.recurringService,
+		services.searchService,
 		db,
 		cfg,
 	)
@@ -230,6 +232,7 @@ type services struct {
 	investmentService  *investment.InvestmentServices
 	analyticsService   *analytics.AnalyticsService
 	recurringService   *recurring_transaction.RecurringTransactionService
+	searchService      *search.SearchService
 }
 
 // initializeServices creates all service instances
@@ -244,5 +247,6 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		investmentService:  investment.NewInvestmentServices(repos.investmentRepository),
 		analyticsService:   analytics.NewAnalyticsService(repos.analyticsRepository),
 		recurringService:   recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository)),
+		searchService:      search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),
 	}
 }

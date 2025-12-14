@@ -144,3 +144,29 @@ func (repo *AccountRepository) FindByIdAndUserId(ctx context.Context, id string,
 
 	return account, nil
 }
+
+func (repo *AccountRepository) Search(ctx context.Context, userId string, query string) ([]*account.Account, error) {
+	searchTerm := "%" + query + "%"
+	rows, err := repo.db.QueryContext(ctx, "SELECT id, name_account, bank, balance, user_id, created_at FROM account WHERE user_id = $1 AND (name_account ILIKE $2 OR bank ILIKE $2)", userId, searchTerm)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	var accounts []*account.Account
+	for rows.Next() {
+		acc := account.Account{}
+		if err = rows.Scan(&acc.Id, &acc.Name, &acc.Bank, &acc.InitialBalance, &acc.UserId, &acc.CreatedAt); err == nil {
+			accounts = append(accounts, &acc)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return accounts, nil
+}

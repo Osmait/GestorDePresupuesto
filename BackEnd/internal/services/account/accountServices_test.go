@@ -49,6 +49,11 @@ func (m *MockAccountRepository) FindByIdAndUserId(ctx context.Context, id string
 	return args.Get(0).(*account.Account), args.Error(1)
 }
 
+func (m *MockAccountRepository) Search(ctx context.Context, userId string, query string) ([]*account.Account, error) {
+	args := m.Called(ctx, userId, query)
+	return args.Get(0).([]*account.Account), args.Error(1)
+}
+
 func TestCreateAccount(t *testing.T) {
 	mockRepo := &MockAccountRepository{}
 

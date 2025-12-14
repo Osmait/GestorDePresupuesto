@@ -93,3 +93,29 @@ func (c *CategoryRespository) Update(ctx context.Context, category *category.Cat
 	_, err := c.db.ExecContext(ctx, "UPDATE categorys SET name = $1, icon = $2, color = $3 WHERE id = $4 AND user_id = $5", category.Name, category.Icon, category.Color, category.Id, category.UserId)
 	return err
 }
+
+func (c *CategoryRespository) Search(ctx context.Context, userId string, query string) ([]*category.Category, error) {
+	searchTerm := "%" + query + "%"
+	rows, err := c.db.QueryContext(ctx, "SELECT id, name, icon, color, user_id, created_at FROM categorys WHERE user_id = $1 AND name ILIKE $2", userId, searchTerm)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	var categories []*category.Category
+	for rows.Next() {
+		var cat category.Category
+		if err = rows.Scan(&cat.Id, &cat.Name, &cat.Icon, &cat.Color, &cat.UserId, &cat.CreatedAt); err == nil {
+			categories = append(categories, &cat)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return categories, nil
+}

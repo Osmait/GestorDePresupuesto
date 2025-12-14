@@ -14,4 +14,5 @@ type AccountRepositoryInterface interface {
 	Balances(ctx context.Context, userId string) (map[string]float64, error)
 	Update(ctx context.Context, id string, name string, bank string, userId string) error
 	FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error)
+	Search(ctx context.Context, userId string, query string) ([]*account.Account, error)
 }

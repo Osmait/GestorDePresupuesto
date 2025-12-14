@@ -17,6 +17,7 @@ import { AccountRepository } from '@/app/repository/accountRepository'
 import { TransactionRepository } from '@/app/repository/transactionRepository'
 import { CategoryRepository } from '@/app/repository/categoryRepository'
 import { AnalyticsRepository } from '@/app/repository/analyticsRepository'
+import { SearchRepository } from '@/app/repository/searchRepository'
 
 // Crear instancias únicas
 let accountRepositoryInstance: AccountRepository | null = null;
@@ -25,6 +26,7 @@ let budgetRepositoryInstance: BudgetRepository | null = null;
 let categoryRepositoryInstance: CategoryRepository | null = null;
 let transactionRepositoryInstance: TransactionRepository | null = null;
 let analyticsRepositoryInstance: AnalyticsRepository | null = null;
+let searchRepositoryInstance: SearchRepository | null = null;
 
 // Funciones para obtener repositorios (con singleton pattern)
 export const getAccountRepository = async () => {
@@ -69,6 +71,13 @@ export const getAnalyticsRepository = async () => {
   return analyticsRepositoryInstance;
 };
 
+export const getSearchRepository = async () => {
+  if (!searchRepositoryInstance) {
+    searchRepositoryInstance = new SearchRepository();
+  }
+  return searchRepositoryInstance;
+};
+
 // Exportar instancias directas para compatibilidad
 export const accountRepository = new AccountRepository();
 export const authRepository = new AuthRepository();
@@ -76,6 +85,7 @@ export const budgetRepository = new BudgetRepository();
 export const categoryRepository = new CategoryRepository();
 export const transactionRepository = new TransactionRepository();
 export const analyticsRepository = new AnalyticsRepository();
+export const searchRepository = new SearchRepository();
 
 // Función para verificar si estamos en modo mock
 export const isMockMode = (): boolean => USE_MOCKS;
@@ -92,4 +102,5 @@ export type IAuthRepository = AuthRepositoryMock;
 export type IBudgetRepository = BudgetRepository;
 export type ICategoryRepository = CategoryRepositoryMock;
 export type ITransactionRepository = TransactionRepositoryMock;
-export type IAnalyticsRepository = AnalyticsRepository; 
+export type IAnalyticsRepository = AnalyticsRepository;
+export type ISearchRepository = SearchRepository; 
