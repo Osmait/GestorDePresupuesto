@@ -90,7 +90,7 @@ export function Search() {
                     >
                       <span className="truncate">{tx.name || tx.description}</span>
                       <span className={cn("text-xs font-mono", tx.type_transation === "income" ? "text-green-500" : "text-red-500")}>
-                        {tx.type_transation === "income" ? "+" : "-"}${tx.amount}
+                        {tx.type_transation === "income" ? "+" : "-"}${Math.abs(tx.amount)}
                       </span>
                     </div>
                   ))}
