@@ -1,6 +1,7 @@
 'use client'
 
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
+import { useRouter } from 'next/navigation'
 import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { BudgetsPageSkeleton } from './BudgetsPageSkeleton'
@@ -54,7 +55,9 @@ interface BudgetCardProps {
     onEdit: (budget: Budget) => void
 }
 
+
 function BudgetCard({ budget, category, transactions, onDelete, onEdit }: BudgetCardProps) {
+    const router = useRouter()
     const spentAmount = Math.abs(budget.current_amount)
     const progressPercentage = (spentAmount / budget.amount) * 100
     const remaining = budget.amount - spentAmount
@@ -63,7 +66,8 @@ function BudgetCard({ budget, category, transactions, onDelete, onEdit }: Budget
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
-    const handleDelete = async () => {
+    const handleDelete = async (e?: React.MouseEvent) => {
+        e?.stopPropagation()
         setIsDeleting(true)
         try {
             await onDelete(budget.id)
@@ -73,6 +77,15 @@ function BudgetCard({ budget, category, transactions, onDelete, onEdit }: Budget
         } finally {
             setIsDeleting(false)
         }
+    }
+
+    const handleEdit = (e: React.MouseEvent) => {
+        e.stopPropagation()
+        onEdit(budget)
+    }
+
+    const handleCardClick = () => {
+        router.push(`/app/transactions?budget=${budget.id}`)
     }
 
     const getStatusColor = () => {
@@ -90,7 +103,10 @@ function BudgetCard({ budget, category, transactions, onDelete, onEdit }: Budget
     }
 
     return (
-        <Card className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20 group">
+        <Card
+            className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20 group cursor-pointer"
+            onClick={handleCardClick}
+        >
             <CardContent className="p-6">
                 <div className="flex items-center justify-between mb-4">
                     <div className="flex items-center space-x-4">
@@ -121,18 +137,21 @@ function BudgetCard({ budget, category, transactions, onDelete, onEdit }: Budget
                         </Badge>
                         <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
                                     <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => onEdit(budget)}>
+                                <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={handleEdit}>
                                     <Edit className="h-4 w-4" />
                                     Editar presupuesto
                                 </DropdownMenuItem>
                                 <DropdownMenuItem
                                     className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
-                                    onClick={() => setShowDeleteDialog(true)}
+                                    onClick={(e) => {
+                                        e.stopPropagation()
+                                        setShowDeleteDialog(true)
+                                    }}
                                 >
                                     <Trash2 className="h-4 w-4" />
                                     Eliminar presupuesto

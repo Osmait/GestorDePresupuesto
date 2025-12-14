@@ -12,6 +12,7 @@ export interface TransactionFiltersState {
     type: string
     account: string
     category: string
+    budget: string
     minAmount: string
     maxAmount: string
     search: string
@@ -57,6 +58,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
             type: searchParams.get('type') || 'all',
             account: searchParams.get('account') || 'all',
             category: searchParams.get('category') || 'all',
+            budget: searchParams.get('budget') || 'all',
             minAmount: searchParams.get('minAmount') || '',
             maxAmount: searchParams.get('maxAmount') || '',
             search: searchParams.get('search') || '',
@@ -82,6 +84,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
         if (filters.account !== 'all') apiFilters.account_id = filters.account
         if (filters.category !== 'all') apiFilters.category_id = filters.category
+        if (filters.budget !== 'all') apiFilters.budget_id = filters.budget
         if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
         if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
         if (filters.search) apiFilters.search = filters.search
@@ -140,6 +143,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         if (newFilters.type && newFilters.type !== 'all') params.set('type', newFilters.type)
         if (newFilters.account && newFilters.account !== 'all') params.set('account', newFilters.account)
         if (newFilters.category && newFilters.category !== 'all') params.set('category', newFilters.category)
+        if (newFilters.budget && newFilters.budget !== 'all') params.set('budget', newFilters.budget)
         if (newFilters.minAmount) params.set('minAmount', newFilters.minAmount)
         if (newFilters.maxAmount) params.set('maxAmount', newFilters.maxAmount)
         if (newFilters.search) params.set('search', newFilters.search)
@@ -156,7 +160,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     const clearFilters = useCallback(() => {
         const clearedFilters = {
             dateRange: { from: undefined, to: undefined },
-            type: 'all', account: 'all', category: 'all', minAmount: '', maxAmount: '', search: '',
+            type: 'all', account: 'all', category: 'all', budget: 'all', minAmount: '', maxAmount: '', search: '',
         }
         setFilters(clearedFilters)
         router.replace(window.location.pathname)
