@@ -10,30 +10,35 @@ import { CategoryExpense, MonthlySummary } from '@/types/analytics'
 interface DashboardChartsProps {
 	categories: { id: string, name: string, color: string }[]
 	transactions: { amount: number, type_transation: string, category_id: string, created_at: string }[]
-  categorysData: CategoryExpense[]
-  monthSummary: MonthlySummary[]
+	categorysData: CategoryExpense[]
+	monthSummary: MonthlySummary[]
 }
 
-export function DashboardCharts({ categorysData,monthSummary}: DashboardChartsProps) {
+export function DashboardCharts({ categorysData, monthSummary }: DashboardChartsProps) {
 	const { theme } = useTheme()
 
 
 
-  const pieData = categorysData ? categorysData.map(cat => {
-    return {
-      ...cat,
-      value: Math.abs(cat.value), 
-    }
-  }) : []
+	const truncate = (str: string, n: number) => str.length > n ? str.slice(0, n) : str
+
+	const pieData = categorysData ? categorysData.map(cat => {
+		return {
+			...cat,
+			id: truncate(cat.label || cat.id, 12),
+			originalId: cat.id,
+			originalLabel: cat.label,
+			value: Math.abs(cat.value),
+		}
+	}) : []
 
 
 
-  const barData = monthSummary ? monthSummary.map(month => {
-    return {
-      ...month,
-      Gastos : Math.abs(month.Gastos), // Asegurarse de que Gastos sea positivo
-    }
-  }) : []
+	const barData = monthSummary ? monthSummary.map(month => {
+		return {
+			...month,
+			Gastos: Math.abs(month.Gastos), // Asegurarse de que Gastos sea positivo
+		}
+	}) : []
 	const nivoTheme = useMemo(() => ({
 		background: 'transparent',
 		textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
@@ -42,12 +47,12 @@ export function DashboardCharts({ categorysData,monthSummary}: DashboardChartsPr
 			legend: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#374151' } },
 			ticks: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#374151' } }
 		},
-		legends: { 
-			text: { 
+		legends: {
+			text: {
 				fill: theme === 'dark' ? '#e5e7eb' : '#374151',
 				fontSize: 13,
 				fontWeight: 500
-			} 
+			}
 		},
 		tooltip: {
 			container: {
@@ -56,7 +61,7 @@ export function DashboardCharts({ categorysData,monthSummary}: DashboardChartsPr
 				fontSize: 14,
 				borderRadius: '8px',
 				border: `1px solid ${theme === 'dark' ? '#374151' : '#d1d5db'}`,
-				boxShadow: theme === 'dark' 
+				boxShadow: theme === 'dark'
 					? '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1)'
 					: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)'
 			},
@@ -92,29 +97,7 @@ export function DashboardCharts({ categorysData,monthSummary}: DashboardChartsPr
 							arcLinkLabelsColor={{ from: 'color' }}
 							activeOuterRadiusOffset={8}
 							theme={nivoTheme}
-							legends={[
-								{
-									anchor: 'bottom',
-									direction: 'row',
-									justify: false,
-									translateY: 36,
-									itemWidth: 80,
-									itemHeight: 18,
-									itemsSpacing: 8,
-									symbolSize: 18,
-									symbolShape: 'circle',
-									itemTextColor: theme === 'dark' ? '#e5e7eb' : '#374151',
-									itemBackground: 'transparent',
-									effects: [
-										{
-											on: 'hover',
-											style: {
-												itemTextColor: theme === 'dark' ? '#ffffff' : '#000000'
-											}
-										}
-									]
-								}
-							]}
+
 						/>
 					) : (
 						<div className="flex items-center justify-center h-full text-muted-foreground">
@@ -133,7 +116,7 @@ export function DashboardCharts({ categorysData,monthSummary}: DashboardChartsPr
 					{barData.length > 0 ? (
 						<ResponsiveBar
 							data={barData}
-							keys={['Ingresos','Gastos']}
+							keys={['Ingresos', 'Gastos']}
 							indexBy="month"
 							margin={{ top: 30, right: 30, bottom: 80, left: 50 }}
 							padding={0.3}
