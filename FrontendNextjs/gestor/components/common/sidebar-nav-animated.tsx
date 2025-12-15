@@ -80,7 +80,7 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 
 			{/* Fondo del indicador con efecto de brillo */}
 			<div
-				className="absolute left-3 right-3 bg-gradient-to-r from-primary/15 to-primary/8 rounded-lg border border-primary/30 transition-all duration-500 ease-out pointer-events-none z-0 shadow-sm"
+				className={`absolute bg-gradient-to-r from-primary/15 to-primary/8 rounded-lg border border-primary/30 transition-all duration-500 ease-out pointer-events-none z-0 shadow-sm ${isExpanded ? 'left-3 right-3' : 'left-2 right-2'}`}
 				style={{
 					top: `${indicatorStyle.top}px`,
 					height: `${indicatorStyle.height}px`,
@@ -115,8 +115,8 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 							href={item.href}
 							onClick={handleLinkClick}
 							className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 group relative ${isActive
-									? 'text-primary font-semibold'
-									: 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
+								? 'text-primary font-semibold'
+								: 'text-muted-foreground hover:text-foreground hover:bg-muted/40'
 								} ${!isExpanded && 'justify-center px-2'}`}
 						>
 							{/* Efecto de hover con gradiente */}
@@ -126,8 +126,8 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 							<div className={`absolute inset-0 bg-gradient-to-r from-transparent via-primary/10 to-transparent rounded-lg opacity-0 transition-all duration-500 pointer-events-none ${!isActive ? 'group-hover:opacity-100' : ''}`} />
 
 							<Icon className={`h-4 w-4 flex-shrink-0 transition-all duration-300 ${isActive
-									? 'text-primary scale-110 animate-icon-bounce'
-									: 'group-hover:scale-110 group-hover:text-foreground group-hover:rotate-3'
+								? 'text-primary scale-110 animate-icon-bounce'
+								: 'group-hover:scale-110 group-hover:text-foreground group-hover:rotate-3'
 								}`} />
 
 							{isExpanded && (
@@ -140,8 +140,8 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 										<Badge
 											variant={isActive ? "default" : "secondary"}
 											className={`text-xs transition-all duration-300 transform ${isActive
-													? 'bg-primary/25 text-primary border-primary/40 scale-105 shadow-sm'
-													: 'group-hover:bg-muted group-hover:scale-105 group-hover:shadow-sm'
+												? 'bg-primary/25 text-primary border-primary/40 scale-105 shadow-sm'
+												: 'group-hover:bg-muted group-hover:scale-105 group-hover:shadow-sm'
 												}`}
 										>
 											{item.badge}
