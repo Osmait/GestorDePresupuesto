@@ -23,6 +23,9 @@ import {
 	Mouse,
 	Layout
 } from 'lucide-react'
+import { useSession } from "next-auth/react"
+import { ModeToggle } from '@/components/common/ToggleMode'
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 
 export default function SettingsPage() {
 	const {
@@ -37,6 +40,13 @@ export default function SettingsPage() {
 		notifications,
 		setNotifications
 	} = useSettings()
+
+	const { data: session } = useSession()
+
+	const getInitials = (name: string, lastName?: string) => {
+		const initials = `${name?.charAt(0) || ""}${lastName?.charAt(0) || ""}`
+		return initials.toUpperCase() || "U"
+	}
 
 	return (
 		<div className="space-y-6">
@@ -67,20 +77,35 @@ export default function SettingsPage() {
 									Perfil de Usuario
 								</CardTitle>
 							</CardHeader>
-							<CardContent className="space-y-4">
-								<div className="flex items-center justify-between">
+							<CardContent className="space-y-6">
+								<div className="flex items-center gap-4">
+									<Avatar className="h-20 w-20">
+										<AvatarImage src={session?.user.image || ""} alt={session?.user.name || ""} />
+										<AvatarFallback className="text-2xl bg-primary text-primary-foreground">
+											{getInitials(session?.user.name || "", session?.user.lastName)}
+										</AvatarFallback>
+									</Avatar>
 									<div>
-										<p className="font-medium">Nombre completo</p>
-										<p className="text-sm text-muted-foreground">Juan Pérez</p>
+										<h2 className="text-xl font-bold">{session?.user.name} {session?.user.lastName}</h2>
+										<p className="text-muted-foreground">{session?.user.email}</p>
 									</div>
-									<Button variant="outline" size="sm">Editar</Button>
 								</div>
-								<div className="flex items-center justify-between">
-									<div>
-										<p className="font-medium">Email</p>
-										<p className="text-sm text-muted-foreground">juan.perez@email.com</p>
+
+								<div className="grid gap-4 pt-4 border-t">
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="font-medium">Nombre completo</p>
+											<p className="text-sm text-muted-foreground">{session?.user.name} {session?.user.lastName}</p>
+										</div>
+										<Button variant="outline" size="sm">Editar</Button>
 									</div>
-									<Button variant="outline" size="sm">Cambiar</Button>
+									<div className="flex items-center justify-between">
+										<div>
+											<p className="font-medium">Email</p>
+											<p className="text-sm text-muted-foreground">{session?.user.email}</p>
+										</div>
+										<Button variant="outline" size="sm">Cambiar</Button>
+									</div>
 								</div>
 							</CardContent>
 						</Card>
@@ -97,10 +122,10 @@ export default function SettingsPage() {
 									<div>
 										<p className="font-medium">Tema</p>
 										<p className="text-sm text-muted-foreground">
-											{theme === 'light' ? 'Claro' : theme === 'dark' ? 'Oscuro' : 'Sistema'}
+											Personaliza la apariencia de la aplicación
 										</p>
 									</div>
-									<Button variant="outline" size="sm">Cambiar</Button>
+									<ModeToggle />
 								</div>
 								<div className="flex items-center justify-between">
 									<div>

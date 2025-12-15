@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogOut, User, Settings } from "lucide-react"
+import { ModeToggle } from "@/components/common/ToggleMode"
 
 export function UserNav() {
   const { data: session, status } = useSession()
@@ -56,6 +57,13 @@ export function UserNav() {
             </p>
           </div>
         </DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        <div className="px-2 py-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm">Tema</span>
+            <ModeToggle />
+          </div>
+        </div>
         <DropdownMenuSeparator />
         <DropdownMenuItem>
           <User className="mr-2 h-4 w-4" />
