@@ -51,7 +51,7 @@ export function SidebarController({ children }: SidebarControllerProps) {
 
 	const getSidebarClassName = () => {
 		return cn(
-			'fixed left-0 top-0 z-50 h-full bg-gradient-to-b from-background via-background to-muted/20 border-r border-border/50 transition-all duration-300 lg:relative lg:translate-x-0',
+			'fixed left-0 top-0 z-50 h-full bg-sidebar border-r border-border/50 transition-all duration-300 lg:relative lg:translate-x-0',
 			isExpanded ? 'w-64' : 'w-16',
 			isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
 		)

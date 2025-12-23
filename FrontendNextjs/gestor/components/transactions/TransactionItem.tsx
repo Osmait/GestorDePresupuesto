@@ -58,7 +58,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
   console.log({ category });
   console.log({ transaction });
   return (
-    <Card className="hover:shadow-md hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20">
+    <Card className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20">
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">

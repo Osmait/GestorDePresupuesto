@@ -63,7 +63,7 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
 
   return (
     <Card
-      className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20 cursor-pointer"
+      className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20 cursor-pointer"
       onClick={handleCardClick}
     >
       <CardContent className="p-6">

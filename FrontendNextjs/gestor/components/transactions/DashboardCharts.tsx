@@ -79,7 +79,7 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 
 	return (
 		<div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
-			<div className="bg-card rounded-xl shadow-lg p-4 flex flex-col items-center">
+			<div className="bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center">
 				<h3 className="font-semibold mb-2 text-lg text-foreground">Gastos por Categoría</h3>
 				<div className="h-64 w-full">
 					{pieData.length > 0 ? (
@@ -110,7 +110,7 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 					)}
 				</div>
 			</div>
-			<div className="bg-card rounded-xl shadow-lg p-4 flex flex-col items-center">
+			<div className="bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center">
 				<h3 className="font-semibold mb-2 text-lg text-foreground">Ingresos vs Gastos por Mes</h3>
 				<div className="h-64 w-full">
 					{barData.length > 0 ? (

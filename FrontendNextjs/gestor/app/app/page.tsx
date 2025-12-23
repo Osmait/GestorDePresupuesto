@@ -50,7 +50,7 @@ function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' 
 	}
 
 	return (
-		<Card className="border-border/50 dark:border-border/20 transition-all duration-200 hover:shadow-lg dark:hover:shadow-lg/25">
+		<Card className="border-border/50 dark:border-border/20 transition-all duration-200 hover:bg-accent/40 dark:hover:bg-accent/40">
 			<CardContent className="p-6">
 				<div className={`rounded-lg p-4 bg-gradient-to-br ${colorClasses[color]}`}>
 					<div className="flex items-center justify-between mb-3">
@@ -83,7 +83,7 @@ function TransactionItem({ transaction, category }: {
 	const isIncome = transaction.type_transation === TypeTransaction.INCOME
 
 	return (
-		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">
+		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors">
 			<div className="flex items-center gap-3">
 				<div className="w-10 h-10 rounded-full flex items-center justify-center text-lg" style={{ backgroundColor: category?.color || '#6B7280' }}>
 					{category?.icon || '💳'}
@@ -115,7 +115,7 @@ function CategoryCard({ category, transactions }: {
 	const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
 
 	return (
-		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">
+		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors">
 			<div className="flex items-center gap-3">
 				<div
 					className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
@@ -141,7 +141,7 @@ function AccountCard({ account }: { account: Account }) {
 	const isPositive = currentBalance > 0
 
 	return (
-		<Card className="border-border/50 dark:border-border/20 hover:shadow-lg dark:hover:shadow-lg/25 transition-all duration-200">
+		<Card className="border-border/50 dark:border-border/20 hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-200">
 			<CardContent className="p-6">
 				<div className="flex items-center justify-between mb-4">
 					<div>
@@ -407,7 +407,7 @@ export default async function DashboardPage() {
 																const percentage = (spentAmount / budget.amount) * 100;
 
 																return (
-																	<div key={budget.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-muted/30 dark:hover:bg-muted/20 transition-colors">
+																	<div key={budget.id} className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors">
 																		<div className="flex items-center gap-3">
 																			<div
 																				className="w-8 h-8 rounded-full flex items-center justify-center text-sm"
@@ -424,8 +424,8 @@ export default async function DashboardPage() {
 																		</div>
 																		<div className="text-right">
 																			<p className={`text-sm font-bold ${percentage > 80 ? 'text-red-600 dark:text-red-400' :
-																					percentage > 60 ? 'text-yellow-600 dark:text-yellow-400' :
-																						'text-green-600 dark:text-green-400'
+																				percentage > 60 ? 'text-yellow-600 dark:text-yellow-400' :
+																					'text-green-600 dark:text-green-400'
 																				}`}>
 																				{percentage.toFixed(1)}%
 																			</p>

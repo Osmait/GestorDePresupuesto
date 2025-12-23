@@ -104,7 +104,7 @@ function BudgetCard({ budget, category, transactions, onDelete, onEdit }: Budget
 
     return (
         <Card
-            className="hover:shadow-lg hover:shadow-primary/5 dark:hover:shadow-primary/10 transition-all duration-300 border-border/50 dark:border-border/20 group cursor-pointer"
+            className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20 group cursor-pointer"
             onClick={handleCardClick}
         >
             <CardContent className="p-6">
