@@ -5,6 +5,8 @@ linters:
   enable:
     - govet
     - staticcheck
-    - gofmt
     - errcheck
     - ineffassign
+formatters:
+  enable:
+    - gofmt
