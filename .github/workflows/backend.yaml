@@ -2,8 +2,8 @@ name: Backend Quality
 
 on:
   push:
-    branches: ['**']
-    paths:
+     branches: [main, development]    
+     paths:
       - 'BackEnd/**'
   pull_request:
     branches: [main, development]
