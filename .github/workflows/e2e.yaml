@@ -54,6 +54,9 @@ jobs:
       # --- Run E2E Tests ---
       - name: Run Playwright Tests
         run: make test-e2e
+        env:
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+          NEXTAUTH_URL: "http://localhost:3000"
         # Note: 'make test-e2e' uses 'webServer' config to start Backend (make backend) and Frontend (make frontend)
 
       - uses: actions/upload-artifact@v4
