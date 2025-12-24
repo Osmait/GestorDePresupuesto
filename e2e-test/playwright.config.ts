@@ -29,7 +29,9 @@ export default defineConfig({
     ],
     webServer: [
         {
-            command: 'cd .. && make backend',
+            // Use direct go run to ensure the process exits correctly on SIGTERM. 
+            // 'make backend' uses 'air' which might swallow signals.
+            command: 'cd ../BackEnd && go run main.go',
             url: 'http://localhost:8080',
             reuseExistingServer: !process.env.CI,
             timeout: 120 * 1000,
@@ -37,7 +39,7 @@ export default defineConfig({
             stderr: 'pipe',
         },
         {
-            command: 'cd .. && make frontend',
+            command: 'cd ../FrontendNextjs/gestor && npm run dev',
             url: 'http://localhost:3000',
             reuseExistingServer: !process.env.CI,
             timeout: 120 * 1000,

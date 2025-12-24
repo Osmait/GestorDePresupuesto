@@ -335,7 +335,6 @@ export default async function DashboardPage() {
 
 	// Extract transactions from the response
 	const transactions = transactionResponse || []
-	console.log(accounts, transactions, categories, budgets)
 
 	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
 
