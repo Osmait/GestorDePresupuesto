@@ -28,11 +28,11 @@ export function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
             <DollarSign className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
             <p className="text-sm font-medium text-muted-foreground">{t('currentBalance')}</p>
             <p className="text-2xl font-bold text-foreground">
-              <AnimatedCounter value={totalCurrentBalance} prefix="$" />
+              <AnimatedCounter value={totalCurrentBalance} prefix="$" decimals={2} />
             </p>
             {totalInitialBalance !== totalCurrentBalance && (
               <p className="text-xs text-muted-foreground mt-1">
-                {t('initial')}: <AnimatedCounter value={totalInitialBalance} prefix="$" />
+                {t('initial')}: <AnimatedCounter value={totalInitialBalance} prefix="$" decimals={2} />
               </p>
             )}
           </div>
@@ -48,7 +48,7 @@ export function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
             <p className="text-sm font-medium text-muted-foreground">{t('totalDifference')}</p>
             <p className={`text-2xl font-bold ${balanceDifference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
               {balanceDifference >= 0 ? '+' : ''}
-              <AnimatedCounter value={Math.abs(balanceDifference)} />
+              <AnimatedCounter value={Math.abs(balanceDifference)} prefix="$" decimals={2} />
             </p>
           </div>
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5">

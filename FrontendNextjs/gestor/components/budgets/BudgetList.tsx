@@ -44,6 +44,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { useTranslations } from 'next-intl'
+import { formatCurrency } from '@/lib/utils'
 
 
 // --- Helper Components copied from original BudgetsClient or improved ---
@@ -169,21 +170,21 @@ function BudgetCard({ budget, category, transactions, onDelete, onEdit }: Budget
                     <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">{t('budget')}</span>
                         <span className="font-bold text-lg text-foreground">
-                            ${budget.amount.toLocaleString()}
+                            {formatCurrency(budget.amount)}
                         </span>
                     </div>
 
                     <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">{t('spent')}</span>
                         <span className={`font-bold text-lg ${isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`}>
-                            ${spentAmount.toLocaleString()}
+                            {formatCurrency(spentAmount)}
                         </span>
                     </div>
 
                     <div className="flex justify-between items-center">
                         <span className="text-sm text-muted-foreground">{t('remaining')}</span>
                         <span className={`font-bold text-lg ${remaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            ${remaining.toLocaleString()}
+                            {formatCurrency(remaining)}
                         </span>
                     </div>
 
@@ -266,21 +267,21 @@ function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], trans
                         <DollarSign className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
                         <p className="text-sm font-medium text-muted-foreground">{t('totalBudget')}</p>
                         <p className="text-xl font-bold text-foreground">
-                            <AnimatedCounter value={totalBudget} prefix="$" />
+                            <AnimatedCounter value={totalBudget} prefix="$" decimals={2} />
                         </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 dark:from-orange-500/5 dark:to-red-500/5">
                         <TrendingDown className="h-6 w-6 mx-auto mb-2 text-orange-600 dark:text-orange-400" />
                         <p className="text-sm font-medium text-muted-foreground">{t('totalSpent')}</p>
                         <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
-                            <AnimatedCounter value={totalSpent} prefix="$" />
+                            <AnimatedCounter value={totalSpent} prefix="$" decimals={2} />
                         </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
                         <TrendingUp className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
                         <p className="text-sm font-medium text-muted-foreground">{t('totalRemaining')}</p>
                         <p className={`text-xl font-bold ${totalRemaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            <AnimatedCounter value={totalRemaining} prefix="$" />
+                            <AnimatedCounter value={totalRemaining} prefix="$" decimals={2} />
                         </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-red-500/10 to-pink-500/10 dark:from-red-500/5 dark:to-pink-500/5">

@@ -24,8 +24,8 @@ export function AnimatedCounter({
             <CountUp
                 end={value}
                 duration={duration}
-                separator="."
-                decimal=","
+                separator=","
+                decimal="."
                 decimals={decimals}
                 prefix={prefix}
                 suffix={suffix}

@@ -7,8 +7,6 @@ import {
     ArrowUpDown,
     Tags,
     PiggyBank,
-    Settings,
-    HelpCircle,
     BarChart,
     TrendingUp,
 } from 'lucide-react'
@@ -84,20 +82,7 @@ export function useNavItems() {
         },
     ]
 
-    const bottomNavItems: NavItem[] = [
-        {
-            title: t('settings'),
-            href: '/app/settings',
-            icon: Settings,
-            description: t('settingsDesc')
-        },
-        {
-            title: t('help'),
-            href: '/app/help',
-            icon: HelpCircle,
-            description: t('helpDesc')
-        }
-    ]
+    const bottomNavItems: NavItem[] = []
 
     return { navItems, bottomNavItems }
 }

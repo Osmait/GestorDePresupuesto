@@ -23,6 +23,7 @@ import { useState } from 'react';
 
 import { useRouter } from 'next/navigation';
 import { useTranslations } from 'next-intl';
+import { formatCurrency } from '@/lib/utils';
 
 interface AccountCardProps {
   account: Account;
@@ -119,15 +120,15 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
                 <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
               )}
               <span className={`font-bold text-2xl ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                ${currentBalance.toLocaleString()}
+                {formatCurrency(currentBalance)}
               </span>
             </div>
           </div>
           {initialBalance !== currentBalance && (
             <div className="flex justify-between items-center text-xs">
-              <span className="text-muted-foreground">{t('initial')}: ${initialBalance.toLocaleString()}</span>
+              <span className="text-muted-foreground">{t('initial')}: {formatCurrency(initialBalance)}</span>
               <span className={`font-medium ${hasGrowth ? 'text-green-600' : 'text-red-600'}`}>
-                {hasGrowth ? '+' : ''}{(currentBalance - initialBalance).toLocaleString()}
+                {hasGrowth ? '+' : ''}{formatCurrency(currentBalance - initialBalance).replace('$', '')}
               </span>
             </div>
           )}

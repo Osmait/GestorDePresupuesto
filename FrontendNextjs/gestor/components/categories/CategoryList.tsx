@@ -31,6 +31,7 @@ import { CategoriesSkeleton } from '@/components/skeletons/categories-skeleton'
 
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { formatCurrency } from '@/lib/utils'
 
 // Helper component extracted from original page
 interface CategoryCardProps {
@@ -115,7 +116,7 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
                     </div>
                     <div className="text-right">
                         <p className="font-bold text-xl text-foreground">
-                            ${totalAmount.toLocaleString()}
+                            {formatCurrency(totalAmount)}
                         </p>
                         <p className="text-xs text-muted-foreground">Total</p>
                     </div>

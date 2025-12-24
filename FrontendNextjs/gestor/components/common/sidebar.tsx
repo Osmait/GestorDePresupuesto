@@ -9,7 +9,6 @@ import { UserNav } from '@/components/auth/user-nav'
 import { Search } from '@/components/common/search'
 import { SidebarController } from '@/components/common/sidebar-controller'
 import { AnimatedSidebarNav } from '@/components/common/sidebar-nav-animated'
-import { SettingsModal } from '@/components/settings/SettingsModal'
 import {
 	LayoutDashboard,
 	CreditCard,
@@ -22,8 +21,6 @@ import {
 	ChevronLeft,
 	ChevronRight,
 	Home,
-	Settings,
-	HelpCircle,
 	Bell,
 	Plus,
 	Mouse,
@@ -225,14 +222,9 @@ export function Sidebar({ children }: SidebarProps) {
 	const pathname = usePathname()
 	const { navItems, bottomNavItems } = useNavItems()
 
-	// Estado local para settings
-	const [showSettings, setShowSettings] = React.useState(false)
-
+	// Estado local para settings eliminada al moverla al UserNav
 	const handleItemClick = (item: NavItem, e: React.MouseEvent) => {
-		if (item.href === '/app/settings') {
-			e.preventDefault()
-			setShowSettings(true)
-		}
+		// Handler vacío por ahora, o eliminar si no se usa
 	}
 
 	return (
@@ -293,7 +285,6 @@ export function Sidebar({ children }: SidebarProps) {
 						</main>
 					</div>
 
-					<SettingsModal open={showSettings} onOpenChange={setShowSettings} />
 				</div>
 			)}
 		</SidebarController>
