@@ -31,7 +31,7 @@ export class TransactionRepository extends BaseRepository {
   async findAll(filters?: TransactionFilters): Promise<PaginatedTransactionResponse> {
     try {
       const queryParams = new URLSearchParams();
-      
+
       if (filters) {
         Object.entries(filters).forEach(([key, value]) => {
           if (value !== undefined && value !== null && value !== '') {
@@ -39,7 +39,7 @@ export class TransactionRepository extends BaseRepository {
           }
         });
       }
-      
+
       const url = `/transaction${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await this.get<PaginatedTransactionResponse>(url);
       console.log("paginated transactions data", response);
@@ -81,11 +81,16 @@ export class TransactionRepository extends BaseRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    created_at?: Date,
   ): Promise<void> {
     try {
-      const body = this.buildTransactionBody(
-        name, description, amount, typeTransaction, account_id, category_id, budget_id
-      );
+      const body = {
+        ...this.buildTransactionBody(
+          name, description, amount, typeTransaction, account_id, category_id, budget_id
+        ),
+        created_at: created_at ? created_at.toISOString() : new Date().toISOString()
+      };
+
       console.log("body", body);
       const data = await this.post("/transaction", body);
       console.log("transaction created", data);
@@ -104,11 +109,15 @@ export class TransactionRepository extends BaseRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    created_at?: Date,
   ): Promise<void> {
     try {
-      const body = this.buildTransactionBody(
-        name, description, amount, typeTransaction, account_id, category_id, budget_id
-      );
+      const body = {
+        ...this.buildTransactionBody(
+          name, description, amount, typeTransaction, account_id, category_id, budget_id
+        ),
+        created_at: created_at ? created_at.toISOString() : undefined
+      };
       await this.put(`/transaction/${id}`, body);
     } catch (error) {
       console.error("Error updating transaction:", error);

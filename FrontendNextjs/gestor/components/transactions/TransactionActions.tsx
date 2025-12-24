@@ -53,7 +53,9 @@ export function TransactionActions() {
 
                     try {
                         // Construct Optimistic Transaction
-                        const [name, description, amount, type_transation, account_id, category_id] = args;
+                        const [name, description, amount, type_transation, account_id, category_id, budget_id, created_at_arg] = args;
+                        const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString();
+
                         const optimisticTx = {
                             id: `temp-${Date.now()}`,
                             name,
@@ -62,7 +64,7 @@ export function TransactionActions() {
                             type_transation,
                             account_id,
                             category_id,
-                            created_at: new Date().toISOString(), // Use string to match typical API response or Date depending on type
+                            created_at,
                             user_id: 'current-user', // Placeholder
                             updated_at: new Date().toISOString()
                         };

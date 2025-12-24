@@ -7,10 +7,14 @@ import { Input } from '@/components/ui/input';
 import { Form, FormField, FormItem, FormLabel, FormControl, FormMessage } from '@/components/ui/form';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Loader2, PlusCircle, AlertCircle } from 'lucide-react';
+import { Loader2, PlusCircle, AlertCircle, CalendarIcon } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery';
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery';
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery';
@@ -39,7 +43,8 @@ type TransactionFormModalProps = {
     type_transaction: TypeTransaction,
     account_id: string,
     category_id: string,
-    budget_id?: string
+    budget_id?: string,
+    created_at?: Date
   ) => Promise<void>;
   isLoading: boolean;
   error: string | null;
@@ -107,7 +112,8 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
           values.type_transaction,
           values.account_id,
           values.category_id,
-          values.budget_id
+          values.budget_id,
+          values.created_at
         );
       } else {
         await createTransaction(
@@ -117,7 +123,8 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
           values.type_transaction,
           values.account_id,
           values.category_id,
-          values.budget_id
+          values.budget_id,
+          values.created_at
         );
       }
       form.reset();
@@ -227,9 +234,37 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
               <FormField control={form.control} name="created_at" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Fecha</FormLabel>
-                  <FormControl>
-                    <Input type="date" value={format(field.value, 'yyyy-MM-dd')} onChange={e => field.onChange(new Date(e.target.value))} />
-                  </FormControl>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <FormControl>
+                        <Button
+                          variant={"outline"}
+                          className={cn(
+                            "w-full pl-3 text-left font-normal",
+                            !field.value && "text-muted-foreground"
+                          )}
+                        >
+                          {field.value ? (
+                            format(field.value, "PPP", { locale: es })
+                          ) : (
+                            <span>Seleccionar fecha</span>
+                          )}
+                          <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
+                        </Button>
+                      </FormControl>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={field.onChange}
+                        disabled={(date) =>
+                          date > new Date() || date < new Date("1900-01-01")
+                        }
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <FormMessage />
                 </FormItem>
               )} />

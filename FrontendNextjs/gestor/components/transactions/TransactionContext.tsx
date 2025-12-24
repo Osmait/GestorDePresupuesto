@@ -131,16 +131,16 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 
     const createTransaction = async (...args: any[]) => {
         // Adapt arguments to object expected by mutation
-        const [name, description, amount, type, accountId, categoryId, budgetId] = args
+        const [name, description, amount, type, accountId, categoryId, budgetId, createdAt] = args
         await createMutation.mutateAsync({
-            name, description, amount, type, accountId, categoryId, budgetId
+            name, description, amount, type, accountId, categoryId, budgetId, createdAt
         })
     }
 
     const updateTransaction = async (id: string, ...args: any[]) => {
-        const [name, description, amount, type, accountId, categoryId, budgetId] = args
+        const [name, description, amount, type, accountId, categoryId, budgetId, createdAt] = args
         await updateMutation.mutateAsync({
-            id, name, description, amount, type, accountId, categoryId, budgetId
+            id, name, description, amount, type, accountId, categoryId, budgetId, createdAt
         })
         setEditingTransaction(null) // Close edit mode after success
     }

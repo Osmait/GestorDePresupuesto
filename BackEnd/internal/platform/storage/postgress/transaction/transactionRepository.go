@@ -22,7 +22,7 @@ func NewTransactionRepository(db *sql.DB) *TransactionRepository {
 }
 
 func (repo *TransactionRepository) Save(ctx context.Context, transaction *transaction.Transaction) error {
-	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId)
+	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, $10)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId, transaction.CreatedAt)
 
 	return err
 }
@@ -148,8 +148,8 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 }
 
 func (r *TransactionRepository) Update(ctx context.Context, id string, transaction *transaction.Transaction) error {
-	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3, type_transation = $4, account_id = $5, category_id = $6, budget_id = $7 WHERE id = $8`
-	_, err := r.db.ExecContext(ctx, query, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.CategoryId, transaction.BudgetId, id)
+	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3, type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, created_at = $8 WHERE id = $9`
+	_, err := r.db.ExecContext(ctx, query, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.CategoryId, transaction.BudgetId, transaction.CreatedAt, id)
 	return err
 }
 

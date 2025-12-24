@@ -145,7 +145,7 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 
 	ctx := context.Background()
 	transaction := utils.GetNewRandomTransaction()
-	err := s.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId)
+	err := s.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId, transaction.CreatedAt)
 	assert.NoError(t, err, "CreateAccount should not return an error")
 	mockRepo.AssertExpectations(t)
 }

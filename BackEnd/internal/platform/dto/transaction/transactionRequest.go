@@ -1,15 +1,19 @@
 package dto
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 type TransactionRequest struct {
-	Name           string  `json:"name" validate:"required" binding:"required" example:"Grocery Shopping"`
-	Description    string  `json:"description" example:"Weekly grocery shopping at Walmart"`
-	Amount         float64 `json:"amount" validate:"required" binding:"required,gt=0" example:"125.50"`
-	TypeTransation string  `json:"type_transation" validate:"required" binding:"required" example:"expense" enums:"income,expense"`
-	AccountId      string  `json:"account_id" validate:"required" binding:"required" example:"acc_123456789"`
-	CategoryId     string  `json:"category_id" validate:"required" binding:"required" example:"cat_987654321"`
-	BudgetId       string  `json:"budget_id" example:"budget_555666777"`
+	Name           string    `json:"name" validate:"required" binding:"required" example:"Grocery Shopping"`
+	Description    string    `json:"description" example:"Weekly grocery shopping at Walmart"`
+	Amount         float64   `json:"amount" validate:"required" binding:"required,gt=0" example:"125.50"`
+	TypeTransation string    `json:"type_transation" validate:"required" binding:"required" example:"expense" enums:"income,expense"`
+	AccountId      string    `json:"account_id" validate:"required" binding:"required" example:"acc_123456789"`
+	CategoryId     string    `json:"category_id" validate:"required" binding:"required" example:"cat_987654321"`
+	BudgetId       string    `json:"budget_id" example:"budget_555666777"`
+	CreatedAt      time.Time `json:"created_at" example:"2023-01-01T15:04:05Z"`
 }
 
 func NewTransactionRequest(Name, Description, TypeTransation, AccountId, categoryId, budgetId string, Amount float64) *TransactionRequest {

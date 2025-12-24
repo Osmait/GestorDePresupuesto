@@ -50,6 +50,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			userID,
 			transactionRequest.CategoryId,
 			transactionRequest.BudgetId,
+			transactionRequest.CreatedAt,
 		)
 		if err != nil {
 			ctx.Error(err)
@@ -275,6 +276,9 @@ func UpdateTransaction(s *transaction.TransactionService) gin.HandlerFunc {
 		}
 		userId := ctx.MustGet("X-User-Id").(string)
 		transactionObj := domain.NewTransaction(id, transactionRequest.Name, transactionRequest.Description, transactionRequest.TypeTransation, transactionRequest.AccountId, transactionRequest.CategoryId, transactionRequest.Amount)
+		if !transactionRequest.CreatedAt.IsZero() {
+			transactionObj.CreatedAt = transactionRequest.CreatedAt
+		}
 		transactionObj.UserId = userId
 
 		if err := s.UpdateTransaction(ctx, id, transactionObj); err != nil {

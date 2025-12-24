@@ -37,7 +37,7 @@ func NewTransactionService(transactionRepository transactionRepo.TransactionRepo
 	}
 }
 
-func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string) error {
+func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, createdAt time.Time) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
@@ -49,6 +49,11 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 
 	transaction := transaction.NewTransaction(id, name, description, typeTransaction, accountId, categoryId, amount)
 	transaction.UserId = userId
+	if !createdAt.IsZero() {
+		transaction.CreatedAt = createdAt
+	} else {
+		transaction.CreatedAt = time.Now()
+	}
 
 	budget, _ := s.budgetRepository.FindByCategory(ctx, categoryId)
 	if budget != nil {
@@ -315,11 +320,11 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 	if budget != nil {
 		transaction.BudgetId = budget.Id
 	}
-	err := s.transactionRepository.Update(ctx, id, transaction)
-	if err == nil {
-		s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", transaction.UserId))
+	if err := s.transactionRepository.Update(ctx, id, transaction); err != nil {
+		return err
 	}
-	return err
+	s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", transaction.UserId))
+	return nil
 }
 
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {

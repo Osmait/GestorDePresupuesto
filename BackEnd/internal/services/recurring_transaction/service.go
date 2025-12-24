@@ -94,6 +94,7 @@ func (s *RecurringTransactionService) ProcessDueTransactions(ctx context.Context
 			rt.UserID,
 			rt.CategoryID,
 			budgetID,
+			time.Now(),
 		)
 
 		if err != nil {

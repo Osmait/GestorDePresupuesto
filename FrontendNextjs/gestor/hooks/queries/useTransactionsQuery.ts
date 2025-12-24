@@ -52,6 +52,7 @@ export function useCreateTransactionMutation() {
             accountId: string
             categoryId: string
             budgetId?: string
+            createdAt?: Date
         }) => {
             const repo = await getTransactionRepository()
             return repo.create(
@@ -61,7 +62,8 @@ export function useCreateTransactionMutation() {
                 data.type,
                 data.accountId,
                 data.categoryId,
-                data.budgetId
+                data.budgetId,
+                data.createdAt
             )
         },
         onSuccess: () => {
@@ -89,6 +91,7 @@ export function useUpdateTransactionMutation() {
             accountId: string
             categoryId: string
             budgetId?: string
+            createdAt?: Date
         }) => {
             const repo = await getTransactionRepository()
             return repo.update(
@@ -99,7 +102,8 @@ export function useUpdateTransactionMutation() {
                 data.type,
                 data.accountId,
                 data.categoryId,
-                data.budgetId
+                data.budgetId,
+                data.createdAt
             )
         },
         onSuccess: () => {
