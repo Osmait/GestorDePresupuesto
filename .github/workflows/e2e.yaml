@@ -27,7 +27,7 @@ jobs:
 
       - name: Start Backend Database Services
         working-directory: ./BackEnd
-        run: docker-compose up -d postgres
+        run: docker compose up -d postgres
       
       - name: Wait for Database
         run: sleep 10
