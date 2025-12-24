@@ -50,15 +50,14 @@ export function InvestmentList({ type, onEdit }: InvestmentListProps) {
 
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            return (
-            <InvestmentCard
-                key={investment.id}
-                investment={investment}
-                onEdit={onEdit}
-                onDelete={handleDelete}
-            />
-            )
-            })}
+            {filteredInvestments.map((investment) => (
+                <InvestmentCard
+                    key={investment.id}
+                    investment={investment}
+                    onEdit={onEdit}
+                    onDelete={handleDelete}
+                />
+            ))}
         </div>
     )
 }
