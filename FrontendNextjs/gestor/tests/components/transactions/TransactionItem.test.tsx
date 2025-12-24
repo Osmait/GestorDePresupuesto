@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import TransactionItem from './TransactionItem'
+import TransactionItem from '@/components/transactions/TransactionItem'
 import { vi } from 'vitest'
 import { TypeTransaction } from '@/types/transaction'
 
@@ -18,7 +18,7 @@ describe('TransactionItem', () => {
         name: 'Netflix Subscription',
         description: 'Monthly payment',
         amount: 15.99,
-        type_transation: TypeTransaction.EXPENSE,
+        type_transation: TypeTransaction.BILL,
         created_at: new Date('2024-01-01T12:00:00Z').toISOString(),
         account_id: 'a1',
         category_id: 'c1',

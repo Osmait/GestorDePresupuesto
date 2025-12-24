@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import { AccountSummaryCard } from './AccountSummaryCard'
+import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard'
 import { vi } from 'vitest'
 
 // Mock dependencies

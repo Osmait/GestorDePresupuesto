@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
-import { AccountActions } from './AccountActions'
+import { AccountActions } from '@/components/accounts/AccountActions'
 import { vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 

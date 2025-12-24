@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react'
-import TransactionSummaryCard from './TransactionSummaryCard'
+import TransactionSummaryCard from '@/components/transactions/TransactionSummaryCard'
 import { vi } from 'vitest'
 import { TypeTransaction } from '@/types/transaction'
 

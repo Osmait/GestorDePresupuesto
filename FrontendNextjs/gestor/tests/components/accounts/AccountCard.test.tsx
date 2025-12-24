@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { AccountCard } from './AccountCard'
+import { AccountCard } from '@/components/accounts/AccountCard'
 import { vi } from 'vitest'
 
 // Mock dependencies
