@@ -11,8 +11,11 @@ import TransactionFormModal from '@/components/transactions/TransactionFormModal
 import { useTransactionContext } from './TransactionContext'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { useTranslations } from 'next-intl'
 
 export function TransactionActions() {
+    const t = useTranslations('transactions')
+    const tForms = useTranslations('forms')
     const [drawerOpen, setDrawerOpen] = useState(false)
     const formRef = useRef<{ reset: () => void } | null>(null)
 
@@ -26,7 +29,7 @@ export function TransactionActions() {
         <div className="flex items-center gap-3">
             <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
                 <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
-                Filtrar
+                {t('filters')}
             </Button>
             <Button
                 className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
@@ -36,7 +39,7 @@ export function TransactionActions() {
                 }}
             >
                 <PlusCircle className="h-4 w-4 mr-2" aria-hidden="true" />
-                Nueva Transacción
+                {t('addTransaction')}
             </Button>
 
             <TransactionFormModal
@@ -92,7 +95,7 @@ export function TransactionActions() {
             <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
                 <DrawerContent className="w-full max-w-sm ml-auto h-full">
                     <DrawerHeader>
-                        <DrawerTitle>Filtrar Transacciones</DrawerTitle>
+                        <DrawerTitle>{t('filterTransactions')}</DrawerTitle>
                     </DrawerHeader>
                     <div className="p-4 space-y-4 overflow-y-auto">
                         <CalendarDateRangePicker value={filters.dateRange} onChange={dateRange => {
@@ -101,52 +104,52 @@ export function TransactionActions() {
                             }
                         }} />
                         <div>
-                            <label className="block mb-1 text-sm">Tipo</label>
+                            <label className="block mb-1 text-sm">{tForms('type')}</label>
                             <Select value={filters.type} onValueChange={v => setFilters(f => ({ ...f, type: v }))}>
-                                <SelectTrigger><SelectValue placeholder="Todos" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder={t('all')} /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">Todos</SelectItem>
-                                    <SelectItem value="INCOME">Ingreso</SelectItem>
-                                    <SelectItem value="BILL">Gasto</SelectItem>
+                                    <SelectItem value="all">{t('all')}</SelectItem>
+                                    <SelectItem value="INCOME">{t('income')}</SelectItem>
+                                    <SelectItem value="BILL">{t('expense')}</SelectItem>
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <label className="block mb-1 text-sm">Cuenta</label>
+                            <label className="block mb-1 text-sm">{t('account')}</label>
                             <Select value={filters.account} onValueChange={v => setFilters(f => ({ ...f, account: v }))}>
-                                <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder={t('allFemale')} /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">Todas</SelectItem>
+                                    <SelectItem value="all">{t('allFemale')}</SelectItem>
                                     {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div>
-                            <label className="block mb-1 text-sm">Categoría</label>
+                            <label className="block mb-1 text-sm">{t('category')}</label>
                             <Select value={filters.category} onValueChange={v => setFilters(f => ({ ...f, category: v }))}>
-                                <SelectTrigger><SelectValue placeholder="Todas" /></SelectTrigger>
+                                <SelectTrigger><SelectValue placeholder={t('allFemale')} /></SelectTrigger>
                                 <SelectContent>
-                                    <SelectItem value="all">Todas</SelectItem>
+                                    <SelectItem value="all">{t('allFemale')}</SelectItem>
                                     {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
                         <div className="flex gap-2">
                             <div className="flex-1">
-                                <label className="block mb-1 text-sm">Monto mínimo</label>
+                                <label className="block mb-1 text-sm">{t('minAmount')}</label>
                                 <Input type="number" value={filters.minAmount} onChange={e => setFilters(f => ({ ...f, minAmount: e.target.value }))} placeholder="0" min={0} />
                             </div>
                             <div className="flex-1">
-                                <label className="block mb-1 text-sm">Monto máximo</label>
+                                <label className="block mb-1 text-sm">{t('maxAmount')}</label>
                                 <Input type="number" value={filters.maxAmount} onChange={e => setFilters(f => ({ ...f, maxAmount: e.target.value }))} placeholder="99999" min={0} />
                             </div>
                         </div>
                         <div>
-                            <label className="block mb-1 text-sm">Buscar</label>
-                            <Input type="text" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Buscar por descripción..." />
+                            <label className="block mb-1 text-sm">{t('search')}</label>
+                            <Input type="text" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder={t('searchPlaceholder')} />
                         </div>
                         <div className="flex flex-col gap-2 pt-4">
-                            <Button type="button" variant="outline" onClick={() => clearFilters()}>Limpiar Filtros</Button>
+                            <Button type="button" variant="outline" onClick={() => clearFilters()}>{t('clearFilters')}</Button>
                         </div>
                     </div>
                 </DrawerContent>
