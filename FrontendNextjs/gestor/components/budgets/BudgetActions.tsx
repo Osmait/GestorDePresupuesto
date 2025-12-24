@@ -3,8 +3,10 @@
 import { Button } from '@/components/ui/button'
 import { PlusCircle } from 'lucide-react'
 import { useBudgetContext } from './BudgetContext'
+import { useTranslations } from 'next-intl'
 
 export function BudgetActions() {
+    const t = useTranslations('budgets')
     const { setModalOpen, setEditingBudget } = useBudgetContext()
 
     const handleCreate = () => {
@@ -19,12 +21,9 @@ export function BudgetActions() {
                 onClick={handleCreate}
             >
                 <PlusCircle className="h-4 w-4 mr-2" />
-                Nuevo Presupuesto
+                {t('addBudget')}
             </Button>
-            {/* Modal is now rendered in BudgetList or we can render it here too, but better if centralized. 
-                However, BudgetList renders it. We don't need to render it here if BudgetList is always present.
-                If this button is outside BudgetList (which it is in page.tsx), we rely on Context.
-            */}
         </div>
     )
 }
+
