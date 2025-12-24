@@ -107,10 +107,38 @@ func (m *MockBudgetRepository) Search(ctx context.Context, userId string, query 
 	return args.Get(0).([]*budget.Budget), args.Error(1)
 }
 
+type MockCache struct {
+	mock.Mock
+}
+
+func (m *MockCache) Get(key string) (interface{}, bool) {
+	args := m.Called(key)
+	return args.Get(0), args.Bool(1)
+}
+
+func (m *MockCache) Set(key string, value interface{}, duration time.Duration) {
+	m.Called(key, value, duration)
+}
+
+func (m *MockCache) Delete(key string) {
+	m.Called(key)
+}
+
+func (m *MockCache) DeleteByPrefix(prefix string) {
+	m.Called(prefix)
+}
+
+func (m *MockCache) Flush() {
+	m.Called()
+}
+
 func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo)
+	mockCache := &MockCache{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache)
+
+	mockCache.On("DeleteByPrefix", mock.Anything).Return()
 
 	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
@@ -125,7 +153,8 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 func TestFindAllTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo)
+	mockCache := &MockCache{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache)
 
 	expectedTransactions := []*transaction.Transaction{}
 	for i := 0; i < 10; i++ {
@@ -146,7 +175,10 @@ func TestFindAllTransaction(t *testing.T) {
 func TestDeleteTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo)
+	mockCache := &MockCache{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache)
+
+	mockCache.On("DeleteByPrefix", mock.Anything).Return()
 
 	expectedTransactions := utils.GetNewRandomTransaction()
 
@@ -160,7 +192,8 @@ func TestDeleteTransaction(t *testing.T) {
 func TestFindAllTransactionofAllAccount(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo)
+	mockCache := &MockCache{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache)
 
 	expectedTransactions := []*transaction.Transaction{}
 	for i := 0; i < 5; i++ {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
@@ -12,6 +13,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 
+	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 )
 
@@ -23,13 +25,15 @@ type TransactionService struct {
 	transactionRepository transactionRepo.TransactionRepositoryInterface
 	budgetRepository      budgetRepo.BudgetRepoInterface
 	notificationService   *notification.NotificationService
+	cache                 cache.CacheRepository
 }
 
-func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService) *TransactionService {
+func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository) *TransactionService {
 	return &TransactionService{
 		transactionRepository: transactionRepository,
 		budgetRepository:      budgetReposiotry,
 		notificationService:   notificationService,
+		cache:                 cache,
 	}
 }
 
@@ -57,6 +61,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 	if err != nil {
 		return err
 	}
+	s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", userId))
 
 	// Check Budget Thresholds
 	log.Debug().Msgf("Checking Alert Conditions: BudgetFound=(%v), Type=(%s), BillConst=(%s)", budget != nil, typeTransaction, BILL)
@@ -178,6 +183,15 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 		return nil, err
 	}
 
+	// Cache Key Generation
+	filterBytes, _ := json.Marshal(filter)
+	cacheKey := fmt.Sprintf("transactions:user:%s:filter:%s:summary:%v", userId, string(filterBytes), includeSummary)
+
+	if cachedResponse, found := s.cache.Get(cacheKey); found {
+		log.Debug().Msg("Serving transactions from cache")
+		return cachedResponse, nil
+	}
+
 	// Get filtered and paginated transactions
 	transactionList, err := s.transactionRepository.FindAllOfAllAccountsWithFilters(ctx, userId, filter)
 	if err != nil {
@@ -202,19 +216,23 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 		allTransactionResponses := s.convertToResponseList(allTransactions)
 		summary := dto.CalculateSummary(allTransactionResponses, totalCount)
 
-		return dto.NewPaginatedTransactionResponseWithSummary(
+		response := dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,
 			filter,
 			totalCount,
 			summary,
-		), nil
+		)
+		s.cache.Set(cacheKey, response, 5*time.Minute)
+		return response, nil
 	}
 
-	return dto.NewPaginatedTransactionResponse(
+	response := dto.NewPaginatedTransactionResponse(
 		transactionResponseList,
 		filter,
 		totalCount,
-	), nil
+	)
+	s.cache.Set(cacheKey, response, 5*time.Minute)
+	return response, nil
 }
 
 // FindAllWithFilters retrieves transactions for a specific account with filtering and pagination
@@ -297,10 +315,17 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 	if budget != nil {
 		transaction.BudgetId = budget.Id
 	}
-	return s.transactionRepository.Update(ctx, id, transaction)
+	err := s.transactionRepository.Update(ctx, id, transaction)
+	if err == nil {
+		s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", transaction.UserId))
+	}
+	return err
 }
 
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {
 	err := s.transactionRepository.Delete(ctx, id, userId)
+	if err == nil {
+		s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", userId))
+	}
 	return err
 }

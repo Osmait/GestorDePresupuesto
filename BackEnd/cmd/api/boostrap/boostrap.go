@@ -13,6 +13,7 @@ import (
 	_ "github.com/lib/pq"
 
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
@@ -251,7 +252,9 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 	quoteService := quote.NewQuoteService()
 
 	notificationService := notification.NewNotificationService(repos.notificationRepository)
-	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService)
+
+	transactionCache := cache.NewInMemoryCache(5*time.Minute, 10*time.Minute)
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache)
 
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),
