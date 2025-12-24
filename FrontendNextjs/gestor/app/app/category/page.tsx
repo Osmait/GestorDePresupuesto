@@ -8,7 +8,7 @@ export default function CategoriesPage() {
 			<div className="container mx-auto px-4 py-8">
 				<CategoryProvider>
 					{/* Header Estático - Server Side */}
-					<div className="mb-8">
+					<div className="mb-8" id="categories-header">
 						<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 							<div>
 								<h1 className="text-4xl font-bold tracking-tight text-foreground">
@@ -19,12 +19,16 @@ export default function CategoriesPage() {
 								</p>
 							</div>
 							{/* Acciones Interactivas - Client Side */}
-							<CategoryActions />
+							<div id="add-category-btn">
+								<CategoryActions />
+							</div>
 						</div>
 					</div>
 
 					{/* Contenido Dinámico - Client Side */}
-					<CategoryList />
+					<div id="categories-list">
+						<CategoryList />
+					</div>
 				</CategoryProvider>
 			</div>
 		</div>

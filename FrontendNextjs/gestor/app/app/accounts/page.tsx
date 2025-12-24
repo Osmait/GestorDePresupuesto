@@ -8,7 +8,7 @@ export default function AccountsPage() {
       <div className="container mx-auto px-4 py-8">
         <AccountProvider>
           {/* Header Estático - Server Side */}
-          <div className="mb-8">
+          <div className="mb-8" id="accounts-header">
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
               <div>
                 <h1 className="text-4xl font-bold tracking-tight text-foreground">
@@ -19,12 +19,16 @@ export default function AccountsPage() {
                 </p>
               </div>
               {/* Acciones */}
-              <AccountActions />
+              <div id="add-account-btn">
+                <AccountActions />
+              </div>
             </div>
           </div>
 
           {/* Contenido Client Side */}
-          <AccountsClient />
+          <div id="accounts-list">
+            <AccountsClient />
+          </div>
         </AccountProvider>
       </div>
     </div>

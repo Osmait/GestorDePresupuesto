@@ -8,7 +8,7 @@ export default function BudgetPage() {
 			<div className="min-h-screen bg-background">
 				<div className="container mx-auto px-4 py-8">
 					{/* Header Estático - Server Side */}
-					<div className="mb-8">
+					<div className="mb-8" id="budgets-header">
 						<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 							<div>
 								<h1 className="text-4xl font-bold tracking-tight text-foreground">
@@ -19,12 +19,16 @@ export default function BudgetPage() {
 								</p>
 							</div>
 							{/* Acciones Interactivas - Client Side */}
-							<BudgetActions />
+							<div id="add-budget-btn">
+								<BudgetActions />
+							</div>
 						</div>
 					</div>
 
 					{/* Contenido Dinámico - Client Side */}
-					<BudgetList />
+					<div id="budgets-list">
+						<BudgetList />
+					</div>
 				</div>
 			</div>
 		</BudgetProvider>

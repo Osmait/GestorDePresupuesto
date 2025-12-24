@@ -29,6 +29,7 @@ import {
 } from 'lucide-react'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { DashboardCharts } from '@/components/transactions/DashboardCharts'
+import { DemoTour } from '@/components/common/DemoTour'
 
 interface StatCardProps {
 	title: string
@@ -326,18 +327,26 @@ export default async function DashboardPage() {
 
 	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
 
+
+
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
 			<div className="container mx-auto px-4 py-8">
-				<DashboardHeader user={user} />
-				<DashboardCharts
-					categories={categories}
-					transactions={Array.isArray(transactions) ? transactions : []}
-					categorysData={categorysData}
-					monthSummary={getMonthlySummary}
+				<div id="dashboard-header">
+					<DashboardHeader user={user} />
+				</div>
+				<div id="dashboard-charts">
+					<DashboardCharts
+						categories={categories}
+						transactions={Array.isArray(transactions) ? transactions : []}
+						categorysData={categorysData}
+						monthSummary={getMonthlySummary}
 
-				/>
-				<StatsGrid accounts={accounts} transactions={transactions} />
+					/>
+				</div>
+				<div id="stats-grid">
+					<StatsGrid accounts={accounts} transactions={transactions} />
+				</div>
 
 				<AnimatedTabs
 					defaultValue="overview"
@@ -350,7 +359,7 @@ export default async function DashboardPage() {
 							content: (
 								<div className="space-y-6">
 									<div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-										<Card className="border-border/50 dark:border-border/20">
+										<Card id="recent-transactions" className="border-border/50 dark:border-border/20">
 											<CardHeader>
 												<CardTitle className="flex items-center gap-2 text-foreground">
 													<Wallet className="h-5 w-5" />

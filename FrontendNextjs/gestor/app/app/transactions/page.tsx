@@ -11,7 +11,7 @@ export default function TransactionsPage() {
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
 			<div className="container mx-auto px-4 py-8">
-				<div className="mb-8">
+				<div className="mb-8" id="transactions-header">
 					<h1 className="text-4xl font-bold tracking-tight text-foreground">
 						Gestión de Transacciones
 					</h1>
@@ -20,7 +20,7 @@ export default function TransactionsPage() {
 					</p>
 				</div>
 
-				<Tabs defaultValue="history" className="space-y-4">
+				<Tabs defaultValue="history" className="space-y-4" id="transactions-tabs">
 					<TabsList>
 						<TabsTrigger value="history">Historial</TabsTrigger>
 						<TabsTrigger value="recurring">Recurrentes</TabsTrigger>
@@ -28,10 +28,12 @@ export default function TransactionsPage() {
 
 					<TabsContent value="history" className="space-y-4">
 						<TransactionProvider>
-							<div className="flex justify-end mb-4">
+							<div className="flex justify-end mb-4" id="add-transaction-btn">
 								<TransactionActions />
 							</div>
-							<TransactionsList />
+							<div id="transactions-list">
+								<TransactionsList />
+							</div>
 						</TransactionProvider>
 					</TabsContent>
 

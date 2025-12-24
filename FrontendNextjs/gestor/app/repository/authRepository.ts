@@ -13,7 +13,7 @@ export class AuthRepository {
     try {
       const response = await fetch(`${this.url}/login`, options);
       const token = await response.json();
-      Cookies.set("x-token", token);
+
       const user = await this.getProfile(token);
       return user;
     } catch (error) {
