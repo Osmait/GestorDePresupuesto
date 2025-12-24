@@ -7,6 +7,7 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { Eye, EyeOff, Mail, Lock, User, AlertCircle, Loader2, LogIn } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 
 import { Button } from '@/components/ui/button'
 import {
@@ -22,35 +23,36 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { signIn } from "next-auth/react"
 
-// Schema de validación con Zod
-const loginSchema = z.object({
-	email: z
-		.string()
-		.min(1, 'El email es requerido')
-		.email('Debe ser un email válido'),
-	password: z
-		.string()
-		.min(6, 'La contraseña debe tener al menos 6 caracteres')
-		.max(100, 'La contraseña no puede tener más de 100 caracteres'),
-})
-
-type LoginFormValues = z.infer<typeof loginSchema>
-
 interface LoginFormProps {
 	onToggleForm?: () => void
 	showToggle?: boolean
 }
 
 export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
+	const t = useTranslations('auth.login')
 	const [isLoading, setIsLoading] = useState(false)
 	const [showPassword, setShowPassword] = useState(false)
 	const [error, setError] = useState<string | null>(null)
 	const router = useRouter()
 
+	// Schema de validación con Zod (con mensajes traducidos)
+	const loginSchema = z.object({
+		email: z
+			.string()
+			.min(1, t('emailRequired'))
+			.email(t('emailInvalid')),
+		password: z
+			.string()
+			.min(6, t('passwordMinLength'))
+			.max(100, 'Password too long'),
+	})
+
+	type LoginFormValues = z.infer<typeof loginSchema>
+
 	const form = useForm<LoginFormValues>({
 		resolver: zodResolver(loginSchema),
 		defaultValues: {
-			email: 'juan.perez@example.com', // Datos por defecto para testing
+			email: 'juan.perez@example.com',
 			password: 'password123',
 		},
 	})
@@ -68,18 +70,16 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 			})
 
 			if (result?.error) {
-				setError('Credenciales inválidas')
+				setError(t('invalidCredentials'))
 				return
 			}
 
 			console.log('✅ Login exitoso')
-
-			// Redirigir al dashboard
 			router.push('/app')
 			router.refresh()
 		} catch (err) {
 			console.error('❌ Error en login:', err)
-			setError(err instanceof Error ? err.message : 'Error al iniciar sesión')
+			setError(err instanceof Error ? err.message : t('error'))
 		} finally {
 			setIsLoading(false)
 		}
@@ -104,10 +104,10 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 					</div>
 				</div>
 				<CardTitle className="text-2xl font-bold text-center">
-					Iniciar Sesión
+					{t('title')}
 				</CardTitle>
 				<CardDescription className="text-muted-foreground">
-					Ingresa tus credenciales para acceder al sistema
+					{t('subtitle')}
 				</CardDescription>
 			</CardHeader>
 
@@ -126,14 +126,14 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 							name="email"
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className="text-sm font-medium">Email</FormLabel>
+									<FormLabel className="text-sm font-medium">{t('email')}</FormLabel>
 									<FormControl>
 										<div className="relative">
 											<Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
 											<Input
 												{...field}
 												type="email"
-												placeholder="ejemplo@correo.com"
+												placeholder={t('emailPlaceholder')}
 												disabled={isLoading}
 												className="pl-10 border-border/50 focus:border-primary/50 transition-colors"
 											/>
@@ -149,7 +149,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 							name="password"
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className="text-sm font-medium">Contraseña</FormLabel>
+									<FormLabel className="text-sm font-medium">{t('password')}</FormLabel>
 									<FormControl>
 										<div className="relative">
 											<Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -189,12 +189,12 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 							{isLoading ? (
 								<>
 									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
-									Iniciando sesión...
+									{t('submitting')}
 								</>
 							) : (
 								<>
 									<LogIn className="mr-2 h-4 w-4" />
-									Iniciar Sesión
+									{t('submit')}
 								</>
 							)}
 						</Button>
@@ -204,7 +204,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 				{/* Datos de prueba */}
 				<div className="space-y-3">
 					<div className="text-center">
-						<p className="text-xs text-muted-foreground mb-2">Datos de prueba:</p>
+						<p className="text-xs text-muted-foreground mb-2">{t('testData')}</p>
 						<div className="flex gap-2 justify-center">
 							<Button
 								type="button"
@@ -236,7 +236,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 				{showToggle && onToggleForm && (
 					<div className="text-center">
 						<p className="text-sm text-muted-foreground">
-							¿No tienes una cuenta?{' '}
+							{t('noAccount')}{' '}
 							<Button
 								type="button"
 								variant="link"
@@ -244,7 +244,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 								onClick={onToggleForm}
 								disabled={isLoading}
 							>
-								Crear cuenta
+								{t('createAccount')}
 							</Button>
 						</p>
 					</div>
@@ -256,14 +256,14 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 						href="/simple-test"
 						className="hover:text-primary transition-colors"
 					>
-						Test Simple
+						{t('testSimple')}
 					</Link>
 					<span>•</span>
 					<Link
 						href="/debug"
 						className="hover:text-primary transition-colors"
 					>
-						Debug
+						{t('debug')}
 					</Link>
 				</div>
 			</CardContent>

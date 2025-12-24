@@ -10,11 +10,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogC
 import { Button } from '@/components/ui/button';
 import { Loader2, PlusCircle, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useTranslations } from 'next-intl';
 
 const accountSchema = z.object({
-  name: z.string().min(2, 'El nombre debe tener al menos 2 caracteres'),
-  bank: z.string().min(2, 'El banco debe tener al menos 2 caracteres'),
-  initial_balance: z.coerce.number().min(0, 'El balance debe ser mayor o igual a 0'),
+  name: z.string().min(2, 'Required'),
+  bank: z.string().min(2, 'Required'),
+  initial_balance: z.coerce.number().min(0, 'Required'),
 });
 type AccountFormValues = z.infer<typeof accountSchema>;
 
@@ -28,6 +29,8 @@ type AccountFormModalProps = {
 
 export function AccountFormModal({ open, setOpen, createAccount, isLoading, error }: AccountFormModalProps) {
   const { user } = useAuth();
+  const t = useTranslations('forms');
+  const tAcc = useTranslations('accounts');
   const form = useForm<AccountFormValues>({
     resolver: zodResolver(accountSchema),
     defaultValues: { name: '', bank: '', initial_balance: 0 },
@@ -44,27 +47,27 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Nueva Cuenta</DialogTitle>
+          <DialogTitle>{t('newAccount')}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem>
-                <FormLabel>Nombre de la cuenta</FormLabel>
-                <FormControl><Input {...field} placeholder="Ej: Cuenta Principal" /></FormControl>
+                <FormLabel>{tAcc('name')}</FormLabel>
+                <FormControl><Input {...field} placeholder={tAcc('namePlaceholder')} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             <FormField control={form.control} name="bank" render={({ field }) => (
               <FormItem>
-                <FormLabel>Banco</FormLabel>
-                <FormControl><Input {...field} placeholder="Ej: Banco Nacional" /></FormControl>
+                <FormLabel>{t('bank')}</FormLabel>
+                <FormControl><Input {...field} placeholder={tAcc('bankPlaceholder')} /></FormControl>
                 <FormMessage />
               </FormItem>
             )} />
             <FormField control={form.control} name="initial_balance" render={({ field }) => (
               <FormItem>
-                <FormLabel>Balance inicial</FormLabel>
+                <FormLabel>{t('initialBalance')}</FormLabel>
                 <FormControl><Input type="number" {...field} min={0} step={0.01} /></FormControl>
                 <FormMessage />
               </FormItem>
@@ -72,10 +75,10 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
             <DialogFooter>
               <Button type="submit" disabled={isLoading} className="w-full">
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
-                Crear Cuenta
+                {t('createAccount')}
               </Button>
               <DialogClose asChild>
-                <Button type="button" variant="ghost" className="w-full">Cancelar</Button>
+                <Button type="button" variant="ghost" className="w-full">{t('cancel')}</Button>
               </DialogClose>
             </DialogFooter>
           </form>
@@ -89,4 +92,4 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
       </DialogContent>
     </Dialog>
   );
-} 
+}

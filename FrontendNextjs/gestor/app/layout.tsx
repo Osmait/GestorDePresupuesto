@@ -7,6 +7,8 @@ import { ProgressBarProvider } from '@/components/common/progress-bar-provider'
 import { ReactQueryProvider } from '@/components/common/react-query-provider'
 import { Toaster } from "@/components/ui/sonner"
 import { cn } from '@/lib/utils'
+import { NextIntlClientProvider } from 'next-intl'
+import { getMessages, getLocale } from 'next-intl/server'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const plusJakarta = Plus_Jakarta_Sans({
@@ -54,13 +56,16 @@ export const metadata: Metadata = {
 	manifest: '/site.webmanifest',
 }
 
-export default function RootLayout({
+export default async function RootLayout({
 	children,
 }: {
 	children: React.ReactNode
 }) {
+	const locale = await getLocale()
+	const messages = await getMessages()
+
 	return (
-		<html lang="es" suppressHydrationWarning>
+		<html lang={locale} suppressHydrationWarning>
 			<body className={cn(
 				inter.variable,
 				plusJakarta.variable,
@@ -73,11 +78,13 @@ export default function RootLayout({
 						enableSystem
 						disableTransitionOnChange
 					>
-						<ProgressBarProvider>
-							<ReactQueryProvider>
-								{children}
-							</ReactQueryProvider>
-						</ProgressBarProvider>
+						<NextIntlClientProvider messages={messages}>
+							<ProgressBarProvider>
+								<ReactQueryProvider>
+									{children}
+								</ReactQueryProvider>
+							</ProgressBarProvider>
+						</NextIntlClientProvider>
 					</ThemeProvider>
 				</AuthSessionProvider>
 				<Toaster />

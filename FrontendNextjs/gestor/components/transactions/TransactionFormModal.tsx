@@ -14,12 +14,13 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { es, enUS } from 'date-fns/locale';
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery';
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery';
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery';
 import { useTransactionContext } from './TransactionContext';
 import { TypeTransaction } from '@/types/transaction';
+import { useTranslations, useLocale } from 'next-intl';
 
 const transactionSchema = z.object({
   name: z.string().min(2, 'El nombre es requerido'),
@@ -52,6 +53,9 @@ type TransactionFormModalProps = {
 };
 
 export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error, formRef }: TransactionFormModalProps) {
+  const t = useTranslations('forms');
+  const tTx = useTranslations('transactions');
+  const locale = useLocale();
   const { data: accounts = [] } = useGetAccounts();
   const { data: categories = [] } = useGetCategories();
   const { data: budgets = [] } = useGetBudgets();
@@ -136,7 +140,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
-          <DialogTitle>{isEditing ? 'Editar Transacción' : 'Nueva Transacción'}</DialogTitle>
+          <DialogTitle>{isEditing ? t('editTransaction') : t('newTransaction')}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
@@ -144,9 +148,9 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
             {/* Row 1: Nombre */}
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem>
-                <FormLabel>Nombre</FormLabel>
+                <FormLabel>{t('name')}</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Ej: Pago de luz" autoFocus />
+                  <Input {...field} placeholder={t('namePlaceholder')} autoFocus />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -156,7 +160,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="amount" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Monto</FormLabel>
+                  <FormLabel>{t('amount')}</FormLabel>
                   <FormControl>
                     <div className="relative">
                       <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
@@ -169,15 +173,15 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
 
               <FormField control={form.control} name="type_transaction" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Tipo</FormLabel>
+                  <FormLabel>{t('type')}</FormLabel>
                   <FormControl>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona" />
+                        <SelectValue placeholder={t('select')} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value={TypeTransaction.INCOME}>Ingreso</SelectItem>
-                        <SelectItem value={TypeTransaction.BILL}>Gasto</SelectItem>
+                        <SelectItem value={TypeTransaction.INCOME}>{tTx('income')}</SelectItem>
+                        <SelectItem value={TypeTransaction.BILL}>{tTx('expense')}</SelectItem>
                       </SelectContent>
                     </Select>
                   </FormControl>
@@ -190,11 +194,11 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="account_id" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Cuenta</FormLabel>
+                  <FormLabel>{t('account')}</FormLabel>
                   <FormControl>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona" />
+                        <SelectValue placeholder={t('select')} />
                       </SelectTrigger>
                       <SelectContent>
                         {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
@@ -207,11 +211,11 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
 
               <FormField control={form.control} name="category_id" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Categoría</FormLabel>
+                  <FormLabel>{t('category')}</FormLabel>
                   <FormControl>
                     <Select value={field.value} onValueChange={field.onChange}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecciona" />
+                        <SelectValue placeholder={t('select')} />
                       </SelectTrigger>
                       <SelectContent>
                         {categories.map(cat => (
@@ -233,7 +237,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
             <div className="grid grid-cols-2 gap-4">
               <FormField control={form.control} name="created_at" render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Fecha</FormLabel>
+                  <FormLabel>{t('date')}</FormLabel>
                   <Popover>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -245,9 +249,9 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
                           )}
                         >
                           {field.value ? (
-                            format(field.value, "PPP", { locale: es })
+                            format(field.value, "PPP", { locale: locale === 'es' ? es : enUS })
                           ) : (
-                            <span>Seleccionar fecha</span>
+                            <span>{t('selectDate')}</span>
                           )}
                           <CalendarIcon className="ml-auto h-4 w-4 opacity-50" />
                         </Button>
@@ -280,9 +284,9 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
             {/* Row 5: Descripción */}
             <FormField control={form.control} name="description" render={({ field }) => (
               <FormItem>
-                <FormLabel>Descripción</FormLabel>
+                <FormLabel>{t('description')}</FormLabel>
                 <FormControl>
-                  <Input {...field} placeholder="Detalle de la transacción" />
+                  <Input {...field} placeholder={t('descriptionPlaceholder')} />
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -290,11 +294,11 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
 
             <DialogFooter className="pt-4">
               <DialogClose asChild>
-                <Button type="button" variant="ghost">Cancelar</Button>
+                <Button type="button" variant="ghost">{t('cancel')}</Button>
               </DialogClose>
               <Button type="submit" disabled={isLoading}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
-                {isEditing ? 'Guardar Cambios' : 'Crear Transacción'}
+                {isEditing ? t('saveChanges') : t('createTransaction')}
               </Button>
             </DialogFooter>
           </form>

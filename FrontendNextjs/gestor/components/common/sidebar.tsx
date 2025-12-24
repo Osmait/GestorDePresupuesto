@@ -39,6 +39,8 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useGlobalAction } from '@/contexts/GlobalActionContext'
 import { NotificationCenter } from '@/components/common/NotificationCenter'
+import { useTranslations } from 'next-intl'
+import { useNavItems } from '@/hooks/use-nav-items'
 
 interface SidebarProps {
 	children: React.ReactNode
@@ -52,66 +54,7 @@ interface NavItem {
 	description: string
 }
 
-const navItems: NavItem[] = [
-	{
-		title: 'Dashboard',
-		href: '/app',
-		icon: LayoutDashboard,
-		description: 'Vista general del sistema'
-	},
-	{
-		title: 'Cuentas',
-		href: '/app/accounts',
-		icon: CreditCard,
-		description: 'Gestión de cuentas bancarias'
-	},
-	{
-		title: 'Transacciones',
-		href: '/app/transactions',
-		icon: ArrowUpDown,
-		description: 'Historial de movimientos'
-	},
-	{
-		title: 'Categorías',
-		href: '/app/category',
-		icon: Tags,
-		description: 'Organización de gastos'
-	},
-	{
-		title: 'Presupuestos',
-		href: '/app/budget',
-		icon: PiggyBank,
-		description: 'Planificación financiera'
-	},
-	{
-		title: 'Inversiones',
-		href: '/app/investments',
-		icon: TrendingUp,
-		badge: 'New',
-		description: 'Portafolio de inversiones'
-	},
-	{
-		title: 'Analíticas',
-		href: '/app/analysis',
-		icon: BarChart,
-		description: 'Visualización y reportes',
-	},
-]
-
-const bottomNavItems: NavItem[] = [
-	{
-		title: 'Configuración',
-		href: '/app/settings',
-		icon: Settings,
-		description: 'Ajustes del sistema'
-	},
-	{
-		title: 'Ayuda',
-		href: '/app/help',
-		icon: HelpCircle,
-		description: 'Soporte y documentación'
-	}
-]
+// Navigation items are now provided by useNavItems hook with translations
 
 // Server Component para el header del sidebar
 function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
@@ -166,6 +109,7 @@ function SidebarFooter({
 	sidebarHoverEnabled: boolean
 	toggleCollapsed: () => void
 }) {
+	const t = useTranslations('nav')
 	return (
 		<div className="border-t border-border/50 p-4 space-y-2">
 			<AnimatedSidebarNav
@@ -183,7 +127,7 @@ function SidebarFooter({
 					{isExpanded ? (
 						<>
 							<ChevronLeft className="h-4 w-4 mr-2 transition-all duration-200 group-hover:scale-110" />
-							<span className="transition-all duration-200 group-hover:translate-x-1">Contraer</span>
+							<span className="transition-all duration-200 group-hover:translate-x-1">{t('collapse')}</span>
 							{sidebarHoverEnabled && (
 								<Mouse className="h-3 w-3 ml-2 opacity-50 transition-all duration-200 group-hover:opacity-100" />
 							)}
@@ -197,12 +141,14 @@ function SidebarFooter({
 	)
 }
 
-// Server Component para el header principal
+// Component for main header
 function MainHeader({ isExpanded, toggleMobile }: {
 	isExpanded: boolean
 	toggleMobile: () => void
 }) {
 	const { openModal } = useGlobalAction()
+	const t = useTranslations('nav')
+	const tDash = useTranslations('dashboard')
 	return (
 		<header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg">
 			<div className="flex h-16 items-center justify-between px-4 lg:px-6">
@@ -218,8 +164,8 @@ function MainHeader({ isExpanded, toggleMobile }: {
 
 					{isExpanded && (
 						<div>
-							<h1 className="text-xl font-semibold text-foreground">Dashboard</h1>
-							<p className="text-sm text-muted-foreground">Panel de control financiero</p>
+							<h1 className="text-xl font-semibold text-foreground">{tDash('title')}</h1>
+							<p className="text-sm text-muted-foreground">{t('dashboardDesc')}</p>
 						</div>
 					)}
 				</div>
@@ -236,27 +182,27 @@ function MainHeader({ isExpanded, toggleMobile }: {
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end" className="w-56">
-								<DropdownMenuLabel>Acciones Rápidas</DropdownMenuLabel>
+								<DropdownMenuLabel>{t('quickActions')}</DropdownMenuLabel>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem onClick={() => openModal('TRANSACTION')}>
 									<ArrowUpDown className="mr-2 h-4 w-4" />
-									<span>Nueva Transacción</span>
+									<span>{t('newTransaction')}</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => openModal('CATEGORY')}>
 									<Tags className="mr-2 h-4 w-4" />
-									<span>Nueva Categoría</span>
+									<span>{t('newCategory')}</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => openModal('BUDGET')}>
 									<PiggyBank className="mr-2 h-4 w-4" />
-									<span>Nuevo Presupuesto</span>
+									<span>{t('newBudget')}</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => openModal('ACCOUNT')}>
 									<Wallet className="mr-2 h-4 w-4" />
-									<span>Nueva Cuenta</span>
+									<span>{t('newAccount')}</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => openModal('INVESTMENT')}>
 									<TrendingUp className="mr-2 h-4 w-4" />
-									<span>Nueva Inversión</span>
+									<span>{t('newInvestment')}</span>
 								</DropdownMenuItem>
 							</DropdownMenuContent>
 						</DropdownMenu>
@@ -272,6 +218,7 @@ function MainHeader({ isExpanded, toggleMobile }: {
 // Componente principal que combina Client Components
 export function Sidebar({ children }: SidebarProps) {
 	const pathname = usePathname()
+	const { navItems, bottomNavItems } = useNavItems()
 
 	return (
 		<SidebarController>
@@ -334,3 +281,4 @@ export function Sidebar({ children }: SidebarProps) {
 		</SidebarController>
 	)
 }
+

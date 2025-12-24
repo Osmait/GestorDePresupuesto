@@ -30,6 +30,7 @@ import {
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { DashboardCharts } from '@/components/transactions/DashboardCharts'
 import { DemoTour } from '@/components/common/DemoTour'
+import { getTranslations, getLocale } from 'next-intl/server'
 
 interface StatCardProps {
 	title: string
@@ -225,22 +226,22 @@ function BudgetCard({ budget, category }: {
 }
 
 // Server Component para el header
-function DashboardHeader({ user }: { user: any }) {
+function DashboardHeader({ user, t, locale }: { user: any, t: any, locale: string }) {
 	return (
 		<div className="mb-8">
 			<div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
 				<div>
 					<h1 className="text-4xl font-bold tracking-tight text-foreground">
-						Dashboard Financiero
+						{t('title')}
 					</h1>
 					<p className="text-muted-foreground mt-2 text-lg">
-						Bienvenido de vuelta, {user?.name} {user?.lastName || user?.last_name} 👋
+						{t('welcome')}, {user?.name} {user?.lastName || user?.last_name} 👋
 					</p>
 				</div>
 				<div className="flex items-center gap-3">
 					<Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400">
 						<Calendar className="h-3 w-3 mr-1" />
-						{new Date().toLocaleDateString('es-ES', {
+						{new Date().toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US', {
 							day: 'numeric',
 							month: 'long',
 							year: 'numeric'
@@ -253,9 +254,10 @@ function DashboardHeader({ user }: { user: any }) {
 }
 
 // Server Component para las estadísticas
-function StatsGrid({ accounts, transactions }: {
+function StatsGrid({ accounts, transactions, t }: {
 	accounts: Account[]
 	transactions: Transaction[]
+	t: any
 }) {
 	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + (acc.current_balance ?? acc.initial_balance ?? 0), 0)
 	const totalIncome = Array.isArray(transactions)
@@ -268,19 +270,19 @@ function StatsGrid({ accounts, transactions }: {
 	return (
 		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
 			<StatCard
-				title="Balance Total"
+				title={t('balance')}
 				value={totalBalance}
 				icon={DollarSign}
 				color="blue"
 			/>
 			<StatCard
-				title="Ingresos"
+				title={t('income')}
 				value={totalIncome}
 				icon={TrendingUp}
 				color="green"
 			/>
 			<StatCard
-				title="Gastos"
+				title={t('expenses')}
 				value={totalExpenses}
 				icon={TrendingDown}
 				color="red"
@@ -298,6 +300,13 @@ export default async function DashboardPage() {
 	const categoryRepository = await getCategoryRepository()
 	const budgetRepository = await getBudgetRepository()
 	const analyticsRepository = await getAnalyticsRepository()
+
+	// Get translations
+	const t = await getTranslations('dashboard')
+	const tNav = await getTranslations('nav')
+	const tBudgets = await getTranslations('budgets')
+	const tCommon = await getTranslations('common')
+	const locale = await getLocale()
 
 	// Obtener la sesión actual (sin hacer login)
 	const { getServerSession } = await import("next-auth");
@@ -333,7 +342,7 @@ export default async function DashboardPage() {
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
 			<div className="container mx-auto px-4 py-8">
 				<div id="dashboard-header">
-					<DashboardHeader user={user} />
+					<DashboardHeader user={user} t={t} locale={locale} />
 				</div>
 				<div id="dashboard-charts">
 					<DashboardCharts
@@ -345,7 +354,7 @@ export default async function DashboardPage() {
 					/>
 				</div>
 				<div id="stats-grid">
-					<StatsGrid accounts={accounts} transactions={transactions} />
+					<StatsGrid accounts={accounts} transactions={transactions} t={t} />
 				</div>
 
 				<AnimatedTabs

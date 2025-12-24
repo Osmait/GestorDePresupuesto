@@ -20,10 +20,11 @@ import { Loader2, PlusCircle, AlertCircle, Edit } from 'lucide-react'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
+import { useTranslations } from 'next-intl'
 
 const budgetSchema = z.object({
-    category_id: z.string().min(1, 'Selecciona una categoría'),
-    amount: z.coerce.number().min(1, 'El monto debe ser mayor a 0'),
+    category_id: z.string().min(1, 'Required'),
+    amount: z.coerce.number().min(1, 'Required'),
 })
 type BudgetFormValues = z.infer<typeof budgetSchema>
 
@@ -33,6 +34,7 @@ interface BudgetFormModalProps {
 }
 
 export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
+    const t = useTranslations('forms')
     const { createBudget, updateBudget, editingBudget, setEditingBudget, isLoading, error } = useBudgetContext()
     const { data: categories = [] } = useGetCategories()
     const isEditing = !!editingBudget
@@ -50,7 +52,6 @@ export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
             } else {
                 await createBudget(values.category_id, values.amount)
             }
-            // Modal closing is handled in Context
             form.reset({ category_id: '', amount: 0 })
         } catch { }
     }
@@ -67,16 +68,16 @@ export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
         <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent>
                 <DialogHeader>
-                    <DialogTitle>{isEditing ? 'Editar Presupuesto' : 'Nuevo Presupuesto'}</DialogTitle>
+                    <DialogTitle>{isEditing ? t('editBudget') : t('newBudget')}</DialogTitle>
                 </DialogHeader>
                 <Form {...form}>
                     <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
                         <FormField control={form.control} name="category_id" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Categoría</FormLabel>
+                                <FormLabel>{t('category')}</FormLabel>
                                 <FormControl>
                                     <Select value={field.value} onValueChange={field.onChange}>
-                                        <SelectTrigger><SelectValue placeholder="Selecciona una categoría" /></SelectTrigger>
+                                        <SelectTrigger><SelectValue placeholder={t('select')} /></SelectTrigger>
                                         <SelectContent>
                                             {categories?.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>)}
                                         </SelectContent>
@@ -87,7 +88,7 @@ export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
                         )} />
                         <FormField control={form.control} name="amount" render={({ field }) => (
                             <FormItem>
-                                <FormLabel>Monto</FormLabel>
+                                <FormLabel>{t('amount')}</FormLabel>
                                 <FormControl><Input type="number" {...field} min={1} step={0.01} /></FormControl>
                                 <FormMessage />
                             </FormItem>
@@ -95,10 +96,10 @@ export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
                         <DialogFooter>
                             <Button type="submit" disabled={isLoading} className="w-full">
                                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : isEditing ? <Edit className="h-4 w-4 mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
-                                {isEditing ? 'Guardar Cambios' : 'Crear Presupuesto'}
+                                {isEditing ? t('saveChanges') : t('createBudget')}
                             </Button>
                             <DialogClose asChild>
-                                <Button type="button" variant="ghost" className="w-full">Cancelar</Button>
+                                <Button type="button" variant="ghost" className="w-full">{t('cancel')}</Button>
                             </DialogClose>
                         </DialogFooter>
                     </form>
@@ -113,3 +114,4 @@ export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
         </Dialog>
     )
 }
+

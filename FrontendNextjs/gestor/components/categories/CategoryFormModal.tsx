@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select'
 import { Tag, Coffee, Home, Car, Smartphone, Plane, ShoppingBag, Heart, MoreHorizontal, Briefcase, GraduationCap, DollarSign, Wallet } from 'lucide-react'
 import { useCategoryContext } from '@/components/categories/CategoryContext'
+import { useTranslations } from 'next-intl'
 
 interface CategoryFormModalProps {
     open: boolean
@@ -30,53 +31,55 @@ interface CategoryFormModalProps {
 
 // Predefined Emojis
 const EMOJIS = [
-    { icon: '🏷️', label: 'Etiqueta' },
-    { icon: '🍔', label: 'Comida' },
-    { icon: '☕', label: 'Café' },
-    { icon: '🏠', label: 'Hogar' },
-    { icon: '🚗', label: 'Transporte' },
-    { icon: '📱', label: 'Tecnología' },
-    { icon: '✈️', label: 'Viajes' },
-    { icon: '🛍️', label: 'Compras' },
-    { icon: '💊', label: 'Salud' },
-    { icon: '💼', label: 'Trabajo' },
-    { icon: '🎓', label: 'Educación' },
-    { icon: '🎮', label: 'Entretenimiento' },
-    { icon: '🏀', label: 'Deporte' },
-    { icon: '💰', label: 'Dinero' },
-    { icon: '💳', label: 'Tarjetas' },
-    { icon: '🎉', label: 'Otros' },
-    { icon: '💡', label: 'Servicios' },
-    { icon: '🔧', label: 'Mantenimiento' },
-    { icon: '🐾', label: 'Mascotas' },
-    { icon: '🎁', label: 'Regalos' },
+    { icon: '🏷️', labelKey: 'tag' },
+    { icon: '🍔', labelKey: 'food' },
+    { icon: '☕', labelKey: 'coffee' },
+    { icon: '🏠', labelKey: 'home' },
+    { icon: '🚗', labelKey: 'transport' },
+    { icon: '📱', labelKey: 'tech' },
+    { icon: '✈️', labelKey: 'travel' },
+    { icon: '🛍️', labelKey: 'shopping' },
+    { icon: '💊', labelKey: 'health' },
+    { icon: '💼', labelKey: 'work' },
+    { icon: '🎓', labelKey: 'education' },
+    { icon: '🎮', labelKey: 'entertainment' },
+    { icon: '🏀', labelKey: 'sports' },
+    { icon: '💰', labelKey: 'money' },
+    { icon: '💳', labelKey: 'cards' },
+    { icon: '🎉', labelKey: 'other' },
+    { icon: '💡', labelKey: 'services' },
+    { icon: '🔧', labelKey: 'maintenance' },
+    { icon: '🐾', labelKey: 'pets' },
+    { icon: '🎁', labelKey: 'gifts' },
 ]
 
 // Predefined colors
 const COLORS = [
-    { name: 'red', value: '#EF4444', label: 'Rojo' },
-    { name: 'orange', value: '#F97316', label: 'Naranja' },
-    { name: 'amber', value: '#F59E0B', label: 'Ámbar' },
-    { name: 'yellow', value: '#EAB308', label: 'Amarillo' },
-    { name: 'lime', value: '#84CC16', label: 'Lima' },
-    { name: 'green', value: '#22C55E', label: 'Verde' },
-    { name: 'emerald', value: '#10B981', label: 'Esmeralda' },
-    { name: 'teal', value: '#14B8A6', label: 'Cian' },
-    { name: 'cyan', value: '#06B6D4', label: 'Celeste' },
-    { name: 'sky', value: '#0EA5E9', label: 'Cielo' },
-    { name: 'blue', value: '#3B82F6', label: 'Azul' },
-    { name: 'indigo', value: '#6366F1', label: 'Índigo' },
-    { name: 'violet', value: '#8B5CF6', label: 'Violeta' },
-    { name: 'purple', value: '#A855F7', label: 'Púrpura' },
-    { name: 'fuchsia', value: '#D946EF', label: 'Fucsia' },
-    { name: 'pink', value: '#EC4899', label: 'Rosa' },
-    { name: 'rose', value: '#F43F5E', label: 'Rosa fuerte' },
-    { name: 'slate', value: '#64748B', label: 'Gris' },
-    { name: 'gray', value: '#6B7280', label: 'Gris medio' },
-    { name: 'zinc', value: '#71717A', label: 'Zinc' },
+    { name: 'red', value: '#EF4444' },
+    { name: 'orange', value: '#F97316' },
+    { name: 'amber', value: '#F59E0B' },
+    { name: 'yellow', value: '#EAB308' },
+    { name: 'lime', value: '#84CC16' },
+    { name: 'green', value: '#22C55E' },
+    { name: 'emerald', value: '#10B981' },
+    { name: 'teal', value: '#14B8A6' },
+    { name: 'cyan', value: '#06B6D4' },
+    { name: 'sky', value: '#0EA5E9' },
+    { name: 'blue', value: '#3B82F6' },
+    { name: 'indigo', value: '#6366F1' },
+    { name: 'violet', value: '#8B5CF6' },
+    { name: 'purple', value: '#A855F7' },
+    { name: 'fuchsia', value: '#D946EF' },
+    { name: 'pink', value: '#EC4899' },
+    { name: 'rose', value: '#F43F5E' },
+    { name: 'slate', value: '#64748B' },
+    { name: 'gray', value: '#6B7280' },
+    { name: 'zinc', value: '#71717A' },
 ]
 
 export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryFormModalProps) {
+    const t = useTranslations('forms')
+    const tCat = useTranslations('categories')
     const { editingCategory, updateCategory } = useCategoryContext()
     const [name, setName] = useState('')
     const [icon, setIcon] = useState('🏷️')
@@ -109,8 +112,6 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
                 await onCreateCategory(name, icon, color)
             }
             setOpen(false)
-            // Form reset via useEffect when mode changes, or explicit here?
-            // Rely on useEffect clearing or explicit clear on next open if state is external
         } catch (error) {
             console.error('Error saving category:', error)
         } finally {
@@ -122,17 +123,17 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogContent className="sm:max-w-[425px]">
                 <DialogHeader>
-                    <DialogTitle>{isEditing ? 'Editar Categoría' : 'Nueva Categoría'}</DialogTitle>
+                    <DialogTitle>{isEditing ? t('editCategory') : t('newCategory')}</DialogTitle>
                     <DialogDescription>
-                        {isEditing ? 'Modifica los detalles de tu categoría.' : 'Crea una nueva categoría para organizar tus transacciones.'}
+                        {isEditing ? tCat('editDescription') : tCat('addDescription')}
                     </DialogDescription>
                 </DialogHeader>
                 <form onSubmit={handleSubmit} className="space-y-4 py-4">
                     <div className="space-y-2">
-                        <Label htmlFor="name">Nombre</Label>
+                        <Label htmlFor="name">{t('name')}</Label>
                         <Input
                             id="name"
-                            placeholder="Ej. Alimentación"
+                            placeholder={t('namePlaceholder')}
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             required
@@ -140,15 +141,14 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Ícono (Emoji)</Label>
+                        <Label>{t('icon')}</Label>
                         <div className="grid grid-cols-5 gap-2 p-2 border rounded-md max-h-[150px] overflow-y-auto">
                             {EMOJIS.map((item) => (
                                 <button
-                                    key={item.label}
+                                    key={item.labelKey}
                                     type="button"
                                     className={`text-2xl h-10 w-10 flex items-center justify-center rounded-md hover:bg-muted transition-colors ${icon === item.icon ? 'bg-muted ring-2 ring-primary' : ''}`}
                                     onClick={() => setIcon(item.icon)}
-                                    title={item.label}
                                 >
                                     {item.icon}
                                 </button>
@@ -157,7 +157,7 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
                     </div>
 
                     <div className="space-y-2">
-                        <Label>Color</Label>
+                        <Label>{t('color')}</Label>
                         <div className="flex flex-wrap gap-2 p-2 border rounded-md">
                             {COLORS.map((c) => (
                                 <button
@@ -166,12 +166,10 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
                                     className={`w-6 h-6 rounded-full border border-gray-200 transition-transform hover:scale-110 ${color === c.value ? 'ring-2 ring-offset-2 ring-black dark:ring-white scale-110' : ''}`}
                                     style={{ backgroundColor: c.value }}
                                     onClick={() => setColor(c.value)}
-                                    title={c.label}
                                 />
                             ))}
                             <div
                                 className="relative w-6 h-6 rounded-full overflow-hidden border border-gray-200 transition-transform hover:scale-110"
-                                title="Personalizado"
                                 style={{ background: 'conic-gradient(from 0deg, red, orange, yellow, green, blue, indigo, violet, red)' }}
                             >
                                 <Input
@@ -186,13 +184,14 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
                 </form>
                 <DialogFooter>
                     <Button variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
-                        Cancelar
+                        {t('cancel')}
                     </Button>
                     <Button onClick={handleSubmit} disabled={isSubmitting || !name}>
-                        {isSubmitting ? 'Guardando...' : (isEditing ? 'Guardar Cambios' : 'Crear Categoría')}
+                        {isSubmitting ? t('saving') : (isEditing ? t('saveChanges') : t('createCategory'))}
                     </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
     )
 }
+
