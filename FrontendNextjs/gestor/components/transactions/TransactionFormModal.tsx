@@ -23,7 +23,7 @@ import { TypeTransaction } from '@/types/transaction';
 
 const transactionSchema = z.object({
   name: z.string().min(2, 'El nombre es requerido'),
-  description: z.string().min(2, 'La descripción es requerida'),
+  description: z.string().optional(),
   amount: z.coerce.number().min(0.01, 'El monto debe ser mayor a 0'),
   type_transaction: z.nativeEnum(TypeTransaction, { errorMap: () => ({ message: 'Selecciona un tipo' }) }),
   account_id: z.string().min(1, 'Selecciona una cuenta'),
@@ -118,7 +118,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
       } else {
         await createTransaction(
           values.name,
-          values.description,
+          values.description || '', // Allow empty description
           values.amount,
           values.type_transaction,
           values.account_id,
