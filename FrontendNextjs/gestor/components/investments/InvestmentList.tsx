@@ -1,10 +1,8 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
+import { Card, CardContent, CardHeader } from "@/components/ui/card"
 import { Investment, InvestmentType } from "@/types/investment"
 import { useDeleteInvestmentMutation, useGetInvestments } from "@/hooks/queries/useInvestmentsQuery"
-import { Button } from "@/components/ui/button"
-import { Edit, Trash2 } from "lucide-react"
-import { formatCurrency } from "@/lib/utils"
 import { Skeleton } from "@/components/ui/skeleton"
+import { InvestmentCard } from "./InvestmentCard"
 
 interface InvestmentListProps {
     type: InvestmentType
@@ -52,37 +50,14 @@ export function InvestmentList({ type, onEdit }: InvestmentListProps) {
 
     return (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredInvestments.map((investment) => {
-                const totalValue = investment.quantity * investment.current_price
-                const profitLoss = (investment.current_price - investment.purchase_price) * investment.quantity
-                const profitLossPercentage = ((investment.current_price - investment.purchase_price) / investment.purchase_price) * 100
-
-                return (
-                    <Card key={investment.id}>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">
-                                {investment.name} ({investment.symbol})
-                            </CardTitle>
-                            <div className="flex space-x-2">
-                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onEdit(investment)}>
-                                    <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDelete(investment.id)}>
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
-                            </div>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{formatCurrency(totalValue)}</div>
-                            <div className="text-xs text-muted-foreground mt-1">
-                                {investment.quantity} shares @ {formatCurrency(investment.current_price)}
-                            </div>
-                            <div className={`text-xs mt-2 font-medium ${profitLoss >= 0 ? "text-green-600" : "text-red-600"}`}>
-                                {profitLoss >= 0 ? "+" : ""}{formatCurrency(profitLoss)} ({profitLossPercentage.toFixed(2)}%)
-                            </div>
-                        </CardContent>
-                    </Card>
-                )
+            return (
+            <InvestmentCard
+                key={investment.id}
+                investment={investment}
+                onEdit={onEdit}
+                onDelete={handleDelete}
+            />
+            )
             })}
         </div>
     )
