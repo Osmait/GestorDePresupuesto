@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Plus, Play, Loader2, Info } from 'lucide-react'
+import { Plus, Play, Loader2 } from 'lucide-react'
 import { useRecurringTransactionContext } from './RecurringTransactionContext'
 import { useProcessRecurringTransactionsMutation } from '@/hooks/queries/useRecurringTransactionsQuery'
 import { toast } from 'sonner'
@@ -32,7 +32,7 @@ export function RecurringTransactionActions() {
 
     const handleConfirmProcess = async () => {
         processMutation.mutate(undefined, {
-            onSuccess: (data) => {
+            onSuccess: (_data) => {
                 toast.success("Transacciones procesadas correctamente", {
                     description: "Se han generado las transacciones pendientes."
                 })

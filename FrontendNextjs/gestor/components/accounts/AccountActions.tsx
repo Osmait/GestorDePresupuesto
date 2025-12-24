@@ -10,7 +10,7 @@ import { useTranslations } from 'next-intl'
 export function AccountActions() {
     const t = useTranslations('accounts')
     const [modalOpen, setModalOpen] = useState(false)
-    const { createAccount, addAccount, isLoading, error } = useAccountContext()
+    const { createAccount, isLoading, error } = useAccountContext()
 
     return (
         <div className="flex items-center gap-3">

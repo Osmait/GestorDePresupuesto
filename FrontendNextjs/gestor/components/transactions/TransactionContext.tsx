@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { DateRange } from 'react-day-picker'
-import { useSearchParams, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import { useGetTransactions, useCreateTransactionMutation, useDeleteTransactionMutation, useUpdateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { TransactionFilters } from '@/types/transaction'
 
@@ -23,54 +23,40 @@ export interface TransactionFiltersState {
 interface TransactionContextType {
     filters: TransactionFiltersState
     setFilters: React.Dispatch<React.SetStateAction<TransactionFiltersState>>
-    applyFilters: () => void
     clearFilters: () => void
     reloadCurrentView: () => void
     // Data
-    transactions: any[] // Using any temporarily or import Transaction type
+    transactions: any[]
     pagination: any
     isLoading: boolean
     error: string | null
-    createTransaction: (...args: any[]) => Promise<void>
-    updateTransaction: (id: string, ...args: any[]) => Promise<void>
-    deleteTransaction: (id: string) => Promise<void>
-    addTransaction: (tx: any) => void
+    createTransaction: (..._args: any[]) => Promise<void>
+    updateTransaction: (_id: string, ..._args: any[]) => Promise<void>
+    deleteTransaction: (_id: string) => Promise<void>
     editingTransaction: any | null
-    setEditingTransaction: (tx: any | null) => void
+    setEditingTransaction: (_tx: any | null) => void
     isModalOpen: boolean
-    setModalOpen: (open: boolean) => void
+    setModalOpen: (_open: boolean) => void
 }
 
 export const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
 
 export function TransactionProvider({ children }: { children: ReactNode }) {
-    const searchParams = useSearchParams()
     const router = useRouter()
-    // Removed duplicate useTransactions call
-
-    const initializeFiltersFromURL = useCallback(() => {
-        const dateFrom = searchParams.get('dateFrom')
-        const dateTo = searchParams.get('dateTo')
-
-        return {
-            dateRange: {
-                from: dateFrom ? new Date(dateFrom) : undefined,
-                to: dateTo ? new Date(dateTo) : undefined,
-            } as DateRange,
-            type: searchParams.get('type') || 'all',
-            account: searchParams.get('account') || 'all',
-            category: searchParams.get('category') || 'all',
-            budget: searchParams.get('budget') || 'all',
-            minAmount: searchParams.get('minAmount') || '',
-            maxAmount: searchParams.get('maxAmount') || '',
-            search: searchParams.get('search') || '',
-            sortBy: searchParams.get('sortBy') || 'created_at',
-            sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
-        }
-    }, [searchParams])
 
     // Filter State
-    const [filters, setFilters] = useState<TransactionFiltersState>(() => initializeFiltersFromURL())
+    const [filters, setFilters] = useState<TransactionFiltersState>({
+        dateRange: { from: undefined, to: undefined },
+        type: 'all',
+        account: 'all',
+        category: 'all',
+        budget: 'all',
+        minAmount: '',
+        maxAmount: '',
+        search: '',
+        sortBy: 'created_at',
+        sortOrder: 'desc',
+    })
 
     // React Query Hooks
     const [activeFilters, setActiveFilters] = useState<TransactionFilters>({})
@@ -93,10 +79,6 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname
         router.replace(newURL, { scroll: false })
     }, [router])
-
-    const applyFilters = useCallback(() => {
-        // No-op manually, handled by effect
-    }, [])
 
     // Map Context Filters -> API Filters
     useEffect(() => {
@@ -129,14 +111,14 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     const updateMutation = useUpdateTransactionMutation()
 
     // Edit State
-    const [editingTransaction, setEditingTransaction] = useState<any | null>(null) // Replace 'any' with Transaction type in future
+    const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
+    const [isModalOpen, setModalOpen] = useState(false)
 
     // Adapters for Legacy Interface
     const transactions = data?.transactions || []
     const pagination = data?.pagination || null
 
     const createTransaction = async (...args: any[]) => {
-        // Adapt arguments to object expected by mutation
         const [name, description, amount, type, accountId, categoryId, budgetId, createdAt] = args
         await createMutation.mutateAsync({
             name, description, amount, type, accountId, categoryId, budgetId, createdAt
@@ -148,23 +130,14 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         await updateMutation.mutateAsync({
             id, name, description, amount, type, accountId, categoryId, budgetId, createdAt
         })
-        setEditingTransaction(null) // Close edit mode after success
+        setEditingTransaction(null)
     }
 
     const deleteTransaction = async (id: string) => {
         await deleteMutation.mutateAsync(id)
     }
 
-    const addTransaction = () => {
-        // No-op: Cache invalidation handles this automatically now
-    }
-
-    // Legacy load functions no longer needed, mapped to refetch or no-ops
-    const loadTransactions = () => refetch()
-    const loadAllTransactions = () => refetch()
-
-    // Moved updateURLWithFilters up
-    // Removed applyFilters as it is now automatic via effect
+    const loadAllTransactions = useCallback(() => refetch(), [refetch])
 
     const clearFilters = useCallback(() => {
         const clearedFilters = {
@@ -174,40 +147,18 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         }
         setFilters(clearedFilters)
         router.replace(window.location.pathname)
-        // Effect will handle refetching "all" since filters reset to empty equivalent
     }, [router])
 
     const reloadCurrentView = useCallback(() => {
-        const hasActiveFilters = searchParams.toString().length > 0
-        if (hasActiveFilters) {
-            applyFilters()
-        } else {
-            loadAllTransactions()
-        }
-    }, [searchParams, applyFilters, loadAllTransactions])
-
-    // Initial Load Logic
-    useEffect(() => {
-        const hasActiveFilters = searchParams.toString().length > 0
-        if (hasActiveFilters) {
-            applyFilters()
-        } else {
-            // Ensure data is loaded initially
-            // Ensure data is loaded initially
-            // Query automatically runs, so we just set defaults if needed
-        }
-    }, [])
-
-    const [isModalOpen, setModalOpen] = useState(false)
+        loadAllTransactions()
+    }, [loadAllTransactions])
 
     return (
         <TransactionContext.Provider value={{
             filters,
             setFilters,
-            applyFilters,
             clearFilters,
             reloadCurrentView,
-            // Expose Data
             transactions,
             pagination,
             isLoading: isLoadingTx,
@@ -215,8 +166,6 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
             createTransaction,
             updateTransaction,
             deleteTransaction,
-            addTransaction,
-            // Edit State
             editingTransaction,
             setEditingTransaction,
             isModalOpen,

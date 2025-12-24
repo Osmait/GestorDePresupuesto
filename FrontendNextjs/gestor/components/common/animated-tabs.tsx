@@ -16,7 +16,7 @@ interface AnimatedTabsProps {
 	defaultValue: string
 	className?: string
 	orientation?: 'horizontal' | 'vertical'
-	onValueChange?: (value: string) => void
+	onValueChange?: (_value: string) => void
 	noContent?: boolean
 }
 

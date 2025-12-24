@@ -1,30 +1,22 @@
 "use client"
 
-import React, { useState } from 'react'
-import Link from 'next/link'
+import React from 'react'
 import { usePathname } from 'next/navigation'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { UserNav } from '@/components/auth/user-nav'
 import { Search } from '@/components/common/search'
 import { SidebarController } from '@/components/common/sidebar-controller'
 import { AnimatedSidebarNav } from '@/components/common/sidebar-nav-animated'
 import {
-	LayoutDashboard,
-	CreditCard,
 	ArrowUpDown,
 	Tags,
-	Bitcoin,
 	PiggyBank,
 	Menu,
-	X,
 	ChevronLeft,
 	ChevronRight,
 	Home,
-	Bell,
 	Plus,
 	Mouse,
-	BarChart,
 	TrendingUp,
 	Wallet
 } from 'lucide-react'
@@ -108,7 +100,7 @@ function SidebarFooter({
 	isExpanded: boolean
 	sidebarHoverEnabled: boolean
 	toggleCollapsed: () => void
-	onItemClick: (item: NavItem, e: React.MouseEvent) => void
+	onItemClick: (_item: NavItem, _e: React.MouseEvent) => void
 }) {
 	const t = useTranslations('nav')
 	return (
@@ -219,11 +211,11 @@ function MainHeader({ isExpanded, toggleMobile }: {
 
 // Componente principal que combina Client Components
 export function Sidebar({ children }: SidebarProps) {
-	const pathname = usePathname()
+	usePathname() // Used for route-based styling in child components
 	const { navItems, bottomNavItems } = useNavItems()
 
 	// Estado local para settings eliminada al moverla al UserNav
-	const handleItemClick = (item: NavItem, e: React.MouseEvent) => {
+	const handleItemClick = (_item: NavItem, _e: React.MouseEvent) => {
 		// Handler vacío por ahora, o eliminar si no se usa
 	}
 

@@ -28,7 +28,7 @@ import { formatCurrency } from '@/lib/utils';
 interface AccountCardProps {
   account: Account;
   onAccountDeleted?: () => void;
-  onAccountEdit?: (account: Account) => void;
+  onAccountEdit?: (_account: Account) => void;
 }
 
 export function AccountCard({ account, onAccountDeleted, onAccountEdit }: AccountCardProps) {

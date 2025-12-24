@@ -13,11 +13,6 @@ export default function InvestmentsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
     const [investmentToEdit, setInvestmentToEdit] = useState<Investment | null>(null)
 
-    const handleCreate = () => {
-        setInvestmentToEdit(null)
-        setIsModalOpen(true)
-    }
-
     const handleEdit = (investment: Investment) => {
         setInvestmentToEdit(investment)
         setIsModalOpen(true)

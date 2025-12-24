@@ -101,8 +101,6 @@ function CategoryModalWrapper({ isOpen, onClose }: { isOpen: boolean, onClose: (
 
 function TransactionModalWrapper({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
     const { createTransaction, isLoading, error } = useTransactionContext()
-    // Dummy ref as we are not editing
-    const formRef = useRef<{ reset: () => void } | null>(null)
 
     return (
         <TransactionFormModal
@@ -111,7 +109,6 @@ function TransactionModalWrapper({ isOpen, onClose }: { isOpen: boolean, onClose
             createTransaction={createTransaction}
             isLoading={isLoading}
             error={error}
-            formRef={formRef}
         />
     )
 }

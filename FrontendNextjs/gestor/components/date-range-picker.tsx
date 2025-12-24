@@ -16,7 +16,7 @@ export function CalendarDateRangePicker({
   onChange,
 }: React.HTMLAttributes<HTMLDivElement> & {
   value?: DateRange | undefined
-  onChange?: (range: DateRange | undefined) => void
+  onChange?: (_range: DateRange | undefined) => void
 }) {
   const [internalDate, setInternalDate] = React.useState<DateRange | undefined>({
     from: new Date(2023, 0, 20),

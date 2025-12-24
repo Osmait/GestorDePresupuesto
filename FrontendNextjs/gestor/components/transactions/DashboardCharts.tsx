@@ -146,7 +146,7 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 							}}
 							axisBottom={{
 								format: v => {
-									const [year, month] = v.split('-');
+									const [_year, month] = v.split('-');
 									return monthAbbreviations[parseInt(month) - 1];
 								},
 								tickSize: 0,

@@ -8,10 +8,10 @@ interface AccountContextType {
     accounts: Account[]
     isLoading: boolean
     error: string | null
-    createAccount: (name: string, bank: string, initial_balance: number) => Promise<void>
-    updateAccount: (id: string, name: string, bank: string) => Promise<void>
-    deleteAccount: (id: string) => Promise<void>
-    addAccount: (acc: Account) => void
+    createAccount: (_name: string, _bank: string, _initial_balance: number) => Promise<void>
+    updateAccount: (_id: string, _name: string, _bank: string) => Promise<void>
+    deleteAccount: (_id: string) => Promise<void>
+    addAccount: (_acc: Account) => void
     refetch: () => Promise<void>
 }
 

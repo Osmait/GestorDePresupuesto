@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useEffect } from 'react'
+import { useMemo } from 'react'
 import { motion } from 'framer-motion'
 import { useTheme } from 'next-themes'
 import { ResponsiveLine } from '@nivo/line'
@@ -10,11 +10,7 @@ import { ResponsiveHeatMap } from '@nivo/heatmap'
 import { ResponsivePie } from '@nivo/pie'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useGetCategoryExpenses, useGetMonthlySummary } from '@/hooks/queries/useAnalyticsQuery'
-import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
-import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
-import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { AnalyticsSkeleton } from '@/components/skeletons/analytics-skeleton'
-import { useAnalysisContext } from './AnalysisContext'
 import { useTranslations } from 'next-intl'
 
 // Mocks
@@ -37,12 +33,8 @@ const mockHeat = [
 export function AnalysisDashboard() {
     const { theme } = useTheme()
     const t = useTranslations('analysis')
-    const { filters } = useAnalysisContext()
-    const { data: accounts = [], isLoading: accountsLoading } = useGetAccounts()
-    const { data: categories = [], isLoading: categoriesLoading } = useGetCategories()
-    const { data: transactions = [], isLoading: transactionsLoading } = useGetAllTransactions()
 
-    // New TanStack Query Hooks
+    // TanStack Query Hooks
     const { data: categoryExpenses = [], isLoading: isLoadingCategoryExpenses } = useGetCategoryExpenses()
     const { data: monthlySummary = [], isLoading: isLoadingMonthlySummary } = useGetMonthlySummary()
 
@@ -102,7 +94,7 @@ export function AnalysisDashboard() {
 
     // ... (rest of the code)
 
-    const loading = accountsLoading || categoriesLoading || transactionsLoading || isLoadingCategoryExpenses || isLoadingMonthlySummary
+    const loading = isLoadingCategoryExpenses || isLoadingMonthlySummary
 
     if (loading) return <AnalyticsSkeleton />
 

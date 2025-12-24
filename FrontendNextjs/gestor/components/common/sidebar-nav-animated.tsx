@@ -17,7 +17,7 @@ interface AnimatedSidebarNavProps {
 	items: NavItem[]
 	isExpanded: boolean
 	onMobileClose?: () => void
-	onItemClick?: (item: NavItem, e: React.MouseEvent) => void
+	onItemClick?: (_item: NavItem, _e: React.MouseEvent) => void
 }
 
 export function AnimatedSidebarNav({ items, isExpanded, onMobileClose, onItemClick }: AnimatedSidebarNavProps) {

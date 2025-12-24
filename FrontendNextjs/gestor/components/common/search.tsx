@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Search as SearchIcon, Loader2, CreditCard, ArrowUpDown, Tags, PiggyBank } from "lucide-react"
+import { Loader2, CreditCard, ArrowUpDown, Tags, PiggyBank } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useSearchQuery } from "@/hooks/queries/useSearchQuery"
 import { Badge } from "@/components/ui/badge"

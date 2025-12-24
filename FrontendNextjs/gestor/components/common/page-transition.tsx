@@ -1,6 +1,5 @@
 "use client"
 
-import { motion, AnimatePresence } from "framer-motion"
 import { usePathname } from "next/navigation"
 
 export default function PageTransition({
@@ -8,19 +7,13 @@ export default function PageTransition({
 }: {
     children: React.ReactNode
 }) {
-    const pathname = usePathname()
+    const _pathname = usePathname()
 
+    // Simple wrapper without animation to avoid duplicate DOM elements
+    // and page transition flashing issues
     return (
-        <AnimatePresence mode="popLayout" initial={false}>
-            <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.2, ease: "easeInOut" }}
-                className="w-full h-full"
-            >
-                {children}
-            </motion.div>
-        </AnimatePresence>
+        <div className="w-full h-full">
+            {children}
+        </div>
     )
 }
