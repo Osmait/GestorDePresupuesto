@@ -13,16 +13,19 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+// AccountService handles business logic related to account management.
 type AccountService struct {
 	accountRepository accountRepo.AccountRepositoryInterface
 }
 
+// NewAccountService creates a new instance of AccountService.
 func NewAccountService(accountRepository accountRepo.AccountRepositoryInterface) *AccountService {
 	return &AccountService{
 		accountRepository: accountRepository,
 	}
 }
 
+// CreateAccount creates a new account for a user.
 func (s *AccountService) CreateAccount(ctx context.Context, name, bank string, balace float64, userId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
@@ -37,6 +40,7 @@ func (s *AccountService) CreateAccount(ctx context.Context, name, bank string, b
 	return err
 }
 
+// FindAll retrieves all accounts for a specific user, including their current balances.
 func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.AccountResponse, error) {
 	accounts, err := s.accountRepository.FindAll(ctx, userId)
 	if err != nil {
@@ -57,11 +61,13 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.Acc
 	return accountResponses, nil
 }
 
+// DeleteAccount removes an account by its ID and User ID.
 func (s *AccountService) DeleteAccount(ctx context.Context, id string, userId string) error {
 	err := s.accountRepository.Delete(ctx, id, userId)
 	return err
 }
 
+// Balance retrieves the current balance of an account.
 func (s *AccountService) Balance(ctx context.Context, id string) (float64, error) {
 	balance, err := s.accountRepository.Balance(ctx, id)
 	if err != nil {
@@ -70,6 +76,7 @@ func (s *AccountService) Balance(ctx context.Context, id string) (float64, error
 	return balance, nil
 }
 
+// UpdateAccount modifies an existing account's details.
 func (s *AccountService) UpdateAccount(ctx context.Context, id string, updateRequest *dto.AccountUpdateRequest, userId string) error {
 	// First validate the request
 	if err := updateRequest.Validate(); err != nil {
@@ -97,6 +104,7 @@ func (s *AccountService) UpdateAccount(ctx context.Context, id string, updateReq
 	return nil
 }
 
+// FindById retrieves a specific account by its ID and User ID.
 func (s *AccountService) FindById(ctx context.Context, id, userId string) (*dto.AccountResponse, error) {
 	acc, err := s.accountRepository.FindByIdAndUserId(ctx, id, userId)
 	if err != nil {

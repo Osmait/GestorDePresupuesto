@@ -10,16 +10,19 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+// CategoryServices handles business logic related to category management.
 type CategoryServices struct {
 	repository categoryRepo.CategoryRepoInterface
 }
 
+// NewCategoryServices creates a new instance of CategoryServices.
 func NewCategoryServices(repo categoryRepo.CategoryRepoInterface) *CategoryServices {
 	return &CategoryServices{
 		repository: repo,
 	}
 }
 
+// CreateCategory creates a new category for a user.
 func (c *CategoryServices) CreateCategory(ctx context.Context, categoryRequest *dto.CategoryRequest, userId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
@@ -33,6 +36,7 @@ func (c *CategoryServices) CreateCategory(ctx context.Context, categoryRequest *
 	return err
 }
 
+// FindAll retrieves all categories for a specific user.
 func (c *CategoryServices) FindAll(ctx context.Context, userId string) ([]*dto.CategoryResponse, error) {
 	categorysList, err := c.repository.FindAll(ctx, userId)
 	if err != nil {
@@ -46,6 +50,7 @@ func (c *CategoryServices) FindAll(ctx context.Context, userId string) ([]*dto.C
 	return categoryResponseList, nil
 }
 
+// Delete removes a category by its ID and User ID.
 func (c *CategoryServices) Delete(ctx context.Context, id string, userId string) error {
 	categoryToDelete, err := c.repository.FindOne(ctx, id)
 	if err != nil {
@@ -58,6 +63,7 @@ func (c *CategoryServices) Delete(ctx context.Context, id string, userId string)
 	return err
 }
 
+// UpdateCategory modifies an existing category's details.
 func (c *CategoryServices) UpdateCategory(ctx context.Context, categoryRequest *dto.CategoryRequest, id string, userId string) error {
 	categoryToUpdate := category.NewCategory(id, categoryRequest.Name, categoryRequest.Icon, categoryRequest.Color)
 	categoryToUpdate.UserId = userId

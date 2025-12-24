@@ -21,6 +21,7 @@ const (
 	BILL = "bill"
 )
 
+// TransactionService handles business logic related to transaction management.
 type TransactionService struct {
 	transactionRepository transactionRepo.TransactionRepositoryInterface
 	budgetRepository      budgetRepo.BudgetRepoInterface
@@ -28,6 +29,7 @@ type TransactionService struct {
 	cache                 cache.CacheRepository
 }
 
+// NewTransactionService creates a new instance of TransactionService.
 func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository) *TransactionService {
 	return &TransactionService{
 		transactionRepository: transactionRepository,
@@ -37,6 +39,7 @@ func NewTransactionService(transactionRepository transactionRepo.TransactionRepo
 	}
 }
 
+// CreateTransaction records a new transaction, checks for budget thresholds, and triggers alerts if necessary.
 func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, createdAt time.Time) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
@@ -126,6 +129,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 	return nil
 }
 
+// FindAll retrieves transactions based on date range and account ID.
 func (s TransactionService) FindAll(ctx context.Context, date string, date2 string, id string) ([]*dto.TransactionResponse, error) {
 	transactionList, err := s.transactionRepository.FindAll(ctx, date, date2, id)
 	if err != nil {
@@ -151,6 +155,7 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 	return transactionResponseList, nil
 }
 
+// FindAllOfAllAccounts retrieves all transactions for a user across all accounts.
 func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, id string) ([]*dto.TransactionResponse, error) {
 	transactionList, err := s.transactionRepository.FindAllOfAllAccounts(ctx, id)
 	if err != nil {
@@ -311,6 +316,7 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 	return transactionResponseList
 }
 
+// UpdateTransaction modifies an existing transaction.
 func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, transaction *transaction.Transaction) error {
 	if transaction.TypeTransation == BILL {
 		transaction.Amount = transaction.Amount * -1
@@ -327,6 +333,7 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 	return nil
 }
 
+// DeleteTransaction removes a transaction by its ID and User ID.
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {
 	err := s.transactionRepository.Delete(ctx, id, userId)
 	if err == nil {

@@ -10,15 +10,18 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+// InvestmentService handles business logic related to investment management.
 type InvestmentService struct {
 	repo         investment.InvestmentRepository
 	quoteService *quote.QuoteService
 }
 
+// NewInvestmentService creates a new instance of InvestmentService.
 func NewInvestmentService(repo investment.InvestmentRepository, quoteService *quote.QuoteService) *InvestmentService {
 	return &InvestmentService{repo: repo, quoteService: quoteService}
 }
 
+// Create records a new investment for a user.
 func (s *InvestmentService) Create(ctx context.Context, id, userId string, investmentType investment.InvestmentType, name, symbol string, quantity, purchasePrice, currentPrice float64) error {
 	if id == "" {
 		id = ksuid.New().String()
@@ -27,6 +30,7 @@ func (s *InvestmentService) Create(ctx context.Context, id, userId string, inves
 	return s.repo.Save(ctx, inv)
 }
 
+// FindAll retrieves all investments for a user, automatically updating quotes if stale.
 func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*investment.Investment, error) {
 	investments, err := s.repo.FindAll(ctx, userId)
 	if err != nil {
@@ -79,11 +83,13 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 	return investments, nil
 }
 
+// Update modifies an existing investment.
 func (s *InvestmentService) Update(ctx context.Context, inv *investment.Investment) error {
 	inv.UpdatedAt = time.Now()
 	return s.repo.Update(ctx, inv)
 }
 
+// Delete removes an investment by its ID.
 func (s *InvestmentService) Delete(ctx context.Context, id string) error {
 	return s.repo.Delete(ctx, id)
 }

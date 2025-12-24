@@ -11,11 +11,13 @@ import (
 	"github.com/segmentio/ksuid"
 )
 
+// BudgetServices handles business logic related to budget management.
 type BudgetServices struct {
 	repository      budgetRepo.BudgetRepoInterface
 	transactionRepo transactionRepo.TransactionRepositoryInterface
 }
 
+// NewBudgetServices creates a new instance of BudgetServices.
 func NewBudgetServices(repo budgetRepo.BudgetRepoInterface, transactionRepo transactionRepo.TransactionRepositoryInterface) *BudgetServices {
 	return &BudgetServices{
 		repository:      repo,
@@ -23,6 +25,7 @@ func NewBudgetServices(repo budgetRepo.BudgetRepoInterface, transactionRepo tran
 	}
 }
 
+// CreateBudget creates a new budget for a user.
 func (b *BudgetServices) CreateBudget(ctx context.Context, budgetRequest *dto.BudgetRequest, userId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
@@ -36,11 +39,13 @@ func (b *BudgetServices) CreateBudget(ctx context.Context, budgetRequest *dto.Bu
 	return err
 }
 
+// UpdateBudget modifies an existing budget details.
 func (b *BudgetServices) UpdateBudget(ctx context.Context, budgetRequest *dto.BudgetRequest, id string, userId string) error {
 	budgetToUpdate := budget.NewBudget(id, budgetRequest.CategoryId, userId, budgetRequest.Amount)
 	return b.repository.Update(ctx, budgetToUpdate)
 }
 
+// FindAll retrieves all budgets for a user, including current spending progress.
 func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.BudgetResponse, error) {
 	budgets, err := b.repository.FindAll(ctx, userId)
 	if err != nil {
@@ -61,6 +66,7 @@ func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.Bud
 	return budgetResponses, nil
 }
 
+// Delete removes a budget by its ID and User ID.
 func (b *BudgetServices) Delete(ctx context.Context, id string, userId string) error {
 	budgets, err := b.repository.FindOne(ctx, id)
 	if err != nil {

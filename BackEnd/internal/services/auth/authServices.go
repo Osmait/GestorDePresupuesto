@@ -23,6 +23,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
+// AuthService handles authentication and authorization logic.
 type AuthService struct {
 	repo            userRepo.UserRepositoryInterface
 	accountRepo     accountRepo.AccountRepositoryInterface
@@ -32,6 +33,7 @@ type AuthService struct {
 	config          *config.Config
 }
 
+// NewAuthService creates a new instance of AuthService with necessary dependencies.
 func NewAuthService(
 	userRepository userRepo.UserRepositoryInterface,
 	accountRepo accountRepo.AccountRepositoryInterface,
@@ -50,6 +52,7 @@ func NewAuthService(
 	}
 }
 
+// Login authenticates a user by email and password, returning a JWT token if successful.
 func (a *AuthService) Login(ctx context.Context, authRequest *authRequest.AuthRequest) (*string, error) {
 	user, err := a.repo.FindUserByEmail(ctx, authRequest.Email)
 	if err != nil {
@@ -73,6 +76,7 @@ func (a *AuthService) Login(ctx context.Context, authRequest *authRequest.AuthRe
 	return token, nil
 }
 
+// CreateDemoUser creates a temporary demo user with pre-seeded data (accounts, categories, transactions) for trial purposes.
 func (a *AuthService) CreateDemoUser(ctx context.Context) (*string, error) {
 	// 1. Create Demo User
 	userID := uuid.New().String()

@@ -17,6 +17,12 @@ import { useLocale } from "next-intl"
 import { useState } from "react"
 import { SettingsModal } from "@/components/settings/SettingsModal"
 
+/**
+ * UserNav displays the user's avatar and a dropdown menu with profile actions.
+ * It provides access to Profile, Settings, Theme toggle, Language switcher, and Logout.
+ * 
+ * @returns The UserNav component.
+ */
 export function UserNav() {
   const { data: session, status } = useSession()
   const locale = useLocale()

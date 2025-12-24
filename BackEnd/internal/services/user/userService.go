@@ -8,21 +8,25 @@ import (
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/segmentio/ksuid"
 	"golang.org/x/crypto/bcrypt"
 )
 
+// UserService handles business logic related to user management.
 type UserService struct {
 	userRepository userRepo.UserRepositoryInterface
 }
 
+// NewUserService creates a new instance of UserService.
 func NewUserService(userRepo userRepo.UserRepositoryInterface) *UserService {
 	return &UserService{
 		userRepository: userRepo,
 	}
 }
 
+// CreateUser registers a new user in the system after validating the request and hashing the password.
 func (u *UserService) CreateUser(ctx context.Context, userRequest *dto.UserRequest) error {
 	// Use safe call to prevent panics
 	return apperrors.SafeCall(ctx, "CreateUser", func() error {
@@ -42,7 +46,7 @@ func (u *UserService) CreateUser(ctx context.Context, userRequest *dto.UserReque
 		}
 
 		// Hash password with error handling
-		hashPassword, err := bcrypt.GenerateFromPassword([]byte(userRequest.Password), bcrypt.DefaultCost)
+		hashPassword, err := utils.HashPassword(userRequest.Password)
 		if err != nil {
 			return apperrors.WrapError(ctx, err, "CreateUser", "failed to hash password")
 		}
@@ -54,7 +58,7 @@ func (u *UserService) CreateUser(ctx context.Context, userRequest *dto.UserReque
 		}
 
 		// Create user domain object
-		userToSave := user.NewUser(id.String(), userRequest.Name, userRequest.LastName, userRequest.Email, string(hashPassword))
+		userToSave := user.NewUser(id.String(), userRequest.Name, userRequest.LastName, userRequest.Email, hashPassword)
 
 		// Save user with wrapped error handling
 		if err := u.userRepository.Save(ctx, userToSave); err != nil {
@@ -102,6 +106,11 @@ func (u *UserService) FindByEmail(ctx context.Context, email string) (*dto.UserR
 	})
 }
 
+// GetUser retrieves a user's details by their ID.
+func (u *UserService) GetUser(ctx context.Context, id string) (*dto.UserResponse, error) {
+	return u.FindUserById(ctx, id)
+}
+
 func (u *UserService) FindUserById(ctx context.Context, id string) (*dto.UserResponse, error) {
 	// Use safe call with result to prevent panics
 	return apperrors.SafeCallWithResult(ctx, "FindUserById", func() (*dto.UserResponse, error) {
@@ -139,6 +148,7 @@ func (u *UserService) FindUserById(ctx context.Context, id string) (*dto.UserRes
 	})
 }
 
+// DeleteUser removes a user from the system by their ID.
 func (u *UserService) DeleteUser(ctx context.Context, id string) error {
 	// Use safe call to prevent panics
 	return apperrors.SafeCall(ctx, "DeleteUser", func() error {
@@ -178,7 +188,7 @@ func (u *UserService) DeleteUser(ctx context.Context, id string) error {
 	})
 }
 
-// UpdateUser updates user information with proper error handling
+// UpdateUser modifies an existing user's information.
 func (u *UserService) UpdateUser(ctx context.Context, id string, userRequest *dto.UserRequest) error {
 	return apperrors.SafeCall(ctx, "UpdateUser", func() error {
 		// Input validation

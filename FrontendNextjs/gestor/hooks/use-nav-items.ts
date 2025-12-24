@@ -13,6 +13,14 @@ import {
     TrendingUp,
 } from 'lucide-react'
 
+/**
+ * Interface representing a navigation item in the sidebar.
+ * @property title - The display title of the item.
+ * @property href - The URL path the item links to.
+ * @property icon - The icon component to display.
+ * @property badge - Optional badge text to display (e.g., "New").
+ * @property description - A brief description of the item.
+ */
 interface NavItem {
     title: string
     href: string
@@ -21,6 +29,12 @@ interface NavItem {
     description: string
 }
 
+/**
+ * Custom hook to retrieve localized navigation items for the application sidebar.
+ * Returns both main navigation items and bottom navigation items (settings, help).
+ * 
+ * @returns An object containing `navItems` and `bottomNavItems`.
+ */
 export function useNavItems() {
     const t = useTranslations('nav')
 

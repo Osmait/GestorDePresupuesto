@@ -10,11 +10,13 @@ import (
 	"github.com/r3labs/sse/v2"
 )
 
+// NotificationService handles real-time user notifications via SSE (Server-Sent Events).
 type NotificationService struct {
 	server *sse.Server
 	repo   notification.NotificationRepository
 }
 
+// NewNotificationService creates a new instance of NotificationService.
 func NewNotificationService(repo notification.NotificationRepository) *NotificationService {
 	server := sse.New()
 	server.AutoReplay = false // We don't want to replay old notifications for now
@@ -24,14 +26,17 @@ func NewNotificationService(repo notification.NotificationRepository) *Notificat
 	}
 }
 
+// GetServer returns the underlying SSE server instance.
 func (s *NotificationService) GetServer() *sse.Server {
 	return s.server
 }
 
+// CreateStream initializes a new notification stream for a client ID.
 func (s *NotificationService) CreateStream(id string) {
 	s.server.CreateStream(id)
 }
 
+// Publish sends a generic event to a specific stream.
 func (s *NotificationService) Publish(streamID string, event string, data string) {
 	s.server.Publish(streamID, &sse.Event{
 		Event: []byte(event),
@@ -39,7 +44,8 @@ func (s *NotificationService) Publish(streamID string, event string, data string
 	})
 }
 
-// SendToUser sends a notification to a specific user's stream and persists it
+// SendToUser sends a notification to a specific user's stream and persists it to the database.
+// It handles JSON parsing of the message and ensures a valid notification structure.
 func (s *NotificationService) SendToUser(userID string, messageJSON string) {
 	// 1. Persist to Database
 	var notifPayload struct {
@@ -87,18 +93,22 @@ func (s *NotificationService) SendToUser(userID string, messageJSON string) {
 	})
 }
 
+// GetHistory retrieves the notification history for a user.
 func (s *NotificationService) GetHistory(userID string) ([]notification.Notification, error) {
 	return s.repo.GetByUserID(userID)
 }
 
+// MarkAsRead marks a specific notification as read.
 func (s *NotificationService) MarkAsRead(id string, userID string) error {
 	return s.repo.MarkAsRead(id, userID)
 }
 
+// MarkAllAsRead marks all notifications for a user as read.
 func (s *NotificationService) MarkAllAsRead(userID string) error {
 	return s.repo.MarkAllAsRead(userID)
 }
 
+// DeleteAll removes all notifications for a user.
 func (s *NotificationService) DeleteAll(userID string) error {
 	return s.repo.DeleteAll(userID)
 }

@@ -29,6 +29,9 @@ import {
     CreditCard
 } from "lucide-react"
 
+/**
+ * Props for the SettingsModal component.
+ */
 interface SettingsModalProps {
     open: boolean
     onOpenChange: (open: boolean) => void
