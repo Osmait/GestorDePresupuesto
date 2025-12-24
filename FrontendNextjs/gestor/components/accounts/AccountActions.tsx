@@ -5,8 +5,10 @@ import { Button } from '@/components/ui/button'
 import { PlusCircle } from 'lucide-react'
 import { AccountFormModal } from '@/components/accounts/AccountFormModal'
 import { useAccountContext } from '@/components/accounts/AccountContext'
+import { useTranslations } from 'next-intl'
 
 export function AccountActions() {
+    const t = useTranslations('accounts')
     const [modalOpen, setModalOpen] = useState(false)
     const { createAccount, addAccount, isLoading, error } = useAccountContext()
 
@@ -17,17 +19,15 @@ export function AccountActions() {
                 onClick={() => setModalOpen(true)}
             >
                 <PlusCircle className="h-4 w-4 mr-2" />
-                Nueva Cuenta
+                {t('addAccount')}
             </Button>
             <AccountFormModal
                 open={modalOpen}
                 setOpen={setModalOpen}
                 createAccount={async (name, bank, initial_balance) => {
-                    // Optimistic Close
                     setModalOpen(false)
 
                     try {
-                        // Silent Refresh handles the UI update
                         await createAccount(name, bank, initial_balance)
                     } catch (e) {
                         console.error("Failed to create account", e)
@@ -39,3 +39,4 @@ export function AccountActions() {
         </div>
     )
 }
+

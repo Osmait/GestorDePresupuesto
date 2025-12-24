@@ -22,6 +22,7 @@ import { Account } from '@/types/account';
 import { useState } from 'react';
 
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
 
 interface AccountCardProps {
   account: Account;
@@ -30,6 +31,8 @@ interface AccountCardProps {
 }
 
 export function AccountCard({ account, onAccountDeleted, onAccountEdit }: AccountCardProps) {
+  const t = useTranslations('accounts');
+  const tForms = useTranslations('forms');
   const router = useRouter();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -94,21 +97,21 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
                 onClick={() => onAccountEdit?.(account)}
               >
                 <Edit className="h-4 w-4" />
-                Editar cuenta
+                {t('edit')}
               </DropdownMenuItem>
               <DropdownMenuItem
                 className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
                 onClick={() => setShowDeleteDialog(true)}
               >
                 <Trash2 className="h-4 w-4" />
-                Eliminar cuenta
+                {t('delete')}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-sm text-muted-foreground">Balance Actual</span>
+            <span className="text-sm text-muted-foreground">{t('currentBalance')}</span>
             <div className="flex items-center gap-2">
               {isPositive ? (
                 <ArrowUpRight className="h-4 w-4 text-green-600 dark:text-green-400" />
@@ -122,7 +125,7 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
           </div>
           {initialBalance !== currentBalance && (
             <div className="flex justify-between items-center text-xs">
-              <span className="text-muted-foreground">Saldo inicial: ${initialBalance.toLocaleString()}</span>
+              <span className="text-muted-foreground">{t('initial')}: ${initialBalance.toLocaleString()}</span>
               <span className={`font-medium ${hasGrowth ? 'text-green-600' : 'text-red-600'}`}>
                 {hasGrowth ? '+' : ''}{(currentBalance - initialBalance).toLocaleString()}
               </span>
@@ -131,7 +134,7 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
           <div className="flex justify-between items-center pt-2 border-t border-border/50">
             <span className="text-xs text-muted-foreground">USD</span>
             <Badge variant="outline" className="bg-muted/30 dark:bg-muted/20">
-              {currentBalance > 10000 ? 'Alto' : currentBalance > 5000 ? 'Medio' : 'Bajo'}
+              {currentBalance > 10000 ? t('high') : currentBalance > 5000 ? t('medium') : t('low')}
             </Badge>
           </div>
         </div>
@@ -140,10 +143,9 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Eliminar Cuenta</DialogTitle>
+            <DialogTitle>{t('deleteTitle')}</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que quieres eliminar la cuenta "{account.name}"?
-              Esta acción no se puede deshacer y eliminará todos los datos asociados.
+              {t('deleteDescription', { name: account.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -152,14 +154,14 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
               onClick={() => setShowDeleteDialog(false)}
               disabled={isDeleting}
             >
-              Cancelar
+              {tForms('cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteAccount}
               disabled={isDeleting}
             >
-              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+              {isDeleting ? t('deleting') : tForms('delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

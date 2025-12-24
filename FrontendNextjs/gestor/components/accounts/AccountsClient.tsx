@@ -18,8 +18,10 @@ import {
 } from 'lucide-react';
 
 import { AccountsPageSkeleton } from '@/components/accounts/AccountsPageSkeleton';
+import { useTranslations } from 'next-intl';
 
 export default function AccountsClient() {
+  const t = useTranslations('accounts');
   const { accounts, isLoading, updateAccount, deleteAccount, error } = useAccountContext();
   const [updateModalOpen, setUpdateModalOpen] = useState(false);
   const [selectedAccount, setSelectedAccount] = useState<Account | null>(null);
@@ -52,13 +54,12 @@ export default function AccountsClient() {
     return <AccountsPageSkeleton />;
   }
 
-  // Render content for each tab
   const renderTabContent = (filter: 'all' | 'positive' | 'negative') => {
     const filteredAccounts = getFilteredAccounts(filter);
     const emptyMessages = {
-      all: 'No tienes cuentas registradas.',
-      positive: 'No tienes cuentas positivas.',
-      negative: 'No tienes cuentas negativas.'
+      all: t('noAccountsAll'),
+      positive: t('noPositiveAccounts'),
+      negative: t('noNegativeAccounts')
     };
 
     if (filteredAccounts.length === 0) {
@@ -92,23 +93,22 @@ export default function AccountsClient() {
     );
   };
 
-  // Tab configuration
   const tabsConfig = [
     {
       value: 'all',
-      label: 'Todas',
+      label: t('all'),
       icon: <Wallet className="h-4 w-4" />,
       filter: 'all' as const,
     },
     {
       value: 'positive',
-      label: 'Positivas',
+      label: t('positive'),
       icon: <TrendingUp className="h-4 w-4" />,
       filter: 'positive' as const,
     },
     {
       value: 'negative',
-      label: 'Negativas',
+      label: t('negative'),
       icon: <TrendingDown className="h-4 w-4" />,
       filter: 'negative' as const,
     }
@@ -120,12 +120,11 @@ export default function AccountsClient() {
       animate={{ opacity: 1 }}
       transition={{ duration: 0.5 }}
     >
-      {/* Resumen de cuentas */}
       <div className="mb-8">
         {Array.isArray(accounts) && accounts.length > 0 ? (
           <AccountSummaryCard accounts={accounts} />
         ) : (
-          <div className="text-center text-muted-foreground py-8">No tienes cuentas registradas.</div>
+          <div className="text-center text-muted-foreground py-8">{t('noAccountsAll')}</div>
         )}
       </div>
 

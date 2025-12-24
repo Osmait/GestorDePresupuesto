@@ -1,3 +1,5 @@
+'use client'
+
 import { TransactionProvider } from '@/components/transactions/TransactionContext'
 import { TransactionActions } from '@/components/transactions/TransactionActions'
 import TransactionsList from '@/components/transactions/TransactionsList'
@@ -6,24 +8,26 @@ import { RecurringTransactionList } from '@/components/recurring/RecurringTransa
 import { RecurringTransactionActions } from '@/components/recurring/RecurringTransactionActions'
 import { RecurringTransactionFormModal } from '@/components/recurring/RecurringTransactionFormModal'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useTranslations } from 'next-intl'
 
 export default function TransactionsPage() {
+	const t = useTranslations('transactions')
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20">
 			<div className="container mx-auto px-4 py-8">
 				<div className="mb-8" id="transactions-header">
 					<h1 className="text-4xl font-bold tracking-tight text-foreground">
-						Gestión de Transacciones
+						{t('title')}
 					</h1>
 					<p className="text-muted-foreground mt-2 text-lg">
-						Supervisa y analiza todas tus transacciones financieras
+						{t('subtitle')}
 					</p>
 				</div>
 
 				<Tabs defaultValue="history" className="space-y-4" id="transactions-tabs">
 					<TabsList>
-						<TabsTrigger value="history">Historial</TabsTrigger>
-						<TabsTrigger value="recurring">Recurrentes</TabsTrigger>
+						<TabsTrigger value="history">{t('history')}</TabsTrigger>
+						<TabsTrigger value="recurring">{t('recurring')}</TabsTrigger>
 					</TabsList>
 
 					<TabsContent value="history" className="space-y-4">
@@ -49,3 +53,4 @@ export default function TransactionsPage() {
 		</div>
 	)
 }
+

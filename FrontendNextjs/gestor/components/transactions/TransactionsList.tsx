@@ -14,8 +14,11 @@ import { TransactionsPageSkeleton } from '@/components/transactions/Transactions
 import { useSearchParams } from 'next/navigation'
 import { useTransactionContext } from './TransactionContext'
 import { TransactionSort } from './TransactionSort'
+import { useTranslations } from 'next-intl'
 
 export default function TransactionsList() {
+    const t = useTranslations('transactions')
+    const tCommon = useTranslations('common')
     const {
         transactions,
         pagination,
@@ -33,13 +36,12 @@ export default function TransactionsList() {
 
     const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME)
     const expenseTransactions = transactions.filter(t => t.type_transation === TypeTransaction.BILL)
-    // Removed client-side sorting. Transactions are now sorted by the backend.
 
     const getFilteredTransactions = () => {
         switch (currentFilter) {
             case 'income': return incomeTransactions
             case 'expense': return expenseTransactions
-            default: return transactions // Use server-sorted/filtered transactions
+            default: return transactions
         }
     }
 
@@ -51,7 +53,7 @@ export default function TransactionsList() {
                     return (
                         <motion.li
                             key={transaction.id}
-                            layout // Add layout prop for smooth reordering/filtering
+                            layout
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
@@ -76,19 +78,18 @@ export default function TransactionsList() {
                     animate={{ opacity: 1 }}
                     className="text-center py-10 text-muted-foreground"
                 >
-                    No se encontraron transacciones
+                    {t('noTransactions')}
                 </motion.div>
             )}
         </ul>
     )
 
     const tabsConfig = [
-        { value: 'all', label: 'Todas', icon: <CreditCard className="h-4 w-4" />, content: <></> },
-        { value: 'income', label: 'Ingresos', icon: <TrendingUp className="h-4 w-4" />, content: <></> },
-        { value: 'expense', label: 'Gastos', icon: <TrendingDown className="h-4 w-4" />, content: <></> }
+        { value: 'all', label: t('all'), icon: <CreditCard className="h-4 w-4" />, content: <></> },
+        { value: 'income', label: t('income'), icon: <TrendingUp className="h-4 w-4" />, content: <></> },
+        { value: 'expense', label: t('expense'), icon: <TrendingDown className="h-4 w-4" />, content: <></> }
     ]
 
-    // Loading State
     if (isLoadingTx || isLoadingCat || isLoadingAcc) {
         return <TransactionsPageSkeleton />
     }
@@ -107,12 +108,12 @@ export default function TransactionsList() {
                 {pagination && (
                     <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
                         <span>
-                            Mostrando {transactions.length} de {pagination.total_records} transacciones
-                            {pagination.total_pages > 1 && ` (Página ${pagination.current_page} de ${pagination.total_pages})`}
+                            {t('showing')} {transactions.length} {t('of')} {pagination.total_records} {t('transactionsCount')}
+                            {pagination.total_pages > 1 && ` (${t('page')} ${pagination.current_page} ${t('of')} ${pagination.total_pages})`}
                         </span>
                         {(searchParams.toString().length > 0) && (
                             <Button variant="link" size="sm" onClick={clearFilters} className="h-auto p-0 ml-2">
-                                Ver todas
+                                {tCommon('actions.viewAll')}
                             </Button>
                         )}
                     </div>
@@ -130,9 +131,9 @@ export default function TransactionsList() {
                     noContent={true}
                 />
 
-                {/* Render content outside of AnimatedTabs to preserve scroll/mount */}
                 {renderTransactionList(getFilteredTransactions())}
             </div>
         </motion.div>
     )
 }
+
