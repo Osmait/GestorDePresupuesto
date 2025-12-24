@@ -87,13 +87,12 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 							data={pieData}
 							margin={{ top: 30, right: 40, bottom: 40, left: 40 }}
 							innerRadius={0.6}
-							padAngle={1.5}
-							cornerRadius={6}
+							padAngle={2}
+							cornerRadius={8}
 							colors={d => d.data.color}
-							borderWidth={2}
-							borderColor={{ from: 'color', modifiers: [['darker', 0.3]] }}
-							enableArcLabels={false}
-							arcLinkLabelsTextColor={theme === 'dark' ? '#e5e7eb' : '#374151'}
+							borderWidth={0}
+							enableArcLinkLabels={true}
+							arcLinkLabelsTextColor={theme === 'dark' ? '#9ca3af' : '#4b5563'}
 							arcLinkLabelsColor={{ from: 'color' }}
 							activeOuterRadiusOffset={8}
 							theme={nivoTheme}
@@ -118,40 +117,55 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 							data={barData}
 							keys={['Ingresos', 'Gastos']}
 							indexBy="month"
-							margin={{ top: 30, right: 30, bottom: 80, left: 50 }}
-							padding={0.3}
+							margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
+							padding={0.5}
+							innerPadding={4}
 							groupMode="grouped"
-							colors={[theme === 'dark' ? '#34d399' : '#10b981', theme === 'dark' ? '#f87171' : '#ef4444']}
+							colors={[theme === 'dark' ? '#10b981' : '#059669', theme === 'dark' ? '#f43f5e' : '#e11d48']}
 							borderRadius={4}
 							enableLabel={false}
-							theme={nivoTheme}
+							enableGridX={false}
+							enableGridY={true}
+							theme={{
+								...nivoTheme,
+								grid: {
+									line: {
+										stroke: theme === 'dark' ? '#374151' : '#e5e7eb',
+										strokeWidth: 1,
+										strokeDasharray: '4 4'
+									}
+								}
+							}}
 							axisBottom={{
 								format: v => {
 									const [year, month] = v.split('-');
-									return `${month}/${year.slice(2)}`;
+									const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
+									return months[parseInt(month) - 1];
 								},
-								legend: 'Mes',
-								legendPosition: 'middle',
-								legendOffset: 32
+								tickSize: 0,
+								tickPadding: 16,
+								legend: '',
 							}}
 							axisLeft={{
-								legend: 'Monto ($)',
-								legendPosition: 'middle',
-								legendOffset: -40
+								tickSize: 0,
+								tickPadding: 16,
+								tickValues: 5,
+								legend: '',
 							}}
 							legends={[
 								{
 									dataFrom: 'keys',
-									anchor: 'bottom',
+									anchor: 'bottom-right',
 									direction: 'row',
 									justify: false,
 									translateY: 60,
-									itemWidth: 80,
-									itemHeight: 18,
-									itemsSpacing: 8,
-									symbolSize: 18,
-									itemTextColor: theme === 'dark' ? '#e5e7eb' : '#374151',
-									itemBackground: 'transparent',
+									translateX: 0,
+									itemWidth: 100,
+									itemHeight: 20,
+									itemsSpacing: 0,
+									symbolSize: 20,
+									symbolShape: 'circle',
+									itemTextColor: theme === 'dark' ? '#9ca3af' : '#6b7280',
 									effects: [
 										{
 											on: 'hover',
