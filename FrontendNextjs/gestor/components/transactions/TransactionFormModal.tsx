@@ -127,95 +127,140 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-[600px]">
         <DialogHeader>
           <DialogTitle>{isEditing ? 'Editar Transacción' : 'Nueva Transacción'}</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+
+            {/* Row 1: Nombre */}
             <FormField control={form.control} name="name" render={({ field }) => (
               <FormItem>
                 <FormLabel>Nombre</FormLabel>
-                <FormControl><Input {...field} placeholder="Ej: Pago de luz" /></FormControl>
+                <FormControl>
+                  <Input {...field} placeholder="Ej: Pago de luz" autoFocus />
+                </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
+
+            {/* Row 2: Monto y Tipo */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="amount" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Monto</FormLabel>
+                  <FormControl>
+                    <div className="relative">
+                      <span className="absolute left-3 top-2.5 text-muted-foreground">$</span>
+                      <Input type="number" {...field} min={0.01} step={0.01} className="pl-7" />
+                    </div>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="type_transaction" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Tipo</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value={TypeTransaction.INCOME}>Ingreso</SelectItem>
+                        <SelectItem value={TypeTransaction.BILL}>Gasto</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+
+            {/* Row 3: Cuenta y Categoría */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="account_id" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Cuenta</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              <FormField control={form.control} name="category_id" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Categoría</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecciona" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categories.map(cat => (
+                          <SelectItem key={cat.id} value={cat.id}>
+                            <span className="flex items-center gap-2">
+                              {cat.icon} {cat.name}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+            </div>
+
+            {/* Row 4: Fecha y Presupuesto (Opcional) */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField control={form.control} name="created_at" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Fecha</FormLabel>
+                  <FormControl>
+                    <Input type="date" value={format(field.value, 'yyyy-MM-dd')} onChange={e => field.onChange(new Date(e.target.value))} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )} />
+
+              {/* Si quisieras agregar el campo de Presupuesto (budget_id), iría aquí.
+                  Actualmente no lo veo explícito en el formulario original salvo en interfaces. 
+                  Si no se usa, este espacio puede quedar vacío o extender la fecha.
+                  Asumo que no se estaba mostrando antes (aunque estaba en props).
+                  Si se debe mostrar, descomentar abajo. */}
+              {/* <FormField control={form.control} name="budget_id" ... /> */}
+            </div>
+
+            {/* Row 5: Descripción */}
             <FormField control={form.control} name="description" render={({ field }) => (
               <FormItem>
                 <FormLabel>Descripción</FormLabel>
-                <FormControl><Input {...field} placeholder="Detalle de la transacción" /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="amount" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Monto</FormLabel>
-                <FormControl><Input type="number" {...field} min={0.01} step={0.01} /></FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="type_transaction" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Tipo</FormLabel>
                 <FormControl>
-                  <Select value={field.value} onValueChange={v => {
-                    field.onChange(v)
-                  }}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value={TypeTransaction.INCOME}>Ingreso</SelectItem>
-                      <SelectItem value={TypeTransaction.BILL}>Gasto</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Input {...field} placeholder="Detalle de la transacción" />
                 </FormControl>
                 <FormMessage />
               </FormItem>
             )} />
-            <FormField control={form.control} name="account_id" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Cuenta</FormLabel>
-                <FormControl>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-                    <SelectContent>
-                      {accounts.map(acc => <SelectItem key={acc.id} value={acc.id}>{acc.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="category_id" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Categoría</FormLabel>
-                <FormControl>
-                  <Select value={field.value} onValueChange={field.onChange}>
-                    <SelectTrigger><SelectValue placeholder="Selecciona" /></SelectTrigger>
-                    <SelectContent>
-                      {categories.map(cat => <SelectItem key={cat.id} value={cat.id}>{cat.icon} {cat.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <FormField control={form.control} name="created_at" render={({ field }) => (
-              <FormItem>
-                <FormLabel>Fecha</FormLabel>
-                <FormControl>
-                  <Input type="date" value={format(field.value, 'yyyy-MM-dd')} onChange={e => field.onChange(new Date(e.target.value))} />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )} />
-            <DialogFooter>
-              <Button type="submit" disabled={isLoading} className="w-full">
+
+            <DialogFooter className="pt-4">
+              <DialogClose asChild>
+                <Button type="button" variant="ghost">Cancelar</Button>
+              </DialogClose>
+              <Button type="submit" disabled={isLoading}>
                 {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <PlusCircle className="h-4 w-4 mr-2" />}
                 {isEditing ? 'Guardar Cambios' : 'Crear Transacción'}
               </Button>
-              <DialogClose asChild>
-                <Button type="button" variant="ghost" className="w-full">Cancelar</Button>
-              </DialogClose>
             </DialogFooter>
           </form>
         </Form>
