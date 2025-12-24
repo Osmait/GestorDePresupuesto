@@ -354,5 +354,27 @@
     "budgetAmount": "Budget Amount",
     "period": "Period",
     "saving": "Saving..."
+  },
+  "charts": {
+    "expensesByCategory": "Expenses by Category",
+    "incomeVsExpenses": "Income vs Expenses by Month",
+    "income": "Income",
+    "expenses": "Expenses",
+    "noExpenses": "No expenses recorded",
+    "expensesHint": "Expenses will appear here when you make transactions",
+    "noTransactions": "No transactions recorded",
+    "statsHint": "Statistics will appear when you have income and expenses",
+    "jan": "Jan",
+    "feb": "Feb",
+    "mar": "Mar",
+    "apr": "Apr",
+    "may": "May",
+    "jun": "Jun",
+    "jul": "Jul",
+    "aug": "Aug",
+    "sep": "Sep",
+    "oct": "Oct",
+    "nov": "Nov",
+    "dec": "Dec"
   }
 }

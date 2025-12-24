@@ -5,6 +5,7 @@ import { ResponsiveBar } from '@nivo/bar'
 import { useTheme } from 'next-themes'
 import { useMemo } from 'react'
 import { CategoryExpense, MonthlySummary } from '@/types/analytics'
+import { useTranslations } from 'next-intl'
 
 
 interface DashboardChartsProps {
@@ -16,6 +17,7 @@ interface DashboardChartsProps {
 
 export function DashboardCharts({ categorysData, monthSummary }: DashboardChartsProps) {
 	const { theme } = useTheme()
+	const t = useTranslations('charts')
 
 
 
@@ -31,14 +33,15 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 		}
 	}) : []
 
-
-
+	// Transform data to use translated keys
 	const barData = monthSummary ? monthSummary.map(month => {
 		return {
-			...month,
-			Gastos: Math.abs(month.Gastos), // Asegurarse de que Gastos sea positivo
+			month: month.month,
+			[t('income')]: month.Ingresos,
+			[t('expenses')]: Math.abs(month.Gastos),
 		}
 	}) : []
+
 	const nivoTheme = useMemo(() => ({
 		background: 'transparent',
 		textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
@@ -77,10 +80,15 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 		}
 	}), [theme])
 
+	const monthAbbreviations = [
+		t('jan'), t('feb'), t('mar'), t('apr'), t('may'), t('jun'),
+		t('jul'), t('aug'), t('sep'), t('oct'), t('nov'), t('dec')
+	]
+
 	return (
 		<div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
 			<div className="bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center">
-				<h3 className="font-semibold mb-2 text-lg text-foreground">Gastos por Categoría</h3>
+				<h3 className="font-semibold mb-2 text-lg text-foreground">{t('expensesByCategory')}</h3>
 				<div className="h-64 w-full">
 					{pieData.length > 0 ? (
 						<ResponsivePie
@@ -102,20 +110,20 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 						<div className="flex items-center justify-center h-full text-muted-foreground">
 							<div className="text-center">
 								<p className="text-lg mb-2">📊</p>
-								<p>No hay gastos registrados</p>
-								<p className="text-sm">Los gastos aparecerán aquí cuando realices transacciones</p>
+								<p>{t('noExpenses')}</p>
+								<p className="text-sm">{t('expensesHint')}</p>
 							</div>
 						</div>
 					)}
 				</div>
 			</div>
 			<div className="bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center">
-				<h3 className="font-semibold mb-2 text-lg text-foreground">Ingresos vs Gastos por Mes</h3>
+				<h3 className="font-semibold mb-2 text-lg text-foreground">{t('incomeVsExpenses')}</h3>
 				<div className="h-64 w-full">
 					{barData.length > 0 ? (
 						<ResponsiveBar
 							data={barData}
-							keys={['Ingresos', 'Gastos']}
+							keys={[t('income'), t('expenses')]}
 							indexBy="month"
 							margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
 							padding={0.5}
@@ -139,8 +147,7 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 							axisBottom={{
 								format: v => {
 									const [year, month] = v.split('-');
-									const months = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic'];
-									return months[parseInt(month) - 1];
+									return monthAbbreviations[parseInt(month) - 1];
 								},
 								tickSize: 0,
 								tickPadding: 16,
@@ -181,8 +188,8 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 						<div className="flex items-center justify-center h-full text-muted-foreground">
 							<div className="text-center">
 								<p className="text-lg mb-2">📈</p>
-								<p>No hay transacciones registradas</p>
-								<p className="text-sm">Las estadísticas aparecerán cuando tengas ingresos y gastos</p>
+								<p>{t('noTransactions')}</p>
+								<p className="text-sm">{t('statsHint')}</p>
 							</div>
 						</div>
 					)}
@@ -190,4 +197,5 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 			</div>
 		</div>
 	)
-} 
+}
+

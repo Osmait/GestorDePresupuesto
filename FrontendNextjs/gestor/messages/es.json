@@ -354,5 +354,27 @@
     "budgetAmount": "Monto del Presupuesto",
     "period": "Período",
     "saving": "Guardando..."
+  },
+  "charts": {
+    "expensesByCategory": "Gastos por Categoría",
+    "incomeVsExpenses": "Ingresos vs Gastos por Mes",
+    "income": "Ingresos",
+    "expenses": "Gastos",
+    "noExpenses": "No hay gastos registrados",
+    "expensesHint": "Los gastos aparecerán aquí cuando realices transacciones",
+    "noTransactions": "No hay transacciones registradas",
+    "statsHint": "Las estadísticas aparecerán cuando tengas ingresos y gastos",
+    "jan": "Ene",
+    "feb": "Feb",
+    "mar": "Mar",
+    "apr": "Abr",
+    "may": "May",
+    "jun": "Jun",
+    "jul": "Jul",
+    "aug": "Ago",
+    "sep": "Sep",
+    "oct": "Oct",
+    "nov": "Nov",
+    "dec": "Dic"
   }
 }
