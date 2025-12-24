@@ -27,11 +27,12 @@ import {
 	Target,
 	LucideIcon
 } from 'lucide-react'
+import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { DashboardCharts } from '@/components/transactions/DashboardCharts'
 
 interface StatCardProps {
 	title: string
-	value: string
+	value: number
 	icon: LucideIcon
 	trend?: 'up' | 'down'
 	trendValue?: string
@@ -39,7 +40,7 @@ interface StatCardProps {
 }
 
 
-// Server Component para StatCard
+// Server Component para StatCard (renders Client Component leaf)
 function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' }: StatCardProps) {
 	const colorClasses = {
 		blue: 'from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5 text-blue-600 dark:text-blue-400',
@@ -68,7 +69,9 @@ function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' 
 						)}
 					</div>
 					<p className="text-sm font-medium text-muted-foreground mb-1">{title}</p>
-					<p className="text-2xl font-bold text-foreground">{value}</p>
+					<p className="text-2xl font-bold text-foreground">
+						<AnimatedCounter value={value} prefix="$" />
+					</p>
 				</div>
 			</CardContent>
 		</Card>
@@ -265,19 +268,19 @@ function StatsGrid({ accounts, transactions }: {
 		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
 			<StatCard
 				title="Balance Total"
-				value={`$${totalBalance.toLocaleString()}`}
+				value={totalBalance}
 				icon={DollarSign}
 				color="blue"
 			/>
 			<StatCard
 				title="Ingresos"
-				value={`$${totalIncome.toLocaleString()}`}
+				value={totalIncome}
 				icon={TrendingUp}
 				color="green"
 			/>
 			<StatCard
 				title="Gastos"
-				value={`$${totalExpenses.toLocaleString()}`}
+				value={totalExpenses}
 				icon={TrendingDown}
 				color="red"
 			/>

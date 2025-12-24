@@ -28,6 +28,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { useState } from 'react'
 import { BudgetFormModal } from './BudgetFormModal'
+import { AnimatedCounter } from '@/components/ui/animated-counter'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -261,24 +262,30 @@ function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], trans
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5">
                         <DollarSign className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
                         <p className="text-sm font-medium text-muted-foreground">Total Presupuesto</p>
-                        <p className="text-xl font-bold text-foreground">${totalBudget.toLocaleString()}</p>
+                        <p className="text-xl font-bold text-foreground">
+                            <AnimatedCounter value={totalBudget} prefix="$" />
+                        </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 dark:from-orange-500/5 dark:to-red-500/5">
                         <TrendingDown className="h-6 w-6 mx-auto mb-2 text-orange-600 dark:text-orange-400" />
                         <p className="text-sm font-medium text-muted-foreground">Total Gastado</p>
-                        <p className="text-xl font-bold text-orange-600 dark:text-orange-400">${totalSpent.toLocaleString()}</p>
+                        <p className="text-xl font-bold text-orange-600 dark:text-orange-400">
+                            <AnimatedCounter value={totalSpent} prefix="$" />
+                        </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
                         <TrendingUp className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
                         <p className="text-sm font-medium text-muted-foreground">Total Restante</p>
                         <p className={`text-xl font-bold ${totalRemaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                            ${totalRemaining.toLocaleString()}
+                            <AnimatedCounter value={totalRemaining} prefix="$" />
                         </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-red-500/10 to-pink-500/10 dark:from-red-500/5 dark:to-pink-500/5">
                         <AlertTriangle className="h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400" />
                         <p className="text-sm font-medium text-muted-foreground">Presupuestos Excedidos</p>
-                        <p className="text-xl font-bold text-red-600 dark:text-red-400">{overBudgetCount}</p>
+                        <p className="text-xl font-bold text-red-600 dark:text-red-400">
+                            <AnimatedCounter value={overBudgetCount} />
+                        </p>
                     </div>
                 </div>
             </CardContent>

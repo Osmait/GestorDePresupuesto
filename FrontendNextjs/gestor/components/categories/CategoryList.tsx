@@ -12,6 +12,7 @@ import { Tag, Activity, Palette, MoreHorizontal, Edit, Trash2 } from 'lucide-rea
 import { Category } from '@/types/category'
 import { Transaction } from '@/types/transaction'
 import { Button } from '@/components/ui/button'
+import { AnimatedCounter } from '@/components/ui/animated-counter'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -183,17 +184,23 @@ function CategorySummaryCard({ categories, transactions }: { categories: Categor
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5">
                         <Tag className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
                         <p className="text-sm font-medium text-muted-foreground">Total Categorías</p>
-                        <p className="text-2xl font-bold text-foreground">{categories.length}</p>
+                        <p className="text-2xl font-bold text-foreground">
+                            <AnimatedCounter value={categories.length} />
+                        </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
                         <Activity className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
                         <p className="text-sm font-medium text-muted-foreground">Categorías Activas</p>
-                        <p className="text-2xl font-bold text-foreground">{activeCategories.length}</p>
+                        <p className="text-2xl font-bold text-foreground">
+                            <AnimatedCounter value={activeCategories.length} />
+                        </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5">
                         <Palette className="h-6 w-6 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
                         <p className="text-sm font-medium text-muted-foreground">Promedio por Categoría</p>
-                        <p className="text-2xl font-bold text-foreground">{averagePerCategory}</p>
+                        <p className="text-2xl font-bold text-foreground">
+                            <AnimatedCounter value={averagePerCategory} />
+                        </p>
                     </div>
                 </div>
             </CardContent>

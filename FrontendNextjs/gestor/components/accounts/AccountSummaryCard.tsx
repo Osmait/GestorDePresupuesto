@@ -1,7 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Wallet, DollarSign, TrendingUp, TrendingDown, CreditCard } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Account } from '@/types/account';
+import { AnimatedCounter } from '@/components/ui/animated-counter';
 
 export function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
   const totalCurrentBalance = (accounts ?? []).reduce((sum, account) => sum + (account.current_balance ?? account.initial_balance ?? 0), 0);
@@ -23,32 +23,39 @@ export function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5">
             <DollarSign className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
             <p className="text-sm font-medium text-muted-foreground">Balance Actual</p>
-            <p className="text-2xl font-bold text-foreground">${totalCurrentBalance.toLocaleString()}</p>
+            <p className="text-2xl font-bold text-foreground">
+              <AnimatedCounter value={totalCurrentBalance} prefix="$" />
+            </p>
             {totalInitialBalance !== totalCurrentBalance && (
               <p className="text-xs text-muted-foreground mt-1">
-                Inicial: ${totalInitialBalance.toLocaleString()}
+                Inicial: <AnimatedCounter value={totalInitialBalance} prefix="$" />
               </p>
             )}
           </div>
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
             <TrendingUp className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
             <p className="text-sm font-medium text-muted-foreground">Cuentas Positivas</p>
-            <p className="text-2xl font-bold text-foreground">{positiveAccounts?.length ?? 0}</p>
+            <p className="text-2xl font-bold text-foreground">
+              <AnimatedCounter value={positiveAccounts?.length ?? 0} />
+            </p>
           </div>
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 dark:from-orange-500/5 dark:to-red-500/5">
             <TrendingDown className="h-6 w-6 mx-auto mb-2 text-orange-600 dark:text-orange-400" />
             <p className="text-sm font-medium text-muted-foreground">Diferencia Total</p>
             <p className={`text-2xl font-bold ${balanceDifference >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {balanceDifference >= 0 ? '+' : ''}{balanceDifference.toLocaleString()}
+              {balanceDifference >= 0 ? '+' : ''}
+              <AnimatedCounter value={Math.abs(balanceDifference)} />
             </p>
           </div>
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5">
             <CreditCard className="h-6 w-6 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
             <p className="text-sm font-medium text-muted-foreground">Total Cuentas</p>
-            <p className="text-2xl font-bold text-foreground">{accounts?.length ?? 0}</p>
+            <p className="text-2xl font-bold text-foreground">
+              <AnimatedCounter value={accounts?.length ?? 0} />
+            </p>
           </div>
         </div>
       </CardContent>
     </Card>
   );
-} 
+}
