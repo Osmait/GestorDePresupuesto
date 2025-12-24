@@ -85,15 +85,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 		}
 	}
 
-	const fillTestData = (userType: 'juan' | 'maria') => {
-		if (userType === 'juan') {
-			form.setValue('email', 'juan.perez@example.com')
-			form.setValue('password', 'password123')
-		} else {
-			form.setValue('email', 'maria.gonzalez@example.com')
-			form.setValue('password', 'password456')
-		}
-	}
+
 
 	return (
 		<Card className="w-full max-w-md mx-auto shadow-lg border-border/50">
@@ -201,36 +193,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 					</form>
 				</Form>
 
-				{/* Datos de prueba */}
-				<div className="space-y-3">
-					<div className="text-center">
-						<p className="text-xs text-muted-foreground mb-2">{t('testData')}</p>
-						<div className="flex gap-2 justify-center">
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={() => fillTestData('juan')}
-								disabled={isLoading}
-								className="text-xs border-border/50 hover:bg-muted/30"
-							>
-								<User className="mr-1 h-3 w-3" />
-								Juan
-							</Button>
-							<Button
-								type="button"
-								variant="outline"
-								size="sm"
-								onClick={() => fillTestData('maria')}
-								disabled={isLoading}
-								className="text-xs border-border/50 hover:bg-muted/30"
-							>
-								<User className="mr-1 h-3 w-3" />
-								María
-							</Button>
-						</div>
-					</div>
-				</div>
+
 
 				{/* Toggle para registro */}
 				{showToggle && onToggleForm && (

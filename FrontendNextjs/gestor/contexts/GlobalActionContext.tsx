@@ -27,6 +27,7 @@ export function GlobalActionProvider({ children }: { children: ReactNode }) {
 
     const handleCreateAccount = async (name: string, bank: string, initial_balance: number) => {
         await createAccountMutation({ name, bank, initial_balance })
+        closeModal()
     }
 
     const openModal = (type: ModalType) => setActiveModal(type)
