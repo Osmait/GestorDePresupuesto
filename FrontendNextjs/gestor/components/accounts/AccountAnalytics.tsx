@@ -7,6 +7,7 @@ import { Transaction } from '@/types/transaction'
 import { Category } from '@/types/category'
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend, AreaChart, Area, CartesianGrid } from 'recharts'
 import { ArrowUpCircle, ArrowDownCircle, TrendingUp } from 'lucide-react'
+import { useTranslations, useLocale } from 'next-intl'
 
 interface AccountAnalyticsProps {
     transactions: Transaction[]
@@ -17,6 +18,9 @@ interface AccountAnalyticsProps {
 const COLORS = ['#10b981', '#ef4444'] // Green for Income, Red for Expense
 
 export function AccountAnalytics({ transactions, categories, currentBalance }: AccountAnalyticsProps) {
+    const t = useTranslations('analytics')
+    const locale = useLocale()
+
     const stats = useMemo(() => {
         let income = 0
         let expense = 0
@@ -38,11 +42,11 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
             }
         })
 
-        const formatCategoryData = (map: Record<string, number>) => {
+        const formatCategoryData = (map: Record<string, number>, noCategory: string) => {
             return Object.entries(map).map(([id, value]) => {
                 const cat = categories.find(c => c.id === id)
                 return {
-                    name: cat?.name || 'Sin Categoría',
+                    name: cat?.name || noCategory,
                     value,
                     color: cat?.color || '#94a3b8' // fallback color
                 }
@@ -56,10 +60,11 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
             new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
         )
 
-        const historyPoints = []
+        const historyPoints: { date: string; fullDate: Date; balance: number }[] = []
         // Push current state
+        const dateLocale = locale === 'es' ? 'es-ES' : 'en-US'
         historyPoints.push({
-            date: new Date().toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
+            date: new Date().toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
             fullDate: new Date(),
             balance: balanceTracker
         })
@@ -75,7 +80,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
             }
 
             historyPoints.push({
-                date: new Date(t.created_at).toLocaleDateString('es-ES', { month: 'short', day: 'numeric' }),
+                date: new Date(t.created_at).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
                 fullDate: new Date(t.created_at),
                 balance: balanceTracker
             })
@@ -100,16 +105,16 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
         return {
             income,
             expense,
-            incomeByCategory: formatCategoryData(incomeMap),
-            expenseByCategory: formatCategoryData(expenseMap),
+            incomeByCategory: formatCategoryData(incomeMap, t('noCategory')),
+            expenseByCategory: formatCategoryData(expenseMap, t('noCategory')),
             balanceHistory,
             topExpenses
         }
-    }, [transactions, categories, currentBalance])
+    }, [transactions, categories, currentBalance, locale, t])
 
     const pieData = [
-        { name: 'Ingresos', value: stats.income },
-        { name: 'Gastos', value: stats.expense }
+        { name: t('income'), value: stats.income },
+        { name: t('expenses'), value: stats.expense }
     ].filter(d => d.value > 0)
 
     const CustomTooltip = ({ active, payload, label }: any) => {
@@ -128,7 +133,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8">
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Ingresos Totales</CardTitle>
+                    <CardTitle className="text-sm font-medium">{t('totalIncome')}</CardTitle>
                     <ArrowUpCircle className="h-4 w-4 text-green-500" />
                 </CardHeader>
                 <CardContent>
@@ -137,7 +142,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
             </Card>
             <Card>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Gastos Totales</CardTitle>
+                    <CardTitle className="text-sm font-medium">{t('totalExpenses')}</CardTitle>
                     <ArrowDownCircle className="h-4 w-4 text-red-500" />
                 </CardHeader>
                 <CardContent>
@@ -147,7 +152,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 
             <Card className="col-span-2 row-span-2">
                 <CardHeader>
-                    <CardTitle>Resumen Financiero</CardTitle>
+                    <CardTitle>{t('financialSummary')}</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[200px]">
                     <ResponsiveContainer width="100%" height="100%">
@@ -157,7 +162,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                             <Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
                             <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                                 {pieData.map((entry, index) => (
-                                    <Cell key={`cell-${index}`} fill={entry.name === 'Ingresos' ? COLORS[0] : COLORS[1]} />
+                                    <Cell key={`cell-${index}`} fill={entry.name === t('income') ? COLORS[0] : COLORS[1]} />
                                 ))}
                             </Bar>
                         </BarChart>
@@ -167,7 +172,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 
             <Card className="col-span-2">
                 <CardHeader>
-                    <CardTitle>Gastos por Categoría</CardTitle>
+                    <CardTitle>{t('expensesByCategory')}</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[200px]">
                     {stats.expenseByCategory.length > 0 ? (
@@ -196,14 +201,14 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                             </PieChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Sin datos</div>
+                        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">{t('noData')}</div>
                     )}
                 </CardContent>
             </Card>
 
             <Card className="col-span-2">
                 <CardHeader>
-                    <CardTitle>Ingresos por Categoría</CardTitle>
+                    <CardTitle>{t('incomeByCategory')}</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[200px]">
                     {stats.incomeByCategory.length > 0 ? (
@@ -232,14 +237,14 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                             </PieChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Sin datos</div>
+                        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">{t('noData')}</div>
                     )}
                 </CardContent>
             </Card>
 
             <Card className="col-span-2">
                 <CardHeader>
-                    <CardTitle>Mayores Gastos</CardTitle>
+                    <CardTitle>{t('topExpenses')}</CardTitle>
                 </CardHeader>
                 <CardContent className="h-[200px]">
                     {stats.topExpenses.length > 0 ? (
@@ -252,14 +257,14 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                             </BarChart>
                         </ResponsiveContainer>
                     ) : (
-                        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">Sin datos</div>
+                        <div className="h-full flex items-center justify-center text-muted-foreground text-sm">{t('noData')}</div>
                     )}
                 </CardContent>
             </Card>
 
             <Card className="col-span-4 mt-4">
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle>Historial de Balance</CardTitle>
+                    <CardTitle>{t('balanceHistory')}</CardTitle>
                     <TrendingUp className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent className="h-[250px]">
@@ -286,7 +291,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                             <Tooltip
                                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                                 labelStyle={{ fontWeight: 'bold', color: '#374151' }}
-                                formatter={(value: number) => [`$${value.toLocaleString()}`, 'Balance']}
+                                formatter={(value: number) => [`$${value.toLocaleString()}`, t('balance')]}
                             />
                             <Area
                                 type="monotone"

@@ -7,12 +7,14 @@ import { useAnalysisContext } from './AnalysisContext'
 import { AnalysisFiltersForm } from './AnalysisFilters'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { useTranslations } from 'next-intl'
 
 const now = new Date()
 const defaultMonth = String(now.getMonth() + 1).padStart(2, '0')
 const defaultYear = String(now.getFullYear())
 
 export function AnalysisActions() {
+    const t = useTranslations('analysis')
     const [drawerOpen, setDrawerOpen] = useState(false)
     const { filters, setFilters } = useAnalysisContext()
     const { data: accounts = [] } = useGetAccounts()
@@ -21,13 +23,13 @@ export function AnalysisActions() {
     return (
         <div className="flex items-center gap-3">
             <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
-                Filtrar
+                {t('filter')}
             </Button>
 
             <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} side="right">
                 <DrawerContent side="right" className="p-6">
                     <DrawerHeader>
-                        <DrawerTitle>Filtrar Analíticas</DrawerTitle>
+                        <DrawerTitle>{t('filterAnalytics')}</DrawerTitle>
                     </DrawerHeader>
                     <AnalysisFiltersForm
                         filters={filters}
@@ -47,9 +49,9 @@ export function AnalysisActions() {
                             minAmount: '',
                             maxAmount: '',
                             search: '',
-                        })} className="w-full">Limpiar Filtros</Button>
+                        })} className="w-full">{t('clearFilters')}</Button>
                         <DrawerClose asChild>
-                            <Button type="button" variant="ghost" className="w-full">Cerrar</Button>
+                            <Button type="button" variant="ghost" className="w-full">{t('close')}</Button>
                         </DrawerClose>
                     </DrawerFooter>
                 </DrawerContent>
@@ -57,3 +59,4 @@ export function AnalysisActions() {
         </div>
     )
 }
+

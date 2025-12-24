@@ -8,27 +8,7 @@ import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import { Account } from '@/types/account'
 import { Category } from '@/types/category'
 import { AnalysisFiltersState } from './AnalysisContext'
-
-const typeOptions = [
-    { value: 'INCOME', label: 'Ingreso' },
-    { value: 'BILL', label: 'Gasto' },
-]
-
-const months = [
-    { value: 'all', label: 'Todos' },
-    { value: '01', label: 'Enero' },
-    { value: '02', label: 'Febrero' },
-    { value: '03', label: 'Marzo' },
-    { value: '04', label: 'Abril' },
-    { value: '05', label: 'Mayo' },
-    { value: '06', label: 'Junio' },
-    { value: '07', label: 'Julio' },
-    { value: '08', label: 'Agosto' },
-    { value: '09', label: 'Septiembre' },
-    { value: '10', label: 'Octubre' },
-    { value: '11', label: 'Noviembre' },
-    { value: '12', label: 'Diciembre' },
-]
+import { useTranslations } from 'next-intl'
 
 const now = new Date()
 const minYear = 2022
@@ -44,34 +24,57 @@ export function AnalysisFiltersForm({ filters, setFilters, accounts, categories 
     accounts: Account[]
     categories: Category[]
 }) {
+    const t = useTranslations('analysis')
+
+    const typeOptions = [
+        { value: 'INCOME', label: t('income') },
+        { value: 'BILL', label: t('expense') },
+    ]
+
+    const months = [
+        { value: 'all', label: t('allMonths') },
+        { value: '01', label: t('january') },
+        { value: '02', label: t('february') },
+        { value: '03', label: t('march') },
+        { value: '04', label: t('april') },
+        { value: '05', label: t('may') },
+        { value: '06', label: t('june') },
+        { value: '07', label: t('july') },
+        { value: '08', label: t('august') },
+        { value: '09', label: t('september') },
+        { value: '10', label: t('october') },
+        { value: '11', label: t('november') },
+        { value: '12', label: t('december') },
+    ]
+
     return (
         <form className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8'>
             <div className='md:col-span-2 lg:col-span-3 flex flex-col gap-2'>
-                <Label>Modo de filtro de fecha</Label>
+                <Label>{t('dateFilterMode')}</Label>
                 <div className='flex gap-2'>
                     <Button
                         type='button'
                         variant={filters.filterMode === 'month' ? 'default' : 'outline'}
                         onClick={() => setFilters(f => ({ ...f, filterMode: 'month', dateRange: { from: undefined, to: undefined } }))}
                     >
-                        Mes/Año
+                        {t('monthYear')}
                     </Button>
                     <Button
                         type='button'
                         variant={filters.filterMode === 'range' ? 'default' : 'outline'}
                         onClick={() => setFilters(f => ({ ...f, filterMode: 'range', month: 'all', year: '' }))}
                     >
-                        Rango de fechas
+                        {t('dateRange')}
                     </Button>
                 </div>
             </div>
             {filters.filterMode === 'month' && (
                 <>
                     <div>
-                        <Label htmlFor='month'>Mes</Label>
+                        <Label htmlFor='month'>{t('month')}</Label>
                         <Select value={filters.month} onValueChange={v => setFilters(f => ({ ...f, month: v }))}>
                             <SelectTrigger id='month' className='w-full'>
-                                <SelectValue placeholder='Selecciona mes' />
+                                <SelectValue placeholder={t('selectMonth')} />
                             </SelectTrigger>
                             <SelectContent>
                                 {months.map(m => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
@@ -79,10 +82,10 @@ export function AnalysisFiltersForm({ filters, setFilters, accounts, categories 
                         </Select>
                     </div>
                     <div>
-                        <Label htmlFor='year'>Año</Label>
+                        <Label htmlFor='year'>{t('year')}</Label>
                         <Select value={filters.year} onValueChange={v => setFilters(f => ({ ...f, year: v }))}>
                             <SelectTrigger id='year' className='w-full'>
-                                <SelectValue placeholder='Selecciona año' />
+                                <SelectValue placeholder={t('selectYear')} />
                             </SelectTrigger>
                             <SelectContent>
                                 {years.map(y => <SelectItem key={y.value} value={y.value}>{y.label}</SelectItem>)}
@@ -93,7 +96,7 @@ export function AnalysisFiltersForm({ filters, setFilters, accounts, categories 
             )}
             {filters.filterMode === 'range' && (
                 <div className='md:col-span-2 lg:col-span-3'>
-                    <Label>Rango de fechas</Label>
+                    <Label>{t('dateRange')}</Label>
                     <CalendarDateRangePicker
                         value={filters.dateRange}
                         onChange={dateRange => {
@@ -105,53 +108,54 @@ export function AnalysisFiltersForm({ filters, setFilters, accounts, categories 
                 </div>
             )}
             <div>
-                <Label htmlFor='account'>Cuenta</Label>
+                <Label htmlFor='account'>{t('account')}</Label>
                 <Select value={filters.account} onValueChange={v => setFilters(f => ({ ...f, account: v }))}>
                     <SelectTrigger id='account' className='w-full'>
-                        <SelectValue placeholder='Todas las cuentas' />
+                        <SelectValue placeholder={t('allAccounts')} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value='all'>Todas</SelectItem>
+                        <SelectItem value='all'>{t('all')}</SelectItem>
                         {accounts.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
             <div>
-                <Label htmlFor='category'>Categoría</Label>
+                <Label htmlFor='category'>{t('category')}</Label>
                 <Select value={filters.category} onValueChange={v => setFilters(f => ({ ...f, category: v }))}>
                     <SelectTrigger id='category' className='w-full'>
-                        <SelectValue placeholder='Todas las categorías' />
+                        <SelectValue placeholder={t('allCategories')} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value='all'>Todas</SelectItem>
+                        <SelectItem value='all'>{t('all')}</SelectItem>
                         {categories.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
             <div>
-                <Label htmlFor='type'>Tipo</Label>
+                <Label htmlFor='type'>{t('type')}</Label>
                 <Select value={filters.type} onValueChange={v => setFilters(f => ({ ...f, type: v }))}>
                     <SelectTrigger id='type' className='w-full'>
-                        <SelectValue placeholder='Todos los tipos' />
+                        <SelectValue placeholder={t('allTypes')} />
                     </SelectTrigger>
                     <SelectContent>
-                        <SelectItem value='all'>Todos</SelectItem>
+                        <SelectItem value='all'>{t('all')}</SelectItem>
                         {typeOptions.map(t => <SelectItem key={t.value} value={t.value}>{t.label}</SelectItem>)}
                     </SelectContent>
                 </Select>
             </div>
             <div>
-                <Label htmlFor='minAmount'>Monto mínimo</Label>
+                <Label htmlFor='minAmount'>{t('minAmount')}</Label>
                 <Input id='minAmount' type='number' value={filters.minAmount} onChange={e => setFilters(f => ({ ...f, minAmount: e.target.value }))} placeholder='0' min={0} className='w-full' />
             </div>
             <div>
-                <Label htmlFor='maxAmount'>Monto máximo</Label>
+                <Label htmlFor='maxAmount'>{t('maxAmount')}</Label>
                 <Input id='maxAmount' type='number' value={filters.maxAmount} onChange={e => setFilters(f => ({ ...f, maxAmount: e.target.value }))} placeholder='99999' min={0} className='w-full' />
             </div>
             <div className='md:col-span-2 lg:col-span-3'>
-                <Label htmlFor='search'>Buscar</Label>
-                <Input id='search' type='text' value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder='Buscar por nombre o descripción...' className='w-full' />
+                <Label htmlFor='search'>{t('searchLabel')}</Label>
+                <Input id='search' type='text' value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder={t('searchPlaceholder')} className='w-full' />
             </div>
         </form>
     )
 }
+
