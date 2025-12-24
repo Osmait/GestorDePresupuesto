@@ -81,9 +81,10 @@ function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' 
 }
 
 // Server Component para TransactionItem
-function TransactionItem({ transaction, category }: {
+function TransactionItem({ transaction, category, locale }: {
 	transaction: Transaction
 	category?: Category
+	locale?: string
 }) {
 	const isIncome = transaction.type_transation === TypeTransaction.INCOME
 
@@ -97,7 +98,7 @@ function TransactionItem({ transaction, category }: {
 					<p className="font-medium text-foreground">{transaction.name}</p>
 					<p className="text-sm text-muted-foreground">{transaction.description}</p>
 					<p className="text-xs text-muted-foreground">
-						{new Date(transaction.created_at).toLocaleDateString('es-ES')}
+						{new Date(transaction.created_at).toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US')}
 					</p>
 				</div>
 			</div>
@@ -105,16 +106,17 @@ function TransactionItem({ transaction, category }: {
 				<p className={`font-bold ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
 					{isIncome ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
 				</p>
-				<p className="text-xs text-muted-foreground">{category?.name || 'Sin categoría'}</p>
+				<p className="text-xs text-muted-foreground">{category?.name}</p>
 			</div>
 		</div>
 	)
 }
 
 // Server Component para CategoryCard
-function CategoryCard({ category, transactions }: {
+function CategoryCard({ category, transactions, t }: {
 	category: Category
 	transactions: Transaction[]
+	t: any
 }) {
 	const categoryTransactions = Array.isArray(transactions) ? transactions.filter(t => t.category_id === category.id) : [];
 	const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
@@ -130,7 +132,7 @@ function CategoryCard({ category, transactions }: {
 				</div>
 				<div>
 					<p className="font-medium text-foreground">{category.name}</p>
-					<p className="text-xs text-muted-foreground">{categoryTransactions.length} transacciones</p>
+					<p className="text-xs text-muted-foreground">{categoryTransactions.length} {t('transactionsCount')}</p>
 				</div>
 			</div>
 			<div className="text-right">
@@ -141,7 +143,7 @@ function CategoryCard({ category, transactions }: {
 }
 
 // Server Component para AccountCard
-function AccountCard({ account }: { account: Account }) {
+function AccountCard({ account, t }: { account: Account, t: any }) {
 	const currentBalance = account.current_balance ?? account.initial_balance ?? 0;
 	const isPositive = currentBalance > 0
 
@@ -161,11 +163,11 @@ function AccountCard({ account }: { account: Account }) {
 					</p>
 					<div className="flex gap-2">
 						<Badge variant="outline" className="text-xs">
-							{currentBalance > 10000 ? 'Alto' : currentBalance > 5000 ? 'Medio' : 'Bajo'}
+							{currentBalance > 10000 ? t('high') : currentBalance > 5000 ? t('medium') : t('low')}
 						</Badge>
 						{account.current_balance !== account.initial_balance && (
 							<Badge variant="secondary" className="text-xs">
-								Inicial: ${account.initial_balance.toLocaleString()}
+								{t('initial')}: ${account.initial_balance.toLocaleString()}
 							</Badge>
 						)}
 					</div>
@@ -176,9 +178,10 @@ function AccountCard({ account }: { account: Account }) {
 }
 
 // Server Component para BudgetCard
-function BudgetCard({ budget, category }: {
+function BudgetCard({ budget, category, t }: {
 	budget: Budget
 	category?: Category
+	t: any
 }) {
 	// Convert negative current_amount to positive for display
 	const spentAmount = Math.abs(budget.current_amount)
@@ -197,9 +200,9 @@ function BudgetCard({ budget, category }: {
 							{category?.icon || '📊'}
 						</div>
 						<div>
-							<h3 className="font-medium text-foreground">{category?.name || 'Sin categoría'}</h3>
+							<h3 className="font-medium text-foreground">{category?.name || t('noCategory')}</h3>
 							<p className="text-sm text-muted-foreground">
-								${spentAmount.toLocaleString()} de ${budget.amount.toLocaleString()}
+								${spentAmount.toLocaleString()} {t('of')} ${budget.amount.toLocaleString()}
 							</p>
 						</div>
 					</div>
@@ -363,7 +366,7 @@ export default async function DashboardPage() {
 					tabs={[
 						{
 							value: 'overview',
-							label: 'Resumen',
+							label: t('overview'),
 							icon: <BarChart3 className="h-4 w-4" />,
 							content: (
 								<div className="space-y-6">
@@ -372,7 +375,7 @@ export default async function DashboardPage() {
 											<CardHeader>
 												<CardTitle className="flex items-center gap-2 text-foreground">
 													<Wallet className="h-5 w-5" />
-													Transacciones Recientes
+													{t('recentTransactions')}
 												</CardTitle>
 											</CardHeader>
 											<CardContent>
@@ -384,6 +387,7 @@ export default async function DashboardPage() {
 																key={transaction.id}
 																transaction={transaction}
 																category={category}
+																locale={locale}
 															/>
 														)
 													}) : []}
@@ -395,7 +399,7 @@ export default async function DashboardPage() {
 											<CardHeader>
 												<CardTitle className="flex items-center gap-2 text-foreground">
 													<PieChart className="h-5 w-5" />
-													Categorías
+													{t('categories')}
 												</CardTitle>
 											</CardHeader>
 											<CardContent>
@@ -405,6 +409,7 @@ export default async function DashboardPage() {
 															key={category.id}
 															category={category}
 															transactions={transactions}
+															t={t}
 														/>
 													)) : []}
 												</div>
@@ -415,7 +420,7 @@ export default async function DashboardPage() {
 											<CardHeader>
 												<CardTitle className="flex items-center gap-2 text-foreground">
 													<Target className="h-5 w-5" />
-													Resumen Presupuestos
+													{t('budgetSummary')}
 												</CardTitle>
 											</CardHeader>
 											<CardContent>
@@ -457,14 +462,14 @@ export default async function DashboardPage() {
 															{budgets.length > 3 && (
 																<div className="text-center pt-2">
 																	<p className="text-xs text-muted-foreground">
-																		+{budgets.length - 3} presupuestos más
+																		+{budgets.length - 3} {t('moreBudgets')}
 																	</p>
 																</div>
 															)}
 														</>
 													) : (
 														<div className="text-center py-4 text-muted-foreground">
-															<p className="text-sm">No hay presupuestos configurados</p>
+															<p className="text-sm">{t('noBudgetsConfigured')}</p>
 														</div>
 													)}
 												</div>
@@ -476,19 +481,19 @@ export default async function DashboardPage() {
 						},
 						{
 							value: 'accounts',
-							label: 'Cuentas',
+							label: t('accounts'),
 							icon: <CreditCard className="h-4 w-4" />,
 							content: (
 								<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 									{Array.isArray(accounts) && accounts.map((account) => (
-										<AccountCard key={account.id} account={account} />
+										<AccountCard key={account.id} account={account} t={t} />
 									))}
 								</div>
 							)
 						},
 						{
 							value: 'transactions',
-							label: 'Transacciones',
+							label: t('transactionsTab'),
 							icon: <Wallet className="h-4 w-4" />,
 							content: (
 								<div className="space-y-4">
@@ -499,6 +504,7 @@ export default async function DashboardPage() {
 												key={transaction.id}
 												transaction={transaction}
 												category={category}
+												locale={locale}
 											/>
 										)
 									}) : []}
@@ -507,7 +513,7 @@ export default async function DashboardPage() {
 						},
 						{
 							value: 'budgets',
-							label: 'Presupuestos',
+							label: t('budgets'),
 							icon: <PieChart className="h-4 w-4" />,
 							content: (
 								<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -518,13 +524,14 @@ export default async function DashboardPage() {
 												key={budget.id}
 												budget={budget}
 												category={category}
+												t={t}
 											/>
 										)
 									}) : (
 										<div className="col-span-full text-center py-12 text-muted-foreground">
 											<Target className="h-12 w-12 mx-auto mb-4 opacity-50" />
-											<h3 className="text-lg font-semibold mb-2">No hay presupuestos configurados</h3>
-											<p className="text-sm">Crea tu primer presupuesto para comenzar a controlar tus gastos por categoría.</p>
+											<h3 className="text-lg font-semibold mb-2">{t('noBudgetsConfigured')}</h3>
+											<p className="text-sm">{t('createBudgetHint')}</p>
 										</div>
 									)}
 								</div>
