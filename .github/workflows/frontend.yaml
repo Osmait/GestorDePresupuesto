@@ -2,7 +2,7 @@ name: Frontend Quality
 
 on:
   push:
-    branches: [main, development]
+    branches: ['**']
     paths:
       - 'FrontendNextjs/**'
   pull_request:

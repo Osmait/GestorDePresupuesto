@@ -64,7 +64,6 @@ export class TransactionRepository extends BaseRepository {
   async findAllSimple(): Promise<Transaction[]> {
     try {
       const response = await this.findAll({ limit: 1000 }); // Get a large limit for simple cases
-      console.log("simple transactions data", response);
       return response.data;
     } catch (error) {
       console.error("Error fetching simple transactions:", error);
