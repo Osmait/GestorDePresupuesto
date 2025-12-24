@@ -17,6 +17,7 @@ interface AnimatedTabsProps {
 	className?: string
 	orientation?: 'horizontal' | 'vertical'
 	onValueChange?: (value: string) => void
+	noContent?: boolean
 }
 
 export function AnimatedTabs({
@@ -24,7 +25,8 @@ export function AnimatedTabs({
 	defaultValue,
 	className,
 	orientation = 'horizontal',
-	onValueChange
+	onValueChange,
+	noContent = false
 }: AnimatedTabsProps) {
 	const [activeTab, setActiveTab] = useState(defaultValue)
 	const tabsRef = useRef<HTMLDivElement>(null)
@@ -216,9 +218,11 @@ export function AnimatedTabs({
 			</div>
 
 			{/* Tab Content */}
-			<div className="min-h-[200px] transition-all duration-300 ease-in-out">
-				{activeTabContent}
-			</div>
+			{!noContent && (
+				<div className="min-h-[200px] transition-all duration-300 ease-in-out">
+					{activeTabContent}
+				</div>
+			)}
 		</div>
 	)
 } 

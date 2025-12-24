@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -27,23 +28,33 @@ export default function TransactionsList() {
     const { isLoading: isLoadingAcc } = useGetAccounts()
     const searchParams = useSearchParams()
 
+    const [currentFilter, setCurrentFilter] = useState('all')
+
     const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME)
     const expenseTransactions = transactions.filter(t => t.type_transation === TypeTransaction.BILL)
+    const sortedTransactions = Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []
 
-    const shownTransactions = Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []
+    const getFilteredTransactions = () => {
+        switch (currentFilter) {
+            case 'income': return incomeTransactions
+            case 'expense': return expenseTransactions
+            default: return sortedTransactions
+        }
+    }
 
     const renderTransactionList = (transactionList: Transaction[]) => (
-        <ul className="space-y-4">
+        <ul className="space-y-4 min-h-[50vh]">
             <AnimatePresence mode="popLayout" initial={false}>
                 {transactionList.map((transaction) => {
                     const category = categories.find(c => c.id === transaction.category_id)
                     return (
                         <motion.li
                             key={transaction.id}
-                            initial={{ opacity: 0, height: 0, x: -20 }}
-                            animate={{ opacity: 1, height: 'auto', x: 0 }}
-                            exit={{ opacity: 0, height: 0, x: 20 }}
-                            transition={{ duration: 0.5, ease: "easeOut" }}
+                            layout // Add layout prop for smooth reordering/filtering
+                            initial={{ opacity: 0, scale: 0.95 }}
+                            animate={{ opacity: 1, scale: 1 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ duration: 0.2 }}
                             className="list-none"
                         >
                             <TransactionItem
@@ -51,7 +62,6 @@ export default function TransactionsList() {
                                 category={category}
                                 onTransactionDeleted={async () => {
                                     await deleteTransaction(transaction.id!)
-                                    // Local optimistic delete could be added here too
                                     reloadCurrentView()
                                 }}
                             />
@@ -59,13 +69,22 @@ export default function TransactionsList() {
                     )
                 })}
             </AnimatePresence>
+            {transactionList.length === 0 && (
+                <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    className="text-center py-10 text-muted-foreground"
+                >
+                    No se encontraron transacciones
+                </motion.div>
+            )}
         </ul>
     )
 
     const tabsConfig = [
-        { value: 'all', label: 'Todas', icon: <CreditCard className="h-4 w-4" />, transactionList: shownTransactions },
-        { value: 'income', label: 'Ingresos', icon: <TrendingUp className="h-4 w-4" />, transactionList: incomeTransactions },
-        { value: 'expense', label: 'Gastos', icon: <TrendingDown className="h-4 w-4" />, transactionList: expenseTransactions }
+        { value: 'all', label: 'Todas', icon: <CreditCard className="h-4 w-4" />, content: <></> },
+        { value: 'income', label: 'Ingresos', icon: <TrendingUp className="h-4 w-4" />, content: <></> },
+        { value: 'expense', label: 'Gastos', icon: <TrendingDown className="h-4 w-4" />, content: <></> }
     ]
 
     // Loading State
@@ -97,15 +116,17 @@ export default function TransactionsList() {
                 </div>
             )}
 
-            <AnimatedTabs
-                defaultValue="all"
-                tabs={tabsConfig.map(tab => ({
-                    value: tab.value,
-                    label: tab.label,
-                    icon: tab.icon,
-                    content: renderTransactionList(tab.transactionList)
-                }))}
-            />
+            <div className="space-y-6">
+                <AnimatedTabs
+                    defaultValue="all"
+                    onValueChange={setCurrentFilter}
+                    tabs={tabsConfig}
+                    noContent={true}
+                />
+
+                {/* Render content outside of AnimatedTabs to preserve scroll/mount */}
+                {renderTransactionList(getFilteredTransactions())}
+            </div>
         </motion.div>
     )
 }
