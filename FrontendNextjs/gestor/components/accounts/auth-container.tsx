@@ -6,8 +6,12 @@ import { RegisterForm } from './register-form'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ModeToggle } from '@/components/common/ToggleMode'
-import { Home, LogIn, UserPlus } from 'lucide-react'
+import { Home, LogIn, UserPlus, Play, Loader2 } from 'lucide-react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
+import { AuthRepository } from '@/app/repository/authRepository'
+import { toast } from 'sonner'
+import { signIn } from 'next-auth/react'
 
 interface AuthContainerProps {
 	initialMode?: 'login' | 'register'
@@ -15,9 +19,39 @@ interface AuthContainerProps {
 
 export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 	const [mode, setMode] = useState<'login' | 'register'>(initialMode)
+	const [isLoading, setIsLoading] = useState(false)
+	const router = useRouter()
+	const authRepo = new AuthRepository()
 
 	const toggleMode = () => {
 		setMode(mode === 'login' ? 'register' : 'login')
+	}
+
+	const handleDemoLogin = async () => {
+		try {
+			setIsLoading(true)
+			// 1. Get Demo Token from Backend
+			const token = await authRepo.createDemoUser() // Renamed for clarity in next step, or keep demoLogin but make it return token
+
+			// 2. Sign in with NextAuth using the token
+			const result = await signIn("credentials", {
+				demoToken: token,
+				redirect: false,
+			})
+
+			if (result?.error) {
+				toast.error("Error iniciando sesión demo")
+				return
+			}
+
+			toast.success("¡Bienvenido al modo Demo! 🎮")
+			router.push('/app')
+		} catch (error) {
+			console.error(error)
+			toast.error("Error al iniciar modo demo")
+		} finally {
+			setIsLoading(false)
+		}
 	}
 
 	return (
@@ -42,14 +76,14 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 					</div>
 
 					{/* Tabs de navegación */}
-					<div className="flex items-center justify-center">
+					<div className="flex flex-col items-center justify-center gap-4">
 						<Card className="p-1 bg-muted/30 border-border/50">
 							<div className="flex rounded-lg">
 								<button
 									onClick={() => setMode('login')}
 									className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${mode === 'login'
-											? 'bg-background text-foreground shadow-sm border border-border/50'
-											: 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+										? 'bg-background text-foreground shadow-sm border border-border/50'
+										: 'text-muted-foreground hover:text-foreground hover:bg-background/50'
 										}`}
 								>
 									<LogIn className="h-4 w-4" />
@@ -58,8 +92,8 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 								<button
 									onClick={() => setMode('register')}
 									className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${mode === 'register'
-											? 'bg-background text-foreground shadow-sm border border-border/50'
-											: 'text-muted-foreground hover:text-foreground hover:bg-background/50'
+										? 'bg-background text-foreground shadow-sm border border-border/50'
+										: 'text-muted-foreground hover:text-foreground hover:bg-background/50'
 										}`}
 								>
 									<UserPlus className="h-4 w-4" />
@@ -67,6 +101,15 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 								</button>
 							</div>
 						</Card>
+
+						<button
+							onClick={handleDemoLogin}
+							disabled={isLoading}
+							className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:text-primary/80 hover:bg-primary/10 rounded-full transition-all duration-200"
+						>
+							{isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+							Probar Demo Interactiva
+						</button>
 					</div>
 
 					{/* Badge de modo de desarrollo */}

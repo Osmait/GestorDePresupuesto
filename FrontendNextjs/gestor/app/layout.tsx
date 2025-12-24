@@ -5,6 +5,7 @@ import { ThemeProvider } from '@/components/common/theme-provider'
 import { AuthSessionProvider } from '@/components/auth/session-provider'
 import { ProgressBarProvider } from '@/components/common/progress-bar-provider'
 import { ReactQueryProvider } from '@/components/common/react-query-provider'
+import { Toaster } from "@/components/ui/sonner"
 import { cn } from '@/lib/utils'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -79,7 +80,8 @@ export default function RootLayout({
 						</ProgressBarProvider>
 					</ThemeProvider>
 				</AuthSessionProvider>
+				<Toaster />
 			</body>
 		</html>
 	)
-} 
+}

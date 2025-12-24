@@ -11,6 +11,7 @@ type User struct {
 	Password  string    `json:"password"`
 	Token     string    `json:"token"`
 	Confirmed string    `json:"confirmed"`
+	IsDemo    bool      `json:"is_demo"`
 }
 
 func NewUser(id, name, lastName, email, password string) *User {

@@ -260,7 +260,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		accountService:      account.NewAccountService(repos.accountRepository),
 		transactionService:  transactionService,
 		userService:         user.NewUserService(repos.userRepository),
-		authService:         auth.NewAuthService(repos.userRepository, cfg),
+		authService:         auth.NewAuthService(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, cfg),
 		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService),

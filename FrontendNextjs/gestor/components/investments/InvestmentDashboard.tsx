@@ -15,7 +15,7 @@ export function InvestmentDashboard() {
     const { theme } = useTheme()
 
     const metrics = useMemo(() => {
-        if (!investments) return { totalValue: 0, totalCost: 0, totalProfit: 0, roi: 0, allocation: [] }
+        if (!investments) return { totalValue: 0, totalCost: 0, totalProfit: 0, roi: 0, allocation: [], history: [] }
 
         let totalValue = 0
         let totalCost = 0

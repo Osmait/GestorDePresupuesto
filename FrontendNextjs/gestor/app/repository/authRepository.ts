@@ -1,4 +1,4 @@
-import Cookies from "js-cookie";
+
 export class AuthRepository {
   private url = "http://127.0.0.1:8080";
 
@@ -52,6 +52,26 @@ export class AuthRepository {
       return user;
     } catch (error) {
       console.log(error);
+    }
+  }
+  async createDemoUser() {
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
+    try {
+      const response = await fetch(`${this.url}/auth/demo`, options);
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Demo login failed:", errorData);
+        throw new Error(errorData || "Error creating demo account");
+      }
+      return await response.json(); // Returns the token string
+    } catch (error) {
+      console.log(error);
+      throw error;
     }
   }
 }

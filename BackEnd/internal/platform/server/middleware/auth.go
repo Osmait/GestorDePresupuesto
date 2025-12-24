@@ -18,6 +18,7 @@ var NO_AUTH_NEEDED = []string{
 	"health",
 	"ping",
 	"metrics",
+	"demo",
 }
 
 // shouldCheckToken determines if a route requires token validation

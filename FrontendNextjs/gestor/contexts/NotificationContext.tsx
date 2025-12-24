@@ -46,7 +46,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
                 if (res.ok) {
                     const data = await res.json()
                     // Map backend data to frontend model
-                    const mapped = data.map((n: any) => ({
+                    const mapped = (Array.isArray(data) ? data : []).map((n: any) => ({
                         id: n.id,
                         type: n.type,
                         message: n.message,

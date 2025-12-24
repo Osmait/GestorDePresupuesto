@@ -19,12 +19,12 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 }
 
 func (u *UserRepository) Save(ctx context.Context, user *user.User) error {
-	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, name , last_name,email, password,token) VALUES ($1,$2,$3,$4,$5,$6)", user.Id, user.Name, user.LastName, user.Email, user.Password, user.Token)
+	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, name , last_name,email, password,token, confirmed, is_demo) VALUES ($1,$2,$3,$4,$5,$6, $7, $8)", user.Id, user.Name, user.LastName, user.Email, user.Password, user.Token, user.Confirmed, user.IsDemo)
 	return err
 }
 
 func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password from users WHERE email = $1", email)
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo from users WHERE email = $1", email)
 	if err != nil {
 		return nil, err
 	}
@@ -37,7 +37,7 @@ func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*us
 
 	user := user.User{}
 	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password); err != nil {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo); err != nil {
 			return nil, err
 		}
 	}

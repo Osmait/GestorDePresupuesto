@@ -17,28 +17,29 @@ export const authOptions: NextAuthOptions = {
       },
       async authorize(credentials) {
         try {
-          if (!credentials?.email || !credentials?.password) {
-            return null
+          let token = "";
+
+          // 1. Check for Demo Token
+          if (credentials?.demoToken) {
+            token = credentials.demoToken;
+          } else {
+            // 2. Normal Login Flow
+            if (!credentials?.email || !credentials?.password) {
+              return null
+            }
+            const { email, password } = loginSchema.parse(credentials)
+
+            const response = await fetch("http://127.0.0.1:8080/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ email, password }),
+            })
+
+            if (!response.ok) return null
+            token = await response.json()
           }
 
-          const { email, password } = loginSchema.parse(credentials)
-          
-          // Llamada al backend para autenticar
-          const response = await fetch("http://127.0.0.1:8080/login", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ email, password }),
-          })
-
-          if (!response.ok) {
-            return null
-          }
-
-          const token = await response.json()
-
-          // Obtener el perfil del usuario
+          // 3. Get User Profile (Common for both flows)
           const profileResponse = await fetch("http://127.0.0.1:8080/profile", {
             headers: {
               "Content-Type": "application/json",
@@ -46,9 +47,7 @@ export const authOptions: NextAuthOptions = {
             },
           })
 
-          if (!profileResponse.ok) {
-            return null
-          }
+          if (!profileResponse.ok) return null
 
           const user = await profileResponse.json()
 

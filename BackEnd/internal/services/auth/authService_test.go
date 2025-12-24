@@ -53,7 +53,7 @@ func getTestConfig() *config.Config {
 func TestAuthServices(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	testConfig := getTestConfig()
-	authService := NewAuthService(mockRepo, testConfig)
+	authService := NewAuthService(mockRepo, nil, nil, nil, nil, testConfig)
 
 	user1 := getNewUser()
 	passwor := user1.Password

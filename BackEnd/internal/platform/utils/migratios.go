@@ -39,7 +39,7 @@ func RunDBMigration(migrationURL string, dbSource string) {
 		log.Fatal().Err(err).Msg("failed to run migrate up")
 	}
 
-	log.Info().Msg("db migrated successfully")
+	log.Info().Int("version", int(version)).Msg("db migrated successfully")
 }
 
 func DownDBMigration(migrationURL string, dbSource string) {
