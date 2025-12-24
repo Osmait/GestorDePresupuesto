@@ -33,9 +33,9 @@ jobs:
 
       # Using dedicated action for better caching and performance
       - name: Lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@v6
         with:
-          version: v2.6
+          version: v1.64
           working-directory: BackEnd
           args: --timeout=5m
 
