@@ -17,9 +17,10 @@ interface AnimatedSidebarNavProps {
 	items: NavItem[]
 	isExpanded: boolean
 	onMobileClose?: () => void
+	onItemClick?: (item: NavItem, e: React.MouseEvent) => void
 }
 
-export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: AnimatedSidebarNavProps) {
+export function AnimatedSidebarNav({ items, isExpanded, onMobileClose, onItemClick }: AnimatedSidebarNavProps) {
 	const pathname = usePathname()
 	const navRef = useRef<HTMLDivElement>(null)
 	const itemRefs = useRef<(HTMLAnchorElement | null)[]>([])
@@ -58,7 +59,10 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 		itemRefs.current = itemRefs.current.slice(0, items.length)
 	}, [items.length])
 
-	const handleLinkClick = () => {
+	const handleLinkClick = (e: React.MouseEvent, item: NavItem) => {
+		if (onItemClick) {
+			onItemClick(item, e)
+		}
 		if (onMobileClose) {
 			onMobileClose()
 		}
@@ -113,7 +117,7 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose }: Animate
 								itemRefs.current[index] = el
 							}}
 							href={item.href}
-							onClick={handleLinkClick}
+							onClick={(e) => handleLinkClick(e, item)}
 							className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 group relative ${isActive
 								? 'text-primary font-semibold'
 								: 'text-muted-foreground hover:text-foreground hover:bg-muted/40'

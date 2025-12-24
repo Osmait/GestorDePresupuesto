@@ -1,5 +1,6 @@
 "use client"
 
+import React, { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +9,7 @@ import { UserNav } from '@/components/auth/user-nav'
 import { Search } from '@/components/common/search'
 import { SidebarController } from '@/components/common/sidebar-controller'
 import { AnimatedSidebarNav } from '@/components/common/sidebar-nav-animated'
+import { SettingsModal } from '@/components/settings/SettingsModal'
 import {
 	LayoutDashboard,
 	CreditCard,
@@ -102,12 +104,14 @@ function SidebarFooter({
 	items,
 	isExpanded,
 	sidebarHoverEnabled,
-	toggleCollapsed
+	toggleCollapsed,
+	onItemClick
 }: {
 	items: NavItem[]
 	isExpanded: boolean
 	sidebarHoverEnabled: boolean
 	toggleCollapsed: () => void
+	onItemClick: (item: NavItem, e: React.MouseEvent) => void
 }) {
 	const t = useTranslations('nav')
 	return (
@@ -115,6 +119,7 @@ function SidebarFooter({
 			<AnimatedSidebarNav
 				items={items}
 				isExpanded={isExpanded}
+				onItemClick={onItemClick}
 			/>
 
 			<div className="pt-2">
@@ -220,6 +225,16 @@ export function Sidebar({ children }: SidebarProps) {
 	const pathname = usePathname()
 	const { navItems, bottomNavItems } = useNavItems()
 
+	// Estado local para settings
+	const [showSettings, setShowSettings] = React.useState(false)
+
+	const handleItemClick = (item: NavItem, e: React.MouseEvent) => {
+		if (item.href === '/app/settings') {
+			e.preventDefault()
+			setShowSettings(true)
+		}
+	}
+
 	return (
 		<SidebarController>
 			{({
@@ -261,6 +276,7 @@ export function Sidebar({ children }: SidebarProps) {
 								isExpanded={isExpanded}
 								sidebarHoverEnabled={sidebarHoverEnabled}
 								toggleCollapsed={toggleCollapsed}
+								onItemClick={handleItemClick}
 							/>
 						</div>
 					</aside>
@@ -276,6 +292,8 @@ export function Sidebar({ children }: SidebarProps) {
 							{children}
 						</main>
 					</div>
+
+					<SettingsModal open={showSettings} onOpenChange={setShowSettings} />
 				</div>
 			)}
 		</SidebarController>
