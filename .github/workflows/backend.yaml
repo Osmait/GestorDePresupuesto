@@ -33,7 +33,7 @@ jobs:
 
       # Using dedicated action for better caching and performance
       - name: Lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           version: v2.7
           working-directory: BackEnd
