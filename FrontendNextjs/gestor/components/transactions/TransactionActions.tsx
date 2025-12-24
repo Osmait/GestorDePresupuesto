@@ -19,7 +19,7 @@ export function TransactionActions() {
     const [drawerOpen, setDrawerOpen] = useState(false)
     const formRef = useRef<{ reset: () => void } | null>(null)
 
-    const { filters, setFilters, applyFilters, clearFilters, reloadCurrentView, createTransaction, addTransaction, isLoading, error, isModalOpen, setModalOpen, setEditingTransaction } = useTransactionContext()
+    const { filters, setFilters, clearFilters, reloadCurrentView, createTransaction, isLoading, error, isModalOpen, setModalOpen, setEditingTransaction } = useTransactionContext()
     const { data: accounts = [] } = useGetAccounts()
     const { data: categories = [] } = useGetCategories()
 
@@ -72,9 +72,8 @@ export function TransactionActions() {
                             updated_at: new Date().toISOString()
                         };
 
-                        // Add to list immediately (Context)
-                        // @ts-ignore
-                        addTransaction(optimisticTx);
+                        // Optimistic update is now handled by React Query cache invalidation
+                        // No need for manual addTransaction call
 
                         // Perform actual save
                         // @ts-ignore
