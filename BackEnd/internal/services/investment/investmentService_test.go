@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
 	domainInvestment "github.com/osmait/gestorDePresupuesto/internal/domain/investment"
+
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -20,12 +20,12 @@ type MockInvestmentRepository struct {
 	mock.Mock
 }
 
-func (m *MockInvestmentRepository) Save(ctx context.Context, investment *investment.Investment) error {
+func (m *MockInvestmentRepository) Save(ctx context.Context, investment *domainInvestment.Investment) error {
 	args := m.Called(ctx, investment)
 	return args.Error(0)
 }
 
-func (m *MockInvestmentRepository) FindAll(ctx context.Context, userId string) ([]*investment.Investment, error) {
+func (m *MockInvestmentRepository) FindAll(ctx context.Context, userId string) ([]*domainInvestment.Investment, error) {
 	args := m.Called(ctx, userId)
 	return args.Get(0).([]*domainInvestment.Investment), args.Error(1)
 }
@@ -92,7 +92,7 @@ func TestFindAllInvestments(t *testing.T) {
 
 	ctx := context.Background()
 	userId := "test-user-id"
-	expectedInvestments := []*investment.Investment{}
+	expectedInvestments := []*domainInvestment.Investment{}
 	for i := 0; i < 5; i++ {
 		investment := utils.GetNewRandomInvestment()
 		investment.UserID = userId
@@ -115,7 +115,7 @@ func TestFindAllInvestments_EmptyResult(t *testing.T) {
 
 	ctx := context.Background()
 	userId := "test-user-id"
-	expectedInvestments := []*investment.Investment{}
+	expectedInvestments := []*domainInvestment.Investment{}
 
 	mockRepo.On("FindAll", ctx, userId).Return(expectedInvestments, nil)
 
@@ -133,7 +133,7 @@ func TestFindAllInvestments_RepositoryError(t *testing.T) {
 	ctx := context.Background()
 	userId := "test-user-id"
 
-	mockRepo.On("FindAll", ctx, userId).Return([]*investment.Investment(nil), ErrRepositoryFailure)
+	mockRepo.On("FindAll", ctx, userId).Return([]*domainInvestment.Investment(nil), ErrRepositoryFailure)
 
 	result, err := investmentService.FindAll(ctx, userId)
 

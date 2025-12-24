@@ -85,9 +85,10 @@ func HealthRoutes(engine *gin.Engine, db *sql.DB, version, environment string) {
 		}
 
 		statusCode := http.StatusOK
-		if overallStatus == "unhealthy" {
+		switch overallStatus {
+		case "unhealthy":
 			statusCode = http.StatusServiceUnavailable
-		} else if overallStatus == "degraded" {
+		case "degraded":
 			statusCode = http.StatusOK // Still return 200 for degraded
 		}
 

@@ -32,7 +32,7 @@ func (r *NotificationRepository) GetByUserID(userID string) ([]notification.Noti
 	if err != nil {
 		return nil, fmt.Errorf("error querying notifications: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var notifications []notification.Notification
 	for rows.Next() {

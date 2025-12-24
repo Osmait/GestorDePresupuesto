@@ -22,10 +22,10 @@ func NewValidationMiddleware() *ValidationMiddleware {
 	v := validator.New()
 
 	// Register custom validators
-	v.RegisterValidation("alpha_space", validateAlphaSpace)
-	v.RegisterValidation("password_strength", validatePasswordStrength)
-	v.RegisterValidation("transaction_type", validateTransactionType)
-	v.RegisterValidation("positive_amount", validatePositiveAmount)
+	_ = v.RegisterValidation("alpha_space", validateAlphaSpace)
+	_ = v.RegisterValidation("password_strength", validatePasswordStrength)
+	_ = v.RegisterValidation("transaction_type", validateTransactionType)
+	_ = v.RegisterValidation("positive_amount", validatePositiveAmount)
 
 	return &ValidationMiddleware{
 		validator: v,

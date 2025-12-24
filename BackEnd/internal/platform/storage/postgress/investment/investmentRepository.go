@@ -33,7 +33,7 @@ func (r *InvestmentRepository) FindAll(ctx context.Context, userId string) ([]*i
 	if err != nil {
 		return nil, fmt.Errorf("error finding investments: %w", err)
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var investments []*investment.Investment
 	for rows.Next() {

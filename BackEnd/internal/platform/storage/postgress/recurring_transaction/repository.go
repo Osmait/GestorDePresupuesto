@@ -44,7 +44,7 @@ func (r *RecurringTransactionRepository) FindAllByUser(ctx context.Context, user
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []*recurring_transaction.RecurringTransaction
 	for rows.Next() {
@@ -85,7 +85,7 @@ func (r *RecurringTransactionRepository) FindDue(ctx context.Context, dayOfMonth
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var results []*recurring_transaction.RecurringTransaction
 	for rows.Next() {

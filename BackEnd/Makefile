@@ -247,7 +247,7 @@ mod-audit:
 # Run all tests (fast version - skips slow benchmarks)
 test:
 	@echo "$(BLUE)Running tests...$(RESET)"
-	@go test -short -race ./...
+	@go test ./...
 	@echo "$(GREEN)Tests completed$(RESET)"
 
 # Run tests with coverage (slower but complete)

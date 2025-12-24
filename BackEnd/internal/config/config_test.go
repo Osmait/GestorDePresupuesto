@@ -23,16 +23,16 @@ func TestLoadConfig(t *testing.T) {
 
 	// Clean environment
 	for _, env := range envVars {
-		os.Unsetenv(env)
+		_ = os.Unsetenv(env)
 	}
 
 	// Restore environment after test
 	defer func() {
 		for env, value := range originalEnv {
 			if value != "" {
-				os.Setenv(env, value)
+				_ = os.Setenv(env, value)
 			} else {
-				os.Unsetenv(env)
+				_ = os.Unsetenv(env)
 			}
 		}
 	}()
@@ -50,11 +50,11 @@ func TestLoadConfig(t *testing.T) {
 	})
 
 	t.Run("environment variables override", func(t *testing.T) {
-		os.Setenv("SERVER_HOST", "0.0.0.0")
-		os.Setenv("SERVER_PORT", "9000")
-		os.Setenv("ENV", "development") // Use development instead of production
-		os.Setenv("DB_TYPE", "sqlite")
-		os.Setenv("JWT_SECRET", "test-secret-that-is-long-enough-for-validation")
+		_ = os.Setenv("SERVER_HOST", "0.0.0.0")
+		_ = os.Setenv("SERVER_PORT", "9000")
+		_ = os.Setenv("ENV", "development") // Use development instead of production
+		_ = os.Setenv("DB_TYPE", "sqlite")
+		_ = os.Setenv("JWT_SECRET", "test-secret-that-is-long-enough-for-validation")
 
 		config, err := LoadConfig()
 		require.NoError(t, err)
@@ -67,7 +67,7 @@ func TestLoadConfig(t *testing.T) {
 	})
 
 	t.Run("invalid configuration", func(t *testing.T) {
-		os.Setenv("SERVER_PORT", "70000") // Invalid port
+		_ = os.Setenv("SERVER_PORT", "70000") // Invalid port
 
 		_, err := LoadConfig()
 		assert.Error(t, err)
@@ -463,8 +463,8 @@ func TestEnvironmentDetection(t *testing.T) {
 
 func TestHelperFunctions(t *testing.T) {
 	t.Run("getEnvString", func(t *testing.T) {
-		os.Setenv("TEST_STRING", "test_value")
-		defer os.Unsetenv("TEST_STRING")
+		_ = os.Setenv("TEST_STRING", "test_value")
+		defer func() { _ = os.Unsetenv("TEST_STRING") }()
 
 		result := getEnvString("TEST_STRING", "default")
 		assert.Equal(t, "test_value", result)
@@ -474,8 +474,8 @@ func TestHelperFunctions(t *testing.T) {
 	})
 
 	t.Run("getEnvInt", func(t *testing.T) {
-		os.Setenv("TEST_INT", "42")
-		defer os.Unsetenv("TEST_INT")
+		_ = os.Setenv("TEST_INT", "42")
+		defer func() { _ = os.Unsetenv("TEST_INT") }()
 
 		result := getEnvInt("TEST_INT", 0)
 		assert.Equal(t, 42, result)
@@ -483,16 +483,16 @@ func TestHelperFunctions(t *testing.T) {
 		result = getEnvInt("NONEXISTENT", 10)
 		assert.Equal(t, 10, result)
 
-		os.Setenv("INVALID_INT", "not_a_number")
-		defer os.Unsetenv("INVALID_INT")
+		_ = os.Setenv("INVALID_INT", "not_a_number")
+		defer func() { _ = os.Unsetenv("INVALID_INT") }()
 
 		result = getEnvInt("INVALID_INT", 20)
 		assert.Equal(t, 20, result)
 	})
 
 	t.Run("getEnvBool", func(t *testing.T) {
-		os.Setenv("TEST_BOOL", "true")
-		defer os.Unsetenv("TEST_BOOL")
+		_ = os.Setenv("TEST_BOOL", "true")
+		defer func() { _ = os.Unsetenv("TEST_BOOL") }()
 
 		result := getEnvBool("TEST_BOOL", false)
 		assert.True(t, result)
@@ -502,8 +502,8 @@ func TestHelperFunctions(t *testing.T) {
 	})
 
 	t.Run("getEnvStringSlice", func(t *testing.T) {
-		os.Setenv("TEST_SLICE", "value1,value2,value3")
-		defer os.Unsetenv("TEST_SLICE")
+		_ = os.Setenv("TEST_SLICE", "value1,value2,value3")
+		defer func() { _ = os.Unsetenv("TEST_SLICE") }()
 
 		result := getEnvStringSlice("TEST_SLICE", []string{"default"})
 		expected := []string{"value1", "value2", "value3"}
@@ -514,8 +514,8 @@ func TestHelperFunctions(t *testing.T) {
 	})
 
 	t.Run("getEnvStringMap", func(t *testing.T) {
-		os.Setenv("TEST_MAP", "key1=value1,key2=value2")
-		defer os.Unsetenv("TEST_MAP")
+		_ = os.Setenv("TEST_MAP", "key1=value1,key2=value2")
+		defer func() { _ = os.Unsetenv("TEST_MAP") }()
 
 		result := getEnvStringMap("TEST_MAP", map[string]string{"default": "value"})
 		expected := map[string]string{"key1": "value1", "key2": "value2"}

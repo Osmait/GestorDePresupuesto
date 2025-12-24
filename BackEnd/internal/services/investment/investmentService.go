@@ -39,7 +39,6 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 
 	// Determine which investments need updating
 	var wg sync.WaitGroup
-	var mu sync.Mutex
 
 	for _, inv := range investments {
 		// Update if older than 5 minutes or price is 0 (initial)
@@ -56,10 +55,8 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 					// Update in DB (ignore error to not block read)
 					_ = s.repo.Update(context.Background(), i)
 
-					mu.Lock()
 					// Update the instance in the list (pointer)
 					// (already updated via pointer i)
-					mu.Unlock()
 				}
 			}(inv)
 		}

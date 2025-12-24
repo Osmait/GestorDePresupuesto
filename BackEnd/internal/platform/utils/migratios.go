@@ -213,6 +213,7 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		email VARCHAR(255) UNIQUE NOT NULL,
 		password VARCHAR(255) NOT NULL,
 		token VARCHAR(32),
+		is_demo BOOLEAN DEFAULT 0,
 		confirmed BOOLEAN DEFAULT 0,
 		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 	);

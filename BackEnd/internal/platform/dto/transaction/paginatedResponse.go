@@ -122,14 +122,15 @@ func CalculateSummary(transactions []*TransactionResponse, filteredCount int64) 
 	for _, transaction := range transactions {
 		amount := transaction.Amount
 
-		if transaction.TypeTransation == "income" {
+		switch transaction.TypeTransation {
+		case "income":
 			summary.TotalIncome += amount
 			summary.IncomeCount++
 
 			if amount > summary.LargestIncome {
 				summary.LargestIncome = amount
 			}
-		} else if transaction.TypeTransation == "expense" {
+		case "expense":
 			summary.TotalExpenses += amount
 			summary.ExpenseCount++
 

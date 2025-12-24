@@ -35,7 +35,7 @@ func (h *SearchHandler) Search(ctx *gin.Context) {
 
 	response, err := h.service.Search(ctx, userId, query)
 	if err != nil {
-		ctx.Error(apperrors.NewInternalError("Error executing search", err))
+		_ = ctx.Error(apperrors.NewInternalError("Error executing search", err))
 		return
 	}
 

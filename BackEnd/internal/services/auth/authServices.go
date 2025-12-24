@@ -159,7 +159,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context) (*string, error) {
 	tx3 := transactionDomain.NewTransaction(uuid.New().String(), "Uber a casa", "Salida tarde", "bill", accountID, transportCatID, 25.50)
 	tx3.UserId = userID
 	tx3.CreatedAt = now.AddDate(0, 0, -5)
-	a.transactionRepo.Save(ctx, tx3)
+	_ = a.transactionRepo.Save(ctx, tx3)
 
 	// Logic for Token
 	token, err := utils.JwtCreate(user.Id, a.config.JWT.Secret)

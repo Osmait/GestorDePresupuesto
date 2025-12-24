@@ -2,8 +2,8 @@ name: Backend Quality
 
 on:
   push:
-    branches: ['**']
-    paths:
+     branches: [main, development]    
+     paths:
       - 'BackEnd/**'
   pull_request:
     branches: [main, development]
@@ -33,11 +33,14 @@ jobs:
 
       # Using dedicated action for better caching and performance
       - name: Lint
-        uses: golangci/golangci-lint-action@v3
+        uses: golangci/golangci-lint-action@v7
         with:
-          version: latest
+          version: v2.7
           working-directory: BackEnd
           args: --timeout=5m
 
       - name: Build
         run: make build
+
+      - name: Test
+        run: make test

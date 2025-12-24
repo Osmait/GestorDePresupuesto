@@ -570,11 +570,11 @@ func (c *Config) validateOpenTelemetry() error {
 // validatePrometheus validates Prometheus configuration
 func (c *Config) validatePrometheus() error {
 	if c.Prometheus.MetricsPath == "" {
-		return fmt.Errorf("Prometheus metrics path cannot be empty")
+		return fmt.Errorf("prometheus metrics path cannot be empty")
 	}
 
 	if !strings.HasPrefix(c.Prometheus.MetricsPath, "/") {
-		return fmt.Errorf("Prometheus metrics path must start with /")
+		return fmt.Errorf("prometheus metrics path must start with /")
 	}
 
 	if c.Prometheus.Endpoint != "" && !isValidURL(c.Prometheus.Endpoint) {
@@ -770,17 +770,12 @@ func getEnvFloat(key string, defaultValue float64) float64 {
 }
 
 // getDuration returns the environment variable value as duration
+// getDuration returns the environment variable value as duration
 func getDuration(value string) time.Duration {
 	if duration, err := time.ParseDuration(value); err == nil {
 		return duration
 	}
 	return 24 * time.Hour // default to 24 hours
-}
-
-// getDurationPtr returns a pointer to duration
-func getDurationPtr(value string) *time.Duration {
-	duration := getDuration(value)
-	return &duration
 }
 
 // getEnvStringSlice returns the environment variable value as string slice

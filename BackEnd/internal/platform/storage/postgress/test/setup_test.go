@@ -27,7 +27,7 @@ func SetUpTestWithCleanup() (*sql.DB, func()) {
 
 	cleanup := func() {
 		if db != nil {
-			db.Close()
+			_ = db.Close()
 		}
 	}
 
