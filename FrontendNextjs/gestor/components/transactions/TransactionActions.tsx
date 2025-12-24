@@ -20,10 +20,7 @@ export function TransactionActions() {
     const { data: accounts = [] } = useGetAccounts()
     const { data: categories = [] } = useGetCategories()
 
-    const handleApplyFilters = () => {
-        applyFilters()
-        setDrawerOpen(false)
-    }
+    // handleApplyFilters removed as it is now automatic
 
     return (
         <div className="flex items-center gap-3">
@@ -147,8 +144,7 @@ export function TransactionActions() {
                             <Input type="text" value={filters.search} onChange={e => setFilters(f => ({ ...f, search: e.target.value }))} placeholder="Buscar por descripción..." />
                         </div>
                         <div className="flex flex-col gap-2 pt-4">
-                            <Button type="button" onClick={handleApplyFilters}>Aplicar Filtros</Button>
-                            <Button type="button" variant="outline" onClick={() => { clearFilters(); setDrawerOpen(false) }}>Limpiar Filtros</Button>
+                            <Button type="button" variant="outline" onClick={() => clearFilters()}>Limpiar Filtros</Button>
                         </div>
                     </div>
                 </DrawerContent>

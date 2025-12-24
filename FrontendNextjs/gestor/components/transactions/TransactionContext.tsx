@@ -71,6 +71,27 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     // React Query Hooks
     const [activeFilters, setActiveFilters] = useState<TransactionFilters>({})
 
+    const updateURLWithFilters = useCallback((newFilters: TransactionFiltersState) => {
+        const params = new URLSearchParams()
+
+        if (newFilters.dateRange.from) params.set('dateFrom', newFilters.dateRange.from.toISOString().split('T')[0])
+        if (newFilters.dateRange.to) params.set('dateTo', newFilters.dateRange.to.toISOString().split('T')[0])
+        if (newFilters.type && newFilters.type !== 'all') params.set('type', newFilters.type)
+        if (newFilters.account && newFilters.account !== 'all') params.set('account', newFilters.account)
+        if (newFilters.category && newFilters.category !== 'all') params.set('category', newFilters.category)
+        if (newFilters.budget && newFilters.budget !== 'all') params.set('budget', newFilters.budget)
+        if (newFilters.minAmount) params.set('minAmount', newFilters.minAmount)
+        if (newFilters.maxAmount) params.set('maxAmount', newFilters.maxAmount)
+        if (newFilters.search) params.set('search', newFilters.search)
+
+        const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname
+        router.replace(newURL)
+    }, [router])
+
+    const applyFilters = useCallback(() => {
+        // No-op manually, handled by effect
+    }, [])
+
     // Map Context Filters -> API Filters
     useEffect(() => {
         const apiFilters: TransactionFilters = {
@@ -90,7 +111,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         if (filters.search) apiFilters.search = filters.search
 
         setActiveFilters(apiFilters)
-    }, [filters])
+        updateURLWithFilters(filters)
+    }, [filters, updateURLWithFilters])
 
     // Query Data
     const { data, isLoading: isLoadingTx, error: errorTx, refetch } = useGetTransactions(activeFilters)
@@ -135,27 +157,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     const loadTransactions = () => refetch()
     const loadAllTransactions = () => refetch()
 
-    const updateURLWithFilters = useCallback((newFilters: TransactionFiltersState) => {
-        const params = new URLSearchParams()
-
-        if (newFilters.dateRange.from) params.set('dateFrom', newFilters.dateRange.from.toISOString().split('T')[0])
-        if (newFilters.dateRange.to) params.set('dateTo', newFilters.dateRange.to.toISOString().split('T')[0])
-        if (newFilters.type && newFilters.type !== 'all') params.set('type', newFilters.type)
-        if (newFilters.account && newFilters.account !== 'all') params.set('account', newFilters.account)
-        if (newFilters.category && newFilters.category !== 'all') params.set('category', newFilters.category)
-        if (newFilters.budget && newFilters.budget !== 'all') params.set('budget', newFilters.budget)
-        if (newFilters.minAmount) params.set('minAmount', newFilters.minAmount)
-        if (newFilters.maxAmount) params.set('maxAmount', newFilters.maxAmount)
-        if (newFilters.search) params.set('search', newFilters.search)
-
-        const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname
-        router.replace(newURL)
-    }, [router])
-
-    const applyFilters = useCallback(() => {
-        updateURLWithFilters(filters)
-
-    }, [filters, updateURLWithFilters])
+    // Moved updateURLWithFilters up
+    // Removed applyFilters as it is now automatic via effect
 
     const clearFilters = useCallback(() => {
         const clearedFilters = {
