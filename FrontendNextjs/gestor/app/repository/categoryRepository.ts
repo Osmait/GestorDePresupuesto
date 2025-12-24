@@ -5,7 +5,6 @@ export class CategoryRepository extends BaseRepository {
   async findAll(): Promise<Category[]> {
     try {
       const categories = await this.get<Category[]>("/category");
-      console.log("categories data", categories);
       return categories;
     } catch (error) {
       console.error("Error fetching categories:", error);

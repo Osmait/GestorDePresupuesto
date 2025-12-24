@@ -42,7 +42,6 @@ export class TransactionRepository extends BaseRepository {
 
       const url = `/transaction${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await this.get<PaginatedTransactionResponse>(url);
-      console.log("paginated transactions data", response);
       return response;
     } catch (error) {
       console.error("Error fetching transactions:", error);

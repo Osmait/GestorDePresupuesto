@@ -10,12 +10,10 @@ export abstract class BaseRepository {
       // Intentar primero getServerSession (para Server Components)
       if (typeof window === 'undefined') {
         const session = await getServerSession(authOptions);
-        console.log("Server Session:", session);
         return (session as any)?.accessToken || null;
       } else {
         // Para Client Components
         const session = await getSession();
-        console.log("Client Session:", session);
         return (session as any)?.accessToken || null;
       }
     } catch (error) {
