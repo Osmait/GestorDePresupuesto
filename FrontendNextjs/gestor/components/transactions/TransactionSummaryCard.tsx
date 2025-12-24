@@ -1,7 +1,7 @@
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Wallet, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { Transaction, TypeTransaction } from '@/types/transaction';
-import CountUp from 'react-countup';
+import { AnimatedFlashNumber } from '@/components/common/AnimatedFlashNumber';
 
 export default function TransactionSummaryCard({ transactions }: { transactions: Transaction[] }) {
   const totalIncome = transactions.filter(t => t.type_transation === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0);
@@ -21,9 +21,10 @@ export default function TransactionSummaryCard({ transactions }: { transactions:
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
             <TrendingUp className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
             <p className="text-sm font-medium text-muted-foreground">Total Ingresos</p>
-            <p className="text-2xl font-bold text-green-600 dark:text-green-400">
-              <CountUp
-                end={totalIncome}
+            <p className="text-2xl font-bold">
+              <AnimatedFlashNumber
+                value={totalIncome}
+                className="text-green-600 dark:text-green-400"
                 duration={1}
                 separator=","
                 prefix="$"
@@ -34,9 +35,11 @@ export default function TransactionSummaryCard({ transactions }: { transactions:
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-red-500/10 to-rose-500/10 dark:from-red-500/5 dark:to-rose-500/5">
             <TrendingDown className="h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400" />
             <p className="text-sm font-medium text-muted-foreground">Total Gastos</p>
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">
-              <CountUp
-                end={totalExpenses}
+            <p className="text-2xl font-bold">
+              <AnimatedFlashNumber
+                value={totalExpenses}
+                className="text-red-600 dark:text-red-400"
+                inverse={true}
                 duration={1}
                 separator=","
                 prefix="$"
@@ -47,9 +50,10 @@ export default function TransactionSummaryCard({ transactions }: { transactions:
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5">
             <DollarSign className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
             <p className="text-sm font-medium text-muted-foreground">Total Transacciones</p>
-            <p className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-              <CountUp
-                end={totalTransactions}
+            <p className="text-2xl font-bold">
+              <AnimatedFlashNumber
+                value={totalTransactions}
+                className="text-blue-600 dark:text-blue-400"
                 duration={1}
                 separator=","
                 preserveValue={true}
