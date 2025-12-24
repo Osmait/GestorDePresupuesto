@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from '@tanstack/react-query'
 import { getTransactionRepository } from '@/lib/repositoryConfig'
 import { TransactionFilters, TypeTransaction } from '@/types/transaction'
 import { CATEGORY_KEYS } from './useCategoriesQuery'
@@ -24,6 +24,7 @@ export function useGetTransactions(filters?: TransactionFilters) {
                 pagination: response.pagination || null
             }
         },
+        placeholderData: keepPreviousData
     })
 }
 
