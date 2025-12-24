@@ -12,8 +12,6 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
-type contextKey string
-
 func TestNewAppError(t *testing.T) {
 	t.Run("creates app error with basic fields", func(t *testing.T) {
 		appErr := NewAppError(ErrorTypeValidation, "TEST_CODE", "test message")
