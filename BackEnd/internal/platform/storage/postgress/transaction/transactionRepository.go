@@ -298,13 +298,13 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 
 	// Amount range filters
 	if filter.AmountMin != nil {
-		whereConditions = append(whereConditions, fmt.Sprintf("amount >= $%d", argIndex))
+		whereConditions = append(whereConditions, fmt.Sprintf("ABS(amount) >= $%d", argIndex))
 		args = append(args, *filter.AmountMin)
 		argIndex++
 	}
 
 	if filter.AmountMax != nil {
-		whereConditions = append(whereConditions, fmt.Sprintf("amount <= $%d", argIndex))
+		whereConditions = append(whereConditions, fmt.Sprintf("ABS(amount) <= $%d", argIndex))
 		args = append(args, *filter.AmountMax)
 		argIndex++
 	}
