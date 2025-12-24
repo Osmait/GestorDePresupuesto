@@ -1,6 +1,5 @@
 'use client'
 
-import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -30,7 +29,7 @@ type BudgetFormValues = z.infer<typeof budgetSchema>
 
 interface BudgetFormModalProps {
     open: boolean
-    setOpen: (v: boolean) => void
+    setOpen: (_v: boolean) => void
 }
 
 export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
@@ -53,7 +52,9 @@ export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
                 await createBudget(values.category_id, values.amount)
             }
             form.reset({ category_id: '', amount: 0 })
-        } catch { }
+        } catch {
+            // Error handling is done via the error prop from context
+        }
     }
 
     const handleOpenChange = (open: boolean) => {

@@ -5,9 +5,9 @@ import { RecurringTransaction } from '@/types/recurringTransaction'
 
 interface RecurringTransactionContextType {
     isModalOpen: boolean
-    setModalOpen: (isOpen: boolean) => void
+    setModalOpen: (_isOpen: boolean) => void
     editingTransaction: RecurringTransaction | null
-    setEditingTransaction: (transaction: RecurringTransaction | null) => void
+    setEditingTransaction: (_transaction: RecurringTransaction | null) => void
 }
 
 const RecurringTransactionContext = createContext<RecurringTransactionContextType | undefined>(undefined)

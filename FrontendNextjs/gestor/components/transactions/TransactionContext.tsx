@@ -30,13 +30,13 @@ interface TransactionContextType {
     pagination: any
     isLoading: boolean
     error: string | null
-    createTransaction: (...args: any[]) => Promise<void>
-    updateTransaction: (id: string, ...args: any[]) => Promise<void>
-    deleteTransaction: (id: string) => Promise<void>
+    createTransaction: (..._args: any[]) => Promise<void>
+    updateTransaction: (_id: string, ..._args: any[]) => Promise<void>
+    deleteTransaction: (_id: string) => Promise<void>
     editingTransaction: any | null
-    setEditingTransaction: (tx: any | null) => void
+    setEditingTransaction: (_tx: any | null) => void
     isModalOpen: boolean
-    setModalOpen: (open: boolean) => void
+    setModalOpen: (_open: boolean) => void
 }
 
 export const TransactionContext = createContext<TransactionContextType | undefined>(undefined)

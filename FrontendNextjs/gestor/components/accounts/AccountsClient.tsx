@@ -7,7 +7,6 @@ import { Account } from '@/types/account';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { AnimatedTabs } from '@/components/common/animated-tabs';
-import { Button } from '@/components/ui/button';
 import { AccountCard } from '@/components/accounts/AccountCard';
 import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard';
 import { AccountUpdateModal } from '@/components/accounts/AccountUpdateModal';

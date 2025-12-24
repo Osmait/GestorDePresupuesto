@@ -25,7 +25,7 @@ interface TransactionItemProps {
   transaction: Transaction;
   category?: Category;
   onTransactionDeleted?: () => void;
-  onEdit?: (transaction: Transaction) => void;
+  onEdit?: (_transaction: Transaction) => void;
 }
 
 export default function TransactionItem({ transaction, category, onTransactionDeleted, onEdit }: TransactionItemProps) {

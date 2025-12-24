@@ -1,9 +1,8 @@
 'use client'
 
 import React from 'react'
-import { Bell, Check, Trash2, X, Zap } from 'lucide-react'
+import { Bell, Check, Trash2, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import Cookies from 'js-cookie'
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -12,7 +11,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { useNotificationContext, NotificationItem } from '@/contexts/NotificationContext'
 import { cn } from '@/lib/utils'
@@ -131,7 +129,7 @@ export function NotificationCenter() {
     )
 }
 
-function NotificationItemRow({ item, onRead }: { item: NotificationItem; onRead: (id: string) => void }) {
+function NotificationItemRow({ item, onRead }: { item: NotificationItem; onRead: (_id: string) => void }) {
     return (
         <DropdownMenuItem
             className={cn(

@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils'
 import { useSettings } from '../../contexts'
 
 interface SidebarControllerProps {
+	// eslint-disable-next-line no-unused-vars
 	children: (props: {
 		isCollapsed: boolean
 		isMobileOpen: boolean

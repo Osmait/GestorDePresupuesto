@@ -13,7 +13,7 @@ import { useTranslations } from 'next-intl'
 import { Budget } from '@/types/budget'
 import { Transaction } from '@/types/transaction'
 
-export function BudgetSummaryCard({ budgets, transactions }: { budgets: Budget[], transactions: Transaction[] }) {
+export function BudgetSummaryCard({ budgets, transactions: _transactions }: { budgets: Budget[], transactions: Transaction[] }) {
     const t = useTranslations('budgets')
     const totalBudget = budgets?.reduce((sum, budget) => sum + budget.amount, 0) || 0
     const totalSpent = budgets?.reduce((sum, budget) => sum + Math.abs(budget.current_amount), 0) || 0

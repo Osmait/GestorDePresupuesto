@@ -1,55 +1,16 @@
 'use client'
 
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
-import { useRouter } from 'next/navigation'
 import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { BudgetsPageSkeleton } from './BudgetsPageSkeleton'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { Budget } from '@/types/budget'
-import { Category } from '@/types/category'
 import { Transaction } from '@/types/transaction'
-import {
-    PiggyBank,
-    TrendingUp,
-    TrendingDown,
-    Target,
-    DollarSign,
-    CheckCircle,
-    Clock,
-    AlertTriangle,
-    PlusCircle,
-    Trash2,
-    MoreHorizontal,
-    Edit
-} from 'lucide-react'
+import { PiggyBank, AlertTriangle, PlusCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { useState } from 'react'
 import { BudgetFormModal } from './BudgetFormModal'
-import { AnimatedCounter } from '@/components/ui/animated-counter'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { useTranslations } from 'next-intl'
-import { formatCurrency } from '@/lib/utils'
-
-
-// --- Helper Components copied from original BudgetsClient or improved ---
-
-// Update BudgetCard props
 import { BudgetCard } from './BudgetCard'
 import { BudgetSummaryCard } from './BudgetSummaryCard'
 

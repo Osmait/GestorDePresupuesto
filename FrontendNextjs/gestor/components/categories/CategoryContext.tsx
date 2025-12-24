@@ -8,14 +8,14 @@ interface CategoryContextType {
     categories: Category[]
     isLoading: boolean
     error: string | null
-    createCategory: (name: string, icon: string, color: string) => Promise<void>
-    updateCategory: (id: string, name: string, icon: string, color: string) => Promise<void>
-    deleteCategory: (id: string) => Promise<void>
+    createCategory: (_name: string, _icon: string, _color: string) => Promise<void>
+    updateCategory: (_id: string, _name: string, _icon: string, _color: string) => Promise<void>
+    deleteCategory: (_id: string) => Promise<void>
     refetch: () => Promise<void>
     editingCategory: Category | null
-    setEditingCategory: (category: Category | null) => void
+    setEditingCategory: (_category: Category | null) => void
     isModalOpen: boolean
-    setModalOpen: (open: boolean) => void
+    setModalOpen: (_open: boolean) => void
 }
 
 const CategoryContext = createContext<CategoryContextType | undefined>(undefined)

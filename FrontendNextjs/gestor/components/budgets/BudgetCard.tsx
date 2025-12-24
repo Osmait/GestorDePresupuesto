@@ -39,8 +39,8 @@ export interface BudgetCardProps {
     budget: Budget
     category?: Category
     transactions: Transaction[]
-    onDelete: (id: string) => void
-    onEdit: (budget: Budget) => void
+    onDelete: (_id: string) => void
+    onEdit: (_budget: Budget) => void
 }
 
 export function BudgetCard({ budget, category, transactions, onDelete, onEdit }: BudgetCardProps) {

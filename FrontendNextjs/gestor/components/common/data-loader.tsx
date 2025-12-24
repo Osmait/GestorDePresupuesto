@@ -15,6 +15,7 @@ import { Category } from '@/types/category'
 import { Budget } from '@/types/budget'
 
 interface DataLoaderProps {
+	// eslint-disable-next-line no-unused-vars
 	children: (data: {
 		user: User | null
 		accounts: Account[]

@@ -11,7 +11,6 @@ export function AccountSummaryCard({ accounts }: { accounts: Account[] }) {
   const totalCurrentBalance = (accounts ?? []).reduce((sum, account) => sum + (account.current_balance ?? account.initial_balance ?? 0), 0);
   const totalInitialBalance = (accounts ?? []).reduce((sum, account) => sum + (account.initial_balance ?? 0), 0);
   const positiveAccounts = (accounts ?? []).filter(account => (account.current_balance ?? account.initial_balance ?? 0) > 0);
-  const negativeAccounts = (accounts ?? []).filter(account => (account.current_balance ?? account.initial_balance ?? 0) < 0);
   const balanceDifference = totalCurrentBalance - totalInitialBalance;
 
   return (

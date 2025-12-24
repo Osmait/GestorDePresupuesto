@@ -12,21 +12,13 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select'
-import { Tag, Coffee, Home, Car, Smartphone, Plane, ShoppingBag, Heart, MoreHorizontal, Briefcase, GraduationCap, DollarSign, Wallet } from 'lucide-react'
 import { useCategoryContext } from '@/components/categories/CategoryContext'
 import { useTranslations } from 'next-intl'
 
 interface CategoryFormModalProps {
     open: boolean
-    setOpen: (open: boolean) => void
-    onCreateCategory: (name: string, icon: string, color: string) => Promise<void>
+    setOpen: (_open: boolean) => void
+    onCreateCategory: (_name: string, _icon: string, _color: string) => Promise<void>
 }
 
 // Predefined Emojis
@@ -194,4 +186,3 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
         </Dialog>
     )
 }
-

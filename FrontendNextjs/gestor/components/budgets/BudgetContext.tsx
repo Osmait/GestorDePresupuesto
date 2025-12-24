@@ -7,14 +7,14 @@ interface BudgetContextType {
     budgets: Budget[]
     isLoading: boolean
     error: string | null
-    createBudget: (categoryId: string, amount: number) => Promise<void>
-    updateBudget: (id: string, categoryId: string, amount: number) => Promise<void>
-    deleteBudget: (id: string) => Promise<void>
+    createBudget: (_categoryId: string, _amount: number) => Promise<void>
+    updateBudget: (_id: string, _categoryId: string, _amount: number) => Promise<void>
+    deleteBudget: (_id: string) => Promise<void>
     refetch: () => Promise<void>
     editingBudget: Budget | null
-    setEditingBudget: (budget: Budget | null) => void
+    setEditingBudget: (_budget: Budget | null) => void
     isModalOpen: boolean
-    setModalOpen: (open: boolean) => void
+    setModalOpen: (_open: boolean) => void
 }
 
 const BudgetContext = createContext<BudgetContextType | undefined>(undefined)

@@ -12,7 +12,6 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
-import { Badge } from '@/components/ui/badge'
 import { useRecurringTransactionsQuery, useDeleteRecurringTransactionMutation } from '@/hooks/queries/useRecurringTransactionsQuery'
 import { useRecurringTransactionContext } from './RecurringTransactionContext'
 import { Skeleton } from '@/components/ui/skeleton'

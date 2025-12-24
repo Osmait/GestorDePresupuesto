@@ -6,7 +6,7 @@ import { InvestmentCard } from "./InvestmentCard"
 
 interface InvestmentListProps {
     type: InvestmentType
-    onEdit: (investment: Investment) => void
+    onEdit: (_investment: Investment) => void
 }
 
 export function InvestmentList({ type, onEdit }: InvestmentListProps) {

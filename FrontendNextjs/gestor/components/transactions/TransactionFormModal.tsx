@@ -36,29 +36,29 @@ type TransactionFormValues = z.infer<typeof transactionSchema>;
 
 type TransactionFormModalProps = {
   open: boolean;
-  setOpen: (v: boolean) => void;
+  setOpen: (_v: boolean) => void;
   createTransaction: (
-    name: string,
-    description: string,
-    amount: number,
-    type_transaction: TypeTransaction,
-    account_id: string,
-    category_id: string,
-    budget_id?: string,
-    created_at?: Date
+    _name: string,
+    _description: string,
+    _amount: number,
+    _type_transaction: TypeTransaction,
+    _account_id: string,
+    _category_id: string,
+    _budget_id?: string,
+    _created_at?: Date
   ) => Promise<void>;
   isLoading: boolean;
   error: string | null;
   formRef: React.MutableRefObject<{ reset: () => void } | null>;
 };
 
-export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error, formRef }: TransactionFormModalProps) {
+export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error }: Omit<TransactionFormModalProps, 'formRef'>) {
   const t = useTranslations('forms');
   const tTx = useTranslations('transactions');
   const locale = useLocale();
   const { data: accounts = [] } = useGetAccounts();
   const { data: categories = [] } = useGetCategories();
-  const { data: budgets = [] } = useGetBudgets();
+  useGetBudgets(); // Keep hook for cache but don't use data directly
   const { editingTransaction, updateTransaction } = useTransactionContext();
 
   const isEditing = !!editingTransaction;
@@ -133,7 +133,9 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
       }
       form.reset();
       setOpen(false);
-    } catch { }
+    } catch {
+      // Error is handled via the error prop
+    }
   }
 
   return (

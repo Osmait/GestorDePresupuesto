@@ -23,13 +23,11 @@ import {
 	BarChart3,
 	ArrowUpRight,
 	ArrowDownRight,
-	Zap,
 	Target,
 	LucideIcon
 } from 'lucide-react'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { DashboardCharts } from '@/components/transactions/DashboardCharts'
-import { DemoTour } from '@/components/common/DemoTour'
 import { getTranslations, getLocale } from 'next-intl/server'
 
 interface StatCardProps {
@@ -306,9 +304,6 @@ export default async function DashboardPage() {
 
 	// Get translations
 	const t = await getTranslations('dashboard')
-	const tNav = await getTranslations('nav')
-	const tBudgets = await getTranslations('budgets')
-	const tCommon = await getTranslations('common')
 	const locale = await getLocale()
 
 	// Obtener la sesión actual (sin hacer login)

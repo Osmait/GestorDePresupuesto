@@ -25,8 +25,7 @@ import {
     Lock,
     Smartphone,
     Download,
-    Mail,
-    CreditCard
+    Mail
 } from "lucide-react"
 
 /**
@@ -34,7 +33,7 @@ import {
  */
 interface SettingsModalProps {
     open: boolean
-    onOpenChange: (open: boolean) => void
+    onOpenChange: (_open: boolean) => void
 }
 
 type SettingsTab = "general" | "security" | "notifications" | "data"
@@ -71,7 +70,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
         setSidebarHoverEnabled,
         notifications,
         setNotifications,
-        currency,
+        currency: _currency,
     } = useSettings()
 
     const getInitials = (name: string, lastName?: string) => {

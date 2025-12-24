@@ -19,9 +19,9 @@ type AccountUpdateFormValues = z.infer<typeof accountUpdateSchema>;
 
 type AccountUpdateModalProps = {
   open: boolean;
-  setOpen: (v: boolean) => void;
+  setOpen: (_v: boolean) => void;
   account: Account | null;
-  updateAccount: (id: string, name: string, bank: string) => Promise<void>;
+  updateAccount: (_id: string, _name: string, _bank: string) => Promise<void>;
   isLoading: boolean;
   error: string | null;
 };

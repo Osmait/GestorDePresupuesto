@@ -19,7 +19,7 @@ export function TransactionActions() {
     const [drawerOpen, setDrawerOpen] = useState(false)
     const formRef = useRef<{ reset: () => void } | null>(null)
 
-    const { filters, setFilters, clearFilters, reloadCurrentView, createTransaction, isLoading, error, isModalOpen, setModalOpen, setEditingTransaction } = useTransactionContext()
+    const { filters, setFilters, clearFilters, createTransaction, isLoading, error, isModalOpen, setModalOpen, setEditingTransaction } = useTransactionContext()
     const { data: accounts = [] } = useGetAccounts()
     const { data: categories = [] } = useGetCategories()
 
@@ -56,10 +56,10 @@ export function TransactionActions() {
 
                     try {
                         // Construct Optimistic Transaction
-                        const [name, description, amount, type_transation, account_id, category_id, budget_id, created_at_arg] = args;
+                        const [name, description, amount, type_transation, account_id, category_id, _budget_id, created_at_arg] = args;
                         const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString();
 
-                        const optimisticTx = {
+                        const _optimisticTx = {
                             id: `temp-${Date.now()}`,
                             name,
                             description,
@@ -88,7 +88,6 @@ export function TransactionActions() {
                 }}
                 isLoading={isLoading}
                 error={error}
-                formRef={formRef}
             />
 
             <Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>

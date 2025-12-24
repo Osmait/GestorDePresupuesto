@@ -1,46 +1,21 @@
 'use client'
 
-import { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { useGetCategories, useDeleteCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
 import { useCategoryContext } from '@/components/categories/CategoryContext'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
-import { Tag, Activity, Palette, MoreHorizontal, Edit, Trash2 } from 'lucide-react'
+import { Tag } from 'lucide-react'
 import { Category } from '@/types/category'
-import { Transaction } from '@/types/transaction'
-import { Button } from '@/components/ui/button'
-import { AnimatedCounter } from '@/components/ui/animated-counter'
-import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import {
-    Dialog,
-    DialogContent,
-    DialogHeader,
-    DialogTitle,
-    DialogFooter,
-    DialogDescription
-} from '@/components/ui/dialog'
 import { CategoriesSkeleton } from '@/components/skeletons/categories-skeleton'
-
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { formatCurrency } from '@/lib/utils'
-
-// Helper component extracted from original page
 import { CategoryCard } from './CategoryCard'
 import { CategorySummaryCard } from './CategorySummaryCard'
 
 
 export function CategoryList() {
     const t = useTranslations('categories')
-    const { data: categories = [], isLoading: isLoadingCategories, error } = useGetCategories()
+    const { data: categories = [], isLoading: isLoadingCategories } = useGetCategories()
     const { data: transactions = [], isLoading: isLoadingTransactions } = useGetAllTransactions()
     const { setEditingCategory, setModalOpen } = useCategoryContext()
 

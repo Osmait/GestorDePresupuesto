@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select"
 import { InvestmentType, CreateInvestmentDTO, Investment } from "@/types/investment"
 import { useEffect, useState } from "react"
-import { useCreateInvestmentMutation, useUpdateInvestmentMutation, useGetInvestments } from "@/hooks/queries/useInvestmentsQuery"
+import { useCreateInvestmentMutation, useUpdateInvestmentMutation } from "@/hooks/queries/useInvestmentsQuery"
 import { Loader2, AlertCircle, Search } from "lucide-react"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { investmentRepository } from "@/lib/repositoryConfig"

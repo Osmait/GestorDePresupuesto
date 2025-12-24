@@ -1,25 +1,17 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import '../../styles/globals.css'
-import { ThemeProvider } from '@/components/common/theme-provider'
 import { SettingsProvider } from '../../contexts'
 import { Sidebar } from '@/components/common/sidebar'
 import { GlobalActionProvider } from '@/contexts/GlobalActionContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
 import { Toaster } from '@/components/ui/sonner'
-import { cn } from '../../lib/utils'
-
-const inter = Inter({ subsets: ['latin'] })
+import PageTransition from '@/components/common/page-transition'
+import { DemoTour } from '@/components/common/DemoTour'
 
 export const metadata: Metadata = {
 	title: 'Gestor de Presupuesto',
 	description: 'Sistema de gestión financiera personal',
 }
-
-import PageTransition from '@/components/common/page-transition'
-import { DemoTour } from '@/components/common/DemoTour'
-
-// ... existing imports
 
 export default async function DashboardLayout({
 	children,

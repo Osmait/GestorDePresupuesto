@@ -1,6 +1,4 @@
 "use client";
-import { useAuth } from '@/hooks/useRepositories';
-import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,14 +19,13 @@ type AccountFormValues = z.infer<typeof accountSchema>;
 
 type AccountFormModalProps = {
   open: boolean;
-  setOpen: (v: boolean) => void;
-  createAccount: (name: string, bank: string, initial_balance: number) => Promise<void>;
+  setOpen: (_v: boolean) => void;
+  createAccount: (_name: string, _bank: string, _initial_balance: number) => Promise<void>;
   isLoading: boolean;
   error: string | null;
 };
 
 export function AccountFormModal({ open, setOpen, createAccount, isLoading, error }: AccountFormModalProps) {
-  const { user } = useAuth();
   const t = useTranslations('forms');
   const tAcc = useTranslations('accounts');
   const form = useForm<AccountFormValues>({
@@ -40,7 +37,9 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
     try {
       await createAccount(values.name, values.bank, values.initial_balance);
       form.reset();
-    } catch { }
+    } catch {
+      // Error handling is done via the error prop
+    }
   }
 
   return (

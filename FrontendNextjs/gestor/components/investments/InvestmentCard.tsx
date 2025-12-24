@@ -8,8 +8,8 @@ import { Investment } from "@/types/investment"
 
 interface InvestmentCardProps {
     investment: Investment
-    onEdit: (investment: Investment) => void
-    onDelete: (id: string) => void
+    onEdit: (_investment: Investment) => void
+    onDelete: (_id: string) => void
 }
 
 export function InvestmentCard({ investment, onEdit, onDelete }: InvestmentCardProps) {
