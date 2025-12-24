@@ -5,8 +5,11 @@ test.describe('Appearance & Settings', () => {
     test.beforeEach(async ({ page }) => {
         // 1. Login as Demo User
         await page.goto('/login');
+        // Wait for page to be fully stable (hydration + network)
+        await page.waitForLoadState('networkidle');
         await page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i }).click();
-        await page.waitForURL('**/app', { timeout: 60000 });
+        // Increase timeout for cold start backend
+        await page.waitForURL('**/app', { timeout: 120000 });
 
         // Handle Demo Welcome Modal
         try {

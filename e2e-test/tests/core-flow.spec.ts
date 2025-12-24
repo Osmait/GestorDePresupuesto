@@ -4,12 +4,13 @@ import { test, expect } from '@playwright/test';
 test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ page }) => {
   // 1. Login as Demo User
   await page.goto('/login');
+  await page.waitForLoadState('networkidle');
 
   // Click "Try Interactive Demo" button
   await page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i }).click();
 
   // Wait for dashboard redirection
-  await page.waitForURL('**/app', { timeout: 60000 });
+  await page.waitForURL('**/app', { timeout: 120000 });
 
   // --- Handle Demo Welcome Modal ---
   // The demo mode shows a driver.js popover/dialog. We need to close it.

@@ -27,4 +27,22 @@ export default defineConfig({
             use: { ...devices['Desktop Safari'] },
         },
     ],
+    webServer: [
+        {
+            command: 'cd .. && make backend',
+            url: 'http://localhost:8080',
+            reuseExistingServer: !process.env.CI,
+            timeout: 120 * 1000,
+            stdout: 'pipe',
+            stderr: 'pipe',
+        },
+        {
+            command: 'cd .. && make frontend',
+            url: 'http://localhost:3000',
+            reuseExistingServer: !process.env.CI,
+            timeout: 120 * 1000,
+            stdout: 'pipe',
+            stderr: 'pipe',
+        }
+    ],
 });
