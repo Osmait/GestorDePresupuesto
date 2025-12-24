@@ -13,6 +13,7 @@ import { Transaction, TypeTransaction } from '@/types/transaction'
 import { TransactionsPageSkeleton } from '@/components/transactions/TransactionsPageSkeleton'
 import { useSearchParams } from 'next/navigation'
 import { useTransactionContext } from './TransactionContext'
+import { TransactionSort } from './TransactionSort'
 
 export default function TransactionsList() {
     const {
@@ -32,13 +33,13 @@ export default function TransactionsList() {
 
     const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME)
     const expenseTransactions = transactions.filter(t => t.type_transation === TypeTransaction.BILL)
-    const sortedTransactions = Array.isArray(transactions) ? transactions.slice().sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()) : []
+    // Removed client-side sorting. Transactions are now sorted by the backend.
 
     const getFilteredTransactions = () => {
         switch (currentFilter) {
             case 'income': return incomeTransactions
             case 'expense': return expenseTransactions
-            default: return sortedTransactions
+            default: return transactions // Use server-sorted/filtered transactions
         }
     }
 
@@ -102,19 +103,24 @@ export default function TransactionsList() {
                 <TransactionSummaryCard transactions={transactions} />
             </div>
 
-            {pagination && (
-                <div className="mb-4 flex justify-between items-center text-sm text-muted-foreground">
-                    <span>
-                        Mostrando {transactions.length} de {pagination.total_records} transacciones
-                        {pagination.total_pages > 1 && ` (Página ${pagination.current_page} de ${pagination.total_pages})`}
-                    </span>
-                    {(searchParams.toString().length > 0) && (
-                        <Button variant="link" size="sm" onClick={clearFilters}>
-                            Ver todas las transacciones
-                        </Button>
-                    )}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+                {pagination && (
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+                        <span>
+                            Mostrando {transactions.length} de {pagination.total_records} transacciones
+                            {pagination.total_pages > 1 && ` (Página ${pagination.current_page} de ${pagination.total_pages})`}
+                        </span>
+                        {(searchParams.toString().length > 0) && (
+                            <Button variant="link" size="sm" onClick={clearFilters} className="h-auto p-0 ml-2">
+                                Ver todas
+                            </Button>
+                        )}
+                    </div>
+                )}
+                <div className="ml-auto">
+                    <TransactionSort />
                 </div>
-            )}
+            </div>
 
             <div className="space-y-6">
                 <AnimatedTabs

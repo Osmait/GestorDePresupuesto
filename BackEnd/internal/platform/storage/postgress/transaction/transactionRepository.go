@@ -331,7 +331,12 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	// ORDER BY clause
 	if filter.SortBy != "" {
 		queryBuilder.WriteString(" ORDER BY ")
-		queryBuilder.WriteString(filter.SortBy)
+		if filter.SortBy == "amount" {
+			queryBuilder.WriteString("ABS(amount)")
+		} else {
+			queryBuilder.WriteString(filter.SortBy)
+		}
+
 		if filter.SortOrder == "asc" || filter.SortOrder == "desc" {
 			queryBuilder.WriteString(" ")
 			queryBuilder.WriteString(strings.ToUpper(filter.SortOrder))

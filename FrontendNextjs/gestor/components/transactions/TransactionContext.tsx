@@ -16,6 +16,8 @@ export interface TransactionFiltersState {
     minAmount: string
     maxAmount: string
     search: string
+    sortBy: string
+    sortOrder: 'asc' | 'desc'
 }
 
 interface TransactionContextType {
@@ -62,6 +64,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
             minAmount: searchParams.get('minAmount') || '',
             maxAmount: searchParams.get('maxAmount') || '',
             search: searchParams.get('search') || '',
+            sortBy: searchParams.get('sortBy') || 'created_at',
+            sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
         }
     }, [searchParams])
 
@@ -83,9 +87,11 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         if (newFilters.minAmount) params.set('minAmount', newFilters.minAmount)
         if (newFilters.maxAmount) params.set('maxAmount', newFilters.maxAmount)
         if (newFilters.search) params.set('search', newFilters.search)
+        if (newFilters.sortBy && newFilters.sortBy !== 'created_at') params.set('sortBy', newFilters.sortBy)
+        if (newFilters.sortOrder && newFilters.sortOrder !== 'desc') params.set('sortOrder', newFilters.sortOrder)
 
         const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname
-        router.replace(newURL)
+        router.replace(newURL, { scroll: false })
     }, [router])
 
     const applyFilters = useCallback(() => {
@@ -95,7 +101,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     // Map Context Filters -> API Filters
     useEffect(() => {
         const apiFilters: TransactionFilters = {
-            page: 1, limit: 50, sort_by: 'created_at', sort_order: 'desc'
+            page: 1, limit: 50, sort_by: (filters.sortBy as any) || 'created_at', sort_order: filters.sortOrder || 'desc'
         }
 
         if (filters.dateRange.from && filters.dateRange.to) {
@@ -164,6 +170,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
         const clearedFilters = {
             dateRange: { from: undefined, to: undefined },
             type: 'all', account: 'all', category: 'all', budget: 'all', minAmount: '', maxAmount: '', search: '',
+            sortBy: 'created_at', sortOrder: 'desc' as 'asc' | 'desc'
         }
         setFilters(clearedFilters)
         router.replace(window.location.pathname)
