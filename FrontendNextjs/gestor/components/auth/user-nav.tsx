@@ -11,11 +11,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
-import { LogOut, User, Settings } from "lucide-react"
+import { LogOut, User, Settings, Globe } from "lucide-react"
 import { ModeToggle } from "@/components/common/ToggleMode"
+import { useLocale } from "next-intl"
 
 export function UserNav() {
   const { data: session, status } = useSession()
+  const locale = useLocale()
 
   if (status === "loading") {
     return <div className="h-8 w-8 rounded-full bg-muted animate-pulse" />
@@ -32,6 +34,11 @@ export function UserNav() {
   const getInitials = (name: string, lastName?: string) => {
     const initials = `${name?.charAt(0) || ""}${lastName?.charAt(0) || ""}`
     return initials.toUpperCase() || "U"
+  }
+
+  const switchLocale = (newLocale: string) => {
+    document.cookie = `locale=${newLocale}; path=/; max-age=31536000`
+    window.location.reload()
   }
 
   return (
@@ -62,6 +69,32 @@ export function UserNav() {
           <div className="flex items-center justify-between">
             <span className="text-sm">Tema</span>
             <ModeToggle />
+          </div>
+        </div>
+        <div className="px-2 py-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-sm flex items-center gap-2">
+              <Globe className="h-4 w-4" />
+              Idioma
+            </span>
+            <div className="flex gap-1">
+              <Button
+                variant={locale === "es" ? "default" : "outline"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => switchLocale("es")}
+              >
+                ES
+              </Button>
+              <Button
+                variant={locale === "en" ? "default" : "outline"}
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => switchLocale("en")}
+              >
+                EN
+              </Button>
+            </div>
           </div>
         </div>
         <DropdownMenuSeparator />
