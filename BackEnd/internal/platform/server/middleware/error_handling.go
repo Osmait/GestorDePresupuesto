@@ -176,7 +176,7 @@ func logError(ctx context.Context, c *gin.Context, appErr *apperrors.AppError, c
 	}
 
 	// Add details if available
-	if appErr.Details != nil && len(appErr.Details) > 0 {
+	if len(appErr.Details) > 0 {
 		fields["details"] = appErr.Details
 	}
 
@@ -298,13 +298,13 @@ func containsSensitiveInfo(key string) bool {
 
 // AbortWithError aborts the request with an error
 func AbortWithError(c *gin.Context, err error) {
-	c.Error(err)
+	_ = c.Error(err)
 	c.Abort()
 }
 
 // AbortWithAppError aborts the request with an AppError
 func AbortWithAppError(c *gin.Context, appErr *apperrors.AppError) {
-	c.Error(appErr)
+	_ = c.Error(appErr)
 	c.Abort()
 }
 

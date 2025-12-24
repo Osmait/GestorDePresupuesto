@@ -33,11 +33,11 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 		var transactionRequest dto.TransactionRequest
 
 		if err := ctx.BindJSON(&transactionRequest); err != nil {
-			ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Error fields required"))
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Error fields required"))
 			return
 		}
 		if err := transactionRequest.Validate(); err != nil {
-			ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
+			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
 		err := transactionservice.CreateTransaction(
@@ -53,7 +53,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			transactionRequest.CreatedAt,
 		)
 		if err != nil {
-			ctx.Error(err)
+			_ = ctx.Error(err)
 			return
 		}
 
@@ -99,14 +99,14 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		filter := dto.NewTransactionFilter()
 		if err := filter.ParseFromQuery(ctx); err != nil {
 			log.Error().Err(err).Msg("failed to parse filter parameters")
-			ctx.Error(apperrors.NewValidationError("INVALID_QUERY_PARAMS", "Invalid filter parameters: "+err.Error()))
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_QUERY_PARAMS", "Invalid filter parameters: "+err.Error()))
 			return
 		}
 
 		// Validate filter parameters
 		if err := filter.Validate(); err != nil {
 			log.Error().Err(err).Msg("filter validation failed")
-			ctx.Error(apperrors.NewValidationError("INVALID_FILTER", "Invalid filter parameters: "+err.Error()))
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_FILTER", "Invalid filter parameters: "+err.Error()))
 			return
 		}
 
@@ -116,7 +116,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		// Get filtered and paginated transactions
 		result, err := transactionService.FindAllOfAllAccountsWithFilters(ctx, userID, filter, includeSummary)
 		if err != nil {
-			ctx.Error(err)
+			_ = ctx.Error(err)
 			return
 		}
 
@@ -186,7 +186,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		filter := dto.NewTransactionFilter()
 		if err := filter.ParseFromQuery(ctx); err != nil {
 			log.Error().Err(err).Msg("failed to parse filter parameters")
-			ctx.Error(apperrors.NewValidationError("INVALID_QUERY_PARAMS", "Invalid filter parameters: "+err.Error()))
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_QUERY_PARAMS", "Invalid filter parameters: "+err.Error()))
 			return
 		}
 
@@ -196,7 +196,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		// Validate filter parameters
 		if err := filter.Validate(); err != nil {
 			log.Error().Err(err).Msg("filter validation failed")
-			ctx.Error(apperrors.NewValidationError("INVALID_FILTER", "Invalid filter parameters: "+err.Error()))
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_FILTER", "Invalid filter parameters: "+err.Error()))
 			return
 		}
 
@@ -206,7 +206,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		// Get filtered and paginated transactions
 		result, err := transactionService.FindAllWithFilters(ctx, filter, includeSummary)
 		if err != nil {
-			ctx.Error(err)
+			_ = ctx.Error(err)
 			return
 		}
 

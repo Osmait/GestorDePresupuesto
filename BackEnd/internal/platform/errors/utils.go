@@ -402,7 +402,7 @@ func (eg *ErrorGroup) ToAppError(ctx context.Context, operation string) error {
 		return WrapError(ctx, eg.errors[0], operation, "Single error in group")
 	}
 
-	return NewInternalError("Multiple errors occurred", fmt.Errorf(eg.Error())).
+	return NewInternalError("Multiple errors occurred", fmt.Errorf("%s", eg.Error())).
 		WithContext(ctx).
 		WithOperation(operation).
 		WithDetails(map[string]interface{}{

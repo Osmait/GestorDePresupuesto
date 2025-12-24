@@ -178,7 +178,7 @@ func initializeDatabase(ctx context.Context, cfg *config.Config, logger *observa
 	defer cancel()
 
 	if err := db.PingContext(ctx); err != nil {
-		db.Close()
+		_ = db.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 

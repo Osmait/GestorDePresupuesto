@@ -12,6 +12,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace"
 )
 
+type contextKey string
+
 func TestNewAppError(t *testing.T) {
 	t.Run("creates app error with basic fields", func(t *testing.T) {
 		appErr := NewAppError(ErrorTypeValidation, "TEST_CODE", "test message")
@@ -104,8 +106,8 @@ func TestAppError_WithContext(t *testing.T) {
 
 	t.Run("adds user and request context", func(t *testing.T) {
 		ctx := context.Background()
-		ctx = context.WithValue(ctx, "user_id", "user123")
-		ctx = context.WithValue(ctx, "request_id", "req456")
+		ctx = context.WithValue(ctx, ContextKeyUserID, "user123")
+		ctx = context.WithValue(ctx, ContextKeyRequestID, "req456")
 
 		appErr := NewAppError(ErrorTypeValidation, "CODE", "message")
 		result := appErr.WithContext(ctx)

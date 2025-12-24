@@ -31,3 +31,12 @@ help:
 test-e2e:
 	@echo "Running E2E Tests..."
 	cd e2e-test && npx playwright test
+
+# Linting
+lint-backend:
+	@echo "Linting Backend..."
+	cd BackEnd && make lint
+
+lint-frontend:
+	@echo "Linting Frontend..."
+	cd FrontendNextjs/gestor && npm run lint

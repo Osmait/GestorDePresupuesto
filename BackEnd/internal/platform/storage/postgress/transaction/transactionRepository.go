@@ -356,7 +356,6 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 		if filter.Offset > 0 {
 			queryBuilder.WriteString(fmt.Sprintf(" OFFSET $%d", argIndex))
 			args = append(args, filter.Offset)
-			argIndex++
 		}
 	}
 

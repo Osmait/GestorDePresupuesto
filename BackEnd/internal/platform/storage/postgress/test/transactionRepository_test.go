@@ -33,6 +33,7 @@ func TestTransactionRepository(t *testing.T) {
 	transaction.UserId = user.Id
 	transaction.CategoryId = category.Id
 	account.UserId = user.Id
+	transaction.CreatedAt = time.Now() // Ensure transaction is within query range
 	err := categoryRepo.Save(ctx, category)
 	assert.NoError(t, err)
 	err = userRepo.Save(ctx, user)

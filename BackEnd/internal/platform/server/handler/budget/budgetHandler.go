@@ -30,13 +30,13 @@ func CreateBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		err := c.Bind(&req)
 		if err != nil {
-			c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
+			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
 		err = budgetServices.CreateBudget(c, &req, userId)
 
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 		c.JSON(http.StatusCreated, "created")
@@ -60,7 +60,7 @@ func FindAllBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		budgets, err := budgetServices.FindAll(c, userId)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, budgets)
@@ -87,7 +87,7 @@ func DeleteBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		err := budgetServices.Delete(c, id, userId)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, "Deleted")
@@ -115,13 +115,13 @@ func UpdateBudget(budgetServices *budget.BudgetServices) gin.HandlerFunc {
 		userId := c.GetString("X-User-Id")
 		var req dto.BudgetRequest
 		if err := c.Bind(&req); err != nil {
-			c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
+			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
 
 		err := budgetServices.UpdateBudget(c, &req, id, userId)
 		if err != nil {
-			c.Error(err)
+			_ = c.Error(err)
 			return
 		}
 		c.JSON(http.StatusOK, "Updated")

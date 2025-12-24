@@ -78,7 +78,7 @@ func (s *QuoteService) fetchNasdaq(symbol, assetClass string) (float64, string, 
 	if err != nil {
 		return 0, "", "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return 0, "", "", fmt.Errorf("bad status")
@@ -125,7 +125,7 @@ func (s *QuoteService) fetchBinance(symbol string) (float64, string, string, err
 	if err != nil {
 		return 0, "", "", err
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
 		return 0, "", "", fmt.Errorf("bad status")

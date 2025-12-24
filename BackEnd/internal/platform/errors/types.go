@@ -11,6 +11,13 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
+type ContextKey string
+
+const (
+	ContextKeyUserID    ContextKey = "user_id"
+	ContextKeyRequestID ContextKey = "request_id"
+)
+
 // ErrorType represents the category of error
 type ErrorType string
 
@@ -100,12 +107,12 @@ func (e *AppError) WithContext(ctx context.Context) *AppError {
 	}
 
 	// Extract user ID from context if available
-	if userID, ok := ctx.Value("user_id").(string); ok {
+	if userID, ok := ctx.Value(ContextKeyUserID).(string); ok {
 		e.UserID = userID
 	}
 
 	// Extract request ID from context if available
-	if requestID, ok := ctx.Value("request_id").(string); ok {
+	if requestID, ok := ctx.Value(ContextKeyRequestID).(string); ok {
 		e.RequestID = requestID
 	}
 

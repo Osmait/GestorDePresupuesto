@@ -25,7 +25,7 @@ func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID st
 		return nil, fmt.Errorf("error getting category expenses: %w", err)
 	}
 
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var categoryExpenses []*analytics.CategoryExpenseRepository
 
@@ -53,7 +53,7 @@ func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID stri
 		return nil, fmt.Errorf("error getting monthly summary: %w", err)
 	}
 
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var monthlySummaries []*analytics.MonthlySummaryRepository
 

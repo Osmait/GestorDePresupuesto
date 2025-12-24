@@ -141,11 +141,14 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockCache.On("DeleteByPrefix", mock.Anything).Return()
 
 	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
+	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything).Return(1000.0, nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
 	transaction := utils.GetNewRandomTransaction()
+	transaction.TypeTransation = "bill" // Force bill to trigger budget check
 	err := s.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId, transaction.CreatedAt)
+	time.Sleep(100 * time.Millisecond) // Allow goroutine to start
 	assert.NoError(t, err, "CreateAccount should not return an error")
 	mockRepo.AssertExpectations(t)
 }

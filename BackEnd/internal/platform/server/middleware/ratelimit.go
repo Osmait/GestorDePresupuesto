@@ -237,11 +237,8 @@ func UserRateLimitMiddleware(config *config.Config) gin.HandlerFunc {
 func (rls *RateLimitService) CleanupMiddleware() {
 	ticker := time.NewTicker(rls.config.RateLimit.Window)
 	go func() {
-		for {
-			select {
-			case <-ticker.C:
-				rls.cleanup()
-			}
+		for range ticker.C {
+			rls.cleanup()
 		}
 	}()
 }
@@ -268,50 +265,4 @@ func (rls *RateLimitService) cleanup() {
 			rls.store.requests[key] = validRequests
 		}
 	}
-}
-
-// getClientIP extracts the real client IP address from various headers
-func getClientIP(c *gin.Context) string {
-	// Check X-Forwarded-For header (most common with proxies)
-	xForwardedFor := c.GetHeader("X-Forwarded-For")
-	if xForwardedFor != "" {
-		// X-Forwarded-For can contain multiple IPs, take the first one
-		ips := strings.Split(xForwardedFor, ",")
-		if len(ips) > 0 {
-			return strings.TrimSpace(ips[0])
-		}
-	}
-
-	// Check X-Real-IP header (common with nginx)
-	xRealIP := c.GetHeader("X-Real-IP")
-	if xRealIP != "" {
-		return strings.TrimSpace(xRealIP)
-	}
-
-	// Check CF-Connecting-IP (Cloudflare)
-	cfConnectingIP := c.GetHeader("CF-Connecting-IP")
-	if cfConnectingIP != "" {
-		return strings.TrimSpace(cfConnectingIP)
-	}
-
-	// Fallback to remote address
-	return c.ClientIP()
-}
-
-// shouldSkipRateLimit determines if rate limiting should be skipped for certain endpoints
-func shouldSkipRateLimit(path string) bool {
-	skipPaths := []string{
-		"/health",
-		"/ping",
-		"/metrics",
-		"/favicon.ico",
-	}
-
-	for _, skipPath := range skipPaths {
-		if strings.Contains(path, skipPath) {
-			return true
-		}
-	}
-
-	return false
 }

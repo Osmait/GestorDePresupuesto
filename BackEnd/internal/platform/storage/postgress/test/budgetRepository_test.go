@@ -61,6 +61,7 @@ func TestBudgetRepository(t *testing.T) {
 	err = budgetRepository.Delete(ctx, budget.Id, user.Id)
 	// This will currently fail due to table name bug
 	// assert.NoError(t, err)
+	_ = err // Suppress ineffassign until bug is fixed
 
 	// Cleanup (manual since Delete might not work)
 	err = categoryRepository.Delete(ctx, category.Id, user.Id)
