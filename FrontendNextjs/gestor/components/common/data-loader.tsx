@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect, ReactNode } from 'react'
-import { 
-	getAuthRepository, 
-	getAccountRepository, 
-	getTransactionRepository, 
-	getCategoryRepository, 
-	getBudgetRepository 
+import {
+	getAuthRepository,
+	getAccountRepository,
+	getTransactionRepository,
+	getCategoryRepository,
+	getBudgetRepository
 } from '@/lib/repositoryConfig'
 import { User } from '@/types/user'
 import { Account } from '@/types/account'
@@ -39,13 +39,13 @@ export function DataLoader({ children }: DataLoaderProps) {
 		const loadAllData = async () => {
 			try {
 				console.log('🔄 DataLoader: Cargando todos los datos...')
-				
+
 				const authRepository = await getAuthRepository()
 				const accountRepository = await getAccountRepository()
 				const transactionRepository = await getTransactionRepository()
 				const categoryRepository = await getCategoryRepository()
 				const budgetRepository = await getBudgetRepository()
-				
+
 				const [userData, accountsData, transactionsData, categoriesData, budgetsData] = await Promise.all([
 					authRepository.login('juan.perez@example.com', 'password123'),
 					accountRepository.findAll(),
@@ -53,13 +53,13 @@ export function DataLoader({ children }: DataLoaderProps) {
 					categoryRepository.findAll(),
 					budgetRepository.findAll()
 				])
-				
+
 				setUser(userData)
 				setAccounts(accountsData)
-				setTransactions(transactionsData)
+				setTransactions(transactionsData.data)
 				setCategories(categoriesData)
 				setBudgets(budgetsData)
-				
+
 				console.log('✅ DataLoader: Todos los datos cargados exitosamente')
 			} catch (err) {
 				console.error('❌ DataLoader: Error cargando datos:', err)

@@ -1,7 +1,7 @@
 'use client'
 
 import { ReactNode } from 'react'
-import { AnimatedTabs } from '@/components/common/client/animated-tabs'
+import { AnimatedTabs } from '@/components/common/animated-tabs'
 
 interface Tab {
 	value: string

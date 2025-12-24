@@ -9,7 +9,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useBudgets } from "@/hooks/useRepositories";
+import { useGetBudgets } from "@/hooks/queries/useBudgetsQuery";
 import { useGetCategories } from "@/hooks/queries/useCategoriesQuery";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle } from "lucide-react";
@@ -26,7 +26,7 @@ function getProgressColor(percentage: number): string {
 }
 
 export function BudgetSesion() {
-  const { budgets, isLoading: budgetsLoading, error: budgetsError } = useBudgets();
+  const { data: budgets = [], isLoading: budgetsLoading, error: budgetsError } = useGetBudgets();
   const { data: categories = [], isLoading: categoriesLoading, error: categoriesError } = useGetCategories();
 
   const isLoading = budgetsLoading || categoriesLoading;
@@ -52,7 +52,7 @@ export function BudgetSesion() {
       <Alert variant="destructive">
         <AlertCircle className="h-4 w-4" />
         <AlertDescription>
-          Error loading budgets: {budgetsError || categoriesError}
+          Error loading budgets: {(budgetsError as Error)?.message || (categoriesError as Error)?.message}
         </AlertDescription>
       </Alert>
     );

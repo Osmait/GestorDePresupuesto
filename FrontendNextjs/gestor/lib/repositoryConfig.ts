@@ -3,14 +3,7 @@
 
 const USE_MOCKS = false // Cambiado a false para usar el backend real
 
-// Importar solo los mocks
-import { AccountRepositoryMock } from '@/mocks/accountRepositoryMock'
-import { AuthRepositoryMock } from '@/mocks/authRepositoryMock'
-import { BudgetRepositoryMock } from '@/mocks/budgetRepositoryMock'
 import { BudgetRepository } from '@/app/repository/budgetRepository'
-import { CategoryRepositoryMock } from '@/mocks/categoryRepositoryMock'
-import { TransactionRepositoryMock } from '@/mocks/transactionRepositoryMock'
-import { AnalyticsRepositoryMock } from '@/mocks/analyticsRepositoryMock'
 // Importar el repositorio real
 import { AuthRepository } from '@/app/repository/authRepository'
 import { AccountRepository } from '@/app/repository/accountRepository'
@@ -107,11 +100,11 @@ export const getRepositoryConfig = () => ({
 });
 
 // Tipos
-export type IAccountRepository = AccountRepositoryMock;
-export type IAuthRepository = AuthRepositoryMock;
+export type IAccountRepository = AccountRepository;
+export type IAuthRepository = AuthRepository;
 export type IBudgetRepository = BudgetRepository;
-export type ICategoryRepository = CategoryRepositoryMock;
-export type ITransactionRepository = TransactionRepositoryMock;
+export type ICategoryRepository = CategoryRepository;
+export type ITransactionRepository = TransactionRepository;
 export type IAnalyticsRepository = AnalyticsRepository;
 export type ISearchRepository = SearchRepository;
 export type IInvestmentRepository = InvestmentRepository; 

@@ -136,8 +136,8 @@ export default function TransactionItem({ transaction, category, onTransactionDe
           <DialogHeader>
             <DialogTitle>Eliminar Transacción</DialogTitle>
             <DialogDescription>
-              ¿Estás seguro de que quieres eliminar la transacción "{transaction.name}"?
-              Esta acción no se puede deshacer y eliminará todos los datos asociados.
+              This action cannot be undone. This will permanently delete the transaction
+              &quot;{transaction.description || transaction.name}&quot; and remove your data from our servers.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

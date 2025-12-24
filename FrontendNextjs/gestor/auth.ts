@@ -20,8 +20,9 @@ export const authOptions: NextAuthOptions = {
           let token = "";
 
           // 1. Check for Demo Token
-          if (credentials?.demoToken) {
-            token = credentials.demoToken;
+          const creds = credentials as any;
+          if (creds?.demoToken) {
+            token = creds.demoToken;
           } else {
             // 2. Normal Login Flow
             if (!credentials?.email || !credentials?.password) {
