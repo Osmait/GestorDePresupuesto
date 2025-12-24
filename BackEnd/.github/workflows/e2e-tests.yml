@@ -1,0 +1,419 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    # Run E2E tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_type:
+        description: 'Type of E2E test to run'
+        required: true
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - flows
+          - scenarios
+          - smoke
+          - performance
+          - stress
+      verbose:
+        description: 'Enable verbose output'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  GO_VERSION: '1.21'
+  DOCKER_BUILDKIT: 1
+  E2E_TIMEOUT: 15m
+  E2E_PARALLEL: 4
+
+jobs:
+  pre-checks:
+    name: Pre-checks
+    runs-on: ubuntu-latest
+    outputs:
+      should_run_e2e: ${{ steps.changes.outputs.should_run }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check for relevant changes
+        id: changes
+        run: |
+          # Check if E2E tests should run based on file changes
+          if [[ "${{ github.event_name }}" == "schedule" ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          elif git diff --name-only ${{ github.event.before }} ${{ github.sha }} | grep -E '\.(go|sql|yml|yaml|md)$' > /dev/null; then
+            echo "should_run=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run=false" >> $GITHUB_OUTPUT
+          fi
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    needs: pre-checks
+    if: needs.pre-checks.outputs.should_run_e2e == 'true'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Run unit tests
+        run: |
+          go test -short -race -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | grep total | awk '{print $3}'
+
+      - name: Upload unit test coverage
+        uses: actions/upload-artifact@v3
+        with:
+          name: unit-coverage
+          path: coverage.out
+
+  e2e-tests:
+    name: E2E Tests
+    runs-on: ubuntu-latest
+    needs: [pre-checks, unit-tests]
+    if: needs.pre-checks.outputs.should_run_e2e == 'true'
+    strategy:
+      matrix:
+        test_suite: [flows, scenarios]
+      fail-fast: false
+    
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Create coverage directory
+        run: mkdir -p coverage
+
+      - name: Run E2E tests - ${{ matrix.test_suite }}
+        env:
+          E2E_VERBOSE: ${{ github.event.inputs.verbose || 'false' }}
+        run: |
+          # Set verbose flag based on input
+          if [ "$E2E_VERBOSE" = "true" ]; then
+            VERBOSE_FLAG="-v"
+          else
+            VERBOSE_FLAG=""
+          fi
+          
+          # Run specific test suite
+          ./scripts/e2e-test.sh ${{ matrix.test_suite }} $VERBOSE_FLAG
+
+      - name: Upload E2E test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: e2e-results-${{ matrix.test_suite }}
+          path: |
+            coverage/
+            test-results.xml
+
+  smoke-tests:
+    name: Smoke Tests
+    runs-on: ubuntu-latest
+    needs: [pre-checks, unit-tests]
+    if: needs.pre-checks.outputs.should_run_e2e == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run smoke tests
+        run: ./scripts/e2e-test.sh smoke -v
+
+  performance-tests:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [pre-checks, unit-tests]
+    if: needs.pre-checks.outputs.should_run_e2e == 'true' && github.event_name == 'schedule'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run performance tests
+        env:
+          E2E_PARALLEL: 8
+        run: ./scripts/e2e-test.sh performance -v
+
+      - name: Upload performance test results
+        uses: actions/upload-artifact@v3
+        if: always()
+        with:
+          name: performance-results
+          path: |
+            coverage/
+            performance-*.json
+
+  stress-tests:
+    name: Stress Tests
+    runs-on: ubuntu-latest
+    needs: [pre-checks, unit-tests]
+    if: needs.pre-checks.outputs.should_run_e2e == 'true' && github.event_name == 'workflow_dispatch' && github.event.inputs.test_type == 'stress'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Cache Go modules
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: ${{ runner.os }}-go-${{ hashFiles('**/go.sum') }}
+          restore-keys: |
+            ${{ runner.os }}-go-
+
+      - name: Download dependencies
+        run: go mod download
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Run stress tests
+        run: ./scripts/e2e-test.sh stress -v
+
+  coverage-report:
+    name: Coverage Report
+    runs-on: ubuntu-latest
+    needs: [unit-tests, e2e-tests]
+    if: always() && needs.pre-checks.outputs.should_run_e2e == 'true'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Download unit test coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: unit-coverage
+          path: coverage/
+
+      - name: Download E2E test coverage
+        uses: actions/download-artifact@v3
+        with:
+          name: e2e-results-flows
+          path: coverage/
+
+      - name: Generate combined coverage report
+        run: |
+          ./scripts/e2e-test.sh coverage
+          
+          # Get total coverage percentage
+          COVERAGE=$(go tool cover -func=coverage/combined.out | grep total | awk '{print $3}')
+          echo "Total coverage: $COVERAGE"
+          
+          # Create coverage badge
+          echo "COVERAGE=$COVERAGE" >> $GITHUB_ENV
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: |
+            coverage/coverage.html
+            coverage/combined.out
+
+      - name: Comment coverage on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const coverage = process.env.COVERAGE;
+            const comment = `## 📊 Coverage Report
+            
+            Total coverage: **${coverage}**
+            
+            📋 [View detailed coverage report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+  notify-results:
+    name: Notify Results
+    runs-on: ubuntu-latest
+    needs: [e2e-tests, smoke-tests]
+    if: always() && needs.pre-checks.outputs.should_run_e2e == 'true'
+    
+    steps:
+      - name: Determine overall result
+        id: result
+        run: |
+          if [[ "${{ needs.e2e-tests.result }}" == "success" && "${{ needs.smoke-tests.result }}" == "success" ]]; then
+            echo "status=success" >> $GITHUB_OUTPUT
+            echo "message=All E2E tests passed! 🎉" >> $GITHUB_OUTPUT
+          else
+            echo "status=failure" >> $GITHUB_OUTPUT
+            echo "message=Some E2E tests failed. Please check the logs." >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create summary
+        run: |
+          echo "## 🧪 E2E Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Status**: ${{ steps.result.outputs.status }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Message**: ${{ steps.result.outputs.message }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Results:" >> $GITHUB_STEP_SUMMARY
+          echo "- **E2E Tests**: ${{ needs.e2e-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Smoke Tests**: ${{ needs.smoke-tests.result }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 Coverage report and detailed results are available in the artifacts." >> $GITHUB_STEP_SUMMARY
+
+      - name: Notify on failure
+        if: steps.result.outputs.status == 'failure' && github.event_name == 'schedule'
+        uses: actions/github-script@v6
+        with:
+          script: |
+            const title = "🚨 Scheduled E2E Tests Failed";
+            const body = `The scheduled E2E tests have failed.
+            
+            **Run**: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+            **Branch**: ${{ github.ref_name }}
+            **Commit**: ${{ github.sha }}
+            
+            Please investigate and fix the issues.`;
+            
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: title,
+              body: body,
+              labels: ['bug', 'e2e-failure', 'ci']
+            });
+
+  cleanup:
+    name: Cleanup
+    runs-on: ubuntu-latest
+    needs: [e2e-tests, smoke-tests, performance-tests, stress-tests]
+    if: always()
+    
+    steps:
+      - name: Cleanup Docker resources
+        run: |
+          # Clean up any remaining containers
+          docker ps -aq | xargs -r docker rm -f
+          docker system prune -f
+          
+          # Clean up Docker volumes
+          docker volume prune -f 

@@ -1,9 +1,5 @@
-import { RegisterForm } from "@/components/registerFrom";
+import { AuthContainer } from '@/components/accounts/auth-container'
 
-export default function Register() {
-  return (
-    <div className="min-h-screen flex justify-center items-center ">
-      <RegisterForm />
-    </div>
-  );
+export default function RegisterPage() {
+	return <AuthContainer initialMode="register" />
 }

@@ -1,0 +1,43 @@
+name: Backend Quality
+
+on:
+  push:
+    branches: ['**']
+    paths:
+      - 'BackEnd/**'
+  pull_request:
+    branches: [main, development]
+    paths:
+      - 'BackEnd/**'
+  workflow_dispatch:
+
+jobs:
+  backend-quality:
+    runs-on: ubuntu-latest
+    
+    defaults:
+      run:
+        working-directory: ./BackEnd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.22'
+          cache-dependency-path: BackEnd/go.sum
+
+      - name: Verify Dependencies
+        run: go mod verify
+
+      # Using dedicated action for better caching and performance
+      - name: Lint
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+          working-directory: BackEnd
+          args: --timeout=5m
+
+      - name: Build
+        run: make build

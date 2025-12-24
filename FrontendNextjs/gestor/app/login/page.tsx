@@ -1,9 +1,5 @@
-import { LoginForm } from "@/components/loginForm";
+import { AuthContainer } from '@/components/accounts/auth-container'
 
-export default function Login() {
-  return (
-    <div className="min-h-screen flex justify-center items-center ">
-      <LoginForm />
-    </div>
-  );
+export default function LoginPage() {
+	return <AuthContainer initialMode="login" />
 }

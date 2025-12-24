@@ -1,0 +1,1068 @@
+basePath: /
+definitions:
+  account.Account:
+    properties:
+      bank:
+        example: Bank of America
+        type: string
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      id:
+        example: acc_123456789
+        type: string
+      initial_balance:
+        example: 1000.5
+        type: number
+      name:
+        example: My Savings Account
+        type: string
+      user_id:
+        example: user_987654321
+        type: string
+    type: object
+  authRequest.AuthRequest:
+    properties:
+      email:
+        example: user@example.com
+        type: string
+      password:
+        example: mySecurePassword123
+        type: string
+    type: object
+  dto.AccountRequest:
+    properties:
+      bank:
+        example: Bank of America
+        maxLength: 100
+        minLength: 2
+        type: string
+      initial_balance:
+        example: 1000.5
+        maximum: 9.9999999999e+08
+        minimum: 0
+        type: number
+      name:
+        example: My Savings Account
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - bank
+    - initial_balance
+    - name
+    type: object
+  dto.AccountResponse:
+    properties:
+      account_info:
+        $ref: '#/definitions/account.Account'
+      current_balance:
+        example: 1250.75
+        type: number
+    type: object
+  dto.AccountUpdateRequest:
+    properties:
+      bank:
+        example: Updated Bank Name
+        maxLength: 100
+        minLength: 2
+        type: string
+      name:
+        example: Updated Savings Account
+        maxLength: 100
+        minLength: 2
+        type: string
+    required:
+    - bank
+    - name
+    type: object
+  dto.BudgetRequest:
+    properties:
+      amount:
+        type: number
+      category_id:
+        type: string
+    type: object
+  dto.BudgetResponse:
+    properties:
+      amount:
+        type: number
+      category_id:
+        type: string
+      created_at:
+        type: string
+      current_amount:
+        type: number
+      id:
+        type: string
+      user_id:
+        type: string
+    type: object
+  dto.CategoryRequest:
+    properties:
+      color:
+        example: '#FF6B6B'
+        maxLength: 7
+        minLength: 4
+        type: string
+      icon:
+        example: "\U0001F354"
+        maxLength: 50
+        minLength: 1
+        type: string
+      name:
+        example: Food & Dining
+        maxLength: 50
+        minLength: 2
+        type: string
+    required:
+    - color
+    - icon
+    - name
+    type: object
+  dto.CategoryResponse:
+    properties:
+      color:
+        example: '#FF6B6B'
+        type: string
+      created_at:
+        example: "2024-01-15T10:30:00Z"
+        type: string
+      icon:
+        example: "\U0001F354"
+        type: string
+      id:
+        example: cat_123456789
+        type: string
+      name:
+        example: Food & Dining
+        type: string
+    type: object
+  dto.PaginatedTransactionResponse:
+    properties:
+      data:
+        items:
+          $ref: '#/definitions/dto.TransactionResponse'
+        type: array
+      pagination:
+        $ref: '#/definitions/dto.PaginationMeta'
+    type: object
+  dto.PaginationMeta:
+    properties:
+      current_page:
+        example: 1
+        type: integer
+      has_next_page:
+        example: true
+        type: boolean
+      has_prev_page:
+        example: false
+        type: boolean
+      next_page:
+        example: 2
+        type: integer
+      per_page:
+        example: 20
+        type: integer
+      prev_page:
+        example: 1
+        type: integer
+      total_pages:
+        example: 5
+        type: integer
+      total_records:
+        example: 100
+        type: integer
+    type: object
+  dto.TransactionRequest:
+    properties:
+      account_id:
+        example: acc_123456789
+        type: string
+      amount:
+        example: 125.5
+        type: number
+      budget_id:
+        example: budget_555666777
+        type: string
+      category_id:
+        example: cat_987654321
+        type: string
+      description:
+        example: Weekly grocery shopping at Walmart
+        type: string
+      name:
+        example: Grocery Shopping
+        type: string
+      type_transation:
+        enum:
+        - income
+        - expense
+        example: expense
+        type: string
+    required:
+    - account_id
+    - amount
+    - category_id
+    - name
+    - type_transation
+    type: object
+  dto.TransactionResponse:
+    properties:
+      account_id:
+        type: string
+      amount:
+        type: number
+      budget_id:
+        type: string
+      category_id:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      id:
+        type: string
+      name:
+        type: string
+      type_transation:
+        type: string
+    required:
+    - amount
+    - name
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@gestordePresupuesto.com
+    name: API Support
+    url: http://github.com/osmait/gestorDePresupuesto
+  description: API for managing personal budget, transactions, accounts, and investments
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: Budget Management System API
+  version: "1.0"
+paths:
+  /account:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all bank accounts for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of user accounts
+          schema:
+            items:
+              $ref: '#/definitions/dto.AccountResponse'
+            type: array
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Get all user accounts
+      tags:
+      - Accounts
+    post:
+      consumes:
+      - application/json
+      description: Create a new bank account for the authenticated user
+      parameters:
+      - description: Account creation data
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AccountRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Account created successfully
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Create a new account
+      tags:
+      - Accounts
+  /account/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific bank account by ID
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Account deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Account not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Delete an account
+      tags:
+      - Accounts
+    put:
+      consumes:
+      - application/json
+      description: Update name and bank information for a specific account owned by
+        the authenticated user
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Account update data
+        in: body
+        name: account
+        required: true
+        schema:
+          $ref: '#/definitions/dto.AccountUpdateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Account updated successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Account not found or not owned by user
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Update an existing account
+      tags:
+      - Accounts
+  /budget:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all budget limits for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of user budgets
+          schema:
+            items:
+              $ref: '#/definitions/dto.BudgetResponse'
+            type: array
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Get all user budgets
+      tags:
+      - Budgets
+    post:
+      consumes:
+      - application/json
+      description: Create a new budget limit for a specific category for the authenticated
+        user
+      parameters:
+      - description: Budget creation data
+        in: body
+        name: budget
+        required: true
+        schema:
+          $ref: '#/definitions/dto.BudgetRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Budget created successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Create a new budget
+      tags:
+      - Budgets
+  /budget/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific budget by ID
+      parameters:
+      - description: Budget ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Budget deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Budget not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Delete a budget
+      tags:
+      - Budgets
+  /category:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all categories for the authenticated user
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: List of user categories
+          schema:
+            items:
+              $ref: '#/definitions/dto.CategoryResponse'
+            type: array
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Get all user categories
+      tags:
+      - Categories
+    post:
+      consumes:
+      - application/json
+      description: Create a new expense/income category for the authenticated user
+      parameters:
+      - description: Category creation data
+        in: body
+        name: category
+        required: true
+        schema:
+          $ref: '#/definitions/dto.CategoryRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Category created successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Create a new category
+      tags:
+      - Categories
+  /category/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific category by ID
+      parameters:
+      - description: Category ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Category deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Category not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Delete a category
+      tags:
+      - Categories
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticate user with email and password to get JWT token
+      parameters:
+      - description: Login credentials
+        in: body
+        name: credentials
+        required: true
+        schema:
+          $ref: '#/definitions/authRequest.AuthRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: JWT token response
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error - Problem with credentials
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: User login
+      tags:
+      - Authentication
+  /transaction:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve all transactions for the authenticated user across all
+        their accounts with comprehensive filtering, sorting, and pagination options
+      parameters:
+      - description: Page number for pagination
+        example: 1
+        in: query
+        name: page
+        type: integer
+      - description: Number of records per page (max 100)
+        example: 20
+        in: query
+        name: limit
+        type: integer
+      - description: Number of records to skip
+        example: 0
+        in: query
+        name: offset
+        type: integer
+      - description: Field to sort by
+        enum:
+        - created_at
+        - amount
+        - name
+        - type_transation
+        example: '"created_at"'
+        in: query
+        name: sort_by
+        type: string
+      - description: Sort order
+        enum:
+        - asc
+        - desc
+        example: '"desc"'
+        in: query
+        name: sort_order
+        type: string
+      - description: Transaction type filter
+        enum:
+        - income
+        - expense
+        - all
+        example: '"all"'
+        in: query
+        name: type
+        type: string
+      - description: Filter by category ID
+        example: '"cat_123456789"'
+        in: query
+        name: category_id
+        type: string
+      - description: Filter by multiple categories (comma-separated)
+        example: '"cat_1,cat_2,cat_3"'
+        in: query
+        name: categories
+        type: string
+      - description: Filter by account ID
+        example: '"acc_123456789"'
+        in: query
+        name: account_id
+        type: string
+      - description: Filter by budget ID
+        example: '"budget_555666777"'
+        in: query
+        name: budget_id
+        type: string
+      - description: Start date (YYYY/MM/DD or YYYY-MM-DD)
+        example: '"2024/01/01"'
+        in: query
+        name: date_from
+        type: string
+      - description: End date (YYYY/MM/DD or YYYY-MM-DD)
+        example: '"2024/12/31"'
+        in: query
+        name: date_to
+        type: string
+      - description: Predefined period filter
+        enum:
+        - today
+        - this_week
+        - this_month
+        - this_year
+        - last_week
+        - last_month
+        - last_year
+        example: '"this_month"'
+        in: query
+        name: period
+        type: string
+      - description: Minimum amount filter
+        example: 0
+        in: query
+        name: amount_min
+        type: number
+      - description: Maximum amount filter
+        example: 1000
+        in: query
+        name: amount_max
+        type: number
+      - description: Search in name and description
+        example: '"grocery"'
+        in: query
+        name: search
+        type: string
+      - description: Include summary statistics
+        example: true
+        in: query
+        name: include_summary
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Paginated list of transactions
+          schema:
+            $ref: '#/definitions/dto.PaginatedTransactionResponse'
+        "400":
+          description: Bad request - Invalid parameters
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Get all transactions across all accounts with filtering and pagination
+      tags:
+      - Transactions
+    post:
+      consumes:
+      - application/json
+      description: Create a new financial transaction (income or expense)
+      parameters:
+      - description: Transaction creation data
+        in: body
+        name: transaction
+        required: true
+        schema:
+          $ref: '#/definitions/dto.TransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Transaction created successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request - Invalid input
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Create a new transaction
+      tags:
+      - Transactions
+  /transaction/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific transaction by ID
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Transaction deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Transaction not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Delete a transaction
+      tags:
+      - Transactions
+    get:
+      consumes:
+      - application/json
+      description: Retrieve transactions for a specific account with comprehensive
+        filtering, sorting, and pagination options
+      parameters:
+      - description: Account ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Page number for pagination
+        example: 1
+        in: query
+        name: page
+        type: integer
+      - description: Number of records per page (max 100)
+        example: 20
+        in: query
+        name: limit
+        type: integer
+      - description: Number of records to skip
+        example: 0
+        in: query
+        name: offset
+        type: integer
+      - description: Field to sort by
+        enum:
+        - created_at
+        - amount
+        - name
+        - type_transation
+        example: '"created_at"'
+        in: query
+        name: sort_by
+        type: string
+      - description: Sort order
+        enum:
+        - asc
+        - desc
+        example: '"desc"'
+        in: query
+        name: sort_order
+        type: string
+      - description: Transaction type filter
+        enum:
+        - income
+        - expense
+        - all
+        example: '"all"'
+        in: query
+        name: type
+        type: string
+      - description: Filter by category ID
+        example: '"cat_123456789"'
+        in: query
+        name: category_id
+        type: string
+      - description: Filter by multiple categories (comma-separated)
+        example: '"cat_1,cat_2,cat_3"'
+        in: query
+        name: categories
+        type: string
+      - description: Filter by budget ID
+        example: '"budget_555666777"'
+        in: query
+        name: budget_id
+        type: string
+      - description: Start date (YYYY/MM/DD or YYYY-MM-DD)
+        example: '"2024/01/01"'
+        in: query
+        name: date_from
+        type: string
+      - description: End date (YYYY/MM/DD or YYYY-MM-DD)
+        example: '"2024/12/31"'
+        in: query
+        name: date_to
+        type: string
+      - description: Predefined period filter
+        enum:
+        - today
+        - this_week
+        - this_month
+        - this_year
+        - last_week
+        - last_month
+        - last_year
+        example: '"this_month"'
+        in: query
+        name: period
+        type: string
+      - description: Minimum amount filter
+        example: 0
+        in: query
+        name: amount_min
+        type: number
+      - description: Maximum amount filter
+        example: 1000
+        in: query
+        name: amount_max
+        type: number
+      - description: Search in name and description
+        example: '"grocery"'
+        in: query
+        name: search
+        type: string
+      - description: Include summary statistics
+        example: true
+        in: query
+        name: include_summary
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Paginated list of transactions for the account
+          schema:
+            $ref: '#/definitions/dto.PaginatedTransactionResponse'
+        "400":
+          description: Bad request - Invalid parameters
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized - Invalid JWT token
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Account not found
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: Internal server error
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      security:
+      - JWT: []
+      summary: Get transactions for a specific account with filtering and pagination
+      tags:
+      - Transactions
+securityDefinitions:
+  JWT:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

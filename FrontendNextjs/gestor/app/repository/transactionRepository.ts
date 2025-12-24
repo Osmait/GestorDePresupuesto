@@ -1,21 +1,72 @@
-import { Transaction, TypeTransaction } from "@/types/transaction";
-import { cookies } from "next/headers";
-export class TransactionRepository {
-  private url = "http://127.0.0.1:8080";
+import { Transaction, TypeTransaction, PaginatedTransactionResponse, TransactionFilters } from "@/types/transaction";
+import { BaseRepository } from "@/lib/base-repository";
 
-  async findAll(): Promise<Transaction[]> {
-    const token = cookies().get("x-token");
-    const options = {
-      headers: {
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
+export class TransactionRepository extends BaseRepository {
+  private getTypeTransactionString(typeTransaction: TypeTransaction): string {
+    if (typeTransaction === TypeTransaction.INCOME) return "income";
+    if (typeTransaction === TypeTransaction.BILL) return "bill";
+    return "";
+  }
+
+  private buildTransactionBody(
+    name: string,
+    description: string,
+    amount: number,
+    typeTransaction: TypeTransaction,
+    account_id: string,
+    category_id: string,
+    budget_id?: string,
+  ) {
+    return {
+      name,
+      description,
+      amount,
+      type_transation: this.getTypeTransactionString(typeTransaction),
+      account_id,
+      category_id,
+      budget_id: budget_id || null,
     };
+  }
+
+  async findAll(filters?: TransactionFilters): Promise<PaginatedTransactionResponse> {
     try {
-      const response = await fetch(`${this.url}/transaction`, options);
-      const account: Transaction[] = await response.json();
-      return account;
+      const queryParams = new URLSearchParams();
+
+      if (filters) {
+        Object.entries(filters).forEach(([key, value]) => {
+          if (value !== undefined && value !== null && value !== '') {
+            queryParams.append(key, String(value));
+          }
+        });
+      }
+
+      const url = `/transaction${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
+      const response = await this.get<PaginatedTransactionResponse>(url);
+      return response;
     } catch (error) {
+      console.error("Error fetching transactions:", error);
+      return {
+        data: [],
+        pagination: {
+          current_page: 1,
+          has_next_page: false,
+          has_prev_page: false,
+          next_page: 1,
+          per_page: 20,
+          prev_page: 1,
+          total_pages: 1,
+          total_records: 0
+        }
+      };
+    }
+  }
+
+  async findAllSimple(): Promise<Transaction[]> {
+    try {
+      const response = await this.findAll({ limit: 1000 }); // Get a large limit for simple cases
+      return response.data;
+    } catch (error) {
+      console.error("Error fetching simple transactions:", error);
       return [];
     }
   }
@@ -28,43 +79,65 @@ export class TransactionRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    created_at?: Date,
   ): Promise<void> {
-    const token = cookies().get("x-token");
-    const options = {
-      headers: {
-        method: "POST",
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        name,
-        description,
-        amount,
-        typeTransaction,
-        account_id,
-        category_id,
-        budget_id: budget_id ? budget_id : null,
-      }), // Convertimos el objeto JavaScript a formato JSON
-    };
     try {
-      await fetch(`${this.url}/transaction`, options);
+      const body = {
+        ...this.buildTransactionBody(
+          name, description, amount, typeTransaction, account_id, category_id, budget_id
+        ),
+        created_at: created_at ? created_at.toISOString() : new Date().toISOString()
+      };
+
+      console.log("body", body);
+      const data = await this.post("/transaction", body);
+      console.log("transaction created", data);
     } catch (error) {
-      console.log(error);
+      console.error("Error creating transaction:", error);
+      throw error;
     }
   }
-  async delete(id: string) {
-    const token = cookies().get("x-token");
-    const options = {
-      headers: {
-        method: "DELETE",
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
-    };
+
+  async update(
+    id: string,
+    name: string,
+    description: string,
+    amount: number,
+    typeTransaction: TypeTransaction,
+    account_id: string,
+    category_id: string,
+    budget_id?: string,
+    created_at?: Date,
+  ): Promise<void> {
     try {
-      await fetch(`${this.url}/transaction/${id}`, options);
+      const body = {
+        ...this.buildTransactionBody(
+          name, description, amount, typeTransaction, account_id, category_id, budget_id
+        ),
+        created_at: created_at ? created_at.toISOString() : undefined
+      };
+      await this.put(`/transaction/${id}`, body);
     } catch (error) {
-      console.log(error);
+      console.error("Error updating transaction:", error);
+      throw error;
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    try {
+      await this.deleteRequest(`/transaction/${id}`);
+    } catch (error) {
+      console.error("Error deleting transaction:", error);
+      throw error;
+    }
+  }
+
+  async findById(id: string): Promise<Transaction | null> {
+    try {
+      return await this.get<Transaction>(`/transaction/${id}`);
+    } catch (error) {
+      console.error("Error fetching transaction by id:", error);
+      return null;
     }
   }
 }

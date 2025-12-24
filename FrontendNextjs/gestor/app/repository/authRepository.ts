@@ -1,4 +1,4 @@
-import Cookies from "js-cookie";
+
 export class AuthRepository {
   private url = "http://127.0.0.1:8080";
 
@@ -13,7 +13,7 @@ export class AuthRepository {
     try {
       const response = await fetch(`${this.url}/login`, options);
       const token = await response.json();
-      Cookies.set("x-token", token);
+
       const user = await this.getProfile(token);
       return user;
     } catch (error) {
@@ -31,7 +31,7 @@ export class AuthRepository {
       headers: {
         "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
       },
-      body: JSON.stringify({ name, lastName, email, password }), // Convertimos el objeto JavaScript a formato JSON
+      body: JSON.stringify({ name, last_name: lastName, email, password }), // Usar last_name como espera el backend
     };
     try {
       await fetch(`${this.url}/user`, options);
@@ -52,6 +52,26 @@ export class AuthRepository {
       return user;
     } catch (error) {
       console.log(error);
+    }
+  }
+  async createDemoUser() {
+    const options = {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    };
+    try {
+      const response = await fetch(`${this.url}/auth/demo`, options);
+      if (!response.ok) {
+        const errorData = await response.text();
+        console.error("Demo login failed:", errorData);
+        throw new Error(errorData || "Error creating demo account");
+      }
+      return await response.json(); // Returns the token string
+    } catch (error) {
+      console.log(error);
+      throw error;
     }
   }
 }

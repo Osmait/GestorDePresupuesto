@@ -1,60 +1,60 @@
 import { Account } from "@/types/account";
-import { cookies } from "next/headers";
-export class AccountRepository {
-  private url = "http://127.0.0.1:8080";
+import { BaseRepository } from "@/lib/base-repository";
 
+export class AccountRepository extends BaseRepository {
   async findAll(): Promise<Account[]> {
-    const token = cookies().get("x-token");
-    const options = {
-      headers: {
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
-    };
     try {
-      const response = await fetch(`${this.url}/account`, options);
-      const account: Account[] = await response.json();
-      return account;
+      const data = await this.get<any[]>("/account");
+      
+      // Normalizar la respuesta para que sea un array de Account plano
+      const accounts = data.map((item: any) => ({
+        ...item.account_info,
+        current_balance: item.current_balance,
+      }));
+      return accounts;
     } catch (error) {
+      console.error("Error fetching accounts:", error);
       return [];
     }
   }
 
-  async create(
-    name_account: string,
-    bank: string,
-    balance: number,
-    user_id: string,
-  ): Promise<void> {
-    const token = cookies().get("x-token");
-    const options = {
-      headers: {
-        method: "POST",
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
-
-      body: JSON.stringify({ name_account, bank, balance, user_id }), // Convertimos el objeto JavaScript a formato JSON
-    };
+  async create(name: string, bank: string, initial_balance: number): Promise<void> {
     try {
-      await fetch(`${this.url}/account`, options);
+      await this.post("/account", { name, bank, initial_balance });
     } catch (error) {
-      console.log(error);
+      console.error("Error creating account:", error);
+      throw error;
     }
   }
-  async delete(id: string): Promise<void> {
-    const token = cookies().get("x-token");
-    const options = {
-      headers: {
-        method: "DELETE",
-        "Content-Type": "application/json", // Especificamos que estamos enviando datos JSON
-        Authorization: `Bearer ${token}`,
-      },
-    };
+
+  async update(id: string, name: string, bank: string): Promise<void> {
     try {
-      await fetch(`${this.url}/account/${id}`, options);
+      await this.put(`/account/${id}`, { name, bank });
     } catch (error) {
-      console.log(error);
+      console.error("Error updating account:", error);
+      throw error;
+    }
+  }
+
+  async delete(id: string): Promise<void> {
+    try {
+      await this.deleteRequest(`/account/${id}`);
+    } catch (error) {
+      console.error("Error deleting account:", error);
+      throw error;
+    }
+  }
+
+  async findById(id: string): Promise<Account | null> {
+    try {
+      const data = await this.get<any>(`/account/${id}`);
+      return {
+        ...data.account_info,
+        current_balance: data.current_balance,
+      };
+    } catch (error) {
+      console.error("Error fetching account by id:", error);
+      return null;
     }
   }
 }

@@ -1,0 +1,183 @@
+version: '3.8'
+
+services:
+  # PostgreSQL database for E2E testing
+  postgres-e2e:
+    image: postgres:15-alpine
+    container_name: gestor-postgres-e2e
+    environment:
+      POSTGRES_DB: gestor_e2e_test
+      POSTGRES_USER: e2e_user
+      POSTGRES_PASSWORD: e2e_password
+      POSTGRES_HOST_AUTH_METHOD: trust
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_e2e_data:/var/lib/postgresql/data
+      - ./cmd/api/db/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U e2e_user -d gestor_e2e_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - e2e-network
+
+  # Redis for caching and session management (if needed)
+  redis-e2e:
+    image: redis:7-alpine
+    container_name: gestor-redis-e2e
+    ports:
+      - "6380:6379"
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_e2e_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - e2e-network
+
+  # Application service for E2E testing
+  app-e2e:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: test
+    container_name: gestor-app-e2e
+    environment:
+      # Database configuration
+      DB_HOST: postgres-e2e
+      DB_PORT: 5432
+      DB_USER: e2e_user
+      DB_PASSWORD: e2e_password
+      DB_NAME: gestor_e2e_test
+      DB_TYPE: postgres
+      DB_SSL_MODE: disable
+      DB_MAX_OPEN_CONN: 10
+      DB_MAX_IDLE_CONN: 5
+      
+      # Server configuration
+      SERVER_HOST: 0.0.0.0
+      SERVER_PORT: 8080
+      SERVER_ENVIRONMENT: test
+      
+      # JWT configuration
+      JWT_SECRET: e2e-test-secret-key-very-long-and-secure-for-testing
+      JWT_EXPIRATION_TIME: 24h
+      
+      # Redis configuration
+      REDIS_HOST: redis-e2e
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: 0
+      
+      # Logging configuration
+      LOG_LEVEL: error
+      LOG_FORMAT: json
+      LOG_CALLER: false
+      
+      # Observability configuration
+      OBSERVABILITY_TRACING: false
+      OBSERVABILITY_METRICS: false
+      
+      # Rate limiting configuration
+      RATE_LIMIT_ENABLED: true
+      RATE_LIMIT_REQUESTS_PER_MINUTE: 1000
+      
+      # Test mode
+      GIN_MODE: test
+      E2E_TEST_MODE: true
+    ports:
+      - "8081:8080"
+    depends_on:
+      postgres-e2e:
+        condition: service_healthy
+      redis-e2e:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - e2e-network
+
+  # E2E test runner service
+  e2e-tests:
+    build:
+      context: .
+      dockerfile: Dockerfile.e2e
+    container_name: gestor-e2e-tests
+    environment:
+      # Test configuration
+      E2E_BASE_URL: http://app-e2e:8080
+      E2E_TIMEOUT: 10m
+      E2E_PARALLEL: 4
+      E2E_VERBOSE: "false"
+      
+      # Database configuration for direct access
+      DB_HOST: postgres-e2e
+      DB_PORT: 5432
+      DB_USER: e2e_user
+      DB_PASSWORD: e2e_password
+      DB_NAME: gestor_e2e_test
+      DB_TYPE: postgres
+      DB_SSL_MODE: disable
+      
+      # Docker configuration
+      DOCKER_HOST: unix:///var/run/docker.sock
+      TESTCONTAINERS_RYUK_DISABLED: true
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./coverage:/app/coverage
+      - ./test-results:/app/test-results
+    depends_on:
+      app-e2e:
+        condition: service_healthy
+    networks:
+      - e2e-network
+    profiles:
+      - e2e
+
+  # Monitoring and debugging tools
+  adminer:
+    image: adminer
+    container_name: gestor-adminer-e2e
+    ports:
+      - "8082:8080"
+    environment:
+      ADMINER_DEFAULT_SERVER: postgres-e2e
+    depends_on:
+      - postgres-e2e
+    networks:
+      - e2e-network
+    profiles:
+      - debug
+
+  # Redis Commander for Redis debugging
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: gestor-redis-commander-e2e
+    ports:
+      - "8083:8081"
+    environment:
+      REDIS_HOSTS: local:redis-e2e:6379
+    depends_on:
+      - redis-e2e
+    networks:
+      - e2e-network
+    profiles:
+      - debug
+
+volumes:
+  postgres_e2e_data:
+    driver: local
+  redis_e2e_data:
+    driver: local
+
+networks:
+  e2e-network:
+    driver: bridge 

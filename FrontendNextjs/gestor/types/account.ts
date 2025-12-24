@@ -1,8 +1,9 @@
 export interface Account {
   id: string;
-  name_account: string;
+  name: string;
   bank: string;
-  balance: number;
+  initial_balance: number;
+  current_balance?: number; // Balance actual calculado por el backend
   user_id: string;
-  created_at: Date;
+  created_at: string;
 }

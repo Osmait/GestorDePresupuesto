@@ -1,22 +1,33 @@
-import { cn } from "@/lib/utils";
-import { fontSans } from "../app/layout";
+import type { Metadata } from 'next'
+import { Inter } from 'next/font/google'
+import '../../styles/globals.css'
+import { ThemeProvider } from '@/components/common/theme-provider'
+import { cn } from '@/lib/utils'
+
+const inter = Inter({ subsets: ['latin'] })
+
+export const metadata: Metadata = {
+	title: 'Iniciar Sesión - FinanceApp',
+	description: 'Accede a tu cuenta de gestión financiera personal',
+}
 
 export default function LoginLayout({
-  children, // will be a page or nested layout
+	children,
 }: {
-  children: React.ReactNode;
+	children: React.ReactNode
 }) {
-  return (
-    <html lang="en">
-      <body
-        className={cn(
-          "min-h-screen bg-background font-sans antialiased",
-          fontSans.variable,
-        )}
-      >
-        {children}
-        <div className="absolute top-0 z-[-2] h-screen w-screen bg-neutral-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.3),rgba(255,255,255,0))]"></div>
-      </body>
-    </html>
-  );
+	return (
+		<html lang="es">
+			<body className={cn(inter.className, 'antialiased')}>
+				<ThemeProvider
+					attribute="class"
+					defaultTheme="system"
+					enableSystem
+					disableTransitionOnChange
+				>
+					{children}
+				</ThemeProvider>
+			</body>
+		</html>
+	)
 }

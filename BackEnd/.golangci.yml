@@ -1,0 +1,311 @@
+# golangci-lint configuration for Gestor de Presupuesto
+# This file configures the linter to enforce code quality, security, and best practices
+
+run:
+  # Timeout for analysis
+  timeout: 5m
+  
+  # Exit code when at least one issue was found
+  issues-exit-code: 1
+  
+  # Include test files in analysis
+  tests: true
+  
+  # Build tags to use during analysis
+  build-tags:
+    - integration
+    - benchmark
+  
+  # Directories to skip
+  skip-dirs:
+    - vendor
+    - tmp
+    - .git
+  
+  # Files to skip
+  skip-files:
+    - ".*\\.pb\\.go$"
+    - ".*_generated\\.go$"
+
+# Linters configuration
+linters-settings:
+  # Gofmt settings
+  gofmt:
+    simplify: true
+  
+  # Goimports settings
+  goimports:
+    local-prefixes: github.com/osmait/gestorDePresupuesto
+  
+  # Golint settings
+  golint:
+    min-confidence: 0.8
+  
+  # Govet settings
+  govet:
+    check-shadowing: true
+    enable-all: true
+  
+  # Misspell settings
+  misspell:
+    locale: US
+    ignore-words:
+      - presupuesto
+      - gestor
+  
+  # Lll (line length) settings
+  lll:
+    line-length: 120
+    tab-width: 4
+  
+  # Unused settings
+  unused:
+    check-exported: true
+  
+  # Unparam settings
+  unparam:
+    check-exported: true
+  
+  # Nakedret settings
+  nakedret:
+    max-func-lines: 30
+  
+  # Prealloc settings
+  prealloc:
+    simple: true
+    range-loops: true
+    for-loops: false
+  
+  # Gocritic settings
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - style
+      - performance
+      - experimental
+      - opinionated
+    disabled-checks:
+      - hugeParam
+      - rangeValCopy
+    settings:
+      captLocal:
+        paramsOnly: true
+      underef:
+        skipRecvDeref: true
+  
+  # Cyclop (cyclomatic complexity)
+  cyclop:
+    max-complexity: 15
+    package-average: 10.0
+    skip-tests: false
+  
+  # Dupl (code duplication)
+  dupl:
+    threshold: 100
+  
+  # Funlen (function length)
+  funlen:
+    lines: 100
+    statements: 50
+  
+  # Gocognit (cognitive complexity)
+  gocognit:
+    min-complexity: 15
+  
+  # Nestif (nested if statements)
+  nestif:
+    min-complexity: 4
+  
+  # Godox (TODO/FIXME comments)
+  godox:
+    keywords:
+      - TODO
+      - BUG
+      - FIXME
+      - HACK
+  
+  # Gomnd (magic numbers)
+  gomnd:
+    settings:
+      mnd:
+        checks: argument,case,condition,operation,return,assign
+        ignored-numbers: 0,1,2,3,8,10,16,32,64,100,1000,1024
+        ignored-files: "_test.go"
+        ignored-functions: "strconv.*,os.*,make"
+  
+  # Gosec (security)
+  gosec:
+    includes:
+      - G101 # Look for hard coded credentials
+      - G102 # Bind to all interfaces
+      - G103 # Audit the use of unsafe block
+      - G104 # Audit errors not checked
+      - G106 # Audit the use of ssh.InsecureIgnoreHostKey
+      - G107 # Url provided to HTTP request as taint input
+      - G108 # Profiling endpoint automatically exposed on /debug/pprof
+      - G109 # Potential Integer overflow made by strconv.Atoi result conversion to int16/32
+      - G110 # Potential DoS vulnerability via decompression bomb
+      - G201 # SQL query construction using format string
+      - G202 # SQL query construction using string concatenation
+      - G203 # Use of unescaped data in HTML templates
+      - G204 # Audit use of command execution
+      - G301 # Poor file permissions used when creating a directory
+      - G302 # Poor file permissions used with chmod
+      - G303 # Creating tempfile using a predictable path
+      - G304 # File path provided as taint input
+      - G305 # File traversal when extracting zip/tar archive
+      - G306 # Poor file permissions used when writing to a new file
+      - G307 # Deferring a method which returns an error
+      - G401 # Detect the usage of DES, RC4, MD5 or SHA1
+      - G402 # Look for bad TLS connection settings
+      - G403 # Ensure minimum RSA key length of 2048 bits
+      - G404 # Insecure random number source (rand)
+      - G501 # Import blocklist: crypto/md5
+      - G502 # Import blocklist: crypto/des
+      - G503 # Import blocklist: crypto/rc4
+      - G504 # Import blocklist: net/http/cgi
+      - G505 # Import blocklist: crypto/sha1
+      - G601 # Implicit memory aliasing of items from a range statement
+    excludes:
+      - G104 # Audit errors not checked - we handle this with errcheck
+    severity: medium
+    confidence: medium
+  
+  # Errcheck settings
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+    ignore: fmt:.*,io/ioutil:^Read.*
+    exclude-functions:
+      - io/ioutil.ReadFile
+      - io.Copy(*bytes.Buffer)
+      - io.Copy(os.Stdout)
+
+# Enabled linters
+linters:
+  disable-all: true
+  enable:
+    # Core linters
+    - errcheck         # Check for unchecked errors
+    - gosimple         # Simplify code
+    - govet            # Go vet
+    - ineffassign      # Detect ineffectual assignments
+    - staticcheck      # Advanced static analysis
+    - typecheck        # Type check
+    - unused           # Check for unused code
+    
+    # Style linters
+    - gofmt            # Check gofmt
+    - goimports        # Check goimports
+    - golint           # Check golint
+    - misspell         # Check spelling
+    
+    # Performance linters
+    - prealloc         # Find slice declarations with pre-allocated capacity
+    - unconvert        # Remove unnecessary type conversions
+    
+    # Security linters
+    - gosec            # Security analyzer
+    
+    # Complexity linters
+    - cyclop           # Cyclomatic complexity
+    - funlen           # Function length
+    - gocognit         # Cognitive complexity
+    - gocyclo          # Cyclomatic complexity
+    - nestif           # Nested if statements
+    
+    # Bug detection
+    - bodyclose        # Check HTTP response body is closed
+    - gocritic         # Go source code linter providing checks
+    - rowserrcheck     # Check whether Err of rows is checked
+    - sqlclosecheck    # Check sql.Rows.Close call
+    
+    # Code quality
+    - dupl             # Code clone detection
+    - goconst          # Find repeated strings that could be constants
+    - godox            # Tool for detection of FIXME, TODO and other comment keywords
+    - gomnd            # Detect magic numbers
+    - lll              # Line length limit
+    - nakedret         # Check for naked returns
+    - unparam          # Check for unused function parameters
+    
+    # Maintainability
+    - gci              # Control imports order and make it deterministic
+    - godot            # Check if comments end in a period
+    - nolintlint       # Ill-formed or insufficient nolint directives
+    - whitespace       # Detection of leading and trailing whitespace
+
+# Issues configuration
+issues:
+  # List of regexps of issue texts to exclude
+  exclude:
+    # Exclude some linters from running on tests files
+    - "G104: Errors unhandled"  # Allow unhandled errors in tests
+    - "should have comment or be unexported"  # Allow unexported without comments in tests
+  
+  # Exclude certain files from analysis
+  exclude-files:
+    - ".*_test.go"     # Allow more flexibility in test files
+    - "mock_.*\\.go"   # Exclude mock files
+  
+  # Exclude certain directories
+  exclude-dirs:
+    - test
+    - vendor
+    - tmp
+  
+  # Maximum issues count per one linter
+  max-issues-per-linter: 50
+  
+  # Maximum count of issues with the same text
+  max-same-issues: 3
+  
+  # Show only new issues created after git revision
+  new: false
+  
+  # Show issues from the whole repository
+  new-from-rev: ""
+  
+  # Show issues from the whole repository  
+  new-from-patch: ""
+
+# Output configuration
+output:
+  # Format of output
+  format: colored-line-number
+  
+  # Print lines of code with issue
+  print-issued-lines: true
+  
+  # Print linter name in the end of issue text
+  print-linter-name: true
+  
+  # Make issues output unique by line
+  uniq-by-line: true
+  
+  # Sort results by the given format
+  sort-results: true
+
+# Severity configuration
+severity:
+  # Default severity for issues
+  default-severity: warning
+  
+  # Show only issues with severity greater than this
+  case-sensitive: false
+  
+  # Rules for assigning severities
+  rules:
+    - linters:
+        - gosec
+      severity: error
+    - linters:
+        - errcheck
+        - govet
+        - staticcheck
+      severity: error
+    - linters:
+        - cyclop
+        - funlen
+        - gocognit
+      severity: warning 
