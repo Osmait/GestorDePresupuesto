@@ -30,6 +30,7 @@ import {
 import { CategoriesSkeleton } from '@/components/skeletons/categories-skeleton'
 
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 
 // Helper component extracted from original page
 interface CategoryCardProps {
@@ -40,6 +41,8 @@ interface CategoryCardProps {
 }
 
 function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCardProps) {
+    const t = useTranslations('categories')
+    const tForms = useTranslations('forms')
     const router = useRouter()
     const categoryTransactions = transactions.filter(t => t.category_id === category.id)
     const totalAmount = categoryTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
@@ -59,7 +62,6 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
     }
 
     const handleCardClick = (e: React.MouseEvent) => {
-        // Prevent navigation if clicking on dropdown or interactive elements
         if ((e.target as HTMLElement).closest('[role="menuitem"], button')) {
             return
         }
@@ -76,20 +78,20 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
                     <DropdownMenuTrigger asChild>
                         <Button variant="ghost" size="sm" className="h-8 w-8 p-0 hover:bg-muted">
                             <MoreHorizontal className="h-4 w-4" />
-                            <span className="sr-only">Abrir menú</span>
+                            <span className="sr-only">{t('openMenu')}</span>
                         </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
                         <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={onEdit}>
                             <Edit className="h-4 w-4" />
-                            Editar categoría
+                            {t('edit')}
                         </DropdownMenuItem>
                         <DropdownMenuItem
                             className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
                             onClick={() => setShowDeleteDialog(true)}
                         >
                             <Trash2 className="h-4 w-4" />
-                            Eliminar categoría
+                            {t('delete')}
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                 </DropdownMenu>
@@ -107,7 +109,7 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
                         <div>
                             <p className="font-semibold text-foreground text-lg">{category.name}</p>
                             <p className="text-sm text-muted-foreground">
-                                {categoryTransactions.length} transacciones
+                                {categoryTransactions.length} {t('transactionsCount')}
                             </p>
                         </div>
                     </div>
@@ -128,7 +130,7 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
                         <span className="text-xs text-muted-foreground">Color</span>
                     </div>
                     <Badge variant="outline" className="bg-muted/30 dark:bg-muted/20">
-                        {categoryTransactions.length > 5 ? 'Activa' : categoryTransactions.length > 0 ? 'Moderada' : 'Inactiva'}
+                        {categoryTransactions.length > 5 ? t('active') : categoryTransactions.length > 0 ? t('moderate') : t('inactive')}
                     </Badge>
                 </div>
             </CardContent>
@@ -136,10 +138,9 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
                 <DialogContent>
                     <DialogHeader>
-                        <DialogTitle>Eliminar Categoría</DialogTitle>
+                        <DialogTitle>{t('deleteTitle')}</DialogTitle>
                         <DialogDescription>
-                            ¿Estás seguro de que quieres eliminar la categoría "{category.name}"?
-                            Esta acción no se puede deshacer.
+                            {t('deleteDescription', { name: category.name })}
                         </DialogDescription>
                     </DialogHeader>
                     <DialogFooter>
@@ -148,14 +149,14 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
                             onClick={() => setShowDeleteDialog(false)}
                             disabled={isDeleting}
                         >
-                            Cancelar
+                            {tForms('cancel')}
                         </Button>
                         <Button
                             variant="destructive"
                             onClick={handleDelete}
                             disabled={isDeleting}
                         >
-                            {isDeleting ? 'Eliminando...' : 'Eliminar'}
+                            {isDeleting ? t('deleting') : tForms('delete')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>
@@ -165,6 +166,7 @@ function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCard
 }
 
 function CategorySummaryCard({ categories, transactions }: { categories: Category[], transactions: Transaction[] }) {
+    const t = useTranslations('categories')
     const activeCategories = categories.filter(cat =>
         transactions.some(t => t.category_id === cat.id)
     )
@@ -176,28 +178,28 @@ function CategorySummaryCard({ categories, transactions }: { categories: Categor
             <CardHeader>
                 <CardTitle className="flex items-center gap-2 text-foreground">
                     <Tag className="h-5 w-5" />
-                    Resumen de Categorías
+                    {t('summary')}
                 </CardTitle>
             </CardHeader>
             <CardContent>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5">
                         <Tag className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
-                        <p className="text-sm font-medium text-muted-foreground">Total Categorías</p>
+                        <p className="text-sm font-medium text-muted-foreground">{t('totalCategories')}</p>
                         <p className="text-2xl font-bold text-foreground">
                             <AnimatedCounter value={categories.length} />
                         </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
                         <Activity className="h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400" />
-                        <p className="text-sm font-medium text-muted-foreground">Categorías Activas</p>
+                        <p className="text-sm font-medium text-muted-foreground">{t('activeCategories')}</p>
                         <p className="text-2xl font-bold text-foreground">
                             <AnimatedCounter value={activeCategories.length} />
                         </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5">
                         <Palette className="h-6 w-6 mx-auto mb-2 text-purple-600 dark:text-purple-400" />
-                        <p className="text-sm font-medium text-muted-foreground">Promedio por Categoría</p>
+                        <p className="text-sm font-medium text-muted-foreground">{t('averagePerCategory')}</p>
                         <p className="text-2xl font-bold text-foreground">
                             <AnimatedCounter value={averagePerCategory} />
                         </p>
@@ -209,6 +211,7 @@ function CategorySummaryCard({ categories, transactions }: { categories: Categor
 }
 
 export function CategoryList() {
+    const t = useTranslations('categories')
     const { data: categories = [], isLoading: isLoadingCategories, error } = useGetCategories()
     const { data: transactions = [], isLoading: isLoadingTransactions } = useGetAllTransactions()
     const { setEditingCategory, setModalOpen } = useCategoryContext()
@@ -236,18 +239,16 @@ export function CategoryList() {
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
         >
-            {/* Resumen de categorías */}
             <div className="mb-8">
                 <CategorySummaryCard categories={categories} transactions={transactions} />
             </div>
 
-            {/* Contenido principal con tabs */}
             <AnimatedTabs
                 defaultValue="all"
                 tabs={[
                     {
                         value: 'all',
-                        label: 'Todas',
+                        label: t('all'),
                         icon: <Tag className="h-4 w-4" />,
                         content: (
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

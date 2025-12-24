@@ -3,12 +3,12 @@
 
 import { Button } from '@/components/ui/button'
 import { PlusCircle } from 'lucide-react'
-import { CategoryFormModal } from './CategoryFormModal' // We need to move or export this
+import { CategoryFormModal } from './CategoryFormModal'
 import { useCategoryContext } from '@/components/categories/CategoryContext'
-
-// ... imports ...
+import { useTranslations } from 'next-intl'
 
 export function CategoryActions() {
+    const t = useTranslations('categories')
     const { createCategory, setEditingCategory, isModalOpen, setModalOpen } = useCategoryContext()
 
     return (
@@ -22,7 +22,7 @@ export function CategoryActions() {
                 }}
             >
                 <PlusCircle className="h-4 w-4 mr-2" />
-                Nueva Categoría
+                {t('addCategory')}
             </Button>
             <CategoryFormModal
                 open={isModalOpen}
@@ -32,3 +32,4 @@ export function CategoryActions() {
         </div>
     )
 }
+
