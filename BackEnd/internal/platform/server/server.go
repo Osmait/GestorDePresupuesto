@@ -104,6 +104,9 @@ func (s *Server) registerRoutes() {
 	// Error handling middleware (must be first)
 	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
 
+	// Rate limiting middleware
+	s.Engine.Use(middleware.RateLimitMiddleware(s.config))
+
 	// Swagger documentation route (before authentication)
 	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

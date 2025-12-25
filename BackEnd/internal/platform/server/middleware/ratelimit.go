@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"fmt"
+	"net"
 	"net/http"
 	"strings"
 	"sync"
@@ -41,14 +42,11 @@ func NewRateLimitService(config *config.Config) *RateLimitService {
 }
 
 // IsAllowed checks if a request should be allowed based on rate limits
-func (rls *RateLimitService) IsAllowed(key string) bool {
+func (rls *RateLimitService) IsAllowed(key string, limit int, window time.Duration, burst int) bool {
 	rls.store.mu.Lock()
 	defer rls.store.mu.Unlock()
 
 	now := time.Now()
-	window := rls.config.RateLimit.Window
-	limit := rls.config.RateLimit.Requests
-	burst := rls.config.RateLimit.Burst
 
 	// Get current requests for this key
 	requests, exists := rls.store.requests[key]
@@ -85,13 +83,21 @@ func (store *RateLimitStore) isIPWhitelisted(ip string) bool {
 		return true
 	}
 
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+
 	for _, whitelistedIP := range store.config.RateLimit.IPWhitelist {
-		if ip == whitelistedIP {
+		if whitelistedIP == ip {
 			return true
 		}
-		// Simple CIDR check (basic implementation)
-		if strings.Contains(whitelistedIP, "/") && strings.HasPrefix(ip, strings.Split(whitelistedIP, "/")[0]) {
-			return true
+		// Proper CIDR check
+		if strings.Contains(whitelistedIP, "/") {
+			_, network, err := net.ParseCIDR(whitelistedIP)
+			if err == nil && network.Contains(parsedIP) {
+				return true
+			}
 		}
 	}
 	return false
@@ -108,6 +114,24 @@ func (rls *RateLimitService) generateRateLimitKey(c *gin.Context) string {
 
 	// Fall back to IP-based rate limiting
 	return "ip:" + c.ClientIP()
+}
+
+// matchEndpointConfig matches the request path to an endpoint configuration
+func (rls *RateLimitService) matchEndpointConfig(path string) *config.EndpointRateLimitConfig {
+	for _, endpoint := range rls.config.RateLimit.Endpoints {
+		// support wildcard at the end (e.g. /api/auth/*)
+		if strings.HasSuffix(endpoint.Path, "*") {
+			prefix := strings.TrimSuffix(endpoint.Path, "*")
+			if strings.HasPrefix(path, prefix) {
+				return &endpoint
+			}
+		} else {
+			if path == endpoint.Path {
+				return &endpoint
+			}
+		}
+	}
+	return nil
 }
 
 // RateLimitMiddleware creates a rate limiting middleware
@@ -127,40 +151,55 @@ func RateLimitMiddleware(config *config.Config) gin.HandlerFunc {
 			return
 		}
 
-		// Generate rate limit key
-		key := service.generateRateLimitKey(c)
+		// Determine limits based on endpoint or global config
+		limit := config.RateLimit.Requests
+		window := config.RateLimit.Window
+		burst := config.RateLimit.Burst
+
+		endpointConfig := service.matchEndpointConfig(c.Request.URL.Path)
+		if endpointConfig != nil {
+			limit = endpointConfig.Requests
+			window = endpointConfig.Window
+			burst = endpointConfig.Burst
+		}
+
+		// Generate rate limit key (append path if endpoint specific to isolate quotas)
+		baseKey := service.generateRateLimitKey(c)
+		key := baseKey
+		if endpointConfig != nil {
+			key = baseKey + ":" + endpointConfig.Path
+		}
 
 		// Check if request is allowed
-		if !service.IsAllowed(key) {
+		if !service.IsAllowed(key, limit, window, burst) {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":       "rate limit exceeded",
-				"retry_after": config.RateLimit.Window.Seconds(),
+				"retry_after": window.Seconds(),
 			})
 			c.Abort()
 			return
 		}
 
 		// Add rate limit headers
-		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", config.RateLimit.Requests))
-		c.Header("X-RateLimit-Window", config.RateLimit.Window.String())
-		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", getRemainingRequests(service, key)))
+		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", limit))
+		c.Header("X-RateLimit-Window", window.String())
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", getRemainingRequests(service, key, limit, window)))
 
 		c.Next()
 	}
 }
 
 // getRemainingRequests calculates remaining requests for a key
-func getRemainingRequests(service *RateLimitService, key string) int {
+func getRemainingRequests(service *RateLimitService, key string, limit int, window time.Duration) int {
 	service.store.mu.RLock()
 	defer service.store.mu.RUnlock()
 
 	requests, exists := service.store.requests[key]
 	if !exists {
-		return service.config.RateLimit.Requests
+		return limit
 	}
 
 	now := time.Now()
-	window := service.config.RateLimit.Window
 
 	// Count valid requests within the window
 	validCount := 0
@@ -170,7 +209,7 @@ func getRemainingRequests(service *RateLimitService, key string) int {
 		}
 	}
 
-	remaining := service.config.RateLimit.Requests - validCount
+	remaining := limit - validCount
 	if remaining < 0 {
 		return 0
 	}
@@ -179,27 +218,7 @@ func getRemainingRequests(service *RateLimitService, key string) int {
 
 // IPRateLimitMiddleware creates an IP-based rate limiting middleware
 func IPRateLimitMiddleware(config *config.Config) gin.HandlerFunc {
-	service := NewRateLimitService(config)
-
-	return func(c *gin.Context) {
-		if !config.RateLimit.Enabled {
-			c.Next()
-			return
-		}
-
-		key := "ip:" + c.ClientIP()
-
-		if !service.IsAllowed(key) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "IP rate limit exceeded",
-				"retry_after": config.RateLimit.Window.Seconds(),
-			})
-			c.Abort()
-			return
-		}
-
-		c.Next()
-	}
+	return RateLimitMiddleware(config) // Re-use main middleware logic which falls back to IP
 }
 
 // UserRateLimitMiddleware creates a user-based rate limiting middleware
@@ -220,7 +239,7 @@ func UserRateLimitMiddleware(config *config.Config) gin.HandlerFunc {
 
 		key := "user:" + userID.(string)
 
-		if !service.IsAllowed(key) {
+		if !service.IsAllowed(key, config.RateLimit.Requests, config.RateLimit.Window, config.RateLimit.Burst) {
 			c.JSON(http.StatusTooManyRequests, gin.H{
 				"error":       "user rate limit exceeded",
 				"retry_after": config.RateLimit.Window.Seconds(),

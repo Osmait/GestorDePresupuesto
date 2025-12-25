@@ -84,12 +84,21 @@ type SecurityConfig struct {
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
-	Enabled     bool          `json:"enabled"`
-	Requests    int           `json:"requests" validate:"min=1"`
-	Window      time.Duration `json:"window" validate:"required"`
-	Burst       int           `json:"burst" validate:"min=1"`
-	IPWhitelist []string      `json:"ip_whitelist"`
-	UserBased   bool          `json:"user_based"`
+	Enabled     bool                      `json:"enabled"`
+	Requests    int                       `json:"requests" validate:"min=1"`
+	Window      time.Duration             `json:"window" validate:"required"`
+	Burst       int                       `json:"burst" validate:"min=1"`
+	IPWhitelist []string                  `json:"ip_whitelist"`
+	UserBased   bool                      `json:"user_based"`
+	Endpoints   []EndpointRateLimitConfig `json:"endpoints"`
+}
+
+// EndpointRateLimitConfig holds rate limiting configuration for a specific endpoint
+type EndpointRateLimitConfig struct {
+	Path     string        `json:"path" validate:"required"`
+	Requests int           `json:"requests" validate:"min=1"`
+	Window   time.Duration `json:"window" validate:"required"`
+	Burst    int           `json:"burst" validate:"min=1"`
 }
 
 // CORSConfig holds CORS configuration
