@@ -126,7 +126,7 @@ export function EditableUserTable({ users, onSave, isLoading }: EditableUserTabl
     };
 
     return (
-        <div className="space-y-4">
+        <div className="space-y-4 w-full overflow-hidden">
             {/* Search and Filters */}
             <div className="flex flex-col sm:flex-row items-center gap-4">
                 <div className="relative w-full sm:max-w-xs">
@@ -166,9 +166,9 @@ export function EditableUserTable({ users, onSave, isLoading }: EditableUserTabl
                 )}
             </div>
 
-            <div className="rounded-md border border-border/50 overflow-hidden bg-card/50">
-                <ScrollArea className="w-full whitespace-nowrap">
-                    <Table>
+            <div className="rounded-md border border-border/50 bg-card/50 max-w-full overflow-hidden">
+                <div className="overflow-x-auto w-full">
+                    <Table className="min-w-[800px] w-max">
                         <TableHeader className="bg-muted/50">
                             <TableRow>
                                 <TableHead
@@ -277,8 +277,7 @@ export function EditableUserTable({ users, onSave, isLoading }: EditableUserTabl
                             )}
                         </TableBody>
                     </Table>
-                    <ScrollBar orientation="horizontal" />
-                </ScrollArea>
+                </div>
             </div>
 
             {/* Confirmation Modal */}
