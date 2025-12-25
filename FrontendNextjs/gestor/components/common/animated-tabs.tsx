@@ -96,7 +96,7 @@ export function AnimatedTabs({
 			<div
 				ref={tabsRef}
 				className={cn(
-					'relative inline-flex h-10 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground backdrop-blur-sm border border-border/50',
+					'relative inline-flex h-10 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground backdrop-blur-sm border border-border/50 w-full sm:w-auto',
 					orientation === 'horizontal' && 'flex-row',
 					orientation === 'vertical' && 'flex-col h-auto'
 				)}
@@ -202,10 +202,10 @@ export function AnimatedTabs({
 								</span>
 							)}
 
-							{/* Label */}
+							{/* Label - Hidden on mobile when icon exists */}
 							<span className={cn(
 								'transition-all duration-300 relative z-10',
-								tab.icon && 'ml-2',
+								tab.icon ? 'hidden sm:inline sm:ml-2' : '',
 								isActive
 									? 'text-primary font-semibold'
 									: 'group-hover:text-foreground group-hover:translate-x-1'
