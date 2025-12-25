@@ -194,7 +194,13 @@ type Config struct {
 func LoadConfig() (*Config, error) {
 	// Load .env file if it exists (ignore error in production)
 	if !isProduction() {
-		_ = godotenv.Load()
+		// Use Overload to FORCE overriding shell variables (like localhost)
+		err := godotenv.Overload()
+		pwd, _ := os.Getwd()
+		fmt.Printf("DEBUG: Current PWD: %s\n", pwd)
+		fmt.Printf("DEBUG: Loading .env result: %v\n", err)
+		fmt.Printf("DEBUG: Loaded DB_HOST: %s\n", getEnvString("DB_HOST", "not_set"))
+		fmt.Printf("DEBUG: Loaded DB_SSL_MODE: %s\n", getEnvString("DB_SSL_MODE", "not_set"))
 	}
 
 	config := &Config{
@@ -672,7 +678,7 @@ func NewConfigSQLite(dbName string) *Config {
 
 // GetPostgresUrl returns the PostgreSQL connection string
 func (c *Config) GetPostgresUrl() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s",
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&binary_parameters=no",
 		c.Database.User, c.Database.Password, c.Database.Host, c.Database.Port, c.Database.Name, c.Database.SSLMode)
 }
 

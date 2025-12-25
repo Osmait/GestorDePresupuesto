@@ -138,27 +138,9 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 	budgets := make(map[string]float64)
 	for rows.Next() {
 		var budgetID string
-		var rawBudget interface{}
-
-		// Scan into interface to see what we are getting without crashing
-		if err = rows.Scan(&budgetID, &rawBudget); err == nil {
-			// Log what we got
-			log.Info().Str("budgetID", budgetID).Interface("rawBudget", rawBudget).Msg("FindCurrentBudgets Row Data")
-
-			// Attempt manual conversion or assignment
-			if val, ok := rawBudget.(float64); ok {
-				budgets[budgetID] = val
-			} else if valBytes, ok := rawBudget.([]uint8); ok {
-				// Handle []byte (postgres often returns this for numeric)
-				strVal := string(valBytes)
-				log.Info().Str("budgetID", budgetID).Str("rawBudgetSeconds", strVal).Msg("Got []uint8 for budget")
-				// Parse it manually to see if it fails
-				// ...
-			} else {
-				log.Error().Str("budgetID", budgetID).Interface("rawBudget_Type", fmt.Sprintf("%T", rawBudget)).Msg("Unexpected type for currentBudget")
-			}
-		} else {
-			log.Error().Err(err).Str("userId", userId).Msg("failed to scan row in FindCurrentBudgets")
+		var currentBudget float64
+		if err = rows.Scan(&budgetID, &currentBudget); err == nil {
+			budgets[budgetID] = currentBudget
 		}
 	}
 	if err = rows.Err(); err != nil {
