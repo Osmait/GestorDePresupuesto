@@ -3,7 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/auth";
 
 export abstract class BaseRepository {
-  protected readonly baseUrl = "http://127.0.0.1:8080";
+  protected readonly baseUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
   protected async getAuthToken(): Promise<string | null> {
     try {

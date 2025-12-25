@@ -1,6 +1,6 @@
 
 export class AuthRepository {
-  private url = "http://127.0.0.1:8080";
+  private url = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
   async login(email: string, password: string) {
     const options = {

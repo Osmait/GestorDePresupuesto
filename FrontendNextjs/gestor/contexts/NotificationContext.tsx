@@ -25,6 +25,8 @@ const NotificationContext = createContext<NotificationContexttype | undefined>(u
 
 import { useSession } from "next-auth/react"
 
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
 export function NotificationProvider({ children }: { children: React.ReactNode }) {
     const { data: session } = useSession()
     const { lastMessage, isConnected } = useNotification()
@@ -38,7 +40,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
         const fetchHistory = async () => {
             try {
-                const res = await fetch('http://localhost:8080/notifications/history', {
+                const res = await fetch(`${BASE_URL}/notifications/history`, {
                     headers: {
                         Authorization: `Bearer ${token}`
                     }
@@ -89,7 +91,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (!token) return
 
         try {
-            await fetch(`http://localhost:8080/notifications/${id}/read`, {
+            await fetch(`${BASE_URL}/notifications/${id}/read`, {
                 method: 'PATCH',
                 headers: {
                     Authorization: `Bearer ${token}`
@@ -108,7 +110,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (!token) return
 
         try {
-            await fetch('http://localhost:8080/notifications/read-all', {
+            await fetch(`${BASE_URL}/notifications/read-all`, {
                 method: 'PATCH',
                 headers: {
                     Authorization: `Bearer ${token}`
@@ -127,7 +129,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         if (!token) return
 
         try {
-            await fetch('http://localhost:8080/notifications', {
+            await fetch(`${BASE_URL}/notifications`, {
                 method: 'DELETE',
                 headers: {
                     Authorization: `Bearer ${token}`

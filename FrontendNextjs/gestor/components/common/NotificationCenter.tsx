@@ -23,13 +23,15 @@ export function NotificationCenter() {
     const { data: session } = useSession()
     const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications } = useNotificationContext()
 
+    const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
     const handleTestNotification = async () => {
         // @ts-ignore
         const token = session?.accessToken || (session?.user as any)?.accessToken
         if (!token) return
 
         try {
-            await fetch('http://localhost:8080/notifications/test', {
+            await fetch(`${BASE_URL}/notifications/test`, {
                 method: 'POST',
                 headers: {
                     Authorization: `Bearer ${token}`

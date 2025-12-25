@@ -14,6 +14,8 @@ import { Shield, Users, Trash2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { EditableUserTable } from "./user-table";
 
+const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
+
 export default function AdminDashboard() {
     const { isAdmin, isLoading: isAdminLoading } = useAdmin();
     const { data: session } = useSession();
@@ -27,7 +29,7 @@ export default function AdminDashboard() {
         setIsLoadingUsers(true);
         try {
             const token = (session as any)?.accessToken;
-            const response = await fetch("http://localhost:8080/users", {
+            const response = await fetch(`${BASE_URL}/users`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
@@ -58,7 +60,7 @@ export default function AdminDashboard() {
         setIsSaving(true);
         try {
             const token = (session as any)?.accessToken;
-            const response = await fetch("http://localhost:8080/users", {
+            const response = await fetch(`${BASE_URL}/users`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -87,7 +89,7 @@ export default function AdminDashboard() {
         setIsCleaning(true);
         try {
             const token = (session as any)?.accessToken;
-            const response = await fetch("http://localhost:8080/users/demos", {
+            const response = await fetch(`${BASE_URL}/users/demos`, {
                 method: "DELETE",
                 headers: {
                     Authorization: `Bearer ${token}`,

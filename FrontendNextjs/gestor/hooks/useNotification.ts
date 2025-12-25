@@ -14,6 +14,8 @@ export function useNotification() {
     const [lastMessage, setLastMessage] = useState<NotificationEvent | null>(null)
     const [isConnected, setIsConnected] = useState(false)
 
+    const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+
     useEffect(() => {
         // @ts-ignore
         const token = session?.accessToken || (session?.user as any)?.accessToken
@@ -26,7 +28,7 @@ export function useNotification() {
         const controller = new AbortController()
 
         const connect = async () => {
-            await fetchEventSource('http://localhost:8080/notifications', {
+            await fetchEventSource(`${BASE_URL}/notifications`, {
                 method: 'GET',
                 headers: {
                     Authorization: `Bearer ${token}`,
