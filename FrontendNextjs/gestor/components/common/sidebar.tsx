@@ -144,7 +144,7 @@ function MainHeader({ isExpanded, toggleMobile }: {
 	const t = useTranslations('nav')
 	const tDash = useTranslations('dashboard')
 	return (
-		<header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg overflow-hidden">
+		<header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg">
 			<div className="flex h-14 sm:h-16 items-center justify-between px-2 sm:px-4 lg:px-6 gap-2">
 				<div className="flex items-center gap-2 sm:gap-4 min-w-0">
 					<Button
@@ -165,9 +165,7 @@ function MainHeader({ isExpanded, toggleMobile }: {
 				</div>
 
 				<div className="flex items-center gap-1 sm:gap-2 lg:gap-4 flex-shrink-0">
-					<div className="hidden md:block">
-						<Search />
-					</div>
+					<Search />
 
 					<div className="flex items-center gap-1">
 						<NotificationCenter />
