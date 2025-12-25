@@ -19,8 +19,35 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 }
 
 func (u *UserRepository) Save(ctx context.Context, user *user.User) error {
-	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, name , last_name,email, password,token, confirmed, is_demo) VALUES ($1,$2,$3,$4,$5,$6, $7, $8)", user.Id, user.Name, user.LastName, user.Email, user.Password, user.Token, user.Confirmed, user.IsDemo)
+	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, name , last_name,email, password,token, confirmed, is_demo, ip_address) VALUES ($1,$2,$3,$4,$5,$6, $7, $8, $9)", user.Id, user.Name, user.LastName, user.Email, user.Password, user.Token, user.Confirmed, user.IsDemo, user.IpAddress)
 	return err
+}
+
+func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*user.User, error) {
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, ip_address from users WHERE ip_address = $1", ip)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	user := user.User{}
+	for rows.Next() {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress); err != nil {
+			return nil, err
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	if user.Id == "" {
+		return nil, errorhttp.ErrNotFound
+	}
+	return &user, nil
 }
 
 func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {

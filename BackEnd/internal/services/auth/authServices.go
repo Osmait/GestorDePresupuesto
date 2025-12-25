@@ -77,7 +77,16 @@ func (a *AuthService) Login(ctx context.Context, authRequest *authRequest.AuthRe
 }
 
 // CreateDemoUser creates a temporary demo user with pre-seeded data (accounts, categories, transactions) for trial purposes.
-func (a *AuthService) CreateDemoUser(ctx context.Context) (*string, error) {
+func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, error) {
+	// 0. Check if demo user exists for this IP
+	if ip != "" {
+		existingUser, err := a.repo.FindUserByIp(ctx, ip)
+		if err == nil && existingUser != nil && existingUser.IsDemo {
+			log.Info().Str("ip", ip).Msg("returning existing demo user for IP")
+			return utils.JwtCreate(existingUser.Id, a.config.JWT.Secret)
+		}
+	}
+
 	// 1. Create Demo User
 	userID := uuid.New().String()
 	password := "demo123" // Temporary password
@@ -86,6 +95,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context) (*string, error) {
 	user := userDomain.NewUser(userID, "Demo User", "Minimizado", "demo+"+userID+"@example.com", string(hashPassword))
 	user.IsDemo = true
 	user.Confirmed = "true"
+	user.IpAddress = ip
 
 	if err := a.repo.Save(ctx, user); err != nil {
 		log.Error().Err(err).Msg("failed to save demo user")

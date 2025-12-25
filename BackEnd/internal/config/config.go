@@ -251,7 +251,15 @@ func LoadConfig() (*Config, error) {
 			Window:      getDuration(getEnvString("RATE_LIMIT_WINDOW", "1m")),
 			Burst:       getEnvInt("RATE_LIMIT_BURST", 50),
 			IPWhitelist: getEnvStringSlice("RATE_LIMIT_IP_WHITELIST", []string{"127.0.0.1", "::1"}),
-			UserBased:   getEnvBool("RATE_LIMIT_USER_BASED", true),
+			UserBased:   getEnvBool("RATE_LIMIT_USER_BASED", false),
+			Endpoints: []EndpointRateLimitConfig{
+				{
+					Path:     "/auth/demo",  // Strict limit for demo user creation
+					Requests: 5,             // Only 5 requests
+					Window:   1 * time.Hour, // Per hour
+					Burst:    1,             // No burst allowed
+				},
+			},
 		},
 
 		CORS: CORSConfig{

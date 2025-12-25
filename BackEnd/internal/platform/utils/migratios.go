@@ -110,6 +110,7 @@ func SetupPostgreSQLSchema(db *sql.DB) error {
 		password VARCHAR(255) NOT NULL,
 		token VARCHAR(32),
 		confirmed BOOLEAN DEFAULT false,
+		ip_address VARCHAR(45),
 		created_at timestamptz NOT NULL DEFAULT (now())
 	);
 
@@ -215,6 +216,7 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		token VARCHAR(32),
 		is_demo BOOLEAN DEFAULT 0,
 		confirmed BOOLEAN DEFAULT 0,
+		ip_address VARCHAR(45),
 		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 	);
 

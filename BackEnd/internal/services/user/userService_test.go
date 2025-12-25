@@ -32,6 +32,11 @@ func (m *MockUserRepostory) FindUserByEmail(ctx context.Context, email string) (
 	return args.Get(0).(*user.User), args.Error(1)
 }
 
+func (m *MockUserRepostory) FindUserByIp(ctx context.Context, ip string) (*user.User, error) {
+	args := m.Called(ctx, ip)
+	return args.Get(0).(*user.User), args.Error(1)
+}
+
 func (m *MockUserRepostory) Save(ctx context.Context, user *user.User) error {
 	args := m.Called(ctx, user)
 	return args.Error(0)
