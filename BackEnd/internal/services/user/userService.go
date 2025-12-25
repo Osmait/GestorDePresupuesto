@@ -102,7 +102,7 @@ func (u *UserService) FindByEmail(ctx context.Context, email string) (*dto.UserR
 		}
 
 		// Create response
-		userResponse := dto.NewUserResponse(foundUser.Id, foundUser.Name, foundUser.LastName, foundUser.Email, foundUser.CreatedAt)
+		userResponse := dto.NewUserResponse(foundUser.Id, foundUser.Name, foundUser.LastName, foundUser.Email, foundUser.Role, foundUser.CreatedAt)
 		return userResponse, nil
 	})
 }
@@ -144,7 +144,7 @@ func (u *UserService) FindUserById(ctx context.Context, id string) (*dto.UserRes
 		}
 
 		// Create response
-		userResponse := dto.NewUserResponse(foundUser.Id, foundUser.Name, foundUser.LastName, foundUser.Email, foundUser.CreatedAt)
+		userResponse := dto.NewUserResponse(foundUser.Id, foundUser.Name, foundUser.LastName, foundUser.Email, foundUser.Role, foundUser.CreatedAt)
 		return userResponse, nil
 	})
 }

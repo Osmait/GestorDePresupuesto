@@ -8,26 +8,35 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
 
 // NO_AUTH_NEEDED defines routes that don't require authentication
 var NO_AUTH_NEEDED = []string{
 	"login",
-	"user",
+	"login",
 	"health",
 	"ping",
 	"metrics",
-	"demo",
 }
 
 // shouldCheckToken determines if a route requires token validation
 func shouldCheckToken(route string) bool {
+	// 1. Check strict substring matches from list
 	for _, p := range NO_AUTH_NEEDED {
 		if strings.Contains(route, p) {
 			return false
 		}
 	}
+
+	// 2. Special case for /user routes (Registration, GetById)
+	// Must allow "/user" and "/user/xxx" BUT NOT "/users/demos"
+	// Also explicitly allow /auth/demo without allowing "demo" substring elsewhere
+	if route == "/user" || strings.HasPrefix(route, "/user/") || route == "/auth/demo" {
+		return false
+	}
+
 	return true
 }
 
@@ -148,5 +157,37 @@ func OptionalAuth(userService *user.UserService, config *config.Config) gin.Hand
 
 		// If header exists, validate it
 		AuthMiddleware(userService, config)(c)
+	}
+}
+
+// RequireRole enforces role-based access control
+func RequireRole(role string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userVal, exists := c.Get("User")
+		if !exists {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "user context required",
+			})
+			c.Abort()
+			return
+		}
+
+		userModel, ok := userVal.(*dto.UserResponse)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "invalid user context",
+			})
+			c.Abort()
+			return
+		}
+
+		if userModel.Role != role {
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "insufficient permissions",
+			})
+			c.Abort()
+			return
+		}
+		c.Next()
 	}
 }

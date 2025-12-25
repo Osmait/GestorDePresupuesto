@@ -3,6 +3,7 @@ package postgress
 import (
 	"context"
 	"database/sql"
+	"strings"
 	"time"
 
 	"github.com/rs/zerolog/log"
@@ -40,13 +41,34 @@ func (u *UserRepository) DeleteDemoUsersOlderThan(ctx context.Context, olderThan
 		return err
 	}
 
-	// 2. Delete recurring transactions (if user_id present, assuming they exist)
-	// Check schema first or just try to delete if table exists
-	_, _ = tx.ExecContext(ctx, `
+	// 2. Delete recurring transactions
+	_, err = tx.ExecContext(ctx, `
 		DELETE FROM recurring_transactions 
 		WHERE user_id IN (
 			SELECT id FROM users WHERE is_demo = true AND created_at < $1
 		)`, olderThan)
+	if err != nil {
+		// Ignore if table does not exist
+		if strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "no such table") {
+			log.Warn().Err(err).Msg("recurring_transactions table not found, skipping cleanup")
+		} else {
+			return err
+		}
+	}
+
+	// 2.1 Delete notifications
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM notifications 
+		WHERE user_id IN (
+			SELECT id FROM users WHERE is_demo = true AND created_at < $1
+		)`, olderThan)
+	if err != nil {
+		if strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "no such table") {
+			log.Warn().Err(err).Msg("notifications table not found, skipping cleanup")
+		} else {
+			return err
+		}
+	}
 
 	// 3. Delete budgets
 	_, err = tx.ExecContext(ctx, `
@@ -115,12 +137,12 @@ func (u *UserRepository) DeleteDemoUsersOlderThan(ctx context.Context, olderThan
 }
 
 func (u *UserRepository) Save(ctx context.Context, user *user.User) error {
-	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, name , last_name,email, password,token, confirmed, is_demo, ip_address) VALUES ($1,$2,$3,$4,$5,$6, $7, $8, $9)", user.Id, user.Name, user.LastName, user.Email, user.Password, user.Token, user.Confirmed, user.IsDemo, user.IpAddress)
+	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, name , last_name,email, password,token, confirmed, is_demo, ip_address, role) VALUES ($1,$2,$3,$4,$5,$6, $7, $8, $9, $10)", user.Id, user.Name, user.LastName, user.Email, user.Password, user.Token, user.Confirmed, user.IsDemo, user.IpAddress, user.Role)
 	return err
 }
 
 func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*user.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, ip_address from users WHERE ip_address = $1", ip)
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE ip_address = $1", ip)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +155,7 @@ func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*user.Use
 
 	user := user.User{}
 	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress); err != nil {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role); err != nil {
 			return nil, err
 		}
 	}
@@ -147,7 +169,7 @@ func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*user.Use
 }
 
 func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo from users WHERE email = $1", email)
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE email = $1", email)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +182,7 @@ func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*us
 
 	user := user.User{}
 	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo); err != nil {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role); err != nil {
 			return nil, err
 		}
 	}
@@ -174,7 +196,7 @@ func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*us
 }
 
 func (u *UserRepository) FindUserById(ctx context.Context, id string) (*user.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id,name,last_name,email FROM users WHERE id = $1", id)
+	rows, err := u.db.QueryContext(ctx, "SELECT id,name,last_name,email, role FROM users WHERE id = $1", id)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +208,7 @@ func (u *UserRepository) FindUserById(ctx context.Context, id string) (*user.Use
 	}()
 	user := user.User{}
 	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email); err == nil {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Role); err == nil {
 			return &user, nil
 		}
 	}

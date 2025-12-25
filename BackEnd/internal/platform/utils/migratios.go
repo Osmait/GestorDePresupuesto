@@ -94,6 +94,9 @@ func SetupPostgreSQLSchema(db *sql.DB) error {
 	DROP TABLE IF EXISTS account CASCADE;
 	DROP TABLE IF EXISTS users CASCADE;
 	DROP TABLE IF EXISTS cryptos CASCADE;
+	DROP TABLE IF EXISTS listings CASCADE;
+	DROP TABLE IF EXISTS notifications CASCADE;
+	DROP TABLE IF EXISTS recurring_transactions CASCADE;
 	DROP TABLE IF EXISTS investments CASCADE;
 	DROP TYPE IF EXISTS TypeTransaction CASCADE;
 
@@ -111,6 +114,7 @@ func SetupPostgreSQLSchema(db *sql.DB) error {
 		token VARCHAR(32),
 		confirmed BOOLEAN DEFAULT false,
 		ip_address VARCHAR(45),
+		role VARCHAR(20) DEFAULT 'USER',
 		created_at timestamptz NOT NULL DEFAULT (now())
 	);
 
@@ -217,6 +221,7 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		is_demo BOOLEAN DEFAULT 0,
 		confirmed BOOLEAN DEFAULT 0,
 		ip_address VARCHAR(45),
+		role VARCHAR(20) DEFAULT 'USER',
 		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 	);
 
@@ -291,6 +296,35 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		updated_at DATETIME,
 		user_id VARCHAR NOT NULL,
 		FOREIGN KEY (user_id) REFERENCES users (id)
+	);
+	CREATE TABLE IF NOT EXISTS recurring_transactions (
+		id VARCHAR PRIMARY KEY,
+		user_id VARCHAR NOT NULL,
+		name VARCHAR(255) NOT NULL,
+		description TEXT,
+		amount DECIMAL(15, 2) NOT NULL,
+		type VARCHAR(50) NOT NULL CHECK (type IN ('income', 'bill')),
+		account_id VARCHAR,
+		category_id VARCHAR,
+		budget_id VARCHAR,
+		day_of_month INTEGER NOT NULL CHECK (day_of_month BETWEEN 1 AND 31),
+		last_execution_date DATETIME,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+		FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE SET NULL,
+		FOREIGN KEY (category_id) REFERENCES categorys(id) ON DELETE SET NULL,
+		FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE SET NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS notifications (
+		id VARCHAR PRIMARY KEY,
+		user_id VARCHAR(255) NOT NULL,
+		type VARCHAR(50) NOT NULL,
+		message TEXT NOT NULL,
+		amount REAL,
+		is_read BOOLEAN DEFAULT 0,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 	);
 	`
 
