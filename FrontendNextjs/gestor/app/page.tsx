@@ -40,13 +40,13 @@ const PROJECT_CONFIG = {
 	name: 'Gestor de Presupuesto',
 	tagline: 'Full-Stack Personal Finance Application',
 	description: 'A production-ready financial management system demonstrating Clean Architecture, SOLID principles, and modern full-stack development patterns. Built with Next.js 14, Go, and PostgreSQL.',
-	repository: 'https://github.com/yourusername/GestorDePresupuesto',
+	repository: 'https://github.com/Osmait/GestorDePresupuesto',
 	liveDemo: '/login',
 	developer: {
-		name: 'Your Name',
+		name: 'Jose Saul Burgos',
 		role: 'Full-Stack Developer',
-		linkedin: 'https://linkedin.com/in/yourprofile',
-		github: 'https://github.com/yourusername',
+		linkedin: 'https://www.linkedin.com/in/jos%C3%A9-sa%C3%BAl-burgos-35680b244/',
+		github: 'https://github.com/Osmait',
 	}
 }
 
