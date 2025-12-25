@@ -49,6 +49,8 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id 
 				transaction.BudgetId = budgetID.String
 			}
 			transactions = append(transactions, &transaction)
+		} else {
+			log.Error().Err(err).Msg("failed to scan row in FindAllOfAllAccounts")
 		}
 
 	}
@@ -81,6 +83,8 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 				transaction.BudgetId = budgetID.String
 			}
 			transactions = append(transactions, &transaction)
+		} else {
+			log.Error().Err(err).Msg("failed to scan row in FindAll")
 		}
 
 	}
@@ -137,10 +141,13 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 		var currentBudget float64
 		if err = rows.Scan(&budgetID, &currentBudget); err == nil {
 			budgets[budgetID] = currentBudget
+		} else {
+			// Added debug log to catch the specific scan error
+			log.Error().Err(err).Str("userId", userId).Msg("failed to scan row in FindCurrentBudgets")
 		}
 	}
 	if err = rows.Err(); err != nil {
-		log.Error().Err(err).Msg("error iterating over budget rows")
+		log.Error().Err(err).Msg("error iterating over transaction rows (FindCurrentBudgets)")
 		return nil, err
 	}
 
