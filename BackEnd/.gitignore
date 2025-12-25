@@ -158,3 +158,6 @@ dev-scripts/
 
 # Claude AI assistant files
 .claude/ 
+
+build-errors.log
+tmp/** */
