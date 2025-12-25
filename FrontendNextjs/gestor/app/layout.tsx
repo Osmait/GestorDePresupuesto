@@ -9,6 +9,9 @@ import { Toaster } from "@/components/ui/sonner"
 import { cn } from '@/lib/utils'
 import { NextIntlClientProvider } from 'next-intl'
 import { getMessages, getLocale } from 'next-intl/server'
+import { Analytics } from "@vercel/analytics/next"
+import { SpeedInsights } from "@vercel/speed-insights/next"
+
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const plusJakarta = Plus_Jakarta_Sans({
@@ -88,6 +91,8 @@ export default async function RootLayout({
 					</ThemeProvider>
 				</AuthSessionProvider>
 				<Toaster />
+        <Analytics />
+        <SpeedInsights />
 			</body>
 		</html>
 	)
