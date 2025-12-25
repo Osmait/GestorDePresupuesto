@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-faker/faker/v4"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
@@ -39,6 +40,11 @@ func (m *MockUserRepostory) Save(ctx context.Context, user *user.User) error {
 
 func (m *MockUserRepostory) Delete(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockUserRepostory) DeleteDemoUsersOlderThan(ctx context.Context, olderThan time.Time) error {
+	args := m.Called(ctx, olderThan)
 	return args.Error(0)
 }
 

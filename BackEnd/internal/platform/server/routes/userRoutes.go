@@ -10,4 +10,5 @@ func UserRoute(s *gin.Engine, userService *user.UserService) {
 	s.GET("user/:id", handler.GetUser(userService))
 	s.GET("/profile", handler.GetProfile(userService))
 	s.POST("user", handler.CreateUser(userService))
+	s.DELETE("/users/demos", handler.CleanupDemoUsers(userService))
 }

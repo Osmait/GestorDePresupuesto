@@ -3,6 +3,7 @@ package postgress
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/rs/zerolog/log"
 
@@ -16,6 +17,101 @@ type UserRepository struct {
 
 func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
+}
+
+// DeleteDemoUsersOlderThan deletes all demo users created before the specified time
+func (u *UserRepository) DeleteDemoUsersOlderThan(ctx context.Context, olderThan time.Time) error {
+	tx, err := u.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	// Defer a rollback in case anything fails.
+	defer func() {
+		_ = tx.Rollback()
+	}()
+
+	// 1. Delete transactions
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM transactions 
+		WHERE user_id IN (
+			SELECT id FROM users WHERE is_demo = true AND created_at < $1
+		)`, olderThan)
+	if err != nil {
+		return err
+	}
+
+	// 2. Delete recurring transactions (if user_id present, assuming they exist)
+	// Check schema first or just try to delete if table exists
+	_, _ = tx.ExecContext(ctx, `
+		DELETE FROM recurring_transactions 
+		WHERE user_id IN (
+			SELECT id FROM users WHERE is_demo = true AND created_at < $1
+		)`, olderThan)
+
+	// 3. Delete budgets
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM budgets 
+		WHERE user_id IN (
+			SELECT id FROM users WHERE is_demo = true AND created_at < $1
+		)`, olderThan)
+	if err != nil {
+		return err
+	}
+
+	// 4. Delete investments
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM investments 
+		WHERE user_id IN (
+			SELECT id FROM users WHERE is_demo = true AND created_at < $1
+		)`, olderThan)
+	if err != nil {
+		return err
+	}
+
+	// 5. Delete cryptos
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM cryptos 
+		WHERE user_id IN (
+			SELECT id FROM users WHERE is_demo = true AND created_at < $1
+		)`, olderThan)
+	if err != nil {
+		return err
+	}
+
+	// 6. Delete accounts (must be after transactions)
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM account 
+		WHERE user_id IN (
+			SELECT id FROM users WHERE is_demo = true AND created_at < $1
+		)`, olderThan)
+	if err != nil {
+		return err
+	}
+
+	// 7. Delete categories (must be after transactions/budgets)
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM categorys 
+		WHERE user_id IN (
+			SELECT id FROM users WHERE is_demo = true AND created_at < $1
+		)`, olderThan)
+	if err != nil {
+		return err
+	}
+
+	// 8. Delete users
+	_, err = tx.ExecContext(ctx, `
+		DELETE FROM users 
+		WHERE is_demo = true AND created_at < $1`, olderThan)
+	if err != nil {
+		return err
+	}
+
+	// Commit the transaction.
+	if err = tx.Commit(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (u *UserRepository) Save(ctx context.Context, user *user.User) error {

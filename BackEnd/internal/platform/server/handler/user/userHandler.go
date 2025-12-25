@@ -51,3 +51,15 @@ func CreateUser(userService *user.UserService) gin.HandlerFunc {
 		c.Status(http.StatusOK)
 	}
 }
+
+func CleanupDemoUsers(userService *user.UserService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// Pass 0 to delete all demo users immediately (regardless of age)
+		err := userService.DeleteDemoUsers(c, 0)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+		c.Status(http.StatusOK)
+	}
+}

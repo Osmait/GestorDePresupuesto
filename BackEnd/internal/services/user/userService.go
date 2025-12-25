@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
@@ -283,4 +284,11 @@ func (u *UserService) GetUserWithRetry(ctx context.Context, id string) (*dto.Use
 	}
 
 	return result, nil
+}
+
+// DeleteDemoUsers deletes demo users older than the specified retention duration.
+// If retention is 0, it deletes all demo users created before now.
+func (u *UserService) DeleteDemoUsers(ctx context.Context, retention time.Duration) error {
+	olderThan := time.Now().Add(-retention)
+	return u.userRepository.DeleteDemoUsersOlderThan(ctx, olderThan)
 }
