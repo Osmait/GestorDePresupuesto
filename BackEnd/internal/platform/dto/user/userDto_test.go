@@ -18,7 +18,7 @@ func TestUserRequest(t *testing.T) {
 
 func TestUserResponse(t *testing.T) {
 	user := utils.GetNewRandomUser()
-	userRequest := NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.CreatedAt)
+	userRequest := NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.Role, user.CreatedAt)
 	assert.Equal(t, userRequest.Email, user.Email)
 	assert.Equal(t, userRequest.Name, user.Name)
 	assert.Equal(t, userRequest.LastName, user.LastName)

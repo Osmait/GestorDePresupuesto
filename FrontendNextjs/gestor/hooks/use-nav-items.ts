@@ -9,7 +9,9 @@ import {
     PiggyBank,
     BarChart,
     TrendingUp,
+    Shield,
 } from 'lucide-react'
+import { useAdmin } from './useAdmin'
 
 /**
  * Interface representing a navigation item in the sidebar.
@@ -83,6 +85,16 @@ export function useNavItems() {
     ]
 
     const bottomNavItems: NavItem[] = []
+
+    const { isAdmin } = useAdmin()
+    if (isAdmin) {
+        navItems.push({
+            title: "Admin",
+            href: '/admin/dashboard',
+            icon: Shield, // Need to import Shield
+            description: "Admin Management"
+        })
+    }
 
     return { navItems, bottomNavItems }
 }

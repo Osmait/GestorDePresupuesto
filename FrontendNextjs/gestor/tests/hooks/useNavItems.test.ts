@@ -7,6 +7,14 @@ vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key
 }))
 
+// Mock useAdmin
+vi.mock('@/hooks/useAdmin', () => ({
+    useAdmin: () => ({
+        isAdmin: false,
+        isLoading: false
+    })
+}))
+
 describe('useNavItems', () => {
     it('returns navigation items array', () => {
         const { result } = renderHook(() => useNavItems())

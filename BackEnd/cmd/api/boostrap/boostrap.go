@@ -93,6 +93,9 @@ func Run() error {
 	scheduler := worker.NewTransactionScheduler(services.recurringService)
 	scheduler.Start(ctx)
 
+	demoCleanupWorker := worker.NewDemoCleanupWorker(services.userService, 24*time.Hour)
+	demoCleanupWorker.Start(ctx)
+
 	serverCtx, srv := server.New(
 		ctx,
 		cfg.Server.Host,

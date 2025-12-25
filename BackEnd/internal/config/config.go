@@ -84,12 +84,21 @@ type SecurityConfig struct {
 
 // RateLimitConfig holds rate limiting configuration
 type RateLimitConfig struct {
-	Enabled     bool          `json:"enabled"`
-	Requests    int           `json:"requests" validate:"min=1"`
-	Window      time.Duration `json:"window" validate:"required"`
-	Burst       int           `json:"burst" validate:"min=1"`
-	IPWhitelist []string      `json:"ip_whitelist"`
-	UserBased   bool          `json:"user_based"`
+	Enabled     bool                      `json:"enabled"`
+	Requests    int                       `json:"requests" validate:"min=1"`
+	Window      time.Duration             `json:"window" validate:"required"`
+	Burst       int                       `json:"burst" validate:"min=1"`
+	IPWhitelist []string                  `json:"ip_whitelist"`
+	UserBased   bool                      `json:"user_based"`
+	Endpoints   []EndpointRateLimitConfig `json:"endpoints"`
+}
+
+// EndpointRateLimitConfig holds rate limiting configuration for a specific endpoint
+type EndpointRateLimitConfig struct {
+	Path     string        `json:"path" validate:"required"`
+	Requests int           `json:"requests" validate:"min=1"`
+	Window   time.Duration `json:"window" validate:"required"`
+	Burst    int           `json:"burst" validate:"min=1"`
 }
 
 // CORSConfig holds CORS configuration
@@ -242,7 +251,15 @@ func LoadConfig() (*Config, error) {
 			Window:      getDuration(getEnvString("RATE_LIMIT_WINDOW", "1m")),
 			Burst:       getEnvInt("RATE_LIMIT_BURST", 50),
 			IPWhitelist: getEnvStringSlice("RATE_LIMIT_IP_WHITELIST", []string{"127.0.0.1", "::1"}),
-			UserBased:   getEnvBool("RATE_LIMIT_USER_BASED", true),
+			UserBased:   getEnvBool("RATE_LIMIT_USER_BASED", false),
+			Endpoints: []EndpointRateLimitConfig{
+				{
+					Path:     "/auth/demo",  // Strict limit for demo user creation
+					Requests: 5,             // Only 5 requests
+					Window:   1 * time.Hour, // Per hour
+					Burst:    1,             // No burst allowed
+				},
+			},
 		},
 
 		CORS: CORSConfig{

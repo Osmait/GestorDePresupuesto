@@ -145,29 +145,29 @@ function MainHeader({ isExpanded, toggleMobile }: {
 	const tDash = useTranslations('dashboard')
 	return (
 		<header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg">
-			<div className="flex h-16 items-center justify-between px-4 lg:px-6">
-				<div className="flex items-center gap-4">
+			<div className="flex h-14 sm:h-16 items-center justify-between px-2 sm:px-4 lg:px-6 gap-2">
+				<div className="flex items-center gap-2 sm:gap-4 min-w-0">
 					<Button
 						variant="ghost"
 						size="sm"
 						onClick={toggleMobile}
-						className="lg:hidden"
+						className="lg:hidden flex-shrink-0"
 					>
 						<Menu className="h-4 w-4" />
 					</Button>
 
 					{isExpanded && (
-						<div>
-							<h1 className="text-xl font-semibold text-foreground">{tDash('title')}</h1>
-							<p className="text-sm text-muted-foreground">{t('dashboardDesc')}</p>
+						<div className="hidden sm:block min-w-0">
+							<h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">{tDash('title')}</h1>
+							<p className="text-xs sm:text-sm text-muted-foreground truncate">{t('dashboardDesc')}</p>
 						</div>
 					)}
 				</div>
 
-				<div className="flex items-center gap-4">
+				<div className="flex items-center gap-1 sm:gap-2 lg:gap-4 flex-shrink-0">
 					<Search />
 
-					<div className="flex items-center gap-2">
+					<div className="flex items-center gap-1">
 						<NotificationCenter />
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>

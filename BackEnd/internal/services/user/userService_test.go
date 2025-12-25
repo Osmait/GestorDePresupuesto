@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -32,6 +33,11 @@ func (m *MockUserRepostory) FindUserByEmail(ctx context.Context, email string) (
 	return args.Get(0).(*user.User), args.Error(1)
 }
 
+func (m *MockUserRepostory) FindUserByIp(ctx context.Context, ip string) (*user.User, error) {
+	args := m.Called(ctx, ip)
+	return args.Get(0).(*user.User), args.Error(1)
+}
+
 func (m *MockUserRepostory) Save(ctx context.Context, user *user.User) error {
 	args := m.Called(ctx, user)
 	return args.Error(0)
@@ -39,6 +45,21 @@ func (m *MockUserRepostory) Save(ctx context.Context, user *user.User) error {
 
 func (m *MockUserRepostory) Delete(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockUserRepostory) DeleteDemoUsersOlderThan(ctx context.Context, olderThan time.Time) error {
+	args := m.Called(ctx, olderThan)
+	return args.Error(0)
+}
+
+func (m *MockUserRepostory) FindAll(ctx context.Context) ([]*user.User, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]*user.User), args.Error(1)
+}
+
+func (m *MockUserRepostory) Update(ctx context.Context, u *user.User) error {
+	args := m.Called(ctx, u)
 	return args.Error(0)
 }
 
@@ -228,7 +249,7 @@ func TestUpdateUser(t *testing.T) {
 	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
 	mockRepo.On("FindUserById", context.Background(), user1.Id).Return(user1, nil)
 	// No need to mock FindUserByEmail since we're not changing the email
-	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
+	mockRepo.On("Update", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
 	userServie := NewUserService(mockRepo)
 	err := userServie.UpdateUser(context.Background(), user1.Id, userRequest)
 	assert.NoError(t, err)
@@ -243,6 +264,7 @@ func TestUpdateUserWithExistingEmail(t *testing.T) {
 	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user2.Email)
 	mockRepo.On("FindUserById", context.Background(), user1.Id).Return(user1, nil)
 	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(user2, nil)
+	// FindUserByEmail will find user2, so it should NOT call Update
 	userServie := NewUserService(mockRepo)
 	err := userServie.UpdateUser(context.Background(), user1.Id, userRequest)
 	assert.Error(t, err)

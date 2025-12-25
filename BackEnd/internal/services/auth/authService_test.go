@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/go-faker/faker/v4"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
@@ -27,6 +28,11 @@ func (m *MockUserRepostory) FindUserByEmail(ctx context.Context, email string) (
 	return args.Get(0).(*user.User), args.Error(1)
 }
 
+func (m *MockUserRepostory) FindUserByIp(ctx context.Context, ip string) (*user.User, error) {
+	args := m.Called(ctx, ip)
+	return args.Get(0).(*user.User), args.Error(1)
+}
+
 func (m *MockUserRepostory) Save(ctx context.Context, user *user.User) error {
 	args := m.Called(ctx, user)
 	return args.Error(0)
@@ -34,6 +40,21 @@ func (m *MockUserRepostory) Save(ctx context.Context, user *user.User) error {
 
 func (m *MockUserRepostory) Delete(ctx context.Context, id string) error {
 	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
+func (m *MockUserRepostory) DeleteDemoUsersOlderThan(ctx context.Context, olderThan time.Time) error {
+	args := m.Called(ctx, olderThan)
+	return args.Error(0)
+}
+
+func (m *MockUserRepostory) FindAll(ctx context.Context) ([]*user.User, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]*user.User), args.Error(1)
+}
+
+func (m *MockUserRepostory) Update(ctx context.Context, u *user.User) error {
+	args := m.Called(ctx, u)
 	return args.Error(0)
 }
 

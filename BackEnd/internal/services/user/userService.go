@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
@@ -101,7 +102,7 @@ func (u *UserService) FindByEmail(ctx context.Context, email string) (*dto.UserR
 		}
 
 		// Create response
-		userResponse := dto.NewUserResponse(foundUser.Id, foundUser.Name, foundUser.LastName, foundUser.Email, foundUser.CreatedAt)
+		userResponse := dto.NewUserResponse(foundUser.Id, foundUser.Name, foundUser.LastName, foundUser.Email, foundUser.Role, foundUser.CreatedAt)
 		return userResponse, nil
 	})
 }
@@ -143,7 +144,7 @@ func (u *UserService) FindUserById(ctx context.Context, id string) (*dto.UserRes
 		}
 
 		// Create response
-		userResponse := dto.NewUserResponse(foundUser.Id, foundUser.Name, foundUser.LastName, foundUser.Email, foundUser.CreatedAt)
+		userResponse := dto.NewUserResponse(foundUser.Id, foundUser.Name, foundUser.LastName, foundUser.Email, foundUser.Role, foundUser.CreatedAt)
 		return userResponse, nil
 	})
 }
@@ -258,10 +259,35 @@ func (u *UserService) UpdateUser(ctx context.Context, id string, userRequest *dt
 		}
 
 		// Save updated user
-		if err := u.userRepository.Save(ctx, existingUser); err != nil {
-			return apperrors.WrapDatabaseError(ctx, err, "Save updated user")
+		if err := u.userRepository.Update(ctx, existingUser); err != nil {
+			return apperrors.WrapDatabaseError(ctx, err, "Update user")
 		}
 
+		return nil
+	})
+}
+
+// BatchUpdateUsers updates multiple users in a single operation.
+func (u *UserService) BatchUpdateUsers(ctx context.Context, updates []dto.UserResponse) error {
+	return apperrors.SafeCall(ctx, "BatchUpdateUsers", func() error {
+		for _, update := range updates {
+			// Find existing user
+			existingUser, err := u.userRepository.FindUserById(ctx, update.Id)
+			if err != nil {
+				return apperrors.WrapDatabaseError(ctx, err, fmt.Sprintf("FindUserById for batch update: %s", update.Id))
+			}
+
+			// Update fields
+			existingUser.Name = update.Name
+			existingUser.LastName = update.LastName
+			existingUser.Email = update.Email
+			existingUser.Role = update.Role
+
+			// Save change
+			if err := u.userRepository.Update(ctx, existingUser); err != nil {
+				return apperrors.WrapDatabaseError(ctx, err, fmt.Sprintf("Update user in batch: %s", update.Id))
+			}
+		}
 		return nil
 	})
 }
@@ -283,4 +309,27 @@ func (u *UserService) GetUserWithRetry(ctx context.Context, id string) (*dto.Use
 	}
 
 	return result, nil
+}
+
+// DeleteDemoUsers deletes demo users older than the specified retention duration.
+// If retention is 0, it deletes all demo users created before now.
+func (u *UserService) DeleteDemoUsers(ctx context.Context, retention time.Duration) error {
+	olderThan := time.Now().Add(-retention)
+	return u.userRepository.DeleteDemoUsersOlderThan(ctx, olderThan)
+}
+
+// GetAllUsers retrieves all users from the database and returns them as UserResponse DTOs.
+func (u *UserService) GetAllUsers(ctx context.Context) ([]*dto.UserResponse, error) {
+	return apperrors.SafeCallWithResult(ctx, "GetAllUsers", func() ([]*dto.UserResponse, error) {
+		users, err := u.userRepository.FindAll(ctx)
+		if err != nil {
+			return nil, apperrors.WrapDatabaseError(ctx, err, "FindAll users")
+		}
+
+		var response []*dto.UserResponse
+		for _, user := range users {
+			response = append(response, dto.NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.Role, user.CreatedAt))
+		}
+		return response, nil
+	})
 }

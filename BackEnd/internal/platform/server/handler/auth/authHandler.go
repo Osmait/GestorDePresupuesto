@@ -57,7 +57,8 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 //	@Router			/auth/demo [post]
 func DemoLogin(authService *auth.AuthService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		token, err := authService.CreateDemoUser(ctx)
+		ip := ctx.ClientIP()
+		token, err := authService.CreateDemoUser(ctx, ip)
 		if err != nil {
 			log.Error().Err(err).Msg("demo user creation failed")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

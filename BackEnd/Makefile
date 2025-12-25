@@ -38,11 +38,11 @@ all: clean fmt lint test build
 
 ## Build Commands
 
-# Build the application
+# Build the application (native for host OS)
 build:
-	@echo "$(BLUE)Building $(BINARY_NAME)...$(RESET)"
+	@echo "$(BLUE)Building $(BINARY_NAME) for $(shell go env GOOS)/$(shell go env GOARCH)...$(RESET)"
 	@mkdir -p $(BUILD_DIR)
-	@CGO_ENABLED=1 GOOS=linux go build \
+	@go build \
 		-ldflags="-X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME) -X main.goVersion=$(GO_VERSION)" \
 		-o $(BUILD_DIR)/$(BINARY_NAME) \
 		$(MAIN_PATH)
@@ -57,16 +57,16 @@ build-all:
 	@GOOS=windows GOARCH=amd64 go build -o $(BUILD_DIR)/$(BINARY_NAME)-windows-amd64.exe $(MAIN_PATH)
 	@echo "$(GREEN)Multi-platform build completed$(RESET)"
 
-# Build with optimizations for production
+# Build with optimizations for production (Linux target for Docker/Deploy)
 build-prod:
-	@echo "$(BLUE)Building production binary...$(RESET)"
+	@echo "$(BLUE)Building production binary (Linux/amd64)...$(RESET)"
 	@mkdir -p $(BUILD_DIR)
-	@CGO_ENABLED=0 GOOS=linux go build \
+	@CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
 		-a -installsuffix cgo \
 		-ldflags="-w -s -X main.version=$(VERSION) -X main.buildTime=$(BUILD_TIME)" \
-		-o $(BUILD_DIR)/$(BINARY_NAME) \
+		-o $(BUILD_DIR)/$(BINARY_NAME)-linux \
 		$(MAIN_PATH)
-	@echo "$(GREEN)Production build completed$(RESET)"
+	@echo "$(GREEN)Production build completed: $(BUILD_DIR)/$(BINARY_NAME)-linux$(RESET)"
 
 ## Development Commands
 
