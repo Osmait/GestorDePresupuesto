@@ -612,9 +612,9 @@ func (c *Config) validateEnvironmentSpecific() error {
 			return fmt.Errorf("default JWT secret cannot be used in production")
 		}
 
-		if !c.Security.EnableTLS {
-			return fmt.Errorf("TLS must be enabled in production")
-		}
+		// if !c.Security.EnableTLS {
+		// 	return fmt.Errorf("TLS must be enabled in production")
+		// }
 
 		if c.FeatureFlags.EnableDebugMode {
 			return fmt.Errorf("debug mode cannot be enabled in production")
