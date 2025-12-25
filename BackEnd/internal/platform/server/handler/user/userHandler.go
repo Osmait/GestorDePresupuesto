@@ -63,3 +63,14 @@ func CleanupDemoUsers(userService *user.UserService) gin.HandlerFunc {
 		c.Status(http.StatusOK)
 	}
 }
+
+func GetUsers(userService *user.UserService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		users, err := userService.GetAllUsers(c)
+		if err != nil {
+			_ = c.Error(err)
+			return
+		}
+		c.JSON(http.StatusOK, users)
+	}
+}

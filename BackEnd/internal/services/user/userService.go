@@ -292,3 +292,19 @@ func (u *UserService) DeleteDemoUsers(ctx context.Context, retention time.Durati
 	olderThan := time.Now().Add(-retention)
 	return u.userRepository.DeleteDemoUsersOlderThan(ctx, olderThan)
 }
+
+// GetAllUsers retrieves all users from the database and returns them as UserResponse DTOs.
+func (u *UserService) GetAllUsers(ctx context.Context) ([]*dto.UserResponse, error) {
+	return apperrors.SafeCallWithResult(ctx, "GetAllUsers", func() ([]*dto.UserResponse, error) {
+		users, err := u.userRepository.FindAll(ctx)
+		if err != nil {
+			return nil, apperrors.WrapDatabaseError(ctx, err, "FindAll users")
+		}
+
+		var response []*dto.UserResponse
+		for _, user := range users {
+			response = append(response, dto.NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.Role, user.CreatedAt))
+		}
+		return response, nil
+	})
+}

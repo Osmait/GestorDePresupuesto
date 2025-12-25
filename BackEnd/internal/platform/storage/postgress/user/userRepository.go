@@ -8,7 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
+	domainUser "github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 )
 
@@ -136,66 +136,12 @@ func (u *UserRepository) DeleteDemoUsersOlderThan(ctx context.Context, olderThan
 	return nil
 }
 
-func (u *UserRepository) Save(ctx context.Context, user *user.User) error {
+func (u *UserRepository) Save(ctx context.Context, user *domainUser.User) error {
 	_, err := u.db.ExecContext(ctx, "INSERT INTO users (id, name , last_name,email, password,token, confirmed, is_demo, ip_address, role) VALUES ($1,$2,$3,$4,$5,$6, $7, $8, $9, $10)", user.Id, user.Name, user.LastName, user.Email, user.Password, user.Token, user.Confirmed, user.IsDemo, user.IpAddress, user.Role)
 	return err
 }
 
-func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*user.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE ip_address = $1", ip)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close database rows")
-		}
-	}()
-
-	user := user.User{}
-	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role); err != nil {
-			return nil, err
-		}
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	if user.Id == "" {
-		return nil, errorhttp.ErrNotFound
-	}
-	return &user, nil
-}
-
-func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*user.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE email = $1", email)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close database rows")
-		}
-	}()
-
-	user := user.User{}
-	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role); err != nil {
-			return nil, err
-		}
-	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	if user.Id == "" {
-		return nil, errorhttp.ErrNotFound
-	}
-	return &user, nil
-}
-
-func (u *UserRepository) FindUserById(ctx context.Context, id string) (*user.User, error) {
+func (u *UserRepository) FindUserById(ctx context.Context, id string) (*domainUser.User, error) {
 	rows, err := u.db.QueryContext(ctx, "SELECT id,name,last_name,email, role FROM users WHERE id = $1", id)
 	if err != nil {
 		return nil, err
@@ -206,7 +152,7 @@ func (u *UserRepository) FindUserById(ctx context.Context, id string) (*user.Use
 			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
-	user := user.User{}
+	user := domainUser.User{}
 	for rows.Next() {
 		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Role); err == nil {
 			return &user, nil
@@ -218,7 +164,87 @@ func (u *UserRepository) FindUserById(ctx context.Context, id string) (*user.Use
 	return &user, nil
 }
 
+func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*domainUser.User, error) {
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE ip_address = $1", ip)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	user := domainUser.User{}
+	for rows.Next() {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role); err != nil {
+			return nil, err
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	if user.Id == "" {
+		return nil, errorhttp.ErrNotFound
+	}
+	return &user, nil
+}
+
+func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*domainUser.User, error) {
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE email = $1", email)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	user := domainUser.User{}
+	for rows.Next() {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role); err != nil {
+			return nil, err
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	if user.Id == "" {
+		return nil, errorhttp.ErrNotFound
+	}
+	return &user, nil
+}
+
 func (u *UserRepository) Delete(ctx context.Context, id string) error {
 	_, err := u.db.ExecContext(ctx, "DELETE FROM users WHERE id = $1", id)
 	return err
+}
+
+func (u *UserRepository) FindAll(ctx context.Context) ([]*domainUser.User, error) {
+	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users ORDER BY created_at DESC")
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	var users []*domainUser.User
+	for rows.Next() {
+		var user domainUser.User
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role, &user.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, &user)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return users, nil
 }

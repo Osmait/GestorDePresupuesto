@@ -53,6 +53,11 @@ func (m *MockUserRepostory) DeleteDemoUsersOlderThan(ctx context.Context, olderT
 	return args.Error(0)
 }
 
+func (m *MockUserRepostory) FindAll(ctx context.Context) ([]*user.User, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]*user.User), args.Error(1)
+}
+
 func TestCreateUser(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	user1 := utils.GetNewRandomUser()

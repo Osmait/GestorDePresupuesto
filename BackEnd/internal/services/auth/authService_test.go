@@ -48,6 +48,11 @@ func (m *MockUserRepostory) DeleteDemoUsersOlderThan(ctx context.Context, olderT
 	return args.Error(0)
 }
 
+func (m *MockUserRepostory) FindAll(ctx context.Context) ([]*user.User, error) {
+	args := m.Called(ctx)
+	return args.Get(0).([]*user.User), args.Error(1)
+}
+
 func getNewUser() *user.User {
 	user1 := user.NewUser(faker.ID, faker.Name(), faker.LastName(), faker.Email(), faker.Password())
 	return user1
