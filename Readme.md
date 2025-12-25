@@ -1,112 +1,523 @@
+# 💰 Gestor de Presupuesto
+
+> A **full-stack personal finance management application** built to practice and demonstrate modern software engineering patterns, advanced backend techniques, and responsive frontend development.
+
+![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-14-black?style=flat&logo=next.js&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat&logo=postgresql&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5.x-3178C6?style=flat&logo=typescript&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=flat&logo=docker&logoColor=white)
+
 ---
-id: "2023-12-31"
-aliases:
-  - Project Name
-  - Tracker Finances app
-  - Tracker Finances App
-tags: []
+
+## 🎯 Project Purpose
+
+This project serves as a **learning playground** to practice and implement:
+
+- Clean Architecture principles in Go
+- Advanced backend patterns (rate limiting, caching, workers, SSE)
+- Modern React patterns with Next.js 14 App Router
+- Real-time notifications with Server-Sent Events
+- Responsive design and mobile-first development
+- Testing strategies (unit, integration, e2e)
+
 ---
 
-# Tracker Finances App
+## ✨ Key Features
 
-# Description
+### 📊 Financial Management
+- **Transaction Tracking**: Income and expense management with categories
+- **Account Management**: Multiple bank accounts with balance tracking
+- **Budget Planning**: Category-based budgets with progress tracking
+- **Investment Portfolio**: Track crypto and stock investments
+- **Analytics Dashboard**: Visual insights with charts and summaries
 
-Finances Tracker that will allow you to follow your income, bills, investment (Crypto, stock market )
+### 🔔 Real-Time Notifications
+- Server-Sent Events (SSE) for instant updates
+- Per-user notification streams
+- Notification history with read/unread status
+- Browser notification support
 
-# Technologies
+### 🔄 Recurring Transactions
+- Automated transaction scheduling
+- Background worker for recurring payments
+- Support for daily, weekly, monthly frequencies
 
-## BackEnd
+### 🛡️ Admin Backoffice
+- User management with editable table
+- Demo user cleanup automation
+- Batch user updates with confirmation modal
 
-- Golang
-- Postgres
-- Crypto and stock api
+---
 
-## FrontEnd
+## 🏗️ Architecture Overview
 
-- Nextsj
-- shadcn/ui
-- reacharts/charts
+### Backend Architecture (Clean Architecture)
 
-## Mobile
+```
+┌─────────────────────────────────────────────────────────────┐
+│                    Frameworks & Drivers                      │
+│  ┌─────────┐ ┌──────────┐ ┌──────────┐ ┌─────────────────┐  │
+│  │   Gin   │ │PostgreSQL│ │  Docker  │ │ Zerolog Logger  │  │
+│  └─────────┘ └──────────┘ └──────────┘ └─────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                   Interface Adapters                         │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐│
+│  │  Handlers   │ │Repositories │ │      Middleware         ││
+│  │(Controllers)│ │ (Database)  │ │(Auth, RateLimit, CORS)  ││
+│  └─────────────┘ └─────────────┘ └─────────────────────────┘│
+├─────────────────────────────────────────────────────────────┤
+│                Application Business Rules                    │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐│
+│  │  Services   │ │   Workers   │ │   Notification SSE      ││
+│  │(Use Cases)  │ │(Background) │ │   (Real-time Push)      ││
+│  └─────────────┘ └─────────────┘ └─────────────────────────┘│
+├─────────────────────────────────────────────────────────────┤
+│               Enterprise Business Rules                      │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐│
+│  │  Entities   │ │Value Objects│ │     Validation          ││
+│  │User,Account │ │   Money     │ │      Rules              ││
+│  └─────────────┘ └─────────────┘ └─────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
 
-- flutter
-- provider(state manager)
-- fl charts(charts)
+### Frontend Architecture
 
-## Model Data
+```
+┌─────────────────────────────────────────────────────────────┐
+│                      Next.js 14 App Router                   │
+├─────────────────────────────────────────────────────────────┤
+│                         Pages (RSC)                          │
+│  ┌──────────┐ ┌─────────┐ ┌─────────┐ ┌──────────────────┐  │
+│  │Dashboard │ │Accounts │ │Budgets  │ │ Admin Backoffice │  │
+│  └──────────┘ └─────────┘ └─────────┘ └──────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                    Client Components                         │
+│  ┌──────────────┐ ┌────────────┐ ┌───────────────────────┐  │
+│  │ shadcn/ui    │ │  Recharts  │ │  Animated Components  │  │
+│  │  Components  │ │   Charts   │ │   (Framer Motion)     │  │
+│  └──────────────┘ └────────────┘ └───────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                     State & Data                             │
+│  ┌─────────────┐ ┌─────────────┐ ┌───────────────────────┐  │
+│  │React Query  │ │  Zustand    │ │ SSE Notifications     │  │
+│  │(Server Data)│ │(Client State)│ │(Real-time Updates)    │  │
+│  └─────────────┘ └─────────────┘ └───────────────────────┘  │
+├─────────────────────────────────────────────────────────────┤
+│                   Internationalization                       │
+│  ┌─────────────────────────────────────────────────────────┐│
+│  │               next-intl (ES/EN)                         ││
+│  └─────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────────────────────────┘
+```
 
-### User
+---
 
-| Field      | Type        |
-| ---------- | ----------- |
-| id         | Varchar     |
-| name       | Varchar     |
-| last_name  | Varchar     |
-| email      | Varchar     |
-| password   | Varchar     |
-| token      | Varchar     |
-| confirmed  | Boolean     |
-| Created_at | Timestamptz |
+## 🔧 Advanced Backend Features
 
-### Account
+### 1. Rate Limiting
 
-| Field       | Type        |
-| ----------- | ----------- |
-| id          | Varchar     |
-| name_accout | Varchar     |
-| bank        | Varchar     |
-| email       | Varchar     |
-| balance     | float       |
-| token       | Varchar     |
-| user_id     | Varchar     |
-| Created_at  | Timestamptz |
+Configurable rate limiting with multiple strategies:
 
-### Category
+```go
+// Features:
+- IP-based rate limiting (default fallback)
+- User-based rate limiting (authenticated users)
+- Endpoint-specific configurations
+- Burst traffic allowance
+- IP whitelist support (CIDR notation)
+- Automatic cleanup of old entries
+- Rate limit headers (X-RateLimit-Limit, X-RateLimit-Remaining)
+```
 
-| Field      | Type        |
-| ---------- | ----------- |
-| id         | Varchar     |
-| name       | Varchar     |
-| icon       | Varchar     |
-| Created_at | Timestamptz |
-| user_id    | Varchar     |
+### 2. Background Workers
 
-### Crypto Or Stock
+Scheduled background tasks for maintenance and automation:
 
-| Field         | Type        |
-| ------------- | ----------- |
-| id            | Varchar     |
-| name          | Varchar     |
-| price         | float       |
-| current_price | float       |
-| quantity      | int         |
-| Created_at    | Timestamptz |
-| user_id       | Varchar     |
+| Worker | Description | Interval |
+|--------|-------------|----------|
+| **Demo Cleanup** | Removes demo users after 24h | Configurable |
+| **Transaction Scheduler** | Processes recurring transactions | Hourly |
 
-### Budget
+### 3. In-Memory Cache
 
-| Field       | Type        |
-| ----------- | ----------- |
-| id          | Varchar     |
-| category_id | Varchar     |
-| amount      | float       |
-| Created_at  | Timestamptz |
-| user_id     | Varchar     |
+High-performance caching layer:
 
-### Transactions
+```go
+// Capabilities:
+- TTL-based expiration
+- Automatic cleanup intervals
+- Prefix-based deletion
+- Full cache flush
+- Thread-safe operations
+```
 
-| Field                   | Type                 |
-| ----------------------- | -------------------- |
-| id                      | Varchar              |
-| transaction_name        | Varchar              |
-| transaction_description | Varchar              |
-| amount                  | float                |
-| type_transaction        | enum(bill or income) |
-| account_id              | Varchar              |
-| category_id             | Varchar              |
-| budget_id               | Varchar Optinal      |
-| user_id                 | Varchar              |
-| Created_at              | Timestamptz          |
+### 4. Server-Sent Events (SSE)
 
-![image](https://github.com/Osmait/GestorDePresupuesto/assets/108156933/d227fef8-7780-49e2-be88-f3d31f48e74e)
+Real-time notification system:
 
+```go
+// Implementation:
+- Per-user notification streams
+- Automatic stream creation
+- Message history persistence
+- Read/unread status tracking
+- Bulk operations (mark all read, delete all)
+```
+
+### 5. Observability
+
+Structured logging with Zerolog:
+
+- Request/response logging middleware
+- Error tracking with stack traces
+- Performance metrics
+- Configurable log levels
+
+---
+
+## 🎨 Frontend Features
+
+### React Server Components (RSC)
+
+Optimized data fetching with Next.js 14:
+
+- Server-side data loading
+- Streaming with Suspense
+- Minimal client-side JavaScript
+
+### Real-Time Updates
+
+SSE integration for instant notifications:
+
+```typescript
+// Using @microsoft/fetch-event-source
+- Automatic reconnection
+- Bearer token authentication
+- Event parsing and state updates
+```
+
+### Internationalization (i18n)
+
+Full multi-language support:
+
+- Spanish (ES) and English (EN)
+- Server-side translations
+- URL-based locale detection
+
+### Responsive Design
+
+Mobile-first responsive UI:
+
+- Collapsible sidebar navigation
+- Icon-only tabs on mobile
+- Fullscreen search modal for mobile
+- Horizontal scroll containment for tables
+
+### UI Components
+
+Built with shadcn/ui and Radix:
+
+- Animated tabs with sliding indicators
+- Data tables with sorting and filtering
+- Toast notifications (Sonner)
+- Form validation (react-hook-form + Zod)
+
+### Charts & Visualizations
+
+Multiple chart libraries:
+
+- **Recharts**: Line and bar charts
+- **Nivo**: Pie charts, heatmaps, radar charts
+- **Animated counters**: Smooth number transitions
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend
+
+| Technology | Purpose |
+|------------|---------|
+| **Go 1.21+** | Primary language |
+| **Gin** | HTTP framework |
+| **PostgreSQL** | Primary database |
+| **SQLite** | Testing database |
+| **JWT** | Authentication |
+| **r3labs/sse** | Server-Sent Events |
+| **go-cache** | In-memory caching |
+| **Zerolog** | Structured logging |
+| **golang-migrate** | Database migrations |
+| **testify** | Testing framework |
+
+### Frontend
+
+| Technology | Purpose |
+|------------|---------|
+| **Next.js 14** | React framework (App Router) |
+| **TypeScript** | Type safety |
+| **Tailwind CSS** | Styling |
+| **shadcn/ui** | UI component library |
+| **React Query** | Server state management |
+| **Zustand** | Client state management |
+| **next-intl** | Internationalization |
+| **NextAuth** | Authentication |
+| **Framer Motion** | Animations |
+| **Vitest** | Testing framework |
+
+### DevOps
+
+| Technology | Purpose |
+|------------|---------|
+| **Docker** | Containerization |
+| **Docker Compose** | Local development |
+| **GitHub Actions** | CI/CD |
+| **Make** | Build automation |
+
+---
+
+## 📁 Project Structure
+
+```
+GestorDePresupuesto/
+├── BackEnd/                    # Go backend
+│   ├── cmd/                    # Application entrypoints
+│   │   └── api/
+│   │       └── bootstrap/      # Dependency injection
+│   ├── internal/
+│   │   ├── config/             # Configuration
+│   │   ├── domain/             # Entities (User, Account, etc.)
+│   │   ├── services/           # Business logic
+│   │   ├── platform/
+│   │   │   ├── cache/          # In-memory cache
+│   │   │   ├── dto/            # Data Transfer Objects
+│   │   │   ├── server/
+│   │   │   │   ├── handler/    # HTTP handlers
+│   │   │   │   ├── middleware/ # Auth, RateLimit, CORS
+│   │   │   │   └── routes/     # Route definitions
+│   │   │   ├── storage/        # Repository implementations
+│   │   │   ├── worker/         # Background workers
+│   │   │   └── observability/  # Logging
+│   │   └── e2e/                # E2E tests
+│   ├── docs/                   # Documentation
+│   └── docker-compose.yaml
+│
+├── FrontendNextjs/gestor/      # Next.js frontend
+│   ├── app/                    # App Router pages
+│   │   ├── (auth)/             # Auth pages (login, register)
+│   │   ├── admin/              # Admin backoffice
+│   │   ├── app/                # Main application
+│   │   │   ├── accounts/
+│   │   │   ├── budget/
+│   │   │   ├── transactions/
+│   │   │   └── analysis/
+│   │   └── api/                # API routes
+│   ├── components/
+│   │   ├── common/             # Shared components
+│   │   ├── ui/                 # shadcn/ui components
+│   │   └── transactions/       # Feature components
+│   ├── contexts/               # React contexts
+│   ├── hooks/                  # Custom hooks
+│   │   └── queries/            # React Query hooks
+│   ├── lib/                    # Utilities
+│   ├── messages/               # i18n translations
+│   ├── types/                  # TypeScript types
+│   └── tests/                  # Unit tests
+│
+├── e2e-test/                   # E2E test suite
+├── Makefile                    # Build commands
+└── README.md
+```
+
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- Go 1.21+
+- Node.js 18+
+- PostgreSQL 16+ (or Docker)
+- Make
+
+### Backend
+
+```bash
+# Navigate to backend
+cd BackEnd
+
+# Start PostgreSQL with Docker
+docker-compose up -d
+
+# Run migrations
+make migrate
+
+# Start the server (with hot reload)
+make dev
+```
+
+### Frontend
+
+```bash
+# Navigate to frontend
+cd FrontendNextjs/gestor
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+### Using Makefile (from root)
+
+```bash
+# Run both backend and frontend checks
+make backend-check
+make frontend-check
+
+# Run all tests
+make test
+```
+
+---
+
+## 📋 Data Model
+
+```mermaid
+erDiagram
+    USER ||--o{ ACCOUNT : owns
+    USER ||--o{ CATEGORY : creates
+    USER ||--o{ BUDGET : sets
+    USER ||--o{ TRANSACTION : makes
+    USER ||--o{ INVESTMENT : tracks
+    USER ||--o{ NOTIFICATION : receives
+    
+    ACCOUNT ||--o{ TRANSACTION : contains
+    CATEGORY ||--o{ TRANSACTION : categorizes
+    CATEGORY ||--o{ BUDGET : limits
+    
+    USER {
+        string id PK
+        string name
+        string last_name
+        string email UK
+        string password
+        string role
+        boolean confirmed
+        boolean is_demo
+        timestamp created_at
+    }
+    
+    ACCOUNT {
+        string id PK
+        string name
+        string bank
+        float initial_balance
+        float current_balance
+        string user_id FK
+    }
+    
+    TRANSACTION {
+        string id PK
+        string name
+        string description
+        float amount
+        enum type
+        string account_id FK
+        string category_id FK
+        string user_id FK
+    }
+    
+    CATEGORY {
+        string id PK
+        string name
+        string icon
+        string color
+        string user_id FK
+    }
+    
+    BUDGET {
+        string id PK
+        float amount
+        float current_amount
+        string category_id FK
+        string user_id FK
+    }
+```
+
+---
+
+## 🧪 Testing
+
+### Backend Tests
+
+```bash
+cd BackEnd
+
+# Unit tests
+make test
+
+# E2E tests
+make test-e2e
+
+# Coverage report
+make coverage
+```
+
+### Frontend Tests
+
+```bash
+cd FrontendNextjs/gestor
+
+# Run tests
+npm run test
+
+# Type checking
+npm run type-check
+
+# Full code quality check
+npm run code-quality
+```
+
+---
+
+## 📚 Documentation
+
+Detailed documentation available in:
+
+- [`BackEnd/ARCHITECTURE.md`](./BackEnd/ARCHITECTURE.md) - Backend architecture deep dive
+- [`BackEnd/CONTRIBUTING.md`](./BackEnd/CONTRIBUTING.md) - Contribution guidelines
+- [`BackEnd/docs/`](./BackEnd/docs/) - Additional documentation
+  - Configuration guide
+  - Error handling patterns
+  - Testing strategies
+
+---
+
+## 🎓 Learning Highlights
+
+This project demonstrates:
+
+1. **Clean Architecture** - Separation of concerns, dependency inversion
+2. **SOLID Principles** - Applied throughout the codebase
+3. **Repository Pattern** - Database abstraction for testability
+4. **Middleware Pattern** - Authentication, rate limiting, logging
+5. **Worker Pattern** - Background job processing
+6. **SSE Pattern** - Real-time event streaming
+7. **React Query** - Server state management
+8. **React Server Components** - Next.js 14 App Router patterns
+9. **Form Validation** - Zod schemas with react-hook-form
+10. **Responsive Design** - Mobile-first with Tailwind CSS
+
+---
+
+## 📄 License
+
+This project is for learning and demonstration purposes.
+
+---
+
+<p align="center">
+  Made with ❤️ for learning modern full-stack development
+</p>
