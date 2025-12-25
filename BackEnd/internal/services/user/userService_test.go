@@ -58,6 +58,11 @@ func (m *MockUserRepostory) FindAll(ctx context.Context) ([]*user.User, error) {
 	return args.Get(0).([]*user.User), args.Error(1)
 }
 
+func (m *MockUserRepostory) Update(ctx context.Context, u *user.User) error {
+	args := m.Called(ctx, u)
+	return args.Error(0)
+}
+
 func TestCreateUser(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	user1 := utils.GetNewRandomUser()
@@ -244,7 +249,7 @@ func TestUpdateUser(t *testing.T) {
 	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
 	mockRepo.On("FindUserById", context.Background(), user1.Id).Return(user1, nil)
 	// No need to mock FindUserByEmail since we're not changing the email
-	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
+	mockRepo.On("Update", context.Background(), mock.AnythingOfType("*user.User")).Return(nil)
 	userServie := NewUserService(mockRepo)
 	err := userServie.UpdateUser(context.Background(), user1.Id, userRequest)
 	assert.NoError(t, err)
@@ -259,6 +264,7 @@ func TestUpdateUserWithExistingEmail(t *testing.T) {
 	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user2.Email)
 	mockRepo.On("FindUserById", context.Background(), user1.Id).Return(user1, nil)
 	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(user2, nil)
+	// FindUserByEmail will find user2, so it should NOT call Update
 	userServie := NewUserService(mockRepo)
 	err := userServie.UpdateUser(context.Background(), user1.Id, userRequest)
 	assert.Error(t, err)

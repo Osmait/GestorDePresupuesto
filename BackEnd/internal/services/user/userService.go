@@ -259,10 +259,35 @@ func (u *UserService) UpdateUser(ctx context.Context, id string, userRequest *dt
 		}
 
 		// Save updated user
-		if err := u.userRepository.Save(ctx, existingUser); err != nil {
-			return apperrors.WrapDatabaseError(ctx, err, "Save updated user")
+		if err := u.userRepository.Update(ctx, existingUser); err != nil {
+			return apperrors.WrapDatabaseError(ctx, err, "Update user")
 		}
 
+		return nil
+	})
+}
+
+// BatchUpdateUsers updates multiple users in a single operation.
+func (u *UserService) BatchUpdateUsers(ctx context.Context, updates []dto.UserResponse) error {
+	return apperrors.SafeCall(ctx, "BatchUpdateUsers", func() error {
+		for _, update := range updates {
+			// Find existing user
+			existingUser, err := u.userRepository.FindUserById(ctx, update.Id)
+			if err != nil {
+				return apperrors.WrapDatabaseError(ctx, err, fmt.Sprintf("FindUserById for batch update: %s", update.Id))
+			}
+
+			// Update fields
+			existingUser.Name = update.Name
+			existingUser.LastName = update.LastName
+			existingUser.Email = update.Email
+			existingUser.Role = update.Role
+
+			// Save change
+			if err := u.userRepository.Update(ctx, existingUser); err != nil {
+				return apperrors.WrapDatabaseError(ctx, err, fmt.Sprintf("Update user in batch: %s", update.Id))
+			}
+		}
 		return nil
 	})
 }

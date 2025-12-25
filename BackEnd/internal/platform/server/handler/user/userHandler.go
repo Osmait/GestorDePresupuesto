@@ -74,3 +74,20 @@ func GetUsers(userService *user.UserService) gin.HandlerFunc {
 		c.JSON(http.StatusOK, users)
 	}
 }
+
+func UpdateUsers(userService *user.UserService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var users []dto.UserResponse
+		if err := c.BindJSON(&users); err != nil {
+			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
+			return
+		}
+
+		if err := userService.BatchUpdateUsers(c, users); err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		c.Status(http.StatusOK)
+	}
+}

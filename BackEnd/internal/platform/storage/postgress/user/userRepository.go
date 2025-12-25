@@ -141,8 +141,14 @@ func (u *UserRepository) Save(ctx context.Context, user *domainUser.User) error 
 	return err
 }
 
+func (u *UserRepository) Update(ctx context.Context, user *domainUser.User) error {
+	_, err := u.db.ExecContext(ctx, "UPDATE users SET name = $1, last_name = $2, email = $3, password = $4, token = $5, confirmed = $6, is_demo = $7, ip_address = $8, role = $9 WHERE id = $10",
+		user.Name, user.LastName, user.Email, user.Password, user.Token, user.Confirmed, user.IsDemo, user.IpAddress, user.Role, user.Id)
+	return err
+}
+
 func (u *UserRepository) FindUserById(ctx context.Context, id string) (*domainUser.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id,name,last_name,email, role FROM users WHERE id = $1", id)
+	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users WHERE id = $1", id)
 	if err != nil {
 		return nil, err
 	}
@@ -152,14 +158,18 @@ func (u *UserRepository) FindUserById(ctx context.Context, id string) (*domainUs
 			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
+
 	user := domainUser.User{}
 	for rows.Next() {
-		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Role); err == nil {
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role, &user.CreatedAt); err == nil {
 			return &user, nil
 		}
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
+	}
+	if user.Id == "" {
+		return nil, errorhttp.ErrNotFound
 	}
 	return &user, nil
 }

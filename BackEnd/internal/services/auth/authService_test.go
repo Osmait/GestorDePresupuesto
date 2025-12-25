@@ -53,6 +53,11 @@ func (m *MockUserRepostory) FindAll(ctx context.Context) ([]*user.User, error) {
 	return args.Get(0).([]*user.User), args.Error(1)
 }
 
+func (m *MockUserRepostory) Update(ctx context.Context, u *user.User) error {
+	args := m.Called(ctx, u)
+	return args.Error(0)
+}
+
 func getNewUser() *user.User {
 	user1 := user.NewUser(faker.ID, faker.Name(), faker.LastName(), faker.Email(), faker.Password())
 	return user1

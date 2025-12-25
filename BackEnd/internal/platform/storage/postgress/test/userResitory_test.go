@@ -26,6 +26,6 @@ func TestUserRespo(t *testing.T) {
 	err = repo.Delete(ctx, user.Id)
 	assert.NoError(t, err)
 	nouser, err := repo.FindUserById(ctx, user.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, nouser.Id, "")
+	assert.Error(t, err)
+	assert.Nil(t, nouser)
 }

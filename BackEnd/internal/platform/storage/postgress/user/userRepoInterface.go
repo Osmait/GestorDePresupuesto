@@ -18,4 +18,6 @@ type UserRepositoryInterface interface {
 	Delete(ctx context.Context, id string) error
 	// FindAll returns all users in the system
 	FindAll(ctx context.Context) ([]*domainUser.User, error)
+	// Update modifies an existing user in the database
+	Update(ctx context.Context, user *domainUser.User) error
 }

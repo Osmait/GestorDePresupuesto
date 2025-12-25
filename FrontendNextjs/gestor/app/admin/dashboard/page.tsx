@@ -12,6 +12,7 @@ import { UserResponse } from "@/types/user";
 import { Badge } from "@/components/ui/badge";
 import { Shield, Users, Trash2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
+import { EditableUserTable } from "./user-table";
 
 export default function AdminDashboard() {
     const { isAdmin, isLoading: isAdminLoading } = useAdmin();
@@ -20,6 +21,7 @@ export default function AdminDashboard() {
     const [users, setUsers] = useState<UserResponse[]>([]);
     const [isLoadingUsers, setIsLoadingUsers] = useState(true);
     const [isCleaning, setIsCleaning] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
 
     const fetchUsers = useCallback(async () => {
         setIsLoadingUsers(true);
@@ -51,6 +53,33 @@ export default function AdminDashboard() {
             fetchUsers();
         }
     }, [isAdmin, isAdminLoading, router, fetchUsers]);
+
+    const handleSave = async (updatedUsers: UserResponse[]) => {
+        setIsSaving(true);
+        try {
+            const token = (session as any)?.accessToken;
+            const response = await fetch("http://localhost:8080/users", {
+                method: "PUT",
+                headers: {
+                    "Content-Type": "application/json",
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify(updatedUsers),
+            });
+
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to save changes: ${response.status} - ${errorText}`);
+            }
+
+            toast.success(`${updatedUsers.length} users updated successfully`);
+            fetchUsers();
+        } catch (error: any) {
+            toast.error(`Error saving changes: ${error.message}`);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleCleanup = async () => {
         if (!confirm("Are you sure? This will delete ALL demo users immediately.")) return;
@@ -105,16 +134,16 @@ export default function AdminDashboard() {
                     <Button
                         variant="outline"
                         onClick={fetchUsers}
-                        disabled={isLoadingUsers}
+                        disabled={isLoadingUsers || isSaving}
                         className="gap-2"
                     >
-                        <RefreshCw className={`h-4 w-4 ${isLoadingUsers ? "animate-spin" : ""}`} />
+                        <RefreshCw className={`h-4 w-4 ${(isLoadingUsers || isSaving) ? "animate-spin" : ""}`} />
                         Refresh
                     </Button>
                     <Button
                         variant="destructive"
                         onClick={handleCleanup}
-                        disabled={isCleaning}
+                        disabled={isCleaning || isSaving}
                         className="gap-2"
                     >
                         <Trash2 className="h-4 w-4" />
@@ -132,7 +161,7 @@ export default function AdminDashboard() {
                                 Registered Users
                             </CardTitle>
                             <CardDescription>
-                                A list of all users registered in the system.
+                                Edit user details directly in the table. Changes are saved once confirmed.
                             </CardDescription>
                         </div>
                         <Badge variant="secondary" className="font-mono">
@@ -140,60 +169,11 @@ export default function AdminDashboard() {
                         </Badge>
                     </CardHeader>
                     <CardContent>
-                        <div className="rounded-md border border-border/50">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>User</TableHead>
-                                        <TableHead>Email</TableHead>
-                                        <TableHead>Role</TableHead>
-                                        <TableHead>Created</TableHead>
-                                        <TableHead className="text-right">ID</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {isLoadingUsers ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">
-                                                Loading users...
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : users.length === 0 ? (
-                                        <TableRow>
-                                            <TableCell colSpan={5} className="h-24 text-center">
-                                                No users found.
-                                            </TableCell>
-                                        </TableRow>
-                                    ) : (
-                                        users.map((user) => (
-                                            <TableRow key={user.id} className="group transition-colors hover:bg-muted/50">
-                                                <TableCell className="font-medium">
-                                                    <div className="flex flex-col">
-                                                        <span>{user.name} {user.last_name}</span>
-                                                    </div>
-                                                </TableCell>
-                                                <TableCell>{user.email}</TableCell>
-                                                <TableCell>
-                                                    <Badge
-                                                        variant={user.role === "ADMIN" ? "default" : "secondary"}
-                                                        className="capitalize"
-                                                    >
-                                                        {user.role === "ADMIN" && <Shield className="h-3 w-3 mr-1" />}
-                                                        {user.role.toLowerCase()}
-                                                    </Badge>
-                                                </TableCell>
-                                                <TableCell className="text-muted-foreground whitespace-nowrap">
-                                                    {format(new Date(user.created_at), "MMM d, yyyy")}
-                                                </TableCell>
-                                                <TableCell className="text-right font-mono text-xs text-muted-foreground">
-                                                    {user.id.slice(0, 8)}...
-                                                </TableCell>
-                                            </TableRow>
-                                        ))
-                                    )}
-                                </TableBody>
-                            </Table>
-                        </div>
+                        <EditableUserTable
+                            users={users}
+                            onSave={handleSave}
+                            isLoading={isLoadingUsers}
+                        />
                     </CardContent>
                 </Card>
             </div>
