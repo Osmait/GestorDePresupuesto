@@ -30,6 +30,7 @@ jobs:
         with:
           token: ${{ secrets.VERCEL_TOKEN }}
           project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          sha: ${{ github.sha }}
           timeout: 600
 
       - name: Install dependencies
