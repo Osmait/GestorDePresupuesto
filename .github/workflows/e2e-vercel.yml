@@ -31,6 +31,7 @@ jobs:
           token: ${{ secrets.VERCEL_TOKEN }}
           project-id: ${{ secrets.VERCEL_PROJECT_ID }}
           sha: ${{ github.sha }}
+          timeout: 1800 # 30 minutes
 
       - name: Install dependencies
         working-directory: ./e2e-test
