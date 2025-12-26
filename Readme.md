@@ -1,5 +1,8 @@
 # 💰 Gestor de Presupuesto
 
+[![E2E Tests on Render](https://github.com/osmait/GestorDePresupuesto/actions/workflows/e2e-render.yml/badge.svg)](https://github.com/osmait/GestorDePresupuesto/actions/workflows/e2e-render.yml)
+[![E2E Tests on Vercel](https://github.com/osmait/GestorDePresupuesto/actions/workflows/e2e-vercel.yml/badge.svg)](https://github.com/osmait/GestorDePresupuesto/actions/workflows/e2e-vercel.yml)
+
 > A **full-stack personal finance management application** built to practice and demonstrate modern software engineering patterns, advanced backend techniques, and responsive frontend development.
 
 ![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?style=flat&logo=go&logoColor=white)
