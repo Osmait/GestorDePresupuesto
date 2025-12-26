@@ -1,0 +1,47 @@
+name: E2E Tests on Render
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: 'URL to test (e.g., https://myapp.onrender.com)'
+        required: true
+        default: 'https://gestordepresupuesto.onrender.com'
+
+jobs:
+  e2e-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Wait for Render Deployment
+        uses: bounceapp/render-action@v0.6.0
+        id: render-deploy
+        with:
+          render-token: ${{ secrets.RENDER_API_KEY }}
+          service-id: ${{ secrets.RENDER_SERVICE_ID }}
+          retries: 20
+          wait: 15000
+          sleep: 30000
+
+      - name: Install dependencies
+        working-directory: ./e2e-test
+        run: npm ci
+
+      - name: Install Playwright Browsers
+        working-directory: ./e2e-test
+        run: npx playwright install --with-deps
+
+      - name: Run Playwright tests
+        working-directory: ./e2e-test
+        env:
+          E2E_TARGET_URL: ${{ github.event.inputs.target_url || steps.render-deploy.outputs.url }}
+        run: npx playwright test
