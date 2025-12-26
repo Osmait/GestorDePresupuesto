@@ -9,7 +9,7 @@ on:
       target_url:
         description: 'URL to test (e.g., https://myapp.onrender.com)'
         required: true
-        default: 'https://gestordepresupuesto.onrender.com'
+        default: 'https://gestor-de-presupuesto.vercel.app'
 
 jobs:
   e2e-test:
@@ -43,5 +43,5 @@ jobs:
       - name: Run Playwright tests
         working-directory: ./e2e-test
         env:
-          E2E_TARGET_URL: ${{ github.event.inputs.target_url || steps.render-deploy.outputs.url }}
+          E2E_TARGET_URL: ${{ github.event.inputs.target_url }}
         run: npx playwright test
