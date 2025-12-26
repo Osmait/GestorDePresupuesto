@@ -1,7 +1,9 @@
 name: E2E Tests on Render
 
 on:
-  deployment_status:
+  push:
+    branches:
+      - main
   workflow_dispatch:
     inputs:
       target_url:
