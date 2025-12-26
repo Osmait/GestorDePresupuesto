@@ -1,0 +1,49 @@
+{
+  "cookies": [
+    {
+      "name": "__Host-next-auth.csrf-token",
+      "value": "edee1cf8bb7c4e28ceaaafd11ca970db90d2f44996752049d33a2fcd8cd5a5ea%7C0d4244dee7ecb1dbe60190ed6e130969be8a1c363dd4bb086b28b02db1a86049",
+      "domain": "gestor-de-presupuesto.vercel.app",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-next-auth.callback-url",
+      "value": "https%3A%2F%2Fgestor-de-presupuesto.vercel.app%2Flogin",
+      "domain": "gestor-de-presupuesto.vercel.app",
+      "path": "/",
+      "expires": -1,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    },
+    {
+      "name": "__Secure-next-auth.session-token",
+      "value": "eyJhbGciOiJkaXIiLCJlbmMiOiJBMjU2R0NNIn0.._MFCt8iDHZtXaK4P.ocLu8T1C8JuTtgU1qcoGLzkhsyoOKRov3J54csi9buFFkQWBpUL3uXcoIMbO8kyLwYfSFFGwuspxP4RHL7SMlHA56u17zbfEW8vjrWM9_FUD_u5iU-bciB0UYeEjSdCzwxtpxoVqCqR8zvS1psVw6lz3fMCwa0P5GcJrWyLNPWGmxMbjJufIjkZGL_Vfn9LVzeDgSMB4TVXnyWs4b9dC3H_1K7N5dB39nEHbAiIgQ2tvEJL-zjTKUBa3-hMbJnuoPOlWvFMiEUKs6otXAZ8Aeh0PZqAyTLpptgUM9erKcL0SxjrKKNQScicIDLcYcMGJ8KImkNIFa9C0WMPQ7VJXI5wSpHMP0UVvSPGrFLc4SgwBKk2Q9WVM9MxSKt-pLC3EyRcfudulUi3aYXmIBdkzpMibtdMtjZDqcTGxehGmFU_ssTMA5e4QPikBKZezut3M6j9N6epjQEn37-sm6MhPwUoE_QJZVHB251qRjb9SjmNEKW9hPJjEziA9_FVTqfUaAEQW2HzeFtNFocnxRNqCGHYrcCse7bVcGwt-uRMO5ejWwtGEB6DWhAH27m1B6AbVJtFhAXKHTks1KbXdnoBF2YEtfKJchXZB1J4LNpe7hX_s0EBVl9BS.1K-ryHIGwxaWYsOW_FPHYw",
+      "domain": "gestor-de-presupuesto.vercel.app",
+      "path": "/",
+      "expires": 1769305276.536323,
+      "httpOnly": true,
+      "secure": true,
+      "sameSite": "Lax"
+    }
+  ],
+  "origins": [
+    {
+      "origin": "https://gestor-de-presupuesto.vercel.app",
+      "localStorage": [
+        {
+          "name": "nextauth.message",
+          "value": "{\"event\":\"session\",\"data\":{\"trigger\":\"getSession\"},\"timestamp\":1766713274}"
+        },
+        {
+          "name": "app-settings",
+          "value": "{\"sidebarHoverEnabled\":true,\"theme\":\"system\",\"language\":\"es\",\"currency\":\"USD\",\"notifications\":{\"email\":true,\"push\":false,\"sms\":true}}"
+        }
+      ]
+    }
+  ]
+}
