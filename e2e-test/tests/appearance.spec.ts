@@ -3,11 +3,13 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Appearance & Settings', () => {
     test.beforeEach(async ({ page }) => {
+        console.log("$E2E_TARGET_URL", process.env.E2E_TARGET_URL);
         // 1. Login as Demo User
         await page.goto('/login');
         // Wait for page to be fully stable (hydration + network)
-        await page.waitForLoadState('networkidle');
-        await page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i }).click();
+        const demoButton = page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i });
+        await expect(demoButton).toBeVisible();
+        await demoButton.click();
         // Increase timeout for cold start backend
         await page.waitForURL('**/app', { timeout: 120000 });
 

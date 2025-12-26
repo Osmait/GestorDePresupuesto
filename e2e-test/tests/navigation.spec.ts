@@ -5,8 +5,11 @@ test.describe('Navigation & Sections', () => {
     test.beforeEach(async ({ page }) => {
         // Login
         await page.goto('/login');
-        await page.waitForLoadState('networkidle');
-        await page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i }).click();
+
+        // Wait for specific element instead of networkidle
+        const demoButton = page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i });
+        await expect(demoButton).toBeVisible();
+        await demoButton.click();
         await page.waitForURL('**/app', { timeout: 120000 });
 
         // Handle Demo Welcome Modal

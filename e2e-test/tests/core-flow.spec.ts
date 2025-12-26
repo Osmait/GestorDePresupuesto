@@ -4,10 +4,13 @@ import { test, expect } from '@playwright/test';
 test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ page }) => {
   // 1. Login as Demo User
   await page.goto('/login');
-  await page.waitForLoadState('networkidle');
+
+  // Wait for the specific interactive element instead of generic network idle
+  const demoButton = page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i });
+  await expect(demoButton).toBeVisible();
 
   // Click "Try Interactive Demo" button
-  await page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i }).click();
+  await demoButton.click();
 
   // Wait for dashboard redirection
   await page.waitForURL('**/app', { timeout: 120000 });
