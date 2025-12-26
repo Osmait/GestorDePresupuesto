@@ -43,5 +43,5 @@ jobs:
       - name: Run Playwright tests
         working-directory: ./e2e-test
         env:
-          E2E_TARGET_URL: ${{ github.event.inputs.target_url }}
+          E2E_TARGET_URL: ${{ github.event.inputs.target_url || 'https://gestor-de-presupuesto.vercel.app' }}
         run: npx playwright test

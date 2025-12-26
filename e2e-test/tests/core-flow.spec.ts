@@ -2,18 +2,11 @@
 import { test, expect } from '@playwright/test';
 
 test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ page }) => {
-  // 1. Login as Demo User
-  await page.goto('/login');
+  // 1. App Load (Authenticated via global setup)
+  await page.goto('/app');
 
-  // Wait for the specific interactive element instead of generic network idle
-  const demoButton = page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i });
-  await expect(demoButton).toBeVisible();
-
-  // Click "Try Interactive Demo" button
-  await demoButton.click();
-
-  // Wait for dashboard redirection
-  await page.waitForURL('**/app', { timeout: 120000 });
+  // Wait for dashboard
+  await expect(page.locator('header')).toBeVisible({ timeout: 120000 });
 
   // --- Handle Demo Welcome Modal ---
   // The demo mode shows a driver.js popover/dialog. We need to close it.
@@ -26,7 +19,7 @@ test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ 
     await expect(welcomeDialog).not.toBeVisible();
   } catch (e) {
     // It might not appear or already be closed, ignore.
-    console.log('Demo welcome modal did not appear or was missed.');
+    // console.log('Demo welcome modal did not appear or was missed.');
   }
 
   // --- 2. Create Account ---

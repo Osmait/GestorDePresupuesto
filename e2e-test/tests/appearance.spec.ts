@@ -4,14 +4,8 @@ import { test, expect } from '@playwright/test';
 test.describe('Appearance & Settings', () => {
     test.beforeEach(async ({ page }) => {
         console.log("$E2E_TARGET_URL", process.env.E2E_TARGET_URL);
-        // 1. Login as Demo User
-        await page.goto('/login');
-        // Wait for page to be fully stable (hydration + network)
-        const demoButton = page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i });
-        await expect(demoButton).toBeVisible();
-        await demoButton.click();
-        // Increase timeout for cold start backend
-        await page.waitForURL('**/app', { timeout: 120000 });
+        // Go to dashboard
+        await page.goto('/app');
 
         // Handle Demo Welcome Modal
         try {
@@ -20,7 +14,7 @@ test.describe('Appearance & Settings', () => {
             await welcomeDialog.getByRole('button', { name: /close|cerrar|×/i }).click();
             await expect(welcomeDialog).not.toBeVisible();
         } catch (e) {
-            console.log('Demo welcome modal did not appear or was missed.');
+            // console.log('Demo welcome modal did not appear or was missed.');
         }
     });
 

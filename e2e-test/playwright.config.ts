@@ -40,18 +40,26 @@ export default defineConfig({
     timeout: 120000,
 
     projects: [
+        { name: 'setup', testMatch: /.*\.setup\.ts/ },
+
         {
             name: 'chromium',
-            use: { ...devices['Desktop Chrome'] },
+            use: {
+                ...devices['Desktop Chrome'],
+                storageState: 'playwright/.auth/user.json',
+            },
+            dependencies: ['setup'],
         },
-        // {
-        //     name: 'firefox',
-        //     use: { ...devices['Desktop Firefox'] },
-        // },
-        // {
-        //     name: 'webkit',
-        //     use: { ...devices['Desktop Safari'] },
-        // },
+        /*
+        {
+            name: 'firefox',
+            use: { 
+                ...devices['Desktop Firefox'],
+                storageState: 'playwright/.auth/user.json',
+            },
+            dependencies: ['setup'],
+        },
+        */
     ],
     // Only use webServer if NOT targeting a remote environment
     webServer: webServerConfig,

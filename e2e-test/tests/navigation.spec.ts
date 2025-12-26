@@ -1,24 +1,17 @@
-
 import { test, expect } from '@playwright/test';
 
 test.describe('Navigation & Sections', () => {
     test.beforeEach(async ({ page }) => {
-        // Login
-        await page.goto('/login');
-
-        // Wait for specific element instead of networkidle
-        const demoButton = page.getByRole('button', { name: /Try Interactive Demo|Probar Demo Interactiva/i });
-        await expect(demoButton).toBeVisible();
-        await demoButton.click();
-        await page.waitForURL('**/app', { timeout: 120000 });
-
-        // Handle Demo Welcome Modal
+        // Go to dashboard, assuming already logged in via global setup
+        await page.goto('/app');
+        // Handle Welcome Modal if it appears (might not if auth state persisted visited state)
+        // But keep the handler just in case
         try {
             const welcomeDialog = page.getByRole('dialog', { name: /Bienvenido al Modo Demo|Welcome to Demo/i });
             await welcomeDialog.waitFor({ state: 'visible', timeout: 5000 });
             await welcomeDialog.getByRole('button', { name: /close|cerrar|×/i }).click();
         } catch (e) {
-            console.log('Demo welcome modal did not appear or was missed.');
+            // Ignore
         }
     });
 
@@ -34,17 +27,12 @@ test.describe('Navigation & Sections', () => {
     for (const section of sections) {
         test(`Navigate to ${section.name}`, async ({ page }) => {
             // Click Sidebar link
-            // Use a robust selector for sidebar links
-            // They are usually in a <nav> or just verify link role
-            // Assuming Sidebar is visible on desktop
-
             await page.getByRole('link', { name: section.name }).click();
 
-            // Verify URL
+            // Verify URL (fixed glob pattern)
             await page.waitForURL(`**${section.href}`);
 
             // Verify Heading
-            // The header often contains the title of the section
             await expect(page.getByRole('heading', { level: 1, name: section.heading })).toBeVisible();
         });
     }
