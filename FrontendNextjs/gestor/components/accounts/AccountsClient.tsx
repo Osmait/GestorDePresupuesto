@@ -4,8 +4,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAccountContext } from '@/components/accounts/AccountContext';
 import { Account } from '@/types/account';
 
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { AnimatedTabs } from '@/components/common/animated-tabs';
 import { AccountCard } from '@/components/accounts/AccountCard';
 import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard';
