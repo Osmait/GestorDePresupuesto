@@ -42,7 +42,7 @@ func (c *CategoryServices) FindAll(ctx context.Context, userId string) ([]*dto.C
 	if err != nil {
 		return nil, err
 	}
-	var categoryResponseList []*dto.CategoryResponse
+	categoryResponseList := make([]*dto.CategoryResponse, 0)
 	for _, category := range categorysList {
 		categoryResonse := dto.NewCategoryResponse(category.Id, category.Name, category.Icon, category.Color, category.CreatedAt)
 		categoryResponseList = append(categoryResponseList, categoryResonse)

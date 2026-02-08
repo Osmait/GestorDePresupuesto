@@ -9,10 +9,12 @@ import { Transaction } from '@/types/transaction'
 
 export function CategorySummaryCard({ categories, transactions }: { categories: Category[], transactions: Transaction[] }) {
     const t = useTranslations('categories')
-    const activeCategories = categories.filter(cat =>
-        transactions.some(t => t.category_id === cat.id)
+    const safeCategories = categories ?? []
+    const safeTransactions = transactions ?? []
+    const activeCategories = safeCategories.filter(cat =>
+        safeTransactions.some(t => t.category_id === cat.id)
     )
-    const totalTransactions = transactions.length
+    const totalTransactions = safeTransactions.length
     const averagePerCategory = activeCategories.length > 0 ? Math.round(totalTransactions / activeCategories.length) : 0
 
     return (
@@ -29,7 +31,7 @@ export function CategorySummaryCard({ categories, transactions }: { categories: 
                         <Tag className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />
                         <p className="text-sm font-medium text-muted-foreground">{t('totalCategories')}</p>
                         <p className="text-2xl font-bold text-foreground">
-                            <AnimatedCounter value={categories.length} />
+                            <AnimatedCounter value={safeCategories.length} />
                         </p>
                     </div>
                     <div className="text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5">
