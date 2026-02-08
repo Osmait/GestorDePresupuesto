@@ -307,9 +307,8 @@ export default async function DashboardPage() {
 	const locale = await getLocale()
 
 	// Obtener la sesión actual (sin hacer login)
-	const { getServerSession } = await import("next-auth");
-	const { authOptions } = await import("@/auth");
-	const session = await getServerSession(authOptions);
+	const { auth } = await import("@/auth");
+	const session = await auth();
 
 	if (!session) {
 		const { redirect } = await import("next/navigation");
