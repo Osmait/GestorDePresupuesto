@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -100,7 +100,7 @@ func TestJwtCreate_TokenExpiration(t *testing.T) {
 
 	// Check that expiration is set to approximately 72 hours from now
 	expectedExpiration := time.Now().Add(time.Hour * 72).Unix()
-	actualExpiration := claims.ExpiresAt
+	actualExpiration := claims.ExpiresAt.Unix()
 
 	// Allow 60 second tolerance for test execution time
 	assert.InDelta(t, expectedExpiration, actualExpiration, 60, "Expiration should be approximately 72 hours from now")
@@ -176,11 +176,11 @@ func TestJwtCreate_DifferentSecrets(t *testing.T) {
 func TestAppClaims_Structure(t *testing.T) {
 	claims := AppClaims{
 		UserId: "test_user_123",
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour).Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
 		},
 	}
 
 	assert.Equal(t, "test_user_123", claims.UserId)
-	assert.Greater(t, claims.ExpiresAt, time.Now().Unix())
+	assert.Greater(t, claims.ExpiresAt.Unix(), time.Now().Unix())
 }

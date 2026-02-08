@@ -7,7 +7,7 @@ toolchain go1.24.4
 require (
 	github.com/go-faker/faker/v4 v4.2.0
 	github.com/go-playground/assert/v2 v2.2.0
-	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-sqlite3 v1.14.28
 	github.com/patrickmn/go-cache v2.1.0+incompatible
