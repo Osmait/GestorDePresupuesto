@@ -10,9 +10,12 @@ import (
 
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/source/file"
+	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"golang.org/x/crypto/bcrypt"
 
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	userDomain "github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server"
@@ -85,6 +88,11 @@ func Run() error {
 
 	// Initialize repositories
 	repositories := initializeRepositories(db)
+
+	// Seed admin user if configured
+	if err := seedAdminUser(ctx, cfg, repositories, logger); err != nil {
+		return fmt.Errorf("failed to seed admin user: %w", err)
+	}
 
 	// Initialize services
 	services := initializeServices(repositories, cfg)
@@ -273,4 +281,51 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		quoteService:        quoteService,
 		notificationService: notificationService,
 	}
+}
+
+// seedAdminUser creates the admin user if it doesn't exist and admin seeding is enabled
+func seedAdminUser(ctx context.Context, cfg *config.Config, repos *repositories, logger *observability.Logger) error {
+	// Check if admin seeding is enabled
+	if !cfg.Admin.Enabled {
+		logger.Info("Admin seeding is disabled")
+		return nil
+	}
+
+	// Validate admin credentials are provided
+	if cfg.Admin.Email == "" || cfg.Admin.Password == "" {
+		logger.Warn("Admin seeding enabled but ADMIN_EMAIL or ADMIN_PASSWORD not set, skipping admin creation")
+		return nil
+	}
+
+	// Check if admin already exists
+	existingUser, err := repos.userRepository.FindUserByEmail(ctx, cfg.Admin.Email)
+	if err == nil && existingUser != nil {
+		logger.WithField("email", cfg.Admin.Email).Info("Admin user already exists, skipping creation")
+		return nil
+	}
+
+	// Hash password
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(cfg.Admin.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return fmt.Errorf("failed to hash admin password: %w", err)
+	}
+
+	// Create admin user
+	adminID := uuid.New().String()
+	adminUser := userDomain.NewUser(adminID, cfg.Admin.Name, cfg.Admin.LastName, cfg.Admin.Email, string(hashedPassword))
+	adminUser.Role = "ADMIN"
+	adminUser.Confirmed = "true"
+	adminUser.IsDemo = false
+
+	if err := repos.userRepository.Save(ctx, adminUser); err != nil {
+		return fmt.Errorf("failed to save admin user: %w", err)
+	}
+
+	logger.WithFields(map[string]interface{}{
+		"email": cfg.Admin.Email,
+		"name":  cfg.Admin.Name,
+		"role":  "ADMIN",
+	}).Info("Admin user created successfully")
+
+	return nil
 }

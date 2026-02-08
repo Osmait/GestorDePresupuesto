@@ -175,6 +175,15 @@ type MiddlewareConfig struct {
 	EnableValidation     bool `json:"enable_validation"`
 }
 
+// AdminConfig holds admin seeding configuration
+type AdminConfig struct {
+	Email    string `json:"-"` // Don't expose in JSON
+	Password string `json:"-"` // Don't expose in JSON
+	Name     string `json:"name"`
+	LastName string `json:"last_name"`
+	Enabled  bool   `json:"enabled"`
+}
+
 // Config holds all application configuration settings
 type Config struct {
 	Server        ServerConfig        `json:"server"`
@@ -188,6 +197,7 @@ type Config struct {
 	OpenTelemetry OpenTelemetryConfig `json:"opentelemetry"`
 	Prometheus    PrometheusConfig    `json:"prometheus"`
 	Middleware    MiddlewareConfig    `json:"middleware"`
+	Admin         AdminConfig         `json:"admin"`
 }
 
 // LoadConfig loads configuration from environment variables with comprehensive validation
@@ -342,6 +352,14 @@ func LoadConfig() (*Config, error) {
 			EnableCompression:    getEnvBool("MIDDLEWARE_ENABLE_COMPRESSION", false),
 			EnableAuthentication: getEnvBool("MIDDLEWARE_ENABLE_AUTHENTICATION", true),
 			EnableValidation:     getEnvBool("MIDDLEWARE_ENABLE_VALIDATION", true),
+		},
+
+		Admin: AdminConfig{
+			Email:    getEnvString("ADMIN_EMAIL", ""),
+			Password: getEnvString("ADMIN_PASSWORD", ""),
+			Name:     getEnvString("ADMIN_NAME", "Admin"),
+			LastName: getEnvString("ADMIN_LASTNAME", "System"),
+			Enabled:  getEnvBool("ADMIN_SEED_ENABLED", true),
 		},
 	}
 
