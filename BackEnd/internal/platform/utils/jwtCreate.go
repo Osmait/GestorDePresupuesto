@@ -4,12 +4,13 @@ import (
 	"errors"
 	"time"
 
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 )
 
+// AppClaims represents the JWT claims structure with user-specific data
 type AppClaims struct {
 	UserId string `json:"id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 // JwtCreate creates a JWT token with the provided secret
@@ -24,8 +25,10 @@ func JwtCreate(id string, secret string) (*string, error) {
 
 	claims := AppClaims{
 		UserId: id,
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Add(time.Hour * 72).Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour * 72)),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+			NotBefore: jwt.NewNumericDate(time.Now()),
 		},
 	}
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)

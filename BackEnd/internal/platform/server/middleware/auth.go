@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
@@ -43,7 +43,7 @@ func shouldCheckToken(route string) bool {
 // AppClaims represents the JWT claims structure
 type AppClaims struct {
 	UserId string `json:"id"`
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
 // AuthMiddleware provides JWT-based authentication with configurable secret
