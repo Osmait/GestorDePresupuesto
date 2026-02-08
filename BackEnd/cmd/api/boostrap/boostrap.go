@@ -314,7 +314,7 @@ func seedAdminUser(ctx context.Context, cfg *config.Config, repos *repositories,
 	adminID := uuid.New().String()
 	adminUser := userDomain.NewUser(adminID, cfg.Admin.Name, cfg.Admin.LastName, cfg.Admin.Email, string(hashedPassword))
 	adminUser.Role = "ADMIN"
-	adminUser.Confirmed = "true"
+	adminUser.Confirmed = true
 	adminUser.IsDemo = false
 
 	if err := repos.userRepository.Save(ctx, adminUser); err != nil {
