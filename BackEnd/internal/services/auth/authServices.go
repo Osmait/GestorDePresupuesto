@@ -94,7 +94,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 
 	user := userDomain.NewUser(userID, "Demo User", "Minimizado", "demo+"+userID+"@example.com", string(hashPassword))
 	user.IsDemo = true
-	user.Confirmed = "true"
+	user.Confirmed = true
 	user.IpAddress = ip
 
 	if err := a.repo.Save(ctx, user); err != nil {
