@@ -104,35 +104,23 @@ export function AnimatedTabs({
 				{/* Indicador animado horizontal */}
 				{orientation === 'horizontal' && (
 					<>
+						{/* Linea inferior del indicador */}
 						<div
-							className="absolute bottom-0 h-0.5 bg-gradient-to-r from-primary to-primary/80 rounded-full transition-all duration-500 ease-out pointer-events-none z-10"
+							className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-all duration-300 ease-out pointer-events-none z-10"
 							style={{
 								left: `${indicatorStyle.left}px`,
 								width: `${indicatorStyle.width}px`,
-								opacity: indicatorStyle.opacity,
-								boxShadow: indicatorStyle.opacity > 0 ? '0 0 8px rgba(var(--primary), 0.6)' : 'none'
+								opacity: indicatorStyle.opacity
 							}}
 						/>
 
 						{/* Fondo del indicador */}
 						<div
-							className="absolute top-1 bottom-1 bg-gradient-to-r from-primary/15 to-primary/8 rounded-md border border-primary/30 transition-all duration-500 ease-out pointer-events-none z-0 shadow-sm"
+							className="absolute top-1 bottom-1 bg-primary/10 rounded-md transition-all duration-300 ease-out pointer-events-none z-0"
 							style={{
 								left: `${indicatorStyle.left}px`,
 								width: `${indicatorStyle.width}px`,
-								opacity: indicatorStyle.opacity,
-								backdropFilter: 'blur(2px)'
-							}}
-						/>
-
-						{/* Efecto de brillo */}
-						<div
-							className="absolute top-1 bottom-1 bg-gradient-to-r from-primary/20 via-primary/30 to-primary/20 rounded-md transition-all duration-500 ease-out pointer-events-none z-5 animate-tab-indicator-pulse"
-							style={{
-								left: `${indicatorStyle.left}px`,
-								width: `${indicatorStyle.width}px`,
-								opacity: indicatorStyle.opacity * 0.7,
-								filter: 'blur(1px)'
+								opacity: indicatorStyle.opacity
 							}}
 						/>
 					</>
@@ -142,22 +130,20 @@ export function AnimatedTabs({
 				{orientation === 'vertical' && (
 					<>
 						<div
-							className="absolute left-0 w-0.5 bg-gradient-to-b from-primary to-primary/80 rounded-full transition-all duration-500 ease-out pointer-events-none z-10"
+							className="absolute left-0 w-0.5 bg-primary rounded-full transition-all duration-300 ease-out pointer-events-none z-10"
 							style={{
 								top: `${indicatorStyle.top}px`,
 								height: `${indicatorStyle.height}px`,
-								opacity: indicatorStyle.opacity,
-								boxShadow: indicatorStyle.opacity > 0 ? '0 0 8px rgba(var(--primary), 0.6)' : 'none'
+								opacity: indicatorStyle.opacity
 							}}
 						/>
 
 						<div
-							className="absolute left-1 right-1 bg-gradient-to-r from-primary/15 to-primary/8 rounded-md border border-primary/30 transition-all duration-500 ease-out pointer-events-none z-0 shadow-sm"
+							className="absolute left-1 right-1 bg-primary/10 rounded-md transition-all duration-300 ease-out pointer-events-none z-0"
 							style={{
 								top: `${indicatorStyle.top}px`,
 								height: `${indicatorStyle.height}px`,
-								opacity: indicatorStyle.opacity,
-								backdropFilter: 'blur(2px)'
+								opacity: indicatorStyle.opacity
 							}}
 						/>
 					</>
@@ -184,19 +170,16 @@ export function AnimatedTabs({
 								isDisabled && 'opacity-50 cursor-not-allowed'
 							)}
 						>
-							{/* Efecto de hover con gradiente */}
-							<div className="absolute inset-0 bg-gradient-to-r from-primary/8 via-primary/4 to-transparent rounded-md opacity-0 group-hover:opacity-100 transition-all duration-300 pointer-events-none" />
-
-							{/* Efecto de brillo en hover */}
-							<div className="absolute inset-0 bg-gradient-to-r from-transparent via-primary/15 to-transparent rounded-md opacity-0 group-hover:opacity-100 transition-all duration-500 pointer-events-none" />
+							{/* Efecto de hover */}
+							<div className="absolute inset-0 bg-primary/5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
 
 							{/* Icono */}
 							{tab.icon && (
 								<span className={cn(
-									'transition-all duration-300 relative z-10',
+									'transition-all duration-200 relative z-10',
 									isActive
-										? 'text-primary scale-110 animate-icon-bounce'
-										: 'group-hover:scale-110 group-hover:text-foreground group-hover:rotate-6'
+										? 'text-primary'
+										: 'group-hover:text-foreground'
 								)}>
 									{tab.icon}
 								</span>
@@ -204,11 +187,11 @@ export function AnimatedTabs({
 
 							{/* Label - Hidden on mobile when icon exists */}
 							<span className={cn(
-								'transition-all duration-300 relative z-10',
+								'transition-all duration-200 relative z-10',
 								tab.icon ? 'hidden sm:inline sm:ml-2' : '',
 								isActive
 									? 'text-primary font-semibold'
-									: 'group-hover:text-foreground group-hover:translate-x-1'
+									: 'group-hover:text-foreground'
 							)}>
 								{tab.label}
 							</span>
