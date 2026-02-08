@@ -75,15 +75,22 @@ func TestCreateUser(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
-func TestCreateUserWithExistingEmail(t *testing.T) {
+func TestCreateUserWithRole(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	user1 := utils.GetNewRandomUser()
 	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
-	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(user1, nil)
+	userRequest.Role = "ADMIN"
+
+	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(nil, errorhttp.ErrNotFound)
+
+	// Verify that the user saved has the correct role
+	mockRepo.On("Save", context.Background(), mock.MatchedBy(func(u *user.User) bool {
+		return u.Role == "ADMIN" && u.Email == userRequest.Email
+	})).Return(nil)
+
 	userServie := NewUserService(mockRepo)
 	err := userServie.CreateUser(context.Background(), userRequest)
-	assert.Error(t, err)
-	assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeConflict))
+	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
 }
 

@@ -91,3 +91,28 @@ func UpdateUsers(userService *user.UserService) gin.HandlerFunc {
 		c.Status(http.StatusOK)
 	}
 }
+
+// CreateUserByAdmin allows administrators to create new users with custom roles.
+// This endpoint is protected and requires ADMIN role.
+func CreateUserByAdmin(userService *user.UserService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		var userReq dto.UserRequest
+		if err := c.BindJSON(&userReq); err != nil {
+			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
+			return
+		}
+
+		// Validate role if provided
+		if userReq.Role != "" && userReq.Role != "USER" && userReq.Role != "ADMIN" {
+			_ = c.Error(apperrors.NewValidationError("INVALID_ROLE", "role must be USER or ADMIN"))
+			return
+		}
+
+		if err := userService.CreateUser(c, &userReq); err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		c.Status(http.StatusCreated)
+	}
+}

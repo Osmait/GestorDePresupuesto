@@ -18,3 +18,11 @@ export interface UserResponse {
   role: string;
   created_at: string;
 }
+
+export interface CreateUserRequest {
+  name: string;
+  last_name: string;
+  email: string;
+  password: string;
+  role: 'USER' | 'ADMIN';
+}
