@@ -19,9 +19,8 @@ export default async function DashboardLayout({
 	children: React.ReactNode
 }) {
 	// Obtener la sesión actual para el tour
-	const { getServerSession } = await import("next-auth");
-	const { authOptions } = await import("@/auth");
-	const session = await getServerSession(authOptions);
+	const { auth } = await import("@/auth");
+	const session = await auth();
 	const user = session?.user;
 
 	return (

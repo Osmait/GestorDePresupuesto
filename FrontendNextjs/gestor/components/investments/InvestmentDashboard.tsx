@@ -183,7 +183,7 @@ export function InvestmentDashboard() {
                                     <Tooltip
                                         contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb', backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff', color: theme === 'dark' ? '#fff' : '#000' }}
                                         labelStyle={{ fontWeight: 'bold', color: theme === 'dark' ? '#fff' : '#374151' }}
-                                        formatter={(value: number) => [formatCurrency(value), 'Value']}
+                                        formatter={(value: any) => [formatCurrency(Number(value)), 'Value']}
                                         labelFormatter={(label) => new Date(label).toLocaleDateString(undefined, { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
                                     />
                                     <Area

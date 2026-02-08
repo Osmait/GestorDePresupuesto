@@ -8,7 +8,7 @@ import { useSearchQuery } from "@/hooks/queries/useSearchQuery"
 import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
+import { Dialog, DialogContent } from "@/components/ui/dialog"
 
 // Component for search results (shared between mobile and desktop)
 function SearchResults({
@@ -18,7 +18,7 @@ function SearchResults({
 }: {
   data: any;
   isLoading: boolean;
-  onSelect: (path: string) => void;
+  onSelect: (_path: string) => void;
 }) {
   const hasResults = data && (
     (data.transactions && data.transactions.length > 0) ||

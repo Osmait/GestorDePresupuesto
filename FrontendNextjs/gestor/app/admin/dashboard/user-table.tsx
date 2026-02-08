@@ -2,13 +2,12 @@
 
 import { useState, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Shield, Save, X, Search, ChevronUp, ChevronDown, ChevronsUpDown, Filter } from "lucide-react";
+import { Save, X, Search, ChevronUp, ChevronDown, ChevronsUpDown, Filter } from "lucide-react";
 import { format } from "date-fns";
 import { UserResponse } from "@/types/user";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import {
     Dialog,
@@ -21,7 +20,7 @@ import {
 
 interface EditableUserTableProps {
     users: UserResponse[];
-    onSave: (updatedUsers: UserResponse[]) => Promise<void>;
+    onSave: (_updatedUsers: UserResponse[]) => Promise<void>;
     isLoading: boolean;
 }
 

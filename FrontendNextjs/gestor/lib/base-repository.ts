@@ -1,15 +1,14 @@
 import { getSession } from "next-auth/react";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/auth";
+import { auth } from "@/auth";
 
 export abstract class BaseRepository {
   protected readonly baseUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
   protected async getAuthToken(): Promise<string | null> {
     try {
-      // Intentar primero getServerSession (para Server Components)
+      // Intentar primero auth() (para Server Components)
       if (typeof window === 'undefined') {
-        const session = await getServerSession(authOptions);
+        const session = await auth();
         return (session as any)?.accessToken || null;
       } else {
         // Para Client Components

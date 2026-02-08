@@ -1,5 +1,5 @@
-import NextAuth, { NextAuthOptions } from "next-auth"
-import CredentialsProvider from "next-auth/providers/credentials"
+import NextAuth from "next-auth"
+import Credentials from "next-auth/providers/credentials"
 import { z } from "zod"
 
 const loginSchema = z.object({
@@ -9,9 +9,9 @@ const loginSchema = z.object({
 
 const BASE_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
-export const authOptions: NextAuthOptions = {
+export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
-    CredentialsProvider({
+    Credentials({
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
@@ -70,6 +70,9 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
+    authorized({ auth }) {
+      return !!auth?.user
+    },
     async jwt({ token, user }) {
       if (user) {
         token.accessToken = (user as any).accessToken
@@ -95,6 +98,4 @@ export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
-}
-
-export default NextAuth(authOptions)
+})

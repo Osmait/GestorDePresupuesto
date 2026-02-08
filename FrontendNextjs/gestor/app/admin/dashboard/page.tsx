@@ -3,15 +3,13 @@
 import { useAdmin } from "@/hooks/useAdmin";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { UserResponse } from "@/types/user";
 import { Badge } from "@/components/ui/badge";
-import { Shield, Users, Trash2, RefreshCw } from "lucide-react";
-import { format } from "date-fns";
+import { Users, Trash2, RefreshCw } from "lucide-react";
 import { EditableUserTable } from "./user-table";
 import { CreateUserModal } from "./create-user-modal";
 
