@@ -61,6 +61,11 @@ func (u *UserService) CreateUser(ctx context.Context, userRequest *dto.UserReque
 		// Create user domain object
 		userToSave := user.NewUser(id.String(), userRequest.Name, userRequest.LastName, userRequest.Email, hashPassword)
 
+		// Set role if provided (for admin-created users)
+		if userRequest.Role != "" {
+			userToSave.Role = userRequest.Role
+		}
+
 		// Save user with wrapped error handling
 		if err := u.userRepository.Save(ctx, userToSave); err != nil {
 			return apperrors.WrapDatabaseError(ctx, err, "Save user")

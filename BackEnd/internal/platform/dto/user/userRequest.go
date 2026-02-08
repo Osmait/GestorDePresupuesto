@@ -7,6 +7,7 @@ type UserRequest struct {
 	LastName string `json:"last_name" validate:"required,min=2,max=50,alpha_space" binding:"required"`
 	Password string `json:"password" validate:"required,min=8,max=128,password_strength" binding:"required"`
 	Email    string `json:"email" validate:"required,email,max=320" binding:"required"`
+	Role     string `json:"role" validate:"omitempty,oneof=USER ADMIN"`
 }
 
 // NewUserRequest creates a new UserRequest with the provided information.

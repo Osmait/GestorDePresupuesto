@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Shield, Users, Trash2, RefreshCw } from "lucide-react";
 import { format } from "date-fns";
 import { EditableUserTable } from "./user-table";
+import { CreateUserModal } from "./create-user-modal";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
@@ -133,6 +134,7 @@ export default function AdminDashboard() {
                     </p>
                 </div>
                 <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <CreateUserModal onUserCreated={fetchUsers} />
                     <Button
                         variant="outline"
                         size="sm"
