@@ -1,6 +1,7 @@
 'use client'
 
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { useTheme } from 'next-themes'
 
 interface SettingsContextType {
 	sidebarHoverEnabled: boolean
@@ -49,7 +50,15 @@ interface SettingsProviderProps {
 export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 	// Initialize with default values
 	const [sidebarHoverEnabled, setSidebarHoverEnabled] = useState(defaultSettings.sidebarHoverEnabled)
-	const [theme, setTheme] = useState<'light' | 'dark' | 'system'>(defaultSettings.theme)
+	
+	// Use next-themes for theme management
+	const { theme: nextTheme, setTheme: setNextTheme } = useTheme()
+	
+	// Adapt next-themes to our context type
+	// If nextTheme is undefined (during SSR or initial mount), fallback to default
+	const theme = (nextTheme as 'light' | 'dark' | 'system') || defaultSettings.theme
+	const setTheme = (t: 'light' | 'dark' | 'system') => setNextTheme(t)
+
 	const [language, setLanguage] = useState<'es' | 'en'>(defaultSettings.language)
 	const [currency, setCurrency] = useState<'USD' | 'EUR' | 'MXN'>(defaultSettings.currency)
 	const [notifications, setNotifications] = useState(defaultSettings.notifications)
@@ -64,7 +73,8 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 				const parsed = JSON.parse(savedSettings)
 				
 				setSidebarHoverEnabled(parsed.sidebarHoverEnabled ?? defaultSettings.sidebarHoverEnabled)
-				setTheme(parsed.theme ?? defaultSettings.theme)
+				// We don't set theme here because next-themes handles it independently
+				// and is the source of truth based on its own storage/detection
 				setLanguage(parsed.language ?? defaultSettings.language)
 				setCurrency(parsed.currency ?? defaultSettings.currency)
 				setNotifications(parsed.notifications ?? defaultSettings.notifications)
@@ -81,7 +91,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 		try {
 			const settings = {
 				sidebarHoverEnabled,
-				theme,
+				theme, // Save current theme to app-settings for consistency/backup
 				language,
 				currency,
 				notifications
