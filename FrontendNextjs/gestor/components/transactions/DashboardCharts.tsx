@@ -1,12 +1,19 @@
 'use client'
 
-import { ResponsivePie } from '@nivo/pie'
-import { ResponsiveBar } from '@nivo/bar'
 import { useTheme } from 'next-themes'
 import { useMemo } from 'react'
 import { CategoryExpense, MonthlySummary } from '@/types/analytics'
 import { useTranslations } from 'next-intl'
+import dynamic from 'next/dynamic'
 
+const DashboardPieChart = dynamic(() => import('@/components/charts/DashboardPieChart'), { 
+    ssr: false, 
+    loading: () => <div className="h-full w-full bg-muted/20 animate-pulse rounded" /> 
+})
+const DashboardBarChart = dynamic(() => import('@/components/charts/DashboardBarChart'), { 
+    ssr: false, 
+    loading: () => <div className="h-full w-full bg-muted/20 animate-pulse rounded" /> 
+})
 
 interface DashboardChartsProps {
 	categories: { id: string, name: string, color: string }[]
@@ -90,109 +97,31 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 			<div className="bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center">
 				<h3 className="font-semibold mb-2 text-lg text-foreground">{t('expensesByCategory')}</h3>
 				<div className="h-64 w-full">
-					{pieData.length > 0 ? (
-						<ResponsivePie
-							data={pieData}
-							margin={{ top: 30, right: 40, bottom: 40, left: 40 }}
-							innerRadius={0.6}
-							padAngle={2}
-							cornerRadius={8}
-							colors={d => d.data.color}
-							borderWidth={0}
-							enableArcLinkLabels={true}
-							arcLinkLabelsTextColor={theme === 'dark' ? '#9ca3af' : '#4b5563'}
-							arcLinkLabelsColor={{ from: 'color' }}
-							activeOuterRadiusOffset={8}
-							theme={nivoTheme}
-
-						/>
-					) : (
-						<div className="flex items-center justify-center h-full text-muted-foreground">
-							<div className="text-center">
-								<p className="text-lg mb-2">📊</p>
-								<p>{t('noExpenses')}</p>
-								<p className="text-sm">{t('expensesHint')}</p>
-							</div>
-						</div>
-					)}
+                    <DashboardPieChart 
+                        data={pieData}
+                        theme={theme}
+                        nivoTheme={nivoTheme}
+                        t={{
+                            noExpenses: t('noExpenses'),
+                            expensesHint: t('expensesHint')
+                        }}
+                    />
 				</div>
 			</div>
 			<div className="bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center">
 				<h3 className="font-semibold mb-2 text-lg text-foreground">{t('incomeVsExpenses')}</h3>
 				<div className="h-64 w-full">
-					{barData.length > 0 ? (
-						<ResponsiveBar
-							data={barData}
-							keys={[t('income'), t('expenses')]}
-							indexBy="month"
-							margin={{ top: 20, right: 20, bottom: 60, left: 60 }}
-							padding={0.5}
-							innerPadding={4}
-							groupMode="grouped"
-							colors={[theme === 'dark' ? '#10b981' : '#059669', theme === 'dark' ? '#f43f5e' : '#e11d48']}
-							borderRadius={4}
-							enableLabel={false}
-							enableGridX={false}
-							enableGridY={true}
-							theme={{
-								...nivoTheme,
-								grid: {
-									line: {
-										stroke: theme === 'dark' ? '#374151' : '#e5e7eb',
-										strokeWidth: 1,
-										strokeDasharray: '4 4'
-									}
-								}
-							}}
-							axisBottom={{
-								format: v => {
-									const [_year, month] = v.split('-');
-									return monthAbbreviations[parseInt(month) - 1];
-								},
-								tickSize: 0,
-								tickPadding: 16,
-								legend: '',
-							}}
-							axisLeft={{
-								tickSize: 0,
-								tickPadding: 16,
-								tickValues: 5,
-								legend: '',
-							}}
-							legends={[
-								{
-									dataFrom: 'keys',
-									anchor: 'bottom-right',
-									direction: 'row',
-									justify: false,
-									translateY: 60,
-									translateX: 0,
-									itemWidth: 100,
-									itemHeight: 20,
-									itemsSpacing: 0,
-									symbolSize: 20,
-									symbolShape: 'circle',
-									itemTextColor: theme === 'dark' ? '#9ca3af' : '#6b7280',
-									effects: [
-										{
-											on: 'hover',
-											style: {
-												itemTextColor: theme === 'dark' ? '#ffffff' : '#000000'
-											}
-										}
-									]
-								}
-							]}
-						/>
-					) : (
-						<div className="flex items-center justify-center h-full text-muted-foreground">
-							<div className="text-center">
-								<p className="text-lg mb-2">📈</p>
-								<p>{t('noTransactions')}</p>
-								<p className="text-sm">{t('statsHint')}</p>
-							</div>
-						</div>
-					)}
+                    <DashboardBarChart 
+                        data={barData}
+                        keys={[t('income'), t('expenses')]}
+                        theme={theme}
+                        nivoTheme={nivoTheme}
+                        monthAbbreviations={monthAbbreviations}
+                        t={{
+                            noTransactions: t('noTransactions'),
+                            statsHint: t('statsHint')
+                        }}
+                    />
 				</div>
 			</div>
 		</div>
