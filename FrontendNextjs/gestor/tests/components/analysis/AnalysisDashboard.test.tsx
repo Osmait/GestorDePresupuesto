@@ -2,6 +2,32 @@ import { render, screen } from '@testing-library/react'
 import { AnalysisDashboard } from '@/components/analysis/AnalysisDashboard'
 import { vi } from 'vitest'
 
+// Mock next/dynamic
+vi.mock('next/dynamic', () => ({
+    default: vi.fn((loader: any) => {
+        const MockComponent = (props: any) => {
+            // Identify chart by specific props passed in AnalysisDashboard.tsx
+            let testId = 'dynamic-chart'
+            if (props.t?.income && props.t?.month && !props.t?.day) testId = 'nivo-line'
+            if (props.t?.category) testId = 'nivo-bar'
+            if (props.nivoTheme && !props.t) testId = 'nivo-pie'
+            if (props.t?.expenses && props.t?.income && !props.t?.month) testId = 'nivo-radar'
+            if (props.t?.day) testId = 'nivo-heatmap'
+            
+            // Filter out non-DOM props to avoid React warnings
+            const { nivoTheme, t, theme, ...domProps } = props
+            return <div {...domProps} data-testid={testId}>{testId}</div>
+        }
+        return MockComponent
+    })
+}))
+
+// Mock theme
+vi.mock('next-themes', () => ({
+    useTheme: () => ({ theme: 'light' })
+}))
+
+
 // Mock all Nivo charts
 vi.mock('@nivo/line', () => ({
     ResponsiveLine: () => <div data-testid="nivo-line">Line Chart</div>
@@ -58,7 +84,7 @@ vi.mock('@/hooks/queries/useAnalyticsQuery', () => ({
 }))
 
 describe('AnalysisDashboard', () => {
-    it('renders all chart components when data is loaded', () => {
+    it('renders all chart components when data is loaded', async () => {
         render(<AnalysisDashboard />)
 
         // Verify all chart titles are present
@@ -68,11 +94,11 @@ describe('AnalysisDashboard', () => {
         expect(screen.getByText('categoryRadar')).toBeInTheDocument()
         expect(screen.getByText('weeklyHeatmap')).toBeInTheDocument()
 
-        // Verify all charts are rendered
-        expect(screen.getByTestId('nivo-line')).toBeInTheDocument()
-        expect(screen.getByTestId('nivo-bar')).toBeInTheDocument()
-        expect(screen.getByTestId('nivo-pie')).toBeInTheDocument()
-        expect(screen.getByTestId('nivo-radar')).toBeInTheDocument()
-        expect(screen.getByTestId('nivo-heatmap')).toBeInTheDocument()
+        // Verify all charts are rendered (use findBy since they are loaded dynamically)
+        expect(await screen.findByTestId('nivo-line')).toBeInTheDocument()
+        expect(await screen.findByTestId('nivo-bar')).toBeInTheDocument()
+        expect(await screen.findByTestId('nivo-pie')).toBeInTheDocument()
+        expect(await screen.findByTestId('nivo-radar')).toBeInTheDocument()
+        expect(await screen.findByTestId('nivo-heatmap')).toBeInTheDocument()
     })
 })
