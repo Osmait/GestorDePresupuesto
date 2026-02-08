@@ -15,8 +15,10 @@ import { CategorySummaryCard } from './CategorySummaryCard'
 
 export function CategoryList() {
     const t = useTranslations('categories')
-    const { data: categories = [], isLoading: isLoadingCategories } = useGetCategories()
-    const { data: transactions = [], isLoading: isLoadingTransactions } = useGetAllTransactions()
+    const { data: categoriesData, isLoading: isLoadingCategories } = useGetCategories()
+    const { data: transactionsData, isLoading: isLoadingTransactions } = useGetAllTransactions()
+    const categories = categoriesData ?? []
+    const transactions = transactionsData ?? []
     const { setEditingCategory, setModalOpen } = useCategoryContext()
 
     const deleteCategoryMutation = useDeleteCategoryMutation()
