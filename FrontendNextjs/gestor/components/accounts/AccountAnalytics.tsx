@@ -291,7 +291,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                             <Tooltip
                                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                                 labelStyle={{ fontWeight: 'bold', color: '#374151' }}
-                                formatter={(value: number) => [`$${value.toLocaleString()}`, t('balance')]}
+                                formatter={(value: any) => [`$${Number(value).toLocaleString()}`, t('balance')]}
                             />
                             <Area
                                 type="monotone"
