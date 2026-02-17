@@ -32,9 +32,21 @@ func shouldCheckToken(route string) bool {
 
 	// 2. Special case for /user routes (Registration, GetById)
 	// Must allow "/user" and "/user/xxx" BUT NOT "/users/demos"
-	// Also explicitly allow /auth/demo without allowing "demo" substring elsewhere
-	if route == "/user" || strings.HasPrefix(route, "/user/") || route == "/auth/demo" {
+	if route == "/user" || strings.HasPrefix(route, "/user/") {
 		return false
+	}
+
+	// 3. Auth routes that don't require authentication
+	authNoAuthRoutes := []string{
+		"/auth/login",
+		"/auth/refresh",
+		"/auth/logout",
+		"/auth/demo",
+	}
+	for _, r := range authNoAuthRoutes {
+		if route == r {
+			return false
+		}
 	}
 
 	return true
