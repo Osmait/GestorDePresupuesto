@@ -8,6 +8,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Input } from '@/components/ui/input'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import TransactionFormModal from '@/components/transactions/TransactionFormModal'
+import { AIExtractionButton } from '@/components/ai'
 import { useTransactionContext } from './TransactionContext'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
@@ -27,6 +28,7 @@ export function TransactionActions() {
 
     return (
         <div className="flex items-center gap-3">
+            <AIExtractionButton variant="outline" />
             <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
                 <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
                 {t('filters')}

@@ -1,0 +1,41 @@
+'use client'
+
+import { useState } from 'react'
+import { Sparkles } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { AIExtractionModal } from './AIExtractionModal'
+
+interface AIExtractionButtonProps {
+  accountId?: string
+  variant?: 'default' | 'outline' | 'secondary' | 'ghost'
+  size?: 'default' | 'sm' | 'lg' | 'icon'
+  className?: string
+}
+
+export function AIExtractionButton({
+  accountId,
+  variant = 'outline',
+  size = 'default',
+  className,
+}: AIExtractionButtonProps) {
+  const [isOpen, setIsOpen] = useState(false)
+
+  return (
+    <>
+      <Button
+        variant={variant}
+        size={size}
+        onClick={() => setIsOpen(true)}
+        className={className}
+      >
+        <Sparkles className="h-4 w-4 mr-2" />
+        Extract from Document
+      </Button>
+      <AIExtractionModal
+        open={isOpen}
+        onOpenChange={setIsOpen}
+        defaultAccountId={accountId}
+      />
+    </>
+  )
+}
