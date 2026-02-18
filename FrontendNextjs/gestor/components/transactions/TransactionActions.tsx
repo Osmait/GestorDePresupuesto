@@ -2,12 +2,13 @@
 
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Filter, PlusCircle } from 'lucide-react'
+import { Filter, PlusCircle, Lightbulb } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import TransactionFormModal from '@/components/transactions/TransactionFormModal'
+import { AIExtractionButton, SpendingInsightsModal } from '@/components/ai'
 import { useTransactionContext } from './TransactionContext'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
@@ -16,31 +17,39 @@ import { useTranslations } from 'next-intl'
 export function TransactionActions() {
     const t = useTranslations('transactions')
     const tForms = useTranslations('forms')
+    const tAI = useTranslations('ai.common')
     const [drawerOpen, setDrawerOpen] = useState(false)
+    const [insightsOpen, setInsightsOpen] = useState(false)
     const formRef = useRef<{ reset: () => void } | null>(null)
 
     const { filters, setFilters, clearFilters, createTransaction, isLoading, error, isModalOpen, setModalOpen, setEditingTransaction } = useTransactionContext()
     const { data: accounts = [] } = useGetAccounts()
     const { data: categories = [] } = useGetCategories()
 
-    // handleApplyFilters removed as it is now automatic
-
     return (
-        <div className="flex items-center gap-3">
-            <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
-                <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
-                {t('filters')}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Button variant="outline" size="sm" className="sm:size-default" onClick={() => setInsightsOpen(true)}>
+                <Lightbulb className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">{tAI('insights')}</span>
+            </Button>
+            <AIExtractionButton variant="outline" size="sm" className="sm:size-default" />
+            <Button variant="outline" size="sm" className="sm:size-default border-border/50" onClick={() => setDrawerOpen(true)}>
+                <Filter className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('filters')}</span>
             </Button>
             <Button
-                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                size="sm"
+                className="sm:size-default bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                 onClick={() => {
                     setEditingTransaction(null)
                     setModalOpen(true)
                 }}
             >
-                <PlusCircle className="h-4 w-4 mr-2" aria-hidden="true" />
-                {t('addTransaction')}
+                <PlusCircle className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('addTransaction')}</span>
             </Button>
+
+            <SpendingInsightsModal open={insightsOpen} onOpenChange={setInsightsOpen} />
 
             <TransactionFormModal
                 open={isModalOpen}
@@ -51,40 +60,26 @@ export function TransactionActions() {
                     }
                 }}
                 createTransaction={async (...args) => {
-                    // Optimistic Close
-                    setModalOpen(false)
+                    const [name, description, amount, type_transation, account_id, category_id, _budget_id, created_at_arg] = args;
+                    const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString();
 
-                    try {
-                        // Construct Optimistic Transaction
-                        const [name, description, amount, type_transation, account_id, category_id, _budget_id, created_at_arg] = args;
-                        const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString();
+                    const _optimisticTx = {
+                        id: `temp-${Date.now()}`,
+                        name,
+                        description,
+                        amount,
+                        type_transation,
+                        account_id,
+                        category_id,
+                        created_at,
+                        user_id: 'current-user',
+                        updated_at: new Date().toISOString()
+                    };
 
-                        const _optimisticTx = {
-                            id: `temp-${Date.now()}`,
-                            name,
-                            description,
-                            amount,
-                            type_transation,
-                            account_id,
-                            category_id,
-                            created_at,
-                            user_id: 'current-user', // Placeholder
-                            updated_at: new Date().toISOString()
-                        };
+                    // @ts-ignore
+                    await createTransaction(...args)
 
-                        // Optimistic update is now handled by React Query cache invalidation
-                        // No need for manual addTransaction call
-
-                        // Perform actual save
-                        // @ts-ignore
-                        await createTransaction(...args)
-
-                        formRef.current?.reset()
-                        // Optionally reload in background without UI loader if needed
-                        // reloadCurrentView() // Disabled to prevent full list refresh
-                    } catch (error) {
-                        console.error("Failed to create transaction:", error)
-                    }
+                    formRef.current?.reset()
                 }}
                 isLoading={isLoading}
                 error={error}

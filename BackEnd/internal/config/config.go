@@ -184,6 +184,19 @@ type AdminConfig struct {
 	Enabled  bool   `json:"enabled"`
 }
 
+// AIConfig holds AI service configuration
+type AIConfig struct {
+	Provider       string        `json:"provider"`
+	Model          string        `json:"model"`
+	GeminiAPIKey   string        `json:"-"`
+	MaxRetries     int           `json:"max_retries"`
+	RetryBackoff   time.Duration `json:"retry_backoff"`
+	RequestTimeout time.Duration `json:"request_timeout"`
+	MaxFileSize    int64         `json:"max_file_size"`
+	MaxFiles       int           `json:"max_files"`
+	EnableMetrics  bool          `json:"enable_metrics"`
+}
+
 // Config holds all application configuration settings
 type Config struct {
 	Server        ServerConfig        `json:"server"`
@@ -198,6 +211,7 @@ type Config struct {
 	Prometheus    PrometheusConfig    `json:"prometheus"`
 	Middleware    MiddlewareConfig    `json:"middleware"`
 	Admin         AdminConfig         `json:"admin"`
+	AI            AIConfig            `json:"ai"`
 }
 
 // LoadConfig loads configuration from environment variables with comprehensive validation
@@ -360,6 +374,18 @@ func LoadConfig() (*Config, error) {
 			Name:     getEnvString("ADMIN_NAME", "Admin"),
 			LastName: getEnvString("ADMIN_LASTNAME", "System"),
 			Enabled:  getEnvBool("ADMIN_SEED_ENABLED", true),
+		},
+
+		AI: AIConfig{
+			Provider:       getEnvString("AI_PROVIDER", "gemini"),
+			Model:          getEnvString("AI_MODEL", "gemini-2.0-flash-exp"),
+			GeminiAPIKey:   getEnvString("GEMINI_API_KEY", ""),
+			MaxRetries:     getEnvInt("AI_MAX_RETRIES", 2),
+			RetryBackoff:   getDuration(getEnvString("AI_RETRY_BACKOFF", "1s")),
+			RequestTimeout: getDuration(getEnvString("AI_REQUEST_TIMEOUT", "30s")),
+			MaxFileSize:    int64(getEnvInt("AI_MAX_FILE_SIZE_MB", 10)) * 1024 * 1024,
+			MaxFiles:       getEnvInt("AI_MAX_FILES", 5),
+			EnableMetrics:  getEnvBool("AI_ENABLE_METRICS", true),
 		},
 	}
 

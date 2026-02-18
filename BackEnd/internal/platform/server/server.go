@@ -15,7 +15,10 @@ import (
 	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
+	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
+	aiService "github.com/osmait/gestorDePresupuesto/internal/services/ai"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
@@ -50,6 +53,10 @@ type Server struct {
 	investmentService   *investmentService.InvestmentService
 	quoteService        *quote.QuoteService
 	notificationService *notification.NotificationService
+	aiService           *aiService.Service
+	aiCache             *aiService.AICacheService
+	categoryRepo        categoryRepo.CategoryRepoInterface
+	transactionRepo     transactionRepo.TransactionRepositoryInterface
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -73,6 +80,10 @@ func New(ctx context.Context,
 	cfg *config.Config,
 	quoteService *quote.QuoteService,
 	notificationService *notification.NotificationService,
+	aiSvc *aiService.Service,
+	aiCache *aiService.AICacheService,
+	catRepo categoryRepo.CategoryRepoInterface,
+	txnRepo transactionRepo.TransactionRepositoryInterface,
 ) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
@@ -89,6 +100,10 @@ func New(ctx context.Context,
 		investmentService:   investmentService,
 		quoteService:        quoteService,
 		notificationService: notificationService,
+		aiService:           aiSvc,
+		aiCache:             aiCache,
+		categoryRepo:        catRepo,
+		transactionRepo:     txnRepo,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -137,6 +152,7 @@ func (s *Server) registerRoutes() {
 	routes.RecurringTransactionRoutes(s.Engine, s.recurringService)
 	routes.SearchRoutes(s.Engine, s.searchService)
 	routes.InvestmentRoutes(s.Engine, s.investmentService)
+	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.aiCache)
 }
 
 func (s *Server) Run(ctx context.Context) error {

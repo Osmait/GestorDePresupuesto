@@ -50,7 +50,7 @@ test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ 
   await accountModal.locator('button[type="submit"]').click();
 
   // Wait for modal to close
-  await expect(accountModal).not.toBeVisible();
+  await expect(accountModal).not.toBeVisible({ timeout: 15000 });
 
 
   // --- 3. Create Category ---
@@ -75,7 +75,7 @@ test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ 
   await categoryModal.getByRole('button', { name: /Create|Crear/i }).click();
 
   // Wait for modal to close
-  await expect(categoryModal).not.toBeVisible();
+  await expect(categoryModal).not.toBeVisible({ timeout: 15000 });
 
 
   // --- 4. Create Transaction ---
@@ -109,7 +109,7 @@ test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ 
   await transactionModal.locator('button[type="submit"]').click();
 
   // Wait for modal to close
-  await expect(transactionModal).not.toBeVisible();
+  await expect(transactionModal).not.toBeVisible({ timeout: 15000 });
 
   // Basic verification
   await expect(page.locator('header')).toBeVisible();

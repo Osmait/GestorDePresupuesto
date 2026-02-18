@@ -31,7 +31,8 @@ export abstract class BaseRepository {
 
   protected async authenticatedFetch(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    retryCount = 0
   ): Promise<Response> {
     const headers = await this.getAuthHeaders();
     const url = `${this.baseUrl}${endpoint}`;
@@ -43,6 +44,35 @@ export abstract class BaseRepository {
         ...options.headers,
       },
     });
+
+    // Handle 401 Unauthorized - token might be expired
+    if (response.status === 401 && retryCount === 0) {
+      // On client side, force session refresh which triggers JWT callback
+      if (typeof window !== 'undefined') {
+        try {
+          // Force a session refresh - this will trigger the jwt callback
+          // which will attempt to refresh the token
+          const { getSession: refreshSession } = await import('next-auth/react');
+          const newSession = await refreshSession();
+          
+          // Check if session has error (refresh failed)
+          if ((newSession as any)?.error === "RefreshAccessTokenError") {
+            // Redirect to login
+            const { signOut } = await import('next-auth/react');
+            await signOut({ callbackUrl: '/login' });
+            throw new Error("Session expired. Please log in again.");
+          }
+          
+          // Retry the request with the new token
+          if (newSession?.accessToken) {
+            return this.authenticatedFetch(endpoint, options, retryCount + 1);
+          }
+        } catch (refreshError) {
+          console.error("Error refreshing session:", refreshError);
+          throw new Error("Session expired. Please log in again.");
+        }
+      }
+    }
 
     if (!response.ok) {
       let errorMessage = `HTTP error! status: ${response.status} - ${response.statusText}`;

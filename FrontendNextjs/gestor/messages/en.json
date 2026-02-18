@@ -469,7 +469,9 @@
     "currency": "Currency",
     "budgetAmount": "Budget Amount",
     "period": "Period",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "delete": "Delete",
+    "deleting": "Deleting..."
   },
   "charts": {
     "expensesByCategory": "Expenses by Category",
@@ -492,5 +494,99 @@
     "oct": "Oct",
     "nov": "Nov",
     "dec": "Dec"
+  },
+  "ai": {
+    "common": {
+      "insights": "AI Insights",
+      "extractFromDocument": "Extract from Document",
+      "cancel": "Cancel",
+      "save": "Save",
+      "creating": "Creating...",
+      "create": "Create",
+      "back": "Back"
+    },
+    "extraction": {
+      "title": "Extract Transactions with AI",
+      "description": "Upload receipts, invoices, or bank statements to automatically extract transactions",
+      "account": "Account",
+      "selectAccount": "Select account",
+      "documentType": "Document Type",
+      "receipt": "Receipt",
+      "invoice": "Invoice",
+      "bankStatement": "Bank Statement",
+      "extracting": "Extracting...",
+      "extractButton": "Extract Transactions",
+      "savingTransactions": "Saving transactions...",
+      "saveTransactions": "Save {count} Transaction",
+      "saveTransactions_plural": "Save {count} Transactions",
+      "transactionsFound": "{count} transactions found",
+      "needCategory": "{count} need category",
+      "selectFilesAndAccount": "Please select files and an account",
+      "failedToExtract": "Failed to extract transactions",
+      "extractedCount": "Extracted {count} transactions",
+      "savedCount": "Saved {count} transaction",
+      "savedCount_plural": "Saved {count} transactions",
+      "failedToSave": "Failed to save {count} transaction",
+      "failedToSave_plural": "Failed to save {count} transactions",
+      "categoryCreated": "Category \"{name}\" created",
+      "failedToCreateCategory": "Failed to create category"
+    },
+    "uploader": {
+      "dropFiles": "Drop files here...",
+      "dragOrClick": "Drag & drop files here, or click to select",
+      "supportedFormats": "PDF, JPG, PNG, WebP, GIF (max {maxSize}MB, {maxFiles} files max)",
+      "fileTooLarge": "File too large. Max size is {maxSize}MB",
+      "invalidFileType": "Invalid file type. Please upload PDF or images.",
+      "invalidFile": "Invalid file",
+      "maxFilesExceeded": "Maximum {maxFiles} files allowed",
+      "filesSelected": "{count} file(s) selected",
+      "clearAll": "Clear all"
+    },
+    "preview": {
+      "noTransactions": "No transactions detected in the document",
+      "selectedCount": "{selected} of {total} selected",
+      "selectAll": "Select all",
+      "deselectAll": "Deselect all",
+      "name": "Name",
+      "amount": "Amount",
+      "description": "Description",
+      "date": "Date",
+      "category": "Category",
+      "selectCategory": "Select category",
+      "createNewCategory": "Create new category",
+      "uncategorized": "Uncategorized",
+      "invalidDate": "Invalid date",
+      "income": "Income",
+      "expense": "Expense",
+      "noCategoryMatched": "No category matched"
+    },
+    "quickCategory": {
+      "title": "Create Category",
+      "description": "Add a new category for your transactions",
+      "name": "Name",
+      "namePlaceholder": "e.g., Groceries, Transport...",
+      "icon": "Icon",
+      "color": "Color",
+      "preview": "Category Preview"
+    },
+    "insights": {
+      "title": "AI Spending Insights",
+      "description": "Get personalized insights and recommendations based on your spending",
+      "dateRange": "Date Range",
+      "analyzing": "Analyzing...",
+      "analyzeButton": "Analyze My Spending",
+      "selectDateRange": "Select a date range and click \"Analyze My Spending\" to get insights",
+      "selectDateRangeError": "Please select a date range",
+      "failedToAnalyze": "Failed to analyze spending",
+      "summary": "Summary",
+      "totalExpenses": "Total Expenses",
+      "totalIncome": "Total Income",
+      "savingsRate": "Savings Rate",
+      "topCategories": "Top Categories",
+      "period": "Period: {from} to {to} ({days} days)",
+      "patternsDetected": "Patterns Detected",
+      "recommendations": "Recommendations",
+      "potentialSavings": "potential savings"
+    }
   }
 }

@@ -469,7 +469,9 @@
     "currency": "Moneda",
     "budgetAmount": "Monto del Presupuesto",
     "period": "Período",
-    "saving": "Guardando..."
+    "saving": "Guardando...",
+    "delete": "Eliminar",
+    "deleting": "Eliminando..."
   },
   "charts": {
     "expensesByCategory": "Gastos por Categoría",
@@ -492,5 +494,99 @@
     "oct": "Oct",
     "nov": "Nov",
     "dec": "Dic"
+  },
+  "ai": {
+    "common": {
+      "insights": "Ideas de IA",
+      "extractFromDocument": "Extraer de Documento",
+      "cancel": "Cancelar",
+      "save": "Guardar",
+      "creating": "Creando...",
+      "create": "Crear",
+      "back": "Volver"
+    },
+    "extraction": {
+      "title": "Extraer Transacciones con IA",
+      "description": "Sube recibos, facturas o estados de cuenta para extraer transacciones automáticamente",
+      "account": "Cuenta",
+      "selectAccount": "Seleccionar cuenta",
+      "documentType": "Tipo de Documento",
+      "receipt": "Recibo",
+      "invoice": "Factura",
+      "bankStatement": "Estado de Cuenta",
+      "extracting": "Extrayendo...",
+      "extractButton": "Extraer Transacciones",
+      "savingTransactions": "Guardando transacciones...",
+      "saveTransactions": "Guardar {count} Transacción",
+      "saveTransactions_plural": "Guardar {count} Transacciones",
+      "transactionsFound": "{count} transacciones encontradas",
+      "needCategory": "{count} necesitan categoría",
+      "selectFilesAndAccount": "Por favor selecciona archivos y una cuenta",
+      "failedToExtract": "Error al extraer transacciones",
+      "extractedCount": "Extraídas {count} transacciones",
+      "savedCount": "Guardada {count} transacción",
+      "savedCount_plural": "Guardadas {count} transacciones",
+      "failedToSave": "Error al guardar {count} transacción",
+      "failedToSave_plural": "Error al guardar {count} transacciones",
+      "categoryCreated": "Categoría \"{name}\" creada",
+      "failedToCreateCategory": "Error al crear categoría"
+    },
+    "uploader": {
+      "dropFiles": "Suelta los archivos aquí...",
+      "dragOrClick": "Arrastra y suelta archivos aquí, o haz clic para seleccionar",
+      "supportedFormats": "PDF, JPG, PNG, WebP, GIF (máx {maxSize}MB, {maxFiles} archivos máximo)",
+      "fileTooLarge": "Archivo demasiado grande. El tamaño máximo es {maxSize}MB",
+      "invalidFileType": "Tipo de archivo inválido. Por favor sube PDF o imágenes.",
+      "invalidFile": "Archivo inválido",
+      "maxFilesExceeded": "Máximo {maxFiles} archivos permitidos",
+      "filesSelected": "{count} archivo(s) seleccionado(s)",
+      "clearAll": "Limpiar todo"
+    },
+    "preview": {
+      "noTransactions": "No se detectaron transacciones en el documento",
+      "selectedCount": "{selected} de {total} seleccionadas",
+      "selectAll": "Seleccionar todo",
+      "deselectAll": "Deseleccionar todo",
+      "name": "Nombre",
+      "amount": "Monto",
+      "description": "Descripción",
+      "date": "Fecha",
+      "category": "Categoría",
+      "selectCategory": "Seleccionar categoría",
+      "createNewCategory": "Crear nueva categoría",
+      "uncategorized": "Sin categoría",
+      "invalidDate": "Fecha inválida",
+      "income": "Ingreso",
+      "expense": "Gasto",
+      "noCategoryMatched": "Sin categoría coincidente"
+    },
+    "quickCategory": {
+      "title": "Crear Categoría",
+      "description": "Añade una nueva categoría para tus transacciones",
+      "name": "Nombre",
+      "namePlaceholder": "ej, Supermercado, Transporte...",
+      "icon": "Ícono",
+      "color": "Color",
+      "preview": "Vista previa de Categoría"
+    },
+    "insights": {
+      "title": "Ideas de Gastos con IA",
+      "description": "Obtén ideas y recomendaciones personalizadas basadas en tus gastos",
+      "dateRange": "Rango de Fechas",
+      "analyzing": "Analizando...",
+      "analyzeButton": "Analizar Mis Gastos",
+      "selectDateRange": "Selecciona un rango de fechas y haz clic en \"Analizar Mis Gastos\" para obtener ideas",
+      "selectDateRangeError": "Por favor selecciona un rango de fechas",
+      "failedToAnalyze": "Error al analizar gastos",
+      "summary": "Resumen",
+      "totalExpenses": "Gastos Totales",
+      "totalIncome": "Ingresos Totales",
+      "savingsRate": "Tasa de Ahorro",
+      "topCategories": "Categorías Principales",
+      "period": "Período: {from} a {to} ({days} días)",
+      "patternsDetected": "Patrones Detectados",
+      "recommendations": "Recomendaciones",
+      "potentialSavings": "ahorro potencial"
+    }
   }
 }

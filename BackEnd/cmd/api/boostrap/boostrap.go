@@ -12,15 +12,18 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	domainAI "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
 	userDomain "github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
 	analyticsRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/analytics"
+	authRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/auth"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
@@ -31,6 +34,9 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/worker"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
+	aiService "github.com/osmait/gestorDePresupuesto/internal/services/ai"
+	"github.com/osmait/gestorDePresupuesto/internal/services/ai/providers/gemini"
+	"github.com/osmait/gestorDePresupuesto/internal/services/ai/tasks"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
@@ -123,6 +129,10 @@ func Run() error {
 		cfg,
 		services.quoteService,
 		services.notificationService,
+		services.aiService,
+		services.aiCache,
+		repositories.categoryRepository,
+		repositories.transactionRepository,
 	)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -224,6 +234,7 @@ type repositories struct {
 	analyticsRepository    *analyticsRepo.AnalyticsRepository
 	recurringRepository    *recurringRepo.RecurringTransactionRepository
 	notificationRepository *notificationRepo.NotificationRepository
+	refreshTokenRepository authRepo.RefreshTokenRepositoryInterface
 }
 
 // initializeRepositories creates all repository instances
@@ -238,6 +249,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		analyticsRepository:    analyticsRepo.NewAnalyticsRepository(db),
 		recurringRepository:    recurringRepo.NewRecurringTransactionRepository(db),
 		notificationRepository: notificationRepo.NewNotificationRepository(db),
+		refreshTokenRepository: authRepo.NewRefreshTokenRepository(db),
 	}
 }
 
@@ -255,6 +267,8 @@ type services struct {
 	searchService       *search.SearchService
 	quoteService        *quote.QuoteService
 	notificationService *notification.NotificationService
+	aiService           *aiService.Service
+	aiCache             *aiService.AICacheService
 }
 
 // initializeServices creates all service instances
@@ -264,14 +278,25 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 
 	notificationService := notification.NewNotificationService(repos.notificationRepository)
 
+	// Initialize AI Service first (needed for cache)
+	aiSvc := initializeAIService(cfg)
+
+	// Create AI cache service
 	transactionCache := cache.NewInMemoryCache(5*time.Minute, 10*time.Minute)
-	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache)
+	var aiCacheInvalidator transaction.AICacheInvalidator
+	var aiCacheSvc *aiService.AICacheService
+	if aiSvc != nil {
+		aiCacheSvc = aiService.NewAICacheService(transactionCache)
+		aiCacheInvalidator = aiCacheSvc
+	}
+
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator)
 
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),
 		transactionService:  transactionService,
 		userService:         user.NewUserService(repos.userRepository),
-		authService:         auth.NewAuthService(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, cfg),
+		authService:         auth.NewAuthServiceWithRefreshTokens(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, repos.refreshTokenRepository, cfg),
 		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService),
@@ -280,7 +305,68 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),
 		quoteService:        quoteService,
 		notificationService: notificationService,
+		aiService:           aiSvc,
+		aiCache:             aiCacheSvc,
 	}
+}
+
+// initializeAIService creates the AI service instance
+func initializeAIService(cfg *config.Config) *aiService.Service {
+	// Check if AI is configured
+	if cfg.AI.GeminiAPIKey == "" {
+		log.Info().Msg("AI service not configured (missing GEMINI_API_KEY)")
+		return nil
+	}
+
+	// Create Gemini provider
+	provider, err := gemini.NewProvider(cfg.AI.GeminiAPIKey, cfg.AI.Model)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create Gemini provider")
+		return nil
+	}
+
+	// Create AI service config
+	aiConfig := &aiService.Config{
+		Provider:       provider,
+		MaxRetries:     cfg.AI.MaxRetries,
+		RetryBackoff:   cfg.AI.RetryBackoff,
+		RequestTimeout: cfg.AI.RequestTimeout,
+		MaxFileSize:    cfg.AI.MaxFileSize,
+		MaxFiles:       cfg.AI.MaxFiles,
+		EnableMetrics:  cfg.AI.EnableMetrics,
+	}
+
+	// Create AI service
+	svc, err := aiService.NewService(aiConfig, log.Logger)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create AI service")
+		return nil
+	}
+
+	// Register transaction extractor task
+	extractor, err := tasks.NewTransactionExtractor()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create transaction extractor")
+		return nil
+	}
+
+	svc.RegisterTask(domainAI.TaskExtractTransactions, extractor)
+
+	// Register spending analyzer task
+	analyzer, err := tasks.NewSpendingAnalyzer()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create spending analyzer")
+		return nil
+	}
+
+	svc.RegisterTask(domainAI.TaskSpendingAnalysis, analyzer)
+
+	log.Info().
+		Str("provider", provider.GetProviderName()).
+		Str("model", provider.GetModel()).
+		Msg("AI service initialized successfully")
+
+	return svc
 }
 
 // seedAdminUser creates the admin user if it doesn't exist and admin seeding is enabled

@@ -19,6 +19,7 @@ export interface Investment {
 
 export interface InvestmentFilters {
     user_id?: string;
+    type?: InvestmentType | string;
 }
 
 export interface CreateInvestmentDTO {
