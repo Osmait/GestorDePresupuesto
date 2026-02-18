@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { AIExtractionModal } from './AIExtractionModal'
+import { useTranslations } from 'next-intl'
 
 interface AIExtractionButtonProps {
   accountId?: string
@@ -18,6 +19,7 @@ export function AIExtractionButton({
   size = 'default',
   className,
 }: AIExtractionButtonProps) {
+  const t = useTranslations('ai.common')
   const [isOpen, setIsOpen] = useState(false)
 
   return (
@@ -29,7 +31,7 @@ export function AIExtractionButton({
         className={className}
       >
         <Sparkles className="h-4 w-4 mr-2" />
-        Extract from Document
+        {t('extractFromDocument')}
       </Button>
       <AIExtractionModal
         open={isOpen}

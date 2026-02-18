@@ -23,6 +23,7 @@ import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
 import { DocumentType, AIExtractResponse } from '@/types/ai'
 import { toast } from 'sonner'
+import { useTranslations } from 'next-intl'
 
 interface AIExtractionModalProps {
 	open: boolean
@@ -31,6 +32,8 @@ interface AIExtractionModalProps {
 }
 
 export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIExtractionModalProps) {
+	const t = useTranslations('ai.extraction')
+	const tCommon = useTranslations('ai.common')
 	const [files, setFiles] = useState<File[]>([])
 	const [documentType, setDocumentType] = useState<DocumentType>('receipt')
 	const [accountId, setAccountId] = useState<string>(defaultAccountId || '')
@@ -54,7 +57,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 
 	const handleExtract = async () => {
 		if (files.length === 0 || !accountId) {
-			toast.error('Please select files and an account')
+			toast.error(t('selectFilesAndAccount'))
 			return
 		}
 
@@ -65,9 +68,9 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 			setExtractedTransactions(response.data.transactions)
 			setSelectedIndices(new Set(response.data.transactions.map((_, i) => i)))
 			setStep('preview')
-			toast.success(`Extracted ${response.data.count} transactions`)
+			toast.success(t('extractedCount', { count: response.data.count }))
 		} else {
-			toast.error('Failed to extract transactions')
+			toast.error(t('failedToExtract'))
 		}
 	}
 
@@ -107,11 +110,11 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 				color: tempCategory.color,
 			})
 
-			toast.success(`Category "${tempCategory.name}" created`)
+			toast.success(t('categoryCreated', { name: tempCategory.name }))
 
 			setShowQuickCategory(false)
 		} catch (error) {
-			toast.error('Failed to create category')
+			toast.error(t('failedToCreateCategory'))
 		}
 	}
 
@@ -141,10 +144,10 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		}
 
 		if (saved > 0) {
-			toast.success(`Saved ${saved} transaction${saved > 1 ? 's' : ''}`)
+			toast.success(t('savedCount', { count: saved }))
 		}
 		if (failed > 0) {
-			toast.error(`Failed to save ${failed} transaction${failed > 1 ? 's' : ''}`)
+			toast.error(t('failedToSave', { count: failed }))
 		}
 
 		handleClose()
@@ -174,11 +177,10 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					<DialogHeader>
 						<DialogTitle className="flex items-center gap-2">
 							<Sparkles className="h-5 w-5 text-primary" />
-							Extract Transactions with AI
+							{t('title')}
 						</DialogTitle>
 						<DialogDescription>
-							Upload receipts, invoices, or bank statements to automatically extract
-							transactions
+							{t('description')}
 						</DialogDescription>
 					</DialogHeader>
 
@@ -186,10 +188,10 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 						<div className="space-y-6">
 							<div className="space-y-4">
 								<div>
-									<label className="text-sm font-medium mb-2 block">Account</label>
+									<label className="text-sm font-medium mb-2 block">{t('account')}</label>
 									<Select value={accountId} onValueChange={setAccountId}>
 										<SelectTrigger>
-											<SelectValue placeholder="Select account" />
+											<SelectValue placeholder={t('selectAccount')} />
 										</SelectTrigger>
 										<SelectContent>
 											{accounts.map((account) => (
@@ -202,7 +204,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 								</div>
 
 								<div>
-									<label className="text-sm font-medium mb-2 block">Document Type</label>
+									<label className="text-sm font-medium mb-2 block">{t('documentType')}</label>
 									<Select
 										value={documentType}
 										onValueChange={(v) => setDocumentType(v as DocumentType)}
@@ -211,9 +213,9 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="receipt">Receipt</SelectItem>
-											<SelectItem value="invoice">Invoice</SelectItem>
-											<SelectItem value="statement">Bank Statement</SelectItem>
+											<SelectItem value="receipt">{t('receipt')}</SelectItem>
+											<SelectItem value="invoice">{t('invoice')}</SelectItem>
+											<SelectItem value="statement">{t('bankStatement')}</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
@@ -226,7 +228,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 
 							<div className="flex justify-end gap-2">
 								<Button variant="outline" onClick={handleClose}>
-									Cancel
+									{tCommon('cancel')}
 								</Button>
 								<Button
 									onClick={handleExtract}
@@ -235,12 +237,12 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 									{isExtracting ? (
 										<>
 											<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-											Extracting...
+											{t('extracting')}
 										</>
 									) : (
 										<>
 											<Sparkles className="h-4 w-4 mr-2" />
-											Extract Transactions
+											{t('extractButton')}
 										</>
 									)}
 								</Button>
@@ -254,13 +256,13 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 								<div className="flex items-center gap-4 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
 									<div className="flex items-center gap-1">
 										<CheckCircle className="h-4 w-4 text-green-500" />
-										<span>{extractData.data.count} transactions found</span>
+										<span>{t('transactionsFound', { count: extractData.data.count })}</span>
 									</div>
 									<div className="flex items-center gap-1">
 										{extractData.data.unmatched_categories > 0 && (
 											<>
 												<AlertCircle className="h-4 w-4 text-yellow-500" />
-												<span>{extractData.data.unmatched_categories} need category</span>
+												<span>{t('needCategory', { count: extractData.data.unmatched_categories })}</span>
 											</>
 										)}
 									</div>
@@ -282,14 +284,13 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 
 							<div className="flex justify-between">
 								<Button variant="outline" onClick={handleBack}>
-									Back
+									{tCommon('back')}
 								</Button>
 								<Button
 									onClick={handleSaveTransactions}
 									disabled={selectedIndices.size === 0}
 								>
-									Save {selectedIndices.size} Transaction
-									{selectedIndices.size !== 1 ? 's' : ''}
+									{t('saveTransactions', { count: selectedIndices.size })}
 								</Button>
 							</div>
 						</div>
@@ -298,7 +299,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					{step === 'saving' && (
 						<div className="flex flex-col items-center justify-center py-12">
 							<Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-							<p className="text-muted-foreground">Saving transactions...</p>
+							<p className="text-muted-foreground">{t('savingTransactions')}</p>
 						</div>
 					)}
 				</DialogContent>

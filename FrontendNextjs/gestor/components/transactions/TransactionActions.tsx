@@ -17,6 +17,7 @@ import { useTranslations } from 'next-intl'
 export function TransactionActions() {
     const t = useTranslations('transactions')
     const tForms = useTranslations('forms')
+    const tAI = useTranslations('ai.common')
     const [drawerOpen, setDrawerOpen] = useState(false)
     const [insightsOpen, setInsightsOpen] = useState(false)
     const formRef = useRef<{ reset: () => void } | null>(null)
@@ -25,13 +26,11 @@ export function TransactionActions() {
     const { data: accounts = [] } = useGetAccounts()
     const { data: categories = [] } = useGetCategories()
 
-    // handleApplyFilters removed as it is now automatic
-
     return (
         <div className="flex items-center gap-3">
             <Button variant="outline" onClick={() => setInsightsOpen(true)}>
                 <Lightbulb className="h-4 w-4 mr-2" />
-                AI Insights
+                {tAI('insights')}
             </Button>
             <AIExtractionButton variant="outline" />
             <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
@@ -60,11 +59,9 @@ export function TransactionActions() {
                     }
                 }}
                 createTransaction={async (...args) => {
-                    // Optimistic Close
                     setModalOpen(false)
 
                     try {
-                        // Construct Optimistic Transaction
                         const [name, description, amount, type_transation, account_id, category_id, _budget_id, created_at_arg] = args;
                         const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString();
 
@@ -77,20 +74,14 @@ export function TransactionActions() {
                             account_id,
                             category_id,
                             created_at,
-                            user_id: 'current-user', // Placeholder
+                            user_id: 'current-user',
                             updated_at: new Date().toISOString()
                         };
 
-                        // Optimistic update is now handled by React Query cache invalidation
-                        // No need for manual addTransaction call
-
-                        // Perform actual save
                         // @ts-ignore
                         await createTransaction(...args)
 
                         formRef.current?.reset()
-                        // Optionally reload in background without UI loader if needed
-                        // reloadCurrentView() // Disabled to prevent full list refresh
                     } catch (error) {
                         console.error("Failed to create transaction:", error)
                     }

@@ -5,6 +5,7 @@ import { useDropzone, FileRejection } from 'react-dropzone'
 import { Upload, FileText, X, AlertCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 interface DocumentUploaderProps {
   onFilesSelected: (files: File[]) => void
@@ -27,6 +28,7 @@ export function DocumentUploader({
   maxSize = 10 * 1024 * 1024,
   disabled = false,
 }: DocumentUploaderProps) {
+  const t = useTranslations('ai.uploader')
   const [files, setFiles] = useState<File[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -37,18 +39,18 @@ export function DocumentUploader({
       if (fileRejections.length > 0) {
         const rejection = fileRejections[0]
         if (rejection.errors[0]?.code === 'file-too-large') {
-          setError(`File too large. Max size is ${maxSize / 1024 / 1024}MB`)
+          setError(t('fileTooLarge', { maxSize: maxSize / 1024 / 1024 }))
         } else if (rejection.errors[0]?.code === 'file-invalid-type') {
-          setError('Invalid file type. Please upload PDF or images.')
+          setError(t('invalidFileType'))
         } else {
-          setError(rejection.errors[0]?.message || 'Invalid file')
+          setError(rejection.errors[0]?.message || t('invalidFile'))
         }
         return
       }
 
       const totalFiles = files.length + acceptedFiles.length
       if (totalFiles > maxFiles) {
-        setError(`Maximum ${maxFiles} files allowed`)
+        setError(t('maxFilesExceeded', { maxFiles }))
         return
       }
 
@@ -56,7 +58,7 @@ export function DocumentUploader({
       setFiles(newFiles)
       onFilesSelected(newFiles)
     },
-    [files, maxFiles, maxSize, onFilesSelected]
+    [files, maxFiles, maxSize, onFilesSelected, t]
   )
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
@@ -94,14 +96,14 @@ export function DocumentUploader({
         <input {...getInputProps()} />
         <Upload className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
         {isDragActive ? (
-          <p className="text-sm text-muted-foreground">Drop files here...</p>
+          <p className="text-sm text-muted-foreground">{t('dropFiles')}</p>
         ) : (
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">
-              Drag & drop files here, or click to select
+              {t('dragOrClick')}
             </p>
             <p className="text-xs text-muted-foreground">
-              PDF, JPG, PNG, WebP, GIF (max {maxSize / 1024 / 1024}MB, {maxFiles} files max)
+              {t('supportedFormats', { maxSize: maxSize / 1024 / 1024, maxFiles })}
             </p>
           </div>
         )}
@@ -117,9 +119,9 @@ export function DocumentUploader({
       {files.length > 0 && (
         <div className="space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">{files.length} file(s) selected</span>
+            <span className="text-sm text-muted-foreground">{t('filesSelected', { count: files.length })}</span>
             <Button variant="ghost" size="sm" onClick={clearFiles}>
-              Clear all
+              {t('clearAll')}
             </Button>
           </div>
           <div className="space-y-2">

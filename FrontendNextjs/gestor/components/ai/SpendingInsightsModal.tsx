@@ -33,6 +33,7 @@ import {
 } from '@/types/ai'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
 
 interface SpendingInsightsModalProps {
 	open: boolean
@@ -40,6 +41,7 @@ interface SpendingInsightsModalProps {
 }
 
 export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsModalProps) {
+	const t = useTranslations('ai.insights')
 	const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
 		const to = new Date()
 		const from = subMonths(to, 3)
@@ -51,7 +53,7 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 
 	const handleAnalyze = async () => {
 		if (!dateRange?.from || !dateRange?.to) {
-			toast.error('Please select a date range')
+			toast.error(t('selectDateRangeError'))
 			return
 		}
 
@@ -64,7 +66,7 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 			const response = result as SpendingAnalysisResponse
 			setInsights(response.data)
 		} else {
-			toast.error('Failed to analyze spending')
+			toast.error(t('failedToAnalyze'))
 		}
 	}
 
@@ -79,17 +81,17 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Lightbulb className="h-5 w-5 text-primary" />
-						AI Spending Insights
+						{t('title')}
 					</DialogTitle>
 					<DialogDescription>
-						Get personalized insights and recommendations based on your spending
+						{t('description')}
 					</DialogDescription>
 				</DialogHeader>
 
 				<div className="space-y-6">
 					<div className="flex items-end gap-4">
 						<div className="flex-1">
-							<label className="text-sm font-medium mb-2 block">Date Range</label>
+							<label className="text-sm font-medium mb-2 block">{t('dateRange')}</label>
 							<CalendarDateRangePicker
 								value={dateRange}
 								onChange={(range) => {
@@ -106,12 +108,12 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 							{analyzeMutation.isPending ? (
 								<>
 									<Loader2 className="h-4 w-4 mr-2 animate-spin" />
-									Analyzing...
+									{t('analyzing')}
 								</>
 							) : (
 								<>
 									<Lightbulb className="h-4 w-4 mr-2" />
-									Analyze My Spending
+									{t('analyzeButton')}
 								</>
 							)}
 						</Button>
@@ -132,7 +134,7 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 					{!insights && !analyzeMutation.isPending && (
 						<div className="text-center py-12 text-muted-foreground">
 							<Lightbulb className="h-12 w-12 mx-auto mb-4 opacity-50" />
-							<p>Select a date range and click "Analyze My Spending" to get insights</p>
+							<p>{t('selectDateRange')}</p>
 						</div>
 					)}
 				</div>
@@ -142,6 +144,7 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 }
 
 function SummarySection({ summary }: { summary: SpendingInsights['summary'] }) {
+	const t = useTranslations('ai.insights')
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat('en-US', {
 			style: 'currency',
@@ -151,13 +154,13 @@ function SummarySection({ summary }: { summary: SpendingInsights['summary'] }) {
 
 	return (
 		<div className="space-y-4">
-			<h3 className="text-lg font-semibold">Summary</h3>
+			<h3 className="text-lg font-semibold">{t('summary')}</h3>
 
 			<div className="grid grid-cols-3 gap-4">
 				<div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20">
 					<div className="flex items-center gap-2 text-red-600 dark:text-red-400 mb-1">
 						<TrendingDown className="h-4 w-4" />
-						<span className="text-sm">Total Expenses</span>
+						<span className="text-sm">{t('totalExpenses')}</span>
 					</div>
 					<p className="text-2xl font-bold">{formatCurrency(summary.total_expenses)}</p>
 				</div>
@@ -165,7 +168,7 @@ function SummarySection({ summary }: { summary: SpendingInsights['summary'] }) {
 				<div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20">
 					<div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-1">
 						<TrendingUp className="h-4 w-4" />
-						<span className="text-sm">Total Income</span>
+						<span className="text-sm">{t('totalIncome')}</span>
 					</div>
 					<p className="text-2xl font-bold">{formatCurrency(summary.total_income)}</p>
 				</div>
@@ -173,7 +176,7 @@ function SummarySection({ summary }: { summary: SpendingInsights['summary'] }) {
 				<div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20">
 					<div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
 						<PiggyBank className="h-4 w-4" />
-						<span className="text-sm">Savings Rate</span>
+						<span className="text-sm">{t('savingsRate')}</span>
 					</div>
 					<p className="text-2xl font-bold">{summary.savings_rate_percent.toFixed(1)}%</p>
 				</div>
@@ -181,7 +184,7 @@ function SummarySection({ summary }: { summary: SpendingInsights['summary'] }) {
 
 			{summary.top_categories.length > 0 && (
 				<div>
-					<h4 className="text-sm font-medium mb-2">Top Categories</h4>
+					<h4 className="text-sm font-medium mb-2">{t('topCategories')}</h4>
 					<div className="space-y-2">
 						{summary.top_categories.map((cat, i) => (
 							<CategoryBar key={i} category={cat} />
@@ -191,7 +194,7 @@ function SummarySection({ summary }: { summary: SpendingInsights['summary'] }) {
 			)}
 
 			<p className="text-xs text-muted-foreground">
-				Period: {summary.period.from} to {summary.period.to} ({summary.period.days} days)
+				{t('period', { from: summary.period.from, to: summary.period.to, days: summary.period.days })}
 			</p>
 		</div>
 	)
@@ -224,9 +227,10 @@ function CategoryBar({ category }: { category: CategoryBreakdown }) {
 }
 
 function PatternsSection({ patterns }: { patterns: Pattern[] }) {
+	const t = useTranslations('ai.insights')
 	return (
 		<div className="space-y-4">
-			<h3 className="text-lg font-semibold">Patterns Detected</h3>
+			<h3 className="text-lg font-semibold">{t('patternsDetected')}</h3>
 			<div className="space-y-3">
 				{patterns.map((pattern, i) => (
 					<div
@@ -254,6 +258,7 @@ function PatternsSection({ patterns }: { patterns: Pattern[] }) {
 }
 
 function RecommendationsSection({ recommendations }: { recommendations: Recommendation[] }) {
+	const t = useTranslations('ai.insights')
 	const formatCurrency = (amount: number) => {
 		return new Intl.NumberFormat('en-US', {
 			style: 'currency',
@@ -279,7 +284,7 @@ function RecommendationsSection({ recommendations }: { recommendations: Recommen
 
 	return (
 		<div className="space-y-4">
-			<h3 className="text-lg font-semibold">Recommendations</h3>
+			<h3 className="text-lg font-semibold">{t('recommendations')}</h3>
 			<div className="space-y-3">
 				{sortedRecommendations.map((rec, i) => (
 					<div
@@ -309,7 +314,7 @@ function RecommendationsSection({ recommendations }: { recommendations: Recommen
 											{formatCurrency(rec.potential_savings)}
 										</span>
 									</div>
-									<span className="text-xs text-muted-foreground">potential savings</span>
+									<span className="text-xs text-muted-foreground">{t('potentialSavings')}</span>
 								</div>
 							)}
 						</div>

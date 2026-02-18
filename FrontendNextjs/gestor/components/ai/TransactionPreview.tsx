@@ -18,6 +18,7 @@ import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
+import { useTranslations } from 'next-intl'
 
 interface TransactionPreviewProps {
 	transactions: Transaction[]
@@ -38,6 +39,8 @@ export function TransactionPreview({
 	selectedIndices,
 	onCreateCategory,
 }: TransactionPreviewProps) {
+	const t = useTranslations('ai.preview')
+	const tCommon = useTranslations('ai.common')
 	const [editingIndex, setEditingIndex] = useState<number | null>(null)
 	const [editForm, setEditForm] = useState<Transaction | null>(null)
 
@@ -61,7 +64,7 @@ export function TransactionPreview({
 
 	const getCategoryName = (categoryId: string) => {
 		const category = categories.find((c) => c.id === categoryId)
-		return category?.name || 'Uncategorized'
+		return category?.name || t('uncategorized')
 	}
 
 	const getCategoryIcon = (categoryId: string) => {
@@ -73,14 +76,14 @@ export function TransactionPreview({
 		try {
 			return format(new Date(dateString), 'MMM d, yyyy')
 		} catch {
-			return 'Invalid date'
+			return t('invalidDate')
 		}
 	}
 
 	if (transactions.length === 0) {
 		return (
 			<div className="text-center py-8 text-muted-foreground">
-				No transactions detected in the document
+				{t('noTransactions')}
 			</div>
 		)
 	}
@@ -89,7 +92,7 @@ export function TransactionPreview({
 		<div className="space-y-3">
 			<div className="flex items-center justify-between mb-4">
 				<span className="text-sm text-muted-foreground">
-					{selectedIndices.size} of {transactions.length} selected
+					{t('selectedCount', { selected: selectedIndices.size, total: transactions.length })}
 				</span>
 				<div className="flex gap-2">
 					<Button
@@ -99,7 +102,7 @@ export function TransactionPreview({
 							transactions.forEach((_, i) => onSelect(i, true))
 						}}
 					>
-						Select all
+						{t('selectAll')}
 					</Button>
 					<Button
 						variant="outline"
@@ -108,7 +111,7 @@ export function TransactionPreview({
 							transactions.forEach((_, i) => onSelect(i, false))
 						}}
 					>
-						Deselect all
+						{t('deselectAll')}
 					</Button>
 				</div>
 			</div>
@@ -137,19 +140,19 @@ export function TransactionPreview({
 									<div className="grid grid-cols-2 gap-3">
 										<div>
 											<label className="text-xs text-muted-foreground mb-1 block">
-												Name
+												{t('name')}
 											</label>
 											<Input
 												value={editForm.name}
 												onChange={(e) =>
 													setEditForm({ ...editForm, name: e.target.value })
 												}
-												placeholder="Name"
+												placeholder={t('name')}
 											/>
 										</div>
 										<div>
 											<label className="text-xs text-muted-foreground mb-1 block">
-												Amount
+												{t('amount')}
 											</label>
 											<Input
 												type="number"
@@ -160,28 +163,28 @@ export function TransactionPreview({
 														amount: parseFloat(e.target.value) || 0,
 													})
 												}
-												placeholder="Amount"
+												placeholder={t('amount')}
 											/>
 										</div>
 									</div>
 
 									<div>
 										<label className="text-xs text-muted-foreground mb-1 block">
-											Description
+											{t('description')}
 										</label>
 										<Input
 											value={editForm.description || ''}
 											onChange={(e) =>
 												setEditForm({ ...editForm, description: e.target.value })
 											}
-											placeholder="Description"
+											placeholder={t('description')}
 										/>
 									</div>
 
 									<div className="grid grid-cols-2 gap-3">
 										<div>
 											<label className="text-xs text-muted-foreground mb-1 block">
-												Date
+												{t('date')}
 											</label>
 											<DatePicker
 												value={
@@ -195,13 +198,13 @@ export function TransactionPreview({
 														created_at: date?.toISOString() || '',
 													})
 												}
-												placeholder="Select date"
+												placeholder={t('date')}
 											/>
 										</div>
 
 										<div>
 											<label className="text-xs text-muted-foreground mb-1 block">
-												Category
+												{t('category')}
 											</label>
 											<Select
 												value={editForm.category_id || ''}
@@ -214,7 +217,7 @@ export function TransactionPreview({
 												}}
 											>
 												<SelectTrigger>
-													<SelectValue placeholder="Select category" />
+													<SelectValue placeholder={t('selectCategory')} />
 												</SelectTrigger>
 												<SelectContent>
 													{categories.map((cat) => (
@@ -224,8 +227,7 @@ export function TransactionPreview({
 													))}
 													<SelectSeparator />
 													<SelectItem value="__create_new__">
-														<Plus className="h-4 w-4 mr-1 inline" /> Create new
-														category
+														<Plus className="h-4 w-4 mr-1 inline" /> {t('createNewCategory')}
 													</SelectItem>
 												</SelectContent>
 											</Select>
@@ -235,11 +237,11 @@ export function TransactionPreview({
 									<div className="flex justify-end gap-2">
 										<Button size="sm" variant="outline" onClick={cancelEdit}>
 											<X className="h-4 w-4 mr-1" />
-											Cancel
+											{tCommon('cancel')}
 										</Button>
 										<Button size="sm" onClick={saveEdit}>
 											<Check className="h-4 w-4 mr-1" />
-											Save
+											{tCommon('save')}
 										</Button>
 									</div>
 								</div>
@@ -258,7 +260,7 @@ export function TransactionPreview({
 												{!hasCategory && (
 													<span
 														className="text-yellow-500"
-														title="No category matched"
+														title={t('noCategoryMatched')}
 													>
 														<AlertTriangle className="h-4 w-4" />
 													</span>
@@ -284,7 +286,7 @@ export function TransactionPreview({
 															: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
 													)}
 												>
-													{isIncome ? 'Income' : 'Expense'}
+													{isIncome ? t('income') : t('expense')}
 												</span>
 												<span className="text-xs text-muted-foreground flex items-center gap-1">
 													<Calendar className="h-3 w-3" />
