@@ -60,32 +60,26 @@ export function TransactionActions() {
                     }
                 }}
                 createTransaction={async (...args) => {
-                    setModalOpen(false)
+                    const [name, description, amount, type_transation, account_id, category_id, _budget_id, created_at_arg] = args;
+                    const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString();
 
-                    try {
-                        const [name, description, amount, type_transation, account_id, category_id, _budget_id, created_at_arg] = args;
-                        const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString();
+                    const _optimisticTx = {
+                        id: `temp-${Date.now()}`,
+                        name,
+                        description,
+                        amount,
+                        type_transation,
+                        account_id,
+                        category_id,
+                        created_at,
+                        user_id: 'current-user',
+                        updated_at: new Date().toISOString()
+                    };
 
-                        const _optimisticTx = {
-                            id: `temp-${Date.now()}`,
-                            name,
-                            description,
-                            amount,
-                            type_transation,
-                            account_id,
-                            category_id,
-                            created_at,
-                            user_id: 'current-user',
-                            updated_at: new Date().toISOString()
-                        };
+                    // @ts-ignore
+                    await createTransaction(...args)
 
-                        // @ts-ignore
-                        await createTransaction(...args)
-
-                        formRef.current?.reset()
-                    } catch (error) {
-                        console.error("Failed to create transaction:", error)
-                    }
+                    formRef.current?.reset()
                 }}
                 isLoading={isLoading}
                 error={error}

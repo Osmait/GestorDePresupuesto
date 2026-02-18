@@ -3,7 +3,6 @@ import { TransactionActions } from '@/components/transactions/TransactionActions
 import { vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { ReactElement } from 'react'
 
 // Mock hooks
 vi.mock('@/components/transactions/TransactionContext', () => ({
@@ -57,14 +56,14 @@ vi.mock('@/components/ai/SpendingInsightsModal', () => ({
     SpendingInsightsModal: () => <div data-testid="spending-insights-modal">Insights Modal</div>
 }))
 
-function createWrapper(): ({ children }: { children: ReactElement }) => ReactElement {
+function createWrapper() {
     const queryClient = new QueryClient({
         defaultOptions: {
             queries: { retry: false },
             mutations: { retry: false }
         }
     })
-    return function Wrapper({ children }: { children: ReactElement }) {
+    return function Wrapper({ children }: { children: React.ReactNode }) {
         return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
     }
 }
