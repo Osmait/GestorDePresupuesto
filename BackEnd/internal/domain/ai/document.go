@@ -30,7 +30,7 @@ func DocumentFromMultipartFile(header *multipart.FileHeader) (*DocumentFile, err
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	data := make([]byte, header.Size)
 	if _, err := file.Read(data); err != nil {

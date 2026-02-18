@@ -107,7 +107,7 @@ func (r *RefreshTokenRepository) FindByUserId(ctx context.Context, userId string
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var tokens []*authDomain.RefreshToken
 	for rows.Next() {
