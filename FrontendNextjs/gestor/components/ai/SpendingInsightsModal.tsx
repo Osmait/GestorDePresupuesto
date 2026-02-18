@@ -77,7 +77,7 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 
 	return (
 		<Dialog open={open} onOpenChange={handleClose}>
-			<DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+			<DialogContent className="w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Lightbulb className="h-5 w-5 text-primary" />
@@ -88,8 +88,8 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 					</DialogDescription>
 				</DialogHeader>
 
-				<div className="space-y-6">
-					<div className="flex items-end gap-4">
+				<div className="space-y-4 sm:space-y-6">
+					<div className="flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4">
 						<div className="flex-1">
 							<label className="text-sm font-medium mb-2 block">{t('dateRange')}</label>
 							<CalendarDateRangePicker
@@ -104,6 +104,7 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 						<Button
 							onClick={handleAnalyze}
 							disabled={!dateRange?.from || !dateRange?.to || analyzeMutation.isPending}
+							className="w-full sm:w-auto"
 						>
 							{analyzeMutation.isPending ? (
 								<>
@@ -120,7 +121,7 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 					</div>
 
 					{insights && (
-						<div className="space-y-6">
+						<div className="space-y-4 sm:space-y-6">
 							<SummarySection summary={insights.summary} />
 							{insights.patterns.length > 0 && (
 								<PatternsSection patterns={insights.patterns} />
@@ -132,9 +133,9 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 					)}
 
 					{!insights && !analyzeMutation.isPending && (
-						<div className="text-center py-12 text-muted-foreground">
-							<Lightbulb className="h-12 w-12 mx-auto mb-4 opacity-50" />
-							<p>{t('selectDateRange')}</p>
+						<div className="text-center py-8 sm:py-12 text-muted-foreground">
+							<Lightbulb className="h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 opacity-50" />
+							<p className="text-sm sm:text-base">{t('selectDateRange')}</p>
 						</div>
 					)}
 				</div>
@@ -154,31 +155,31 @@ function SummarySection({ summary }: { summary: SpendingInsights['summary'] }) {
 
 	return (
 		<div className="space-y-4">
-			<h3 className="text-lg font-semibold">{t('summary')}</h3>
+			<h3 className="text-base sm:text-lg font-semibold">{t('summary')}</h3>
 
-			<div className="grid grid-cols-3 gap-4">
-				<div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20">
+			<div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+				<div className="p-3 sm:p-4 rounded-lg bg-red-50 dark:bg-red-900/20">
 					<div className="flex items-center gap-2 text-red-600 dark:text-red-400 mb-1">
 						<TrendingDown className="h-4 w-4" />
-						<span className="text-sm">{t('totalExpenses')}</span>
+						<span className="text-xs sm:text-sm">{t('totalExpenses')}</span>
 					</div>
-					<p className="text-2xl font-bold">{formatCurrency(summary.total_expenses)}</p>
+					<p className="text-xl sm:text-2xl font-bold">{formatCurrency(summary.total_expenses)}</p>
 				</div>
 
-				<div className="p-4 rounded-lg bg-green-50 dark:bg-green-900/20">
+				<div className="p-3 sm:p-4 rounded-lg bg-green-50 dark:bg-green-900/20">
 					<div className="flex items-center gap-2 text-green-600 dark:text-green-400 mb-1">
 						<TrendingUp className="h-4 w-4" />
-						<span className="text-sm">{t('totalIncome')}</span>
+						<span className="text-xs sm:text-sm">{t('totalIncome')}</span>
 					</div>
-					<p className="text-2xl font-bold">{formatCurrency(summary.total_income)}</p>
+					<p className="text-xl sm:text-2xl font-bold">{formatCurrency(summary.total_income)}</p>
 				</div>
 
-				<div className="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20">
+				<div className="p-3 sm:p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20">
 					<div className="flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1">
 						<PiggyBank className="h-4 w-4" />
-						<span className="text-sm">{t('savingsRate')}</span>
+						<span className="text-xs sm:text-sm">{t('savingsRate')}</span>
 					</div>
-					<p className="text-2xl font-bold">{summary.savings_rate_percent.toFixed(1)}%</p>
+					<p className="text-xl sm:text-2xl font-bold">{summary.savings_rate_percent.toFixed(1)}%</p>
 				</div>
 			</div>
 
@@ -229,26 +230,26 @@ function CategoryBar({ category }: { category: CategoryBreakdown }) {
 function PatternsSection({ patterns }: { patterns: Pattern[] }) {
 	const t = useTranslations('ai.insights')
 	return (
-		<div className="space-y-4">
-			<h3 className="text-lg font-semibold">{t('patternsDetected')}</h3>
-			<div className="space-y-3">
+		<div className="space-y-3 sm:space-y-4">
+			<h3 className="text-base sm:text-lg font-semibold">{t('patternsDetected')}</h3>
+			<div className="space-y-2 sm:space-y-3">
 				{patterns.map((pattern, i) => (
 					<div
 						key={i}
 						className="flex items-start gap-3 p-3 rounded-lg bg-muted"
 					>
 						{pattern.severity === 'alert' ? (
-							<AlertCircle className="h-5 w-5 text-red-500 mt-0.5" />
+							<AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 mt-0.5 shrink-0" />
 						) : pattern.severity === 'warning' ? (
-							<AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5" />
+							<AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 mt-0.5 shrink-0" />
 						) : (
-							<Info className="h-5 w-5 text-blue-500 mt-0.5" />
+							<Info className="h-4 w-4 sm:h-5 sm:w-5 text-blue-500 mt-0.5 shrink-0" />
 						)}
 						<div>
-							<p className="font-medium capitalize">
+							<p className="font-medium text-sm sm:text-base capitalize">
 								{pattern.type.replace(/_/g, ' ')}
 							</p>
-							<p className="text-sm text-muted-foreground">{pattern.description}</p>
+							<p className="text-xs sm:text-sm text-muted-foreground">{pattern.description}</p>
 						</div>
 					</div>
 				))}
@@ -283,18 +284,18 @@ function RecommendationsSection({ recommendations }: { recommendations: Recommen
 	})
 
 	return (
-		<div className="space-y-4">
-			<h3 className="text-lg font-semibold">{t('recommendations')}</h3>
-			<div className="space-y-3">
+		<div className="space-y-3 sm:space-y-4">
+			<h3 className="text-base sm:text-lg font-semibold">{t('recommendations')}</h3>
+			<div className="space-y-2 sm:space-y-3">
 				{sortedRecommendations.map((rec, i) => (
 					<div
 						key={i}
-						className="p-4 rounded-lg border border-border"
+						className="p-3 sm:p-4 rounded-lg border border-border"
 					>
-						<div className="flex items-start justify-between gap-4">
+						<div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4">
 							<div className="flex-1">
 								<div className="flex items-center gap-2 mb-1">
-									<span className="font-medium">{rec.title}</span>
+									<span className="font-medium text-sm sm:text-base">{rec.title}</span>
 									<span
 										className={cn(
 											'text-xs px-2 py-0.5 rounded capitalize',
@@ -304,17 +305,15 @@ function RecommendationsSection({ recommendations }: { recommendations: Recommen
 										{rec.priority}
 									</span>
 								</div>
-								<p className="text-sm text-muted-foreground">{rec.description}</p>
+								<p className="text-xs sm:text-sm text-muted-foreground">{rec.description}</p>
 							</div>
 							{rec.potential_savings > 0 && (
-								<div className="text-right shrink-0">
-									<div className="flex items-center gap-1 text-green-600 dark:text-green-400">
-										<DollarSign className="h-4 w-4" />
-										<span className="font-bold">
-											{formatCurrency(rec.potential_savings)}
-										</span>
-									</div>
-									<span className="text-xs text-muted-foreground">{t('potentialSavings')}</span>
+								<div className="flex items-center gap-1 sm:flex-col sm:items-end text-green-600 dark:text-green-400">
+									<DollarSign className="h-4 w-4" />
+									<span className="font-bold text-sm sm:text-base">
+										{formatCurrency(rec.potential_savings)}
+									</span>
+									<span className="text-xs text-muted-foreground hidden sm:block">{t('potentialSavings')}</span>
 								</div>
 							)}
 						</div>
