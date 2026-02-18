@@ -27,25 +27,26 @@ export function TransactionActions() {
     const { data: categories = [] } = useGetCategories()
 
     return (
-        <div className="flex items-center gap-3">
-            <Button variant="outline" onClick={() => setInsightsOpen(true)}>
-                <Lightbulb className="h-4 w-4 mr-2" />
-                {tAI('insights')}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+            <Button variant="outline" size="sm" className="sm:size-default" onClick={() => setInsightsOpen(true)}>
+                <Lightbulb className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">{tAI('insights')}</span>
             </Button>
-            <AIExtractionButton variant="outline" />
-            <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
-                <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
-                {t('filters')}
+            <AIExtractionButton variant="outline" size="sm" className="sm:size-default" />
+            <Button variant="outline" size="sm" className="sm:size-default border-border/50" onClick={() => setDrawerOpen(true)}>
+                <Filter className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('filters')}</span>
             </Button>
             <Button
-                className="bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
+                size="sm"
+                className="sm:size-default bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70"
                 onClick={() => {
                     setEditingTransaction(null)
                     setModalOpen(true)
                 }}
             >
-                <PlusCircle className="h-4 w-4 mr-2" aria-hidden="true" />
-                {t('addTransaction')}
+                <PlusCircle className="h-4 w-4 sm:mr-2" aria-hidden="true" />
+                <span className="hidden sm:inline">{t('addTransaction')}</span>
             </Button>
 
             <SpendingInsightsModal open={insightsOpen} onOpenChange={setInsightsOpen} />

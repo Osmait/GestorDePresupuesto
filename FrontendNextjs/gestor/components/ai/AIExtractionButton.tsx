@@ -22,6 +22,8 @@ export function AIExtractionButton({
   const t = useTranslations('ai.common')
   const [isOpen, setIsOpen] = useState(false)
 
+  const isSmall = size === 'sm'
+
   return (
     <>
       <Button
@@ -30,8 +32,8 @@ export function AIExtractionButton({
         onClick={() => setIsOpen(true)}
         className={className}
       >
-        <Sparkles className="h-4 w-4 mr-2" />
-        {t('extractFromDocument')}
+        <Sparkles className={`h-4 w-4 ${isSmall ? '' : 'mr-2'} sm:mr-2`} />
+        <span className={`${isSmall ? 'hidden sm:inline' : ''}`}>{t('extractFromDocument')}</span>
       </Button>
       <AIExtractionModal
         open={isOpen}
