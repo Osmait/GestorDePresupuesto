@@ -131,6 +131,7 @@ func Run() error {
 		services.notificationService,
 		services.aiService,
 		repositories.categoryRepository,
+		repositories.transactionRepository,
 	)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -339,6 +340,15 @@ func initializeAIService(cfg *config.Config) *aiService.Service {
 	}
 
 	svc.RegisterTask(domainAI.TaskExtractTransactions, extractor)
+
+	// Register spending analyzer task
+	analyzer, err := tasks.NewSpendingAnalyzer()
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to create spending analyzer")
+		return nil
+	}
+
+	svc.RegisterTask(domainAI.TaskSpendingAnalysis, analyzer)
 
 	log.Info().
 		Str("provider", provider.GetProviderName()).

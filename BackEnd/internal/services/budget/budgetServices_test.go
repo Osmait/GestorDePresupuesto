@@ -3,6 +3,7 @@ package budget
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
@@ -103,6 +104,11 @@ func (m *MockTransaction) FindAllWithFilters(ctx context.Context, filter *transa
 func (m *MockTransaction) CountWithFilters(ctx context.Context, userId string, filter *transactionDto.TransactionFilter) (int64, error) {
 	args := m.Called(ctx, userId, filter)
 	return args.Get(0).(int64), args.Error(1)
+}
+
+func (m *MockTransaction) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateTo time.Time) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, userId, dateFrom, dateTo)
+	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
 func TestCreateBudget(t *testing.T) {

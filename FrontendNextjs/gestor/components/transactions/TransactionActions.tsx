@@ -2,13 +2,13 @@
 
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Filter, PlusCircle } from 'lucide-react'
+import { Filter, PlusCircle, Lightbulb } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import TransactionFormModal from '@/components/transactions/TransactionFormModal'
-import { AIExtractionButton } from '@/components/ai'
+import { AIExtractionButton, SpendingInsightsModal } from '@/components/ai'
 import { useTransactionContext } from './TransactionContext'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
@@ -18,6 +18,7 @@ export function TransactionActions() {
     const t = useTranslations('transactions')
     const tForms = useTranslations('forms')
     const [drawerOpen, setDrawerOpen] = useState(false)
+    const [insightsOpen, setInsightsOpen] = useState(false)
     const formRef = useRef<{ reset: () => void } | null>(null)
 
     const { filters, setFilters, clearFilters, createTransaction, isLoading, error, isModalOpen, setModalOpen, setEditingTransaction } = useTransactionContext()
@@ -28,6 +29,10 @@ export function TransactionActions() {
 
     return (
         <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={() => setInsightsOpen(true)}>
+                <Lightbulb className="h-4 w-4 mr-2" />
+                AI Insights
+            </Button>
             <AIExtractionButton variant="outline" />
             <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
                 <Filter className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -43,6 +48,8 @@ export function TransactionActions() {
                 <PlusCircle className="h-4 w-4 mr-2" aria-hidden="true" />
                 {t('addTransaction')}
             </Button>
+
+            <SpendingInsightsModal open={insightsOpen} onOpenChange={setInsightsOpen} />
 
             <TransactionFormModal
                 open={isModalOpen}

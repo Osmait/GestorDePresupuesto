@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
@@ -401,4 +402,23 @@ func (repo *TransactionRepository) scanTransactions(rows *sql.Rows) ([]*transact
 	}
 
 	return transactions, nil
+}
+
+func (repo *TransactionRepository) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateTo time.Time) ([]*transaction.Transaction, error) {
+	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, created_at 
+		FROM transactions 
+		WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3 
+		ORDER BY created_at DESC`
+
+	rows, err := repo.db.QueryContext(ctx, query, userId, dateFrom, dateTo)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query transactions: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("failed to close database rows")
+		}
+	}()
+
+	return repo.scanTransactions(rows)
 }

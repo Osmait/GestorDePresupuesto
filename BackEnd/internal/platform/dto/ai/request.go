@@ -13,3 +13,12 @@ type ExtractRequest struct {
 func (r *ExtractRequest) Validate() error {
 	return nil
 }
+
+type AnalyzeSpendingRequest struct {
+	DateFrom string `json:"date_from" binding:"required"`
+	DateTo   string `json:"date_to" binding:"required"`
+}
+
+func (r *AnalyzeSpendingRequest) Validate() error {
+	return nil
+}

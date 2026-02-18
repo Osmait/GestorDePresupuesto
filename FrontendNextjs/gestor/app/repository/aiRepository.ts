@@ -1,5 +1,11 @@
 import { BaseRepository } from '@/lib/base-repository'
-import { AIExtractRequest, AIExtractResponse, AIError } from '@/types/ai'
+import {
+  AIExtractRequest,
+  AIExtractResponse,
+  AIError,
+  SpendingAnalysisRequest,
+  SpendingAnalysisResponse,
+} from '@/types/ai'
 
 export class AIRepository extends BaseRepository {
   async extractTransactions(request: AIExtractRequest): Promise<AIExtractResponse | AIError> {
@@ -14,6 +20,27 @@ export class AIRepository extends BaseRepository {
       return response
     } catch (error) {
       console.error('Error extracting transactions:', error)
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error occurred',
+      }
+    }
+  }
+
+  async analyzeSpending(
+    request: SpendingAnalysisRequest
+  ): Promise<SpendingAnalysisResponse | AIError> {
+    try {
+      const response = await this.post<SpendingAnalysisResponse>('/ai/analyze/spending', request)
+      if (!response) {
+        return {
+          success: false,
+          error: 'Empty response from server',
+        }
+      }
+      return response
+    } catch (error) {
+      console.error('Error analyzing spending:', error)
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error occurred',

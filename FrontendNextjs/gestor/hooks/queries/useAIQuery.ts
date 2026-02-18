@@ -2,10 +2,18 @@
 
 import { useMutation } from '@tanstack/react-query'
 import { aiRepository } from '@/app/repository/aiRepository'
-import { AIExtractRequest, AIExtractResponse, AIError, DocumentType } from '@/types/ai'
+import {
+  AIExtractRequest,
+  AIExtractResponse,
+  AIError,
+  DocumentType,
+  SpendingAnalysisRequest,
+  SpendingAnalysisResponse,
+} from '@/types/ai'
 
 export const AI_KEYS = {
   extract: ['ai', 'extract'] as const,
+  analyze: ['ai', 'analyze'] as const,
 }
 
 export function useExtractTransactionsMutation() {
@@ -38,4 +46,10 @@ export function useExtractFromFile() {
     extractData: extractMutation.data,
     reset: extractMutation.reset,
   }
+}
+
+export function useAnalyzeSpendingMutation() {
+  return useMutation<SpendingAnalysisResponse | AIError, Error, SpendingAnalysisRequest>({
+    mutationFn: (request: SpendingAnalysisRequest) => aiRepository.analyzeSpending(request),
+  })
 }

@@ -68,6 +68,11 @@ func (m *MockTransaction) CountWithFilters(ctx context.Context, userId string, f
 	return args.Get(0).(int64), args.Error(1)
 }
 
+func (m *MockTransaction) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateTo time.Time) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, userId, dateFrom, dateTo)
+	return args.Get(0).([]*transaction.Transaction), args.Error(1)
+}
+
 type MockBudgetRepository struct {
 	mock.Mock
 }

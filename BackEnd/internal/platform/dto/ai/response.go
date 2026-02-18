@@ -20,6 +20,54 @@ type ExtractData struct {
 	UnmatchedCategories int                        `json:"unmatched_categories"`
 }
 
+type SpendingAnalysisResponse struct {
+	Success        bool              `json:"success"`
+	Task           string            `json:"task"`
+	Data           SpendingInsights  `json:"data"`
+	Usage          domain.TokenUsage `json:"usage"`
+	ProcessingTime int64             `json:"processing_time_ms"`
+	ModelUsed      string            `json:"model_used"`
+}
+
+type SpendingInsights struct {
+	Summary         SpendingSummary  `json:"summary"`
+	Patterns        []Pattern        `json:"patterns"`
+	Recommendations []Recommendation `json:"recommendations"`
+}
+
+type SpendingSummary struct {
+	TotalExpenses      float64             `json:"total_expenses"`
+	TotalIncome        float64             `json:"total_income"`
+	SavingsRatePercent float64             `json:"savings_rate_percent"`
+	Period             PeriodInfo          `json:"period"`
+	TopCategories      []CategoryBreakdown `json:"top_categories"`
+}
+
+type PeriodInfo struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+	Days int    `json:"days"`
+}
+
+type CategoryBreakdown struct {
+	Category   string  `json:"category"`
+	Amount     float64 `json:"amount"`
+	Percentage float64 `json:"percentage"`
+}
+
+type Pattern struct {
+	Type        string `json:"type"`
+	Description string `json:"description"`
+	Severity    string `json:"severity"`
+}
+
+type Recommendation struct {
+	Title            string  `json:"title"`
+	Description      string  `json:"description"`
+	PotentialSavings float64 `json:"potential_savings"`
+	Priority         string  `json:"priority"`
+}
+
 type ErrorResponse struct {
 	Success bool   `json:"success"`
 	Error   string `json:"error"`

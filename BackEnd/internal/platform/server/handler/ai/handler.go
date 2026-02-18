@@ -3,26 +3,34 @@ package ai
 import (
 	"encoding/base64"
 	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	aiService "github.com/osmait/gestorDePresupuesto/internal/services/ai"
 	"github.com/osmait/gestorDePresupuesto/internal/services/ai/tasks"
 	"github.com/rs/zerolog/log"
 )
 
 type Handler struct {
-	aiService          *aiService.Service
-	categoryRepository categoryRepo.CategoryRepoInterface
+	aiService             *aiService.Service
+	categoryRepository    categoryRepo.CategoryRepoInterface
+	transactionRepository transactionRepo.TransactionRepositoryInterface
 }
 
-func NewHandler(aiService *aiService.Service, categoryRepo categoryRepo.CategoryRepoInterface) *Handler {
+func NewHandler(
+	aiService *aiService.Service,
+	categoryRepo categoryRepo.CategoryRepoInterface,
+	transactionRepo transactionRepo.TransactionRepositoryInterface,
+) *Handler {
 	return &Handler{
-		aiService:          aiService,
-		categoryRepository: categoryRepo,
+		aiService:             aiService,
+		categoryRepository:    categoryRepo,
+		transactionRepository: transactionRepo,
 	}
 }
 
@@ -107,6 +115,111 @@ func (h *Handler) ExtractTransactions(c *gin.Context) {
 		Int("transactions_count", response.Data.Count).
 		Int("total_tokens", result.Usage.TotalTokens).
 		Msg("AI extraction completed")
+
+	c.JSON(http.StatusOK, response)
+}
+
+// AnalyzeSpending godoc
+//
+//	@Summary		Analyze spending patterns with AI
+//	@Description	Analyze transactions within a date range to provide insights and recommendations
+//	@Tags			AI
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			request	body		dto.AnalyzeSpendingRequest	true	"Analysis request with date range"
+//	@Success		200		{object}	dto.SpendingAnalysisResponse	"Analysis completed successfully"
+//	@Failure		400		{object}	map[string]string	"Bad request"
+//	@Failure		401		{object}	map[string]string	"Unauthorized"
+//	@Failure		500		{object}	map[string]string	"Internal server error"
+//	@Router			/ai/analyze/spending [post]
+func (h *Handler) AnalyzeSpending(c *gin.Context) {
+	userID := c.GetString("X-User-Id")
+
+	var req dto.AnalyzeSpendingRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		return
+	}
+
+	dateFrom, err := time.Parse("2006-01-02", req.DateFrom)
+	if err != nil {
+		_ = c.Error(apperrors.NewValidationError("INVALID_DATE_FROM", "Invalid date_from format, use YYYY-MM-DD"))
+		return
+	}
+
+	dateTo, err := time.Parse("2006-01-02", req.DateTo)
+	if err != nil {
+		_ = c.Error(apperrors.NewValidationError("INVALID_DATE_TO", "Invalid date_to format, use YYYY-MM-DD"))
+		return
+	}
+
+	if dateFrom.After(dateTo) {
+		_ = c.Error(apperrors.NewValidationError("INVALID_DATE_RANGE", "date_from must be before date_to"))
+		return
+	}
+
+	dateTo = dateTo.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+
+	transactions, err := h.transactionRepository.FindByUserAndDateRange(
+		c.Request.Context(),
+		userID,
+		dateFrom,
+		dateTo,
+	)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to fetch transactions for analysis")
+		_ = c.Error(apperrors.NewInternalError("Failed to fetch transactions", err))
+		return
+	}
+
+	if len(transactions) == 0 {
+		c.JSON(http.StatusOK, dto.SpendingAnalysisResponse{
+			Success:        true,
+			Task:           string(domain.TaskSpendingAnalysis),
+			Data:           dto.SpendingInsights{},
+			Usage:          domain.TokenUsage{},
+			ProcessingTime: 0,
+			ModelUsed:      "",
+		})
+		return
+	}
+
+	input := tasks.PrepareAnalyzerInput(transactions, dateFrom, dateTo)
+
+	result, err := h.aiService.Execute(
+		c.Request.Context(),
+		domain.TaskSpendingAnalysis,
+		input,
+		nil,
+	)
+
+	if err != nil {
+		log.Error().Err(err).Str("user_id", userID).Msg("AI spending analysis failed")
+		_ = c.Error(apperrors.NewInternalError("Analysis failed", err))
+		return
+	}
+
+	insights, ok := result.Data.(dto.SpendingInsights)
+	if !ok {
+		_ = c.Error(apperrors.NewInternalError("Failed to parse analysis result", nil))
+		return
+	}
+
+	response := dto.SpendingAnalysisResponse{
+		Success:        true,
+		Task:           string(result.TaskType),
+		Data:           insights,
+		Usage:          result.Usage,
+		ProcessingTime: result.ProcessingTime.Milliseconds(),
+		ModelUsed:      result.ModelUsed,
+	}
+
+	log.Info().
+		Str("user_id", userID).
+		Int("transactions_count", len(transactions)).
+		Int("total_tokens", result.Usage.TotalTokens).
+		Msg("AI spending analysis completed")
 
 	c.JSON(http.StatusOK, response)
 }
