@@ -3,6 +3,7 @@ package dto
 type ExtractRequest struct {
 	AccountID    string `json:"account_id" binding:"required"`
 	DocumentType string `json:"document_type" binding:"required,oneof=receipt statement invoice"`
+	Language     string `json:"language"`
 	Files        []struct {
 		Filename    string `json:"filename" binding:"required"`
 		ContentType string `json:"content_type" binding:"required"`
@@ -17,6 +18,7 @@ func (r *ExtractRequest) Validate() error {
 type AnalyzeSpendingRequest struct {
 	DateFrom string `json:"date_from" binding:"required"`
 	DateTo   string `json:"date_to" binding:"required"`
+	Language string `json:"language"`
 }
 
 func (r *AnalyzeSpendingRequest) Validate() error {

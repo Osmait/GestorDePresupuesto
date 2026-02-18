@@ -20,6 +20,7 @@ type ExtractorInput struct {
 	DocumentType string         `json:"document_type"`
 	AccountID    string         `json:"account_id"`
 	Categories   []CategoryData `json:"categories"`
+	Language     string         `json:"language"`
 }
 
 type CategoryData struct {
@@ -75,12 +76,18 @@ func (e *TransactionExtractor) BuildPrompt(input interface{}) (string, error) {
 		return "", domain.ErrInvalidInput
 	}
 
+	language := inp.Language
+	if language == "" {
+		language = "es"
+	}
+
 	data := map[string]interface{}{
 		"DocumentType": inp.DocumentType,
 		"AccountID":    inp.AccountID,
 		"IsStatement":  inp.DocumentType == "statement",
 		"Categories":   inp.Categories,
 		"Timestamp":    time.Now().Unix(),
+		"Language":     language,
 	}
 
 	var buf strings.Builder

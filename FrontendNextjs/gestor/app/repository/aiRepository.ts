@@ -8,9 +8,21 @@ import {
 } from '@/types/ai'
 
 export class AIRepository extends BaseRepository {
+  private getLocale(): string {
+    if (typeof window !== 'undefined') {
+      const match = document.cookie.match(/locale=([^;]+)/)
+      return match ? match[1] : 'es'
+    }
+    return 'es'
+  }
+
   async extractTransactions(request: AIExtractRequest): Promise<AIExtractResponse | AIError> {
     try {
-      const response = await this.post<AIExtractResponse>('/ai/extract/transactions', request)
+      const requestWithLanguage = {
+        ...request,
+        language: request.language || this.getLocale(),
+      }
+      const response = await this.post<AIExtractResponse>('/ai/extract/transactions', requestWithLanguage)
       if (!response) {
         return {
           success: false,
@@ -31,7 +43,11 @@ export class AIRepository extends BaseRepository {
     request: SpendingAnalysisRequest
   ): Promise<SpendingAnalysisResponse | AIError> {
     try {
-      const response = await this.post<SpendingAnalysisResponse>('/ai/analyze/spending', request)
+      const requestWithLanguage = {
+        ...request,
+        language: request.language || this.getLocale(),
+      }
+      const response = await this.post<SpendingAnalysisResponse>('/ai/analyze/spending', requestWithLanguage)
       if (!response) {
         return {
           success: false,

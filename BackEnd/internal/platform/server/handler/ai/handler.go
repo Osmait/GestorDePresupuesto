@@ -76,6 +76,7 @@ func (h *Handler) ExtractTransactions(c *gin.Context) {
 		DocumentType: req.DocumentType,
 		AccountID:    req.AccountID,
 		Categories:   categoryData,
+		Language:     req.Language,
 	}
 
 	files := make([]domain.DocumentFile, len(req.Files))
@@ -186,6 +187,11 @@ func (h *Handler) AnalyzeSpending(c *gin.Context) {
 	}
 
 	input := tasks.PrepareAnalyzerInput(transactions, dateFrom, dateTo)
+	if req.Language != "" {
+		input.Language = req.Language
+	} else {
+		input.Language = "es"
+	}
 
 	result, err := h.aiService.Execute(
 		c.Request.Context(),

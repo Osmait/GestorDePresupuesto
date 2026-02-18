@@ -11,6 +11,7 @@ export interface TokenUsage {
 export interface AIExtractRequest {
   account_id: string
   document_type: DocumentType
+  language?: string
   files: Array<{
     filename: string
     content_type: string
@@ -42,6 +43,7 @@ export type AIResponse = AIExtractResponse | AIError
 export interface SpendingAnalysisRequest {
   date_from: string
   date_to: string
+  language?: string
 }
 
 export interface SpendingAnalysisResponse {

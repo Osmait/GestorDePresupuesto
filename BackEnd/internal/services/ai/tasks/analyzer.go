@@ -27,6 +27,7 @@ type AnalyzerInput struct {
 	CategoryBreakdown []CategoryBreakdownInput
 	Transactions      []TransactionInput
 	TransactionCount  int
+	Language          string
 }
 
 type CategoryBreakdownInput struct {
