@@ -283,12 +283,14 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 
 	// Create AI cache service
 	transactionCache := cache.NewInMemoryCache(5*time.Minute, 10*time.Minute)
-	var aiCacheService *aiService.AICacheService
+	var aiCacheInvalidator transaction.AICacheInvalidator
+	var aiCacheSvc *aiService.AICacheService
 	if aiSvc != nil {
-		aiCacheService = aiService.NewAICacheService(transactionCache)
+		aiCacheSvc = aiService.NewAICacheService(transactionCache)
+		aiCacheInvalidator = aiCacheSvc
 	}
 
-	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheService)
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator)
 
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),
@@ -304,7 +306,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		quoteService:        quoteService,
 		notificationService: notificationService,
 		aiService:           aiSvc,
-		aiCache:             aiCacheService,
+		aiCache:             aiCacheSvc,
 	}
 }
 
