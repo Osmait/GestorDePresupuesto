@@ -130,6 +130,7 @@ func Run() error {
 		services.quoteService,
 		services.notificationService,
 		services.aiService,
+		services.aiCache,
 		repositories.categoryRepository,
 		repositories.transactionRepository,
 	)
@@ -267,6 +268,7 @@ type services struct {
 	quoteService        *quote.QuoteService
 	notificationService *notification.NotificationService
 	aiService           *aiService.Service
+	aiCache             *aiService.AICacheService
 }
 
 // initializeServices creates all service instances
@@ -276,11 +278,17 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 
 	notificationService := notification.NewNotificationService(repos.notificationRepository)
 
-	transactionCache := cache.NewInMemoryCache(5*time.Minute, 10*time.Minute)
-	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache)
-
-	// Initialize AI Service
+	// Initialize AI Service first (needed for cache)
 	aiSvc := initializeAIService(cfg)
+
+	// Create AI cache service
+	transactionCache := cache.NewInMemoryCache(5*time.Minute, 10*time.Minute)
+	var aiCacheService *aiService.AICacheService
+	if aiSvc != nil {
+		aiCacheService = aiService.NewAICacheService(transactionCache)
+	}
+
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheService)
 
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),
@@ -296,6 +304,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		quoteService:        quoteService,
 		notificationService: notificationService,
 		aiService:           aiSvc,
+		aiCache:             aiCacheService,
 	}
 }
 

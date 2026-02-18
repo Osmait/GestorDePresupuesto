@@ -137,13 +137,23 @@ func (m *MockCache) Flush() {
 	m.Called()
 }
 
+type MockAICache struct {
+	mock.Mock
+}
+
+func (m *MockAICache) InvalidateUserAnalysis(userID string) {
+	m.Called(userID)
+}
+
 func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
 	mockCache := &MockCache{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache)
+	mockAICache := &MockAICache{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache)
 
 	mockCache.On("DeleteByPrefix", mock.Anything).Return()
+	mockAICache.On("InvalidateUserAnalysis", mock.Anything).Return()
 
 	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
 	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything).Return(1000.0, nil)
@@ -162,7 +172,8 @@ func TestFindAllTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
 	mockCache := &MockCache{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache)
+	mockAICache := &MockAICache{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache)
 
 	expectedTransactions := []*transaction.Transaction{}
 	for i := 0; i < 10; i++ {
@@ -184,9 +195,11 @@ func TestDeleteTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
 	mockCache := &MockCache{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache)
+	mockAICache := &MockAICache{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache)
 
 	mockCache.On("DeleteByPrefix", mock.Anything).Return()
+	mockAICache.On("InvalidateUserAnalysis", mock.Anything).Return()
 
 	expectedTransactions := utils.GetNewRandomTransaction()
 
@@ -201,7 +214,8 @@ func TestFindAllTransactionofAllAccount(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
 	mockCache := &MockCache{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache)
+	mockAICache := &MockAICache{}
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache)
 
 	expectedTransactions := []*transaction.Transaction{}
 	for i := 0; i < 5; i++ {

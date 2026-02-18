@@ -21,21 +21,25 @@ const (
 	BILL = "bill"
 )
 
-// TransactionService handles business logic related to transaction management.
+type AICacheInvalidator interface {
+	InvalidateUserAnalysis(userID string)
+}
+
 type TransactionService struct {
 	transactionRepository transactionRepo.TransactionRepositoryInterface
 	budgetRepository      budgetRepo.BudgetRepoInterface
 	notificationService   *notification.NotificationService
 	cache                 cache.CacheRepository
+	aiCache               AICacheInvalidator
 }
 
-// NewTransactionService creates a new instance of TransactionService.
-func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository) *TransactionService {
+func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator) *TransactionService {
 	return &TransactionService{
 		transactionRepository: transactionRepository,
 		budgetRepository:      budgetReposiotry,
 		notificationService:   notificationService,
 		cache:                 cache,
+		aiCache:               aiCache,
 	}
 }
 
@@ -70,6 +74,10 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 		return err
 	}
 	s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", userId))
+
+	if s.aiCache != nil {
+		s.aiCache.InvalidateUserAnalysis(userId)
+	}
 
 	// Check Budget Thresholds
 	log.Debug().Msgf("Checking Alert Conditions: BudgetFound=(%v), Type=(%s), BillConst=(%s)", budget != nil, typeTransaction, BILL)
@@ -330,6 +338,10 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 		return err
 	}
 	s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", transaction.UserId))
+
+	if s.aiCache != nil {
+		s.aiCache.InvalidateUserAnalysis(transaction.UserId)
+	}
 	return nil
 }
 
@@ -338,6 +350,10 @@ func (s TransactionService) DeleteTransaction(ctx context.Context, id string, us
 	err := s.transactionRepository.Delete(ctx, id, userId)
 	if err == nil {
 		s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", userId))
+
+		if s.aiCache != nil {
+			s.aiCache.InvalidateUserAnalysis(userId)
+		}
 	}
 	return err
 }

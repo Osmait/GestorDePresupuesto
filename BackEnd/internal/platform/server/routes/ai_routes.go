@@ -14,8 +14,9 @@ func AIRoutes(
 	aiService *aiService.Service,
 	categoryRepo categoryRepo.CategoryRepoInterface,
 	transactionRepo transactionRepo.TransactionRepositoryInterface,
+	aiCache *aiService.AICacheService,
 ) {
-	handler := aiHandler.NewHandler(aiService, categoryRepo, transactionRepo)
+	handler := aiHandler.NewHandler(aiService, categoryRepo, transactionRepo, aiCache)
 
 	ai := r.Group("/ai")
 	{

@@ -20,17 +20,20 @@ type Handler struct {
 	aiService             *aiService.Service
 	categoryRepository    categoryRepo.CategoryRepoInterface
 	transactionRepository transactionRepo.TransactionRepositoryInterface
+	aiCache               *aiService.AICacheService
 }
 
 func NewHandler(
 	aiService *aiService.Service,
 	categoryRepo categoryRepo.CategoryRepoInterface,
 	transactionRepo transactionRepo.TransactionRepositoryInterface,
+	aiCache *aiService.AICacheService,
 ) *Handler {
 	return &Handler{
 		aiService:             aiService,
 		categoryRepository:    categoryRepo,
 		transactionRepository: transactionRepo,
+		aiCache:               aiCache,
 	}
 }
 
@@ -95,6 +98,24 @@ func (h *Handler) ExtractTransactions(c *gin.Context) {
 		}
 	}
 
+	fileHash, err := aiService.ComputeFileHash(files)
+	if err != nil {
+		log.Error().Err(err).Msg("Failed to compute file hash")
+		_ = c.Error(apperrors.NewInternalError("Failed to compute file hash", err))
+		return
+	}
+
+	if h.aiCache != nil {
+		if cached, found := h.aiCache.GetExtraction(c.Request.Context(), userID, fileHash, req.DocumentType); found {
+			log.Info().
+				Str("user_id", userID).
+				Str("file_hash", fileHash).
+				Msg("Returning cached AI extraction")
+			c.JSON(http.StatusOK, cached)
+			return
+		}
+	}
+
 	result, err := h.aiService.Execute(
 		c.Request.Context(),
 		domain.TaskExtractTransactions,
@@ -109,6 +130,10 @@ func (h *Handler) ExtractTransactions(c *gin.Context) {
 	}
 
 	response := dto.ToExtractResponse(result)
+
+	if h.aiCache != nil {
+		h.aiCache.SetExtraction(c.Request.Context(), userID, fileHash, req.DocumentType, response)
+	}
 
 	log.Info().
 		Str("user_id", userID).
@@ -160,13 +185,25 @@ func (h *Handler) AnalyzeSpending(c *gin.Context) {
 		return
 	}
 
-	dateTo = dateTo.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	if h.aiCache != nil {
+		if cached, found := h.aiCache.GetAnalysis(c.Request.Context(), userID, req.DateFrom, req.DateTo); found {
+			log.Info().
+				Str("user_id", userID).
+				Str("date_from", req.DateFrom).
+				Str("date_to", req.DateTo).
+				Msg("Returning cached AI analysis")
+			c.JSON(http.StatusOK, cached)
+			return
+		}
+	}
+
+	dateToEnd := dateTo.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
 
 	transactions, err := h.transactionRepository.FindByUserAndDateRange(
 		c.Request.Context(),
 		userID,
 		dateFrom,
-		dateTo,
+		dateToEnd,
 	)
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to fetch transactions for analysis")
@@ -219,6 +256,10 @@ func (h *Handler) AnalyzeSpending(c *gin.Context) {
 		Usage:          result.Usage,
 		ProcessingTime: result.ProcessingTime.Milliseconds(),
 		ModelUsed:      result.ModelUsed,
+	}
+
+	if h.aiCache != nil {
+		h.aiCache.SetAnalysis(c.Request.Context(), userID, req.DateFrom, req.DateTo, &response)
 	}
 
 	log.Info().

@@ -54,6 +54,7 @@ type Server struct {
 	quoteService        *quote.QuoteService
 	notificationService *notification.NotificationService
 	aiService           *aiService.Service
+	aiCache             *aiService.AICacheService
 	categoryRepo        categoryRepo.CategoryRepoInterface
 	transactionRepo     transactionRepo.TransactionRepositoryInterface
 	shutdownTimeout     *time.Duration
@@ -80,6 +81,7 @@ func New(ctx context.Context,
 	quoteService *quote.QuoteService,
 	notificationService *notification.NotificationService,
 	aiSvc *aiService.Service,
+	aiCache *aiService.AICacheService,
 	catRepo categoryRepo.CategoryRepoInterface,
 	txnRepo transactionRepo.TransactionRepositoryInterface,
 ) (context.Context, *Server) {
@@ -99,6 +101,7 @@ func New(ctx context.Context,
 		quoteService:        quoteService,
 		notificationService: notificationService,
 		aiService:           aiSvc,
+		aiCache:             aiCache,
 		categoryRepo:        catRepo,
 		transactionRepo:     txnRepo,
 		shutdownTimeout:     shutdownTimeout,
@@ -149,7 +152,7 @@ func (s *Server) registerRoutes() {
 	routes.RecurringTransactionRoutes(s.Engine, s.recurringService)
 	routes.SearchRoutes(s.Engine, s.searchService)
 	routes.InvestmentRoutes(s.Engine, s.investmentService)
-	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo)
+	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.aiCache)
 }
 
 func (s *Server) Run(ctx context.Context) error {
