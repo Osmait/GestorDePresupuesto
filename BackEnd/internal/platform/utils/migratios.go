@@ -329,7 +329,7 @@ func SetupSQLiteSchema(db *sql.DB) error {
 
 	CREATE TABLE IF NOT EXISTS certificates (
 		id VARCHAR(32) PRIMARY KEY,
-		user_id VARCHAR(32) NOT NULL,
+		user_id VARCHAR(36) NOT NULL,
 		bank VARCHAR(255) NOT NULL,
 		base_capital REAL NOT NULL,
 		interest_type VARCHAR(20) NOT NULL DEFAULT 'simple' CHECK (interest_type IN ('simple', 'compound')),
@@ -350,7 +350,7 @@ func SetupSQLiteSchema(db *sql.DB) error {
 	CREATE TABLE IF NOT EXISTS certificate_payments (
 		id VARCHAR(32) PRIMARY KEY,
 		certificate_id VARCHAR(32) NOT NULL,
-		user_id VARCHAR(32) NOT NULL,
+		user_id VARCHAR(36) NOT NULL,
 		payment_date DATETIME NOT NULL,
 		period_start DATETIME NOT NULL,
 		period_end DATETIME NOT NULL,
