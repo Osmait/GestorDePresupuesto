@@ -23,6 +23,8 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
+	"github.com/osmait/gestorDePresupuesto/internal/services/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
@@ -57,6 +59,8 @@ type Server struct {
 	aiCache             *aiService.AICacheService
 	categoryRepo        categoryRepo.CategoryRepoInterface
 	transactionRepo     transactionRepo.TransactionRepositoryInterface
+	certificateService  *certificate.CertificateService
+	exchangeService     *exchange.ExchangeRateService
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -84,6 +88,8 @@ func New(ctx context.Context,
 	aiCache *aiService.AICacheService,
 	catRepo categoryRepo.CategoryRepoInterface,
 	txnRepo transactionRepo.TransactionRepositoryInterface,
+	certificateSvc *certificate.CertificateService,
+	exchangeSvc *exchange.ExchangeRateService,
 ) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
@@ -104,6 +110,8 @@ func New(ctx context.Context,
 		aiCache:             aiCache,
 		categoryRepo:        catRepo,
 		transactionRepo:     txnRepo,
+		certificateService:  certificateSvc,
+		exchangeService:     exchangeSvc,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -128,6 +136,7 @@ func (s *Server) registerRoutes() {
 	// Health routes (before authentication)
 	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Server.Environment))
 	routes.QuoteRoutes(s.Engine, s.quoteService)
+	routes.ExchangeRoutes(s.Engine, s.exchangeService)
 
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
@@ -152,6 +161,7 @@ func (s *Server) registerRoutes() {
 	routes.RecurringTransactionRoutes(s.Engine, s.recurringService)
 	routes.SearchRoutes(s.Engine, s.searchService)
 	routes.InvestmentRoutes(s.Engine, s.investmentService)
+	routes.CertificateRoutes(s.Engine, s.certificateService)
 	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.aiCache)
 }
 

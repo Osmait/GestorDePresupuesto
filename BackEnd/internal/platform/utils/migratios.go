@@ -326,6 +326,48 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		is_read BOOLEAN DEFAULT 0,
 		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
 	);
+
+	CREATE TABLE IF NOT EXISTS certificates (
+		id VARCHAR(32) PRIMARY KEY,
+		user_id VARCHAR(32) NOT NULL,
+		bank VARCHAR(255) NOT NULL,
+		base_capital REAL NOT NULL,
+		interest_type VARCHAR(20) NOT NULL DEFAULT 'simple' CHECK (interest_type IN ('simple', 'compound')),
+		current_interest_rate REAL NOT NULL,
+		current_tax_rate REAL NOT NULL DEFAULT 10.00,
+		cut_day INTEGER NOT NULL CHECK (cut_day >= 1 AND cut_day <= 28),
+		reinvest_interest BOOLEAN DEFAULT 0,
+		payout_account_id VARCHAR(32),
+		maturity_date DATETIME,
+		status VARCHAR(20) NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'matured', 'cancelled')),
+		currency VARCHAR(3) NOT NULL DEFAULT 'DOP',
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+		FOREIGN KEY (payout_account_id) REFERENCES account(id) ON DELETE SET NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS certificate_payments (
+		id VARCHAR(32) PRIMARY KEY,
+		certificate_id VARCHAR(32) NOT NULL,
+		user_id VARCHAR(32) NOT NULL,
+		payment_date DATETIME NOT NULL,
+		period_start DATETIME NOT NULL,
+		period_end DATETIME NOT NULL,
+		gross_interest REAL NOT NULL,
+		tax_withheld REAL NOT NULL,
+		net_interest REAL NOT NULL,
+		applied_rate REAL NOT NULL,
+		applied_tax_rate REAL NOT NULL,
+		applied_capital REAL NOT NULL,
+		payout_account_id VARCHAR(32),
+		transaction_id VARCHAR(32),
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (certificate_id) REFERENCES certificates(id) ON DELETE CASCADE,
+		FOREIGN KEY (user_id) REFERENCES users(id),
+		FOREIGN KEY (payout_account_id) REFERENCES account(id) ON DELETE SET NULL,
+		FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
+	);
 	`
 
 	// Split the schema into individual statements

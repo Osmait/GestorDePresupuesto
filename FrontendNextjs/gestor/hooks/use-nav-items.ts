@@ -10,6 +10,7 @@ import {
     BarChart,
     TrendingUp,
     Shield,
+    FileCheck,
 } from 'lucide-react'
 import { useAdmin } from './useAdmin'
 
@@ -75,6 +76,12 @@ export function useNavItems() {
             icon: TrendingUp,
             badge: t('new'),
             description: t('investmentsDesc')
+        },
+        {
+            title: t('certificates'),
+            href: '/app/certificates',
+            icon: FileCheck,
+            description: t('certificatesDesc')
         },
         {
             title: t('analytics'),

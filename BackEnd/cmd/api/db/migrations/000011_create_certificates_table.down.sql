@@ -1,0 +1,9 @@
+DROP INDEX IF EXISTS idx_certificate_payments_user;
+DROP INDEX IF EXISTS idx_certificate_payments_date;
+DROP INDEX IF EXISTS idx_certificate_payments_cert;
+DROP INDEX IF EXISTS idx_certificates_status;
+DROP INDEX IF EXISTS idx_certificates_user;
+DROP TABLE IF EXISTS certificate_payments;
+DROP TABLE IF EXISTS certificates;
+DROP TYPE IF EXISTS certificate_status;
+DROP TYPE IF EXISTS interest_type;
