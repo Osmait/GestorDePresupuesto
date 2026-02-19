@@ -7,6 +7,7 @@ import (
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/certificate"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/certificate"
+	"github.com/rs/zerolog/log"
 )
 
 func CreateCertificate(certificateService *certificate.CertificateService) gin.HandlerFunc {
@@ -14,15 +15,18 @@ func CreateCertificate(certificateService *certificate.CertificateService) gin.H
 		userId := ctx.GetString("X-User-Id")
 		var req dto.CreateCertificateRequest
 		if err := ctx.BindJSON(&req); err != nil {
+			log.Error().Err(err).Str("user_id", userId).Msg("Invalid JSON in create certificate request")
 			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Error fields required"))
 			return
 		}
 		if err := req.Validate(); err != nil {
+			log.Error().Err(err).Str("user_id", userId).Interface("request", req).Msg("Validation failed for create certificate")
 			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
 		err := certificateService.CreateCertificate(ctx, &req, userId)
 		if err != nil {
+			log.Error().Err(err).Str("user_id", userId).Interface("request", req).Msg("Failed to create certificate")
 			_ = ctx.Error(err)
 			return
 		}

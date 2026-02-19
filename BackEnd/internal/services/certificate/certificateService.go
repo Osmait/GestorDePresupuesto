@@ -10,6 +10,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/certificate"
 	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
+	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 )
 
@@ -53,11 +54,13 @@ func (c *PaymentCalculator) CalculateMonthlyPayment(capital, rate, taxRate float
 
 func (s *CertificateService) CreateCertificate(ctx context.Context, req *dto.CreateCertificateRequest, userId string) error {
 	if err := req.Validate(); err != nil {
+		log.Error().Err(err).Str("user_id", userId).Msg("Certificate validation failed")
 		return err
 	}
 
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
+		log.Error().Err(err).Str("user_id", userId).Msg("Failed to generate certificate ID")
 		return err
 	}
 	id := uuid.String()
@@ -70,7 +73,23 @@ func (s *CertificateService) CreateCertificate(ctx context.Context, req *dto.Cre
 		cert.Currency = req.Currency
 	}
 
-	return s.repository.Save(ctx, cert)
+	log.Info().
+		Str("id", id).
+		Str("user_id", userId).
+		Str("bank", req.Bank).
+		Msg("Creating certificate")
+
+	if err := s.repository.Save(ctx, cert); err != nil {
+		log.Error().Err(err).
+			Str("id", id).
+			Str("user_id", userId).
+			Interface("payout_account_id", req.PayoutAccountId).
+			Msg("Failed to save certificate")
+		return err
+	}
+
+	log.Info().Str("id", id).Str("user_id", userId).Msg("Certificate created successfully")
+	return nil
 }
 
 func (s *CertificateService) FindAll(ctx context.Context, userId string) ([]*dto.CertificateResponse, error) {

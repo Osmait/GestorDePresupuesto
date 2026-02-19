@@ -23,6 +23,17 @@ func (r *CertificateRepository) Save(ctx context.Context, cert *certificate.Cert
 	_, err := r.db.ExecContext(ctx, query, cert.Id, cert.UserId, cert.Bank, cert.BaseCapital, cert.InterestType,
 		cert.CurrentInterestRate, cert.CurrentTaxRate, cert.CutDay, cert.ReinvestInterest, cert.PayoutAccountId,
 		cert.MaturityDate, cert.Status, cert.Currency, cert.CreatedAt, cert.UpdatedAt)
+	if err != nil {
+		log.Error().Err(err).
+			Str("id", cert.Id).
+			Str("user_id", cert.UserId).
+			Str("bank", cert.Bank).
+			Float64("base_capital", cert.BaseCapital).
+			Str("interest_type", string(cert.InterestType)).
+			Interface("payout_account_id", cert.PayoutAccountId).
+			Interface("maturity_date", cert.MaturityDate).
+			Msg("Failed to save certificate to database")
+	}
 	return err
 }
 
