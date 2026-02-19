@@ -26,6 +26,7 @@ import (
 	authRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/auth"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
 	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
@@ -41,6 +42,8 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
+	"github.com/osmait/gestorDePresupuesto/internal/services/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
@@ -133,6 +136,8 @@ func Run() error {
 		services.aiCache,
 		repositories.categoryRepository,
 		repositories.transactionRepository,
+		services.certificateService,
+		services.exchangeService,
 	)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -235,6 +240,7 @@ type repositories struct {
 	recurringRepository    *recurringRepo.RecurringTransactionRepository
 	notificationRepository *notificationRepo.NotificationRepository
 	refreshTokenRepository authRepo.RefreshTokenRepositoryInterface
+	certificateRepository  certificateRepo.CertificateRepositoryInterface
 }
 
 // initializeRepositories creates all repository instances
@@ -250,6 +256,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		recurringRepository:    recurringRepo.NewRecurringTransactionRepository(db),
 		notificationRepository: notificationRepo.NewNotificationRepository(db),
 		refreshTokenRepository: authRepo.NewRefreshTokenRepository(db),
+		certificateRepository:  certificateRepo.NewCertificateRepository(db),
 	}
 }
 
@@ -269,6 +276,8 @@ type services struct {
 	notificationService *notification.NotificationService
 	aiService           *aiService.Service
 	aiCache             *aiService.AICacheService
+	certificateService  *certificate.CertificateService
+	exchangeService     *exchange.ExchangeRateService
 }
 
 // initializeServices creates all service instances
@@ -292,6 +301,10 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 
 	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator)
 
+	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService)
+
+	exchangeService := exchange.NewExchangeRateService()
+
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),
 		transactionService:  transactionService,
@@ -307,6 +320,8 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		notificationService: notificationService,
 		aiService:           aiSvc,
 		aiCache:             aiCacheSvc,
+		certificateService:  certificateService,
+		exchangeService:     exchangeService,
 	}
 }
 

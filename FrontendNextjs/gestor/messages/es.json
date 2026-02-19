@@ -51,6 +51,8 @@
     "budgetsDesc": "Planificación financiera",
     "investments": "Inversiones",
     "investmentsDesc": "Portafolio de inversiones",
+    "certificates": "Certificados",
+    "certificatesDesc": "Certificados financieros y seguimiento de intereses",
     "analytics": "Analíticas",
     "analyticsDesc": "Visualización y reportes",
     "settings": "Configuración",
@@ -101,7 +103,13 @@
     "initial": "Inicial",
     "high": "Alto",
     "medium": "Medio",
-    "low": "Bajo"
+    "low": "Bajo",
+    "patrimony": "Patrimonio",
+    "accountsBalance": "Saldo de Cuentas",
+    "investmentsValue": "Valor Inversiones",
+    "certificatesValue": "Valor Certificados",
+    "totalPatrimony": "Patrimonio Total",
+    "activeItems": "activos"
   },
   "accounts": {
     "title": "Gestión de Cuentas",

@@ -6,12 +6,16 @@ import {
 	getTransactionRepository,
 	getCategoryRepository,
 	getBudgetRepository,
-	getAnalyticsRepository
+	getAnalyticsRepository,
+	getInvestmentRepository,
+	getCertificateRepository,
+	getExchangeRateRepository
 } from '@/lib/repositoryConfig'
 import { Account } from '@/types/account'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
 import { Budget } from '@/types/budget'
+import { Investment } from '@/types/investment'
 import {
 	TrendingUp,
 	TrendingDown,
@@ -24,10 +28,12 @@ import {
 	ArrowUpRight,
 	ArrowDownRight,
 	Target,
+	PiggyBank,
 	LucideIcon
 } from 'lucide-react'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { DashboardCharts } from '@/components/transactions/DashboardCharts'
+import { PatrimonyTab } from '@/components/dashboard/PatrimonyTab'
 import { getTranslations, getLocale } from 'next-intl/server'
 
 interface StatCardProps {
@@ -301,6 +307,9 @@ export default async function DashboardPage() {
 	const categoryRepository = await getCategoryRepository()
 	const budgetRepository = await getBudgetRepository()
 	const analyticsRepository = await getAnalyticsRepository()
+	const investmentRepository = await getInvestmentRepository()
+	const certificateRepository = await getCertificateRepository()
+	const exchangeRateRepository = await getExchangeRateRepository()
 
 	// Get translations
 	const t = await getTranslations('dashboard')
@@ -318,19 +327,38 @@ export default async function DashboardPage() {
 
 	const user = session.user;
 
-	const [accounts, transactionResponse, categories, budgets, categorysData, getMonthlySummary] = await Promise.all([
+	const [accounts, transactionResponse, categories, budgets, categorysData, getMonthlySummary, investments, certificateSummary, exchangeRate] = await Promise.all([
 		accountRepository.findAll(),
 		transactionRepository.findAllSimple(),
 		categoryRepository.findAll(),
 		budgetRepository.findAll(),
 		analyticsRepository.getCategoryExpenses(),
-		analyticsRepository.getMonthlySummary()
+		analyticsRepository.getMonthlySummary(),
+		investmentRepository.findAll(),
+		certificateRepository.getSummary(),
+		exchangeRateRepository.getRate(),
 	])
 
 	// Extract transactions from the response
 	const transactions = transactionResponse || []
 
 	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
+
+	// Get exchange rate (fallback to 60 if failed)
+	const usdToDop = exchangeRate?.usd_to_dop ?? 60
+
+	// Calculate patrimony totals
+	const accountsTotal = Array.isArray(accounts) 
+		? accounts.reduce((sum, acc) => sum + (acc.current_balance ?? acc.initial_balance ?? 0), 0) 
+		: 0
+	const investmentsTotalUSD = Array.isArray(investments)
+		? investments.reduce((sum, inv) => sum + (inv.quantity * inv.current_price), 0)
+		: 0
+	const investmentsTotalDOP = investmentsTotalUSD * usdToDop
+	const certificatesTotal = certificateSummary?.portfolio_value ?? 0
+	const accountsCount = Array.isArray(accounts) ? accounts.length : 0
+	const investmentsCount = Array.isArray(investments) ? investments.length : 0
+	const certificatesCount = certificateSummary?.active_certificates ?? 0
 
 
 
@@ -528,6 +556,31 @@ export default async function DashboardPage() {
 										</div>
 									)}
 								</div>
+							)
+						},
+						{
+							value: 'patrimony',
+							label: t('patrimony'),
+							icon: <PiggyBank className="h-4 w-4" />,
+							content: (
+								<PatrimonyTab
+									accountsTotal={accountsTotal}
+									investmentsTotal={investmentsTotalDOP}
+									investmentsTotalUSD={investmentsTotalUSD}
+									certificatesTotal={certificatesTotal}
+									accountsCount={accountsCount}
+									investmentsCount={investmentsCount}
+									certificatesCount={certificatesCount}
+									exchangeRate={usdToDop}
+									labels={{
+										title: t('patrimony'),
+										accounts: t('accountsBalance'),
+										investments: t('investmentsValue'),
+										certificates: t('certificatesValue'),
+										total: t('totalPatrimony'),
+										activeItems: t('activeItems'),
+									}}
+								/>
 							)
 						}
 					]}
