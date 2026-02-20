@@ -36,10 +36,11 @@ export default function CreditCardsPage() {
 		try {
 			setLoading(true)
 			const data = await creditCardRepository.findAll()
-			setCards(data)
+			setCards(data || [])
 		} catch (error) {
 			console.error('Error loading cards:', error)
 			toast.error('Failed to load credit cards')
+			setCards([])
 		} finally {
 			setLoading(false)
 		}
@@ -120,12 +121,13 @@ export default function CreditCardsPage() {
 		setSelectedCard(null)
 	}
 
-	const totalDebt = cards.reduce(
-		(sum, card) => sum + card.balances.reduce((s, b) => s + Math.abs(b.current_balance), 0),
+	const cardsList = cards || []
+	const totalDebt = cardsList.reduce(
+		(sum, card) => sum + (card.balances || []).reduce((s, b) => s + Math.abs(b.current_balance), 0),
 		0
 	)
-	const totalLimit = cards.reduce(
-		(sum, card) => sum + card.balances.reduce((s, b) => s + b.credit_limit, 0),
+	const totalLimit = cardsList.reduce(
+		(sum, card) => sum + (card.balances || []).reduce((s, b) => s + b.credit_limit, 0),
 		0
 	)
 	const avgUtilization = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0
@@ -169,7 +171,7 @@ export default function CreditCardsPage() {
 					<CardContent>
 						<div className="flex items-center gap-2">
 							<CardIcon className="h-5 w-5 text-primary" />
-							<span className="text-2xl font-bold">{cards.length}</span>
+							<span className="text-2xl font-bold">{cardsList.length}</span>
 						</div>
 					</CardContent>
 				</Card>
@@ -200,7 +202,7 @@ export default function CreditCardsPage() {
 				</Card>
 			</div>
 
-			{cards.length === 0 ? (
+			{cardsList.length === 0 ? (
 				<Card className="p-12">
 					<div className="flex flex-col items-center justify-center text-center">
 						<CardIcon className="h-12 w-12 text-muted-foreground mb-4" />
@@ -216,7 +218,7 @@ export default function CreditCardsPage() {
 				</Card>
 			) : (
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-					{cards.map((card) => (
+					{cardsList.map((card) => (
 						<CreditCardItem
 							key={card.id}
 							card={card}
