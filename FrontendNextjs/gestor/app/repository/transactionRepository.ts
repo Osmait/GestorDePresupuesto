@@ -66,8 +66,35 @@ export class TransactionRepository extends BaseRepository {
 
   async findAllSimple(): Promise<Transaction[]> {
     try {
-      const response = await this.findAll({ limit: 1000 }); // Get a large limit for simple cases
-      return response.data;
+      const allTransactions: Transaction[] = [];
+      const pageSize = 100;
+      let page = 1;
+      let hasNextPage = true;
+      let safetyCounter = 0;
+
+      while (hasNextPage && safetyCounter < 100) {
+        const response = await this.findAll({
+          page,
+          limit: pageSize,
+          sort_by: 'created_at',
+          sort_order: 'desc',
+        });
+
+        const pageData = response.data || [];
+        allTransactions.push(...pageData);
+
+        const pagination = response.pagination;
+        hasNextPage = Boolean(pagination?.has_next_page) && pageData.length > 0;
+
+        if (hasNextPage) {
+          const nextPage = pagination?.next_page;
+          page = (typeof nextPage === 'number' && nextPage > page) ? nextPage : page + 1;
+        }
+
+        safetyCounter += 1;
+      }
+
+      return allTransactions;
     } catch (error) {
       console.error("Error fetching simple transactions:", error);
       return [];
