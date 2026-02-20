@@ -5,16 +5,14 @@ import { Tag, Activity, Palette } from 'lucide-react'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { useTranslations } from 'next-intl'
 import { Category } from '@/types/category'
-import { Transaction } from '@/types/transaction'
+import { CategoryExpense } from '@/types/analytics'
 
-export function CategorySummaryCard({ categories, transactions }: { categories: Category[], transactions: Transaction[] }) {
+export function CategorySummaryCard({ categories, categoryExpenses }: { categories: Category[], categoryExpenses: CategoryExpense[] }) {
     const t = useTranslations('categories')
     const safeCategories = categories ?? []
-    const safeTransactions = transactions ?? []
-    const activeCategories = safeCategories.filter(cat =>
-        safeTransactions.some(t => t.category_id === cat.id)
-    )
-    const totalTransactions = safeTransactions.length
+    const expenses = categoryExpenses ?? []
+    const activeCategories = expenses.filter((item) => item.transaction_count > 0)
+    const totalTransactions = expenses.reduce((sum, item) => sum + (item.transaction_count || 0), 0)
     const averagePerCategory = activeCategories.length > 0 ? Math.round(totalTransactions / activeCategories.length) : 0
 
     return (

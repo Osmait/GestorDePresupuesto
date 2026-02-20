@@ -242,6 +242,13 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 
 	// Create paginated response
 	if includeSummary {
+		usdToDop := 60.0
+		if s.usdToDopRateFn != nil {
+			if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
+				usdToDop = rate
+			}
+		}
+
 		// Get all transactions for summary calculation (without pagination)
 		allTransactionsFilter := *filter
 		allTransactionsFilter.Limit = 0 // Remove pagination for summary
@@ -253,7 +260,7 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 		}
 
 		allTransactionResponses := s.convertToResponseList(allTransactions)
-		summary := dto.CalculateSummary(allTransactionResponses, totalCount)
+		summary := dto.CalculateSummary(allTransactionResponses, totalCount, usdToDop)
 
 		response := dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,
@@ -297,6 +304,13 @@ func (s TransactionService) FindAllWithFilters(
 
 	// Create paginated response
 	if includeSummary {
+		usdToDop := 60.0
+		if s.usdToDopRateFn != nil {
+			if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
+				usdToDop = rate
+			}
+		}
+
 		// Get all transactions for summary calculation (without pagination)
 		allTransactionsFilter := *filter
 		allTransactionsFilter.Limit = 0 // Remove pagination for summary
@@ -308,7 +322,7 @@ func (s TransactionService) FindAllWithFilters(
 		}
 
 		allTransactionResponses := s.convertToResponseList(allTransactions)
-		summary := dto.CalculateSummary(allTransactionResponses, totalCount)
+		summary := dto.CalculateSummary(allTransactionResponses, totalCount, usdToDop)
 
 		return dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,

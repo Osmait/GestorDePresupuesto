@@ -6,15 +6,14 @@ import {
 	getTransactionRepository,
 	getCategoryRepository,
 	getBudgetRepository,
-	getInvestmentRepository,
-	getCertificateRepository,
-	getExchangeRateRepository
+	getExchangeRateRepository,
+	getAnalyticsRepository,
 } from '@/lib/repositoryConfig'
 import { Account } from '@/types/account'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
 import { Budget } from '@/types/budget'
-import { Investment } from '@/types/investment'
+import { DashboardSummary } from '@/types/analytics'
 import {
 	TrendingUp,
 	TrendingDown,
@@ -116,36 +115,22 @@ function TransactionItem({ transaction, category, locale }: {
 	)
 }
 
-function convertAmountToDOP(amount: number, currency: string | undefined, usdToDop: number): number {
-	const normalizedCurrency = (currency || 'DOP').toUpperCase()
-	if (normalizedCurrency === 'USD') {
-		return amount * usdToDop
-	}
-	return amount
-}
-
 // Server Component para CategoryCard
-function CategoryCard({ category, transactions, usdToDop, t }: {
+function CategoryCard({
+	category,
+	transactionCount,
+	totalAmountDOP,
+	dopTotal,
+	usdTotal,
+	t,
+}: {
 	category: Category
-	transactions: Transaction[]
-	usdToDop: number
+	transactionCount: number
+	totalAmountDOP: number
+	dopTotal: number
+	usdTotal: number
 	t: any
 }) {
-	const categoryTransactions = Array.isArray(transactions) ? transactions.filter(t => t.category_id === category.id) : [];
-	const categoryTotals = categoryTransactions.reduce(
-		(acc, transaction) => {
-			const amount = Math.abs(transaction.amount)
-			if ((transaction.currency || 'DOP') === 'USD') {
-				acc.usd += amount
-			} else {
-				acc.dop += amount
-			}
-			return acc
-		},
-		{ dop: 0, usd: 0 }
-	)
-	const totalAmountDOP = categoryTotals.dop + (categoryTotals.usd * usdToDop)
-
 	return (
 		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors">
 			<div className="flex items-center gap-3">
@@ -157,13 +142,13 @@ function CategoryCard({ category, transactions, usdToDop, t }: {
 				</div>
 				<div>
 					<p className="font-medium text-foreground">{category.name}</p>
-					<p className="text-xs text-muted-foreground">{categoryTransactions.length} {t('transactionsCount')}</p>
+					<p className="text-xs text-muted-foreground">{transactionCount} {t('transactionsCount')}</p>
 				</div>
 			</div>
 			<div className="text-right">
 				<p className="font-bold text-foreground">{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totalAmountDOP)}</p>
-				<p className="text-[11px] text-muted-foreground">DOP: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(categoryTotals.dop)}</p>
-				<p className="text-[11px] text-muted-foreground">USD: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(categoryTotals.usd)}</p>
+				<p className="text-[11px] text-muted-foreground">DOP: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(dopTotal)}</p>
+				<p className="text-[11px] text-muted-foreground">USD: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdTotal)}</p>
 			</div>
 		</div>
 	)
@@ -284,23 +269,13 @@ function DashboardHeader({ user, t, locale }: { user: any, t: any, locale: strin
 }
 
 // Server Component para las estadísticas
-function StatsGrid({ accounts, transactions, usdToDop, t }: {
-	accounts: Account[]
-	transactions: Transaction[]
-	usdToDop: number
+function StatsGrid({ summary, t }: {
+	summary: DashboardSummary | null
 	t: any
 }) {
-	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + (acc.current_balance ?? acc.initial_balance ?? 0), 0)
-	const totalIncome = Array.isArray(transactions)
-		? transactions
-			.filter(t => t.type_transation === TypeTransaction.INCOME)
-			.reduce((sum, t) => sum + convertAmountToDOP(Math.abs(t.amount), t.currency, usdToDop), 0)
-		: 0;
-	const totalExpenses = Array.isArray(transactions)
-		? transactions
-			.filter(t => t.type_transation === TypeTransaction.BILL)
-			.reduce((sum, t) => sum + convertAmountToDOP(Math.abs(t.amount), t.currency, usdToDop), 0)
-		: 0;
+	const totalBalance = summary?.accounts_total || 0
+	const totalIncome = summary?.total_income || 0
+	const totalExpenses = summary?.total_expenses || 0
 
 	return (
 		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -334,9 +309,8 @@ export default async function DashboardPage() {
 	const transactionRepository = await getTransactionRepository()
 	const categoryRepository = await getCategoryRepository()
 	const budgetRepository = await getBudgetRepository()
-	const investmentRepository = await getInvestmentRepository()
-	const certificateRepository = await getCertificateRepository()
 	const exchangeRateRepository = await getExchangeRateRepository()
+	const analyticsRepository = await getAnalyticsRepository()
 
 	// Get translations
 	const t = await getTranslations('dashboard')
@@ -354,14 +328,13 @@ export default async function DashboardPage() {
 
 	const user = session.user;
 
-	const [accounts, transactionResponse, categories, budgets, investments, certificateSummary, exchangeRate] = await Promise.all([
+	const [accounts, transactionResponse, categories, budgets, exchangeRate, dashboardSummary] = await Promise.all([
 		accountRepository.findAll(),
 		transactionRepository.findAllSimple(),
 		categoryRepository.findAll(),
 		budgetRepository.findAll(),
-		investmentRepository.findAll(),
-		certificateRepository.getSummary(),
 		exchangeRateRepository.getRate(),
+		analyticsRepository.getDashboardSummary(),
 	])
 
 	// Extract transactions from the response
@@ -370,61 +343,16 @@ export default async function DashboardPage() {
 	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
 
 	// Get exchange rate (fallback to 60 if failed)
-	const usdToDop = exchangeRate?.usd_to_dop ?? 60
+	const usdToDop = dashboardSummary?.usd_to_dop_rate ?? exchangeRate?.usd_to_dop ?? 60
 
-	// Build chart data with currency conversion to DOP
-	const categoryMap = new Map((categories || []).map((category) => [category.id, category]))
-	const categoryTotals = new Map<string, number>()
-	for (const tx of transactions) {
-		if (tx.type_transation !== TypeTransaction.BILL) continue
-		if (!tx.category_id) continue
-		const amountDOP = convertAmountToDOP(Math.abs(tx.amount), tx.currency, usdToDop)
-		categoryTotals.set(tx.category_id, (categoryTotals.get(tx.category_id) || 0) + amountDOP)
-	}
-
-	const categorysData = Array.from(categoryTotals.entries()).map(([categoryId, total]) => {
-		const category = categoryMap.get(categoryId)
-		return {
-			id: categoryId,
-			label: category?.name || 'Uncategorized',
-			value: total,
-			color: category?.color || '#6B7280',
-		}
-	})
-
-	const monthlyMap = new Map<string, { Ingresos: number; Gastos: number }>()
-	for (const tx of transactions) {
-		const date = new Date(tx.created_at)
-		if (Number.isNaN(date.getTime())) continue
-		const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
-		if (!monthlyMap.has(month)) {
-			monthlyMap.set(month, { Ingresos: 0, Gastos: 0 })
-		}
-		const bucket = monthlyMap.get(month)!
-		const amountDOP = convertAmountToDOP(Math.abs(tx.amount), tx.currency, usdToDop)
-		if (tx.type_transation === TypeTransaction.INCOME) {
-			bucket.Ingresos += amountDOP
-		} else if (tx.type_transation === TypeTransaction.BILL) {
-			bucket.Gastos += amountDOP
-		}
-	}
-
-	const getMonthlySummary = Array.from(monthlyMap.entries())
-		.sort(([a], [b]) => a.localeCompare(b))
-		.map(([month, values]) => ({ month, ...values }))
-
-	// Calculate patrimony totals
-	const accountsTotal = Array.isArray(accounts) 
-		? accounts.reduce((sum, acc) => sum + (acc.current_balance ?? acc.initial_balance ?? 0), 0) 
-		: 0
-	const investmentsTotalUSD = Array.isArray(investments)
-		? investments.reduce((sum, inv) => sum + (inv.quantity * inv.current_price), 0)
-		: 0
-	const investmentsTotalDOP = investmentsTotalUSD * usdToDop
-	const certificatesTotal = certificateSummary?.portfolio_value ?? 0
-	const accountsCount = Array.isArray(accounts) ? accounts.length : 0
-	const investmentsCount = Array.isArray(investments) ? investments.length : 0
-	const certificatesCount = certificateSummary?.active_certificates ?? 0
+	const accountsTotal = dashboardSummary?.accounts_total || 0
+	const investmentsTotalDOP = dashboardSummary?.investments_total || 0
+	const investmentsTotalUSD = usdToDop > 0 ? (investmentsTotalDOP / usdToDop) : 0
+	const certificatesTotal = dashboardSummary?.certificates_total || 0
+	const accountsCount = dashboardSummary?.accounts_count || 0
+	const investmentsCount = dashboardSummary?.investments_count || 0
+	const certificatesCount = dashboardSummary?.certificates_count || 0
+	const categoryExpensesById = new Map((dashboardSummary?.category_expenses || []).map((item) => [item.id, item]))
 
 
 
@@ -438,13 +366,13 @@ export default async function DashboardPage() {
 					<DashboardCharts
 						categories={categories}
 						transactions={Array.isArray(transactions) ? transactions : []}
-						categorysData={categorysData}
-						monthSummary={getMonthlySummary}
+						categorysData={dashboardSummary?.category_expenses || []}
+						monthSummary={dashboardSummary?.monthly_summary || []}
 
 					/>
 				</div>
 				<div id="stats-grid">
-					<StatsGrid accounts={accounts} transactions={transactions} usdToDop={usdToDop} t={t} />
+					<StatsGrid summary={dashboardSummary} t={t} />
 				</div>
 
 				<AnimatedTabs
@@ -491,16 +419,21 @@ export default async function DashboardPage() {
 											</CardHeader>
 											<CardContent>
 												<div className="space-y-4">
-													{Array.isArray(categories) ? categories.slice(0, 4).map((category) => (
-															<CategoryCard
-																key={category.id}
-																category={category}
-																transactions={transactions}
-																usdToDop={usdToDop}
-																t={t}
-															/>
-													)) : []}
-												</div>
+										{Array.isArray(categories) ? categories.slice(0, 4).map((category) => {
+											const stats = categoryExpensesById.get(category.id)
+											return (
+													<CategoryCard
+														key={category.id}
+														category={category}
+														transactionCount={stats?.transaction_count || 0}
+														totalAmountDOP={stats?.value || 0}
+														dopTotal={stats?.dop_total || 0}
+														usdTotal={stats?.usd_total || 0}
+														t={t}
+													/>
+											)
+										}) : []}
+										</div>
 											</CardContent>
 										</Card>
 

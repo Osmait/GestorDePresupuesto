@@ -22,36 +22,25 @@ import {
     DialogDescription
 } from '@/components/ui/dialog'
 import { Category } from '@/types/category'
-import { Transaction } from '@/types/transaction'
-import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
+import { CategoryExpense } from '@/types/analytics'
 
 export interface CategoryCardProps {
     category: Category
-    transactions: Transaction[]
+    stats?: CategoryExpense
     onDelete: () => Promise<void>
     onEdit: () => void
 }
 
-export function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCardProps) {
+export function CategoryCard({ category, stats, onDelete, onEdit }: CategoryCardProps) {
     const t = useTranslations('categories')
     const tForms = useTranslations('forms')
     const router = useRouter()
-    const categoryTransactions = transactions.filter(t => t.category_id === category.id)
-    const { data: exchangeRateData } = useExchangeRateQuery()
-    const usdToDopRate = exchangeRateData?.usd_to_dop ?? 60
-    const totals = categoryTransactions.reduce(
-        (acc, transaction) => {
-            const amount = Math.abs(transaction.amount)
-            if ((transaction.currency || 'DOP') === 'USD') {
-                acc.usd += amount
-            } else {
-                acc.dop += amount
-            }
-            return acc
-        },
-        { dop: 0, usd: 0 }
-    )
-    const totalAmountDOP = totals.dop + (totals.usd * usdToDopRate)
+    const categoryTransactionsCount = stats?.transaction_count || 0
+    const totalAmountDOP = stats?.value || 0
+    const totals = {
+        dop: stats?.dop_total || 0,
+        usd: stats?.usd_total || 0,
+    }
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -115,7 +104,7 @@ export function CategoryCard({ category, transactions, onDelete, onEdit }: Categ
                         <div>
                             <p className="font-semibold text-foreground text-lg">{category.name}</p>
                             <p className="text-sm text-muted-foreground">
-                                {categoryTransactions.length} {t('transactionsCount')}
+                                {categoryTransactionsCount} {t('transactionsCount')}
                             </p>
                         </div>
                     </div>
@@ -138,7 +127,7 @@ export function CategoryCard({ category, transactions, onDelete, onEdit }: Categ
                         <span className="text-xs text-muted-foreground">Color</span>
                     </div>
                     <Badge variant="outline" className="bg-muted/30 dark:bg-muted/20">
-                        {categoryTransactions.length > 5 ? t('active') : categoryTransactions.length > 0 ? t('moderate') : t('inactive')}
+                        {categoryTransactionsCount > 5 ? t('active') : categoryTransactionsCount > 0 ? t('moderate') : t('inactive')}
                     </Badge>
                 </div>
             </CardContent>

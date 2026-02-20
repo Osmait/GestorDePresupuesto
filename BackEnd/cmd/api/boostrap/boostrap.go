@@ -329,7 +329,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository, usdToDopRateFn),
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService),
-		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository),
+		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn),
 		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService),
 		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),
 		quoteService:        quoteService,

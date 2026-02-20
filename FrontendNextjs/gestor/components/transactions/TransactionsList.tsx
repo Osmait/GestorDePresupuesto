@@ -22,6 +22,7 @@ export default function TransactionsList() {
     const {
         transactions,
         pagination,
+        summary,
         isLoading: isLoadingTx,
         deleteTransaction,
         clearFilters,
@@ -101,7 +102,7 @@ export default function TransactionsList() {
             transition={{ duration: 0.5 }}
         >
             <div className="mb-8">
-                <TransactionSummaryCard transactions={transactions} />
+                <TransactionSummaryCard transactions={transactions} summary={summary} />
             </div>
 
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
@@ -136,4 +137,3 @@ export default function TransactionsList() {
         </motion.div>
     )
 }
-

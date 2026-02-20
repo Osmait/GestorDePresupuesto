@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { CreditCard, CreateCreditCardDTO, CreatePaymentDTO } from '@/types/creditcard'
+import { CreditCard, CreditCardSummary, CreateCreditCardDTO, CreatePaymentDTO } from '@/types/creditcard'
 import { creditCardRepository } from '@/lib/repositoryConfig'
 import { CreditCardItem } from '@/components/creditcards/CreditCardItem'
 import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModal'
@@ -24,6 +24,7 @@ import {
 
 export default function CreditCardsPage() {
 	const [cards, setCards] = useState<CreditCard[]>([])
+	const [summary, setSummary] = useState<CreditCardSummary | null>(null)
 	const [loading, setLoading] = useState(true)
 	const [formOpen, setFormOpen] = useState(false)
 	const [paymentOpen, setPaymentOpen] = useState(false)
@@ -39,12 +40,17 @@ export default function CreditCardsPage() {
 	const loadCards = async () => {
 		try {
 			setLoading(true)
-			const data = await creditCardRepository.findAll()
+			const [data, summaryData] = await Promise.all([
+				creditCardRepository.findAll(),
+				creditCardRepository.getSummary(),
+			])
 			setCards(data || [])
+			setSummary(summaryData || null)
 		} catch (error) {
 			console.error('Error loading cards:', error)
 			toast.error('Failed to load credit cards')
 			setCards([])
+			setSummary(null)
 		} finally {
 			setLoading(false)
 		}
@@ -137,34 +143,42 @@ export default function CreditCardsPage() {
 
 	const cardsList = cards || []
 	const usdToDopRate = exchangeRateData?.usd_to_dop || 0
+	const summaryDebtDOP = summary?.total_debt?.DOP || 0
+	const summaryDebtUSD = summary?.total_debt?.USD || 0
+	const summaryLimitDOP = summary?.total_credit_limit?.DOP || 0
+	const summaryLimitUSD = summary?.total_credit_limit?.USD || 0
 
-	const totalDebtDOP = cardsList.reduce(
+	const localTotalDebtDOP = cardsList.reduce(
 		(sum, card) => sum + (card.balances || [])
 			.filter((b) => b.currency === 'DOP')
 			.reduce((s, b) => s + Math.max(0, -b.current_balance), 0),
 		0
 	)
-	const totalDebtUSD = cardsList.reduce(
+	const localTotalDebtUSD = cardsList.reduce(
 		(sum, card) => sum + (card.balances || [])
 			.filter((b) => b.currency === 'USD')
 			.reduce((s, b) => s + Math.max(0, -b.current_balance), 0),
 		0
 	)
+	const totalDebtDOP = summary ? summaryDebtDOP : localTotalDebtDOP
+	const totalDebtUSD = summary ? summaryDebtUSD : localTotalDebtUSD
 	const totalDebtUSDInDOP = totalDebtUSD * usdToDopRate
 	const totalDebt = totalDebtDOP + totalDebtUSDInDOP
 
-	const totalLimitDOP = cardsList.reduce(
+	const localTotalLimitDOP = cardsList.reduce(
 		(sum, card) => sum + (card.balances || [])
 			.filter((b) => b.currency === 'DOP')
 			.reduce((s, b) => s + b.credit_limit, 0),
 		0
 	)
-	const totalLimitUSD = cardsList.reduce(
+	const localTotalLimitUSD = cardsList.reduce(
 		(sum, card) => sum + (card.balances || [])
 			.filter((b) => b.currency === 'USD')
 			.reduce((s, b) => s + b.credit_limit, 0),
 		0
 	)
+	const totalLimitDOP = summary ? summaryLimitDOP : localTotalLimitDOP
+	const totalLimitUSD = summary ? summaryLimitUSD : localTotalLimitUSD
 	const totalLimit = totalLimitDOP + (totalLimitUSD * usdToDopRate)
 	const avgUtilization = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0
 

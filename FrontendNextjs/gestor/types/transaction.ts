@@ -30,6 +30,20 @@ export interface PaginationMeta {
 export interface PaginatedTransactionResponse {
   data: Transaction[];
   pagination: PaginationMeta;
+  summary?: TransactionSummary;
+}
+
+export interface TransactionSummary {
+  total_income: number;
+  total_expenses: number;
+  net_amount: number;
+  income_dop: number;
+  income_usd: number;
+  expenses_dop: number;
+  expenses_usd: number;
+  usd_to_dop_rate: number;
+  income_count: number;
+  expense_count: number;
 }
 
 export interface TransactionFilters {
