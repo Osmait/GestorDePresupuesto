@@ -5,11 +5,39 @@ import { Wallet, TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
 import { Transaction, TypeTransaction } from '@/types/transaction';
 import { AnimatedFlashNumber } from '@/components/common/AnimatedFlashNumber';
 import { useTranslations } from 'next-intl';
+import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery';
 
 export default function TransactionSummaryCard({ transactions }: { transactions: Transaction[] }) {
   const t = useTranslations('transactions');
-  const totalIncome = transactions.filter(t => t.type_transation === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0);
-  const totalExpenses = transactions.filter(t => t.type_transation === TypeTransaction.BILL).reduce((sum, t) => sum + Math.abs(t.amount), 0);
+  const { data: exchangeRateData } = useExchangeRateQuery();
+  const usdToDopRate = exchangeRateData?.usd_to_dop ?? 60;
+
+  const incomeTotals = transactions
+    .filter(tx => tx.type_transation === TypeTransaction.INCOME)
+    .reduce((acc, tx) => {
+      const amount = Math.abs(tx.amount)
+      if ((tx.currency || 'DOP') === 'USD') {
+        acc.usd += amount
+      } else {
+        acc.dop += amount
+      }
+      return acc
+    }, { dop: 0, usd: 0 })
+
+  const expenseTotals = transactions
+    .filter(tx => tx.type_transation === TypeTransaction.BILL)
+    .reduce((acc, tx) => {
+      const amount = Math.abs(tx.amount)
+      if ((tx.currency || 'DOP') === 'USD') {
+        acc.usd += amount
+      } else {
+        acc.dop += amount
+      }
+      return acc
+    }, { dop: 0, usd: 0 })
+
+  const totalIncome = incomeTotals.dop + (incomeTotals.usd * usdToDopRate)
+  const totalExpenses = expenseTotals.dop + (expenseTotals.usd * usdToDopRate)
   const totalTransactions = transactions.length;
 
   return (
@@ -35,6 +63,8 @@ export default function TransactionSummaryCard({ transactions }: { transactions:
                 preserveValue={true}
               />
             </p>
+            <p className="text-xs text-muted-foreground">DOP: {incomeTotals.dop.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}</p>
+            <p className="text-xs text-muted-foreground">USD: {incomeTotals.usd.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</p>
           </div>
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-red-500/10 to-rose-500/10 dark:from-red-500/5 dark:to-rose-500/5">
             <TrendingDown className="h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400" />
@@ -50,6 +80,8 @@ export default function TransactionSummaryCard({ transactions }: { transactions:
                 preserveValue={true}
               />
             </p>
+            <p className="text-xs text-muted-foreground">DOP: {expenseTotals.dop.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}</p>
+            <p className="text-xs text-muted-foreground">USD: {expenseTotals.usd.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</p>
           </div>
           <div className="text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5">
             <DollarSign className="h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400" />

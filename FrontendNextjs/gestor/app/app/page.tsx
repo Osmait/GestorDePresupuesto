@@ -6,7 +6,6 @@ import {
 	getTransactionRepository,
 	getCategoryRepository,
 	getBudgetRepository,
-	getAnalyticsRepository,
 	getInvestmentRepository,
 	getCertificateRepository,
 	getExchangeRateRepository
@@ -91,6 +90,7 @@ function TransactionItem({ transaction, category, locale }: {
 	locale?: string
 }) {
 	const isIncome = transaction.type_transation === TypeTransaction.INCOME
+	const transactionCurrency = transaction.currency || 'DOP'
 
 	return (
 		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors">
@@ -108,7 +108,7 @@ function TransactionItem({ transaction, category, locale }: {
 			</div>
 			<div className="text-right">
 				<p className={`font-bold ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-					{isIncome ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
+					{isIncome ? '+' : ''}{transactionCurrency} {Math.abs(transaction.amount).toLocaleString()}
 				</p>
 				<p className="text-xs text-muted-foreground">{category?.name}</p>
 			</div>
@@ -116,14 +116,35 @@ function TransactionItem({ transaction, category, locale }: {
 	)
 }
 
+function convertAmountToDOP(amount: number, currency: string | undefined, usdToDop: number): number {
+	const normalizedCurrency = (currency || 'DOP').toUpperCase()
+	if (normalizedCurrency === 'USD') {
+		return amount * usdToDop
+	}
+	return amount
+}
+
 // Server Component para CategoryCard
-function CategoryCard({ category, transactions, t }: {
+function CategoryCard({ category, transactions, usdToDop, t }: {
 	category: Category
 	transactions: Transaction[]
+	usdToDop: number
 	t: any
 }) {
 	const categoryTransactions = Array.isArray(transactions) ? transactions.filter(t => t.category_id === category.id) : [];
-	const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
+	const categoryTotals = categoryTransactions.reduce(
+		(acc, transaction) => {
+			const amount = Math.abs(transaction.amount)
+			if ((transaction.currency || 'DOP') === 'USD') {
+				acc.usd += amount
+			} else {
+				acc.dop += amount
+			}
+			return acc
+		},
+		{ dop: 0, usd: 0 }
+	)
+	const totalAmountDOP = categoryTotals.dop + (categoryTotals.usd * usdToDop)
 
 	return (
 		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors">
@@ -140,7 +161,9 @@ function CategoryCard({ category, transactions, t }: {
 				</div>
 			</div>
 			<div className="text-right">
-				<p className="font-bold text-foreground">${totalAmount.toLocaleString()}</p>
+				<p className="font-bold text-foreground">{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totalAmountDOP)}</p>
+				<p className="text-[11px] text-muted-foreground">DOP: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(categoryTotals.dop)}</p>
+				<p className="text-[11px] text-muted-foreground">USD: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(categoryTotals.usd)}</p>
 			</div>
 		</div>
 	)
@@ -261,17 +284,22 @@ function DashboardHeader({ user, t, locale }: { user: any, t: any, locale: strin
 }
 
 // Server Component para las estadísticas
-function StatsGrid({ accounts, transactions, t }: {
+function StatsGrid({ accounts, transactions, usdToDop, t }: {
 	accounts: Account[]
 	transactions: Transaction[]
+	usdToDop: number
 	t: any
 }) {
 	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + (acc.current_balance ?? acc.initial_balance ?? 0), 0)
 	const totalIncome = Array.isArray(transactions)
-		? transactions.filter(t => t.type_transation === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0)
+		? transactions
+			.filter(t => t.type_transation === TypeTransaction.INCOME)
+			.reduce((sum, t) => sum + convertAmountToDOP(Math.abs(t.amount), t.currency, usdToDop), 0)
 		: 0;
 	const totalExpenses = Array.isArray(transactions)
-		? transactions.filter(t => t.type_transation === TypeTransaction.BILL).reduce((sum, t) => sum + Math.abs(t.amount), 0)
+		? transactions
+			.filter(t => t.type_transation === TypeTransaction.BILL)
+			.reduce((sum, t) => sum + convertAmountToDOP(Math.abs(t.amount), t.currency, usdToDop), 0)
 		: 0;
 
 	return (
@@ -306,7 +334,6 @@ export default async function DashboardPage() {
 	const transactionRepository = await getTransactionRepository()
 	const categoryRepository = await getCategoryRepository()
 	const budgetRepository = await getBudgetRepository()
-	const analyticsRepository = await getAnalyticsRepository()
 	const investmentRepository = await getInvestmentRepository()
 	const certificateRepository = await getCertificateRepository()
 	const exchangeRateRepository = await getExchangeRateRepository()
@@ -327,13 +354,11 @@ export default async function DashboardPage() {
 
 	const user = session.user;
 
-	const [accounts, transactionResponse, categories, budgets, categorysData, getMonthlySummary, investments, certificateSummary, exchangeRate] = await Promise.all([
+	const [accounts, transactionResponse, categories, budgets, investments, certificateSummary, exchangeRate] = await Promise.all([
 		accountRepository.findAll(),
 		transactionRepository.findAllSimple(),
 		categoryRepository.findAll(),
 		budgetRepository.findAll(),
-		analyticsRepository.getCategoryExpenses(),
-		analyticsRepository.getMonthlySummary(),
 		investmentRepository.findAll(),
 		certificateRepository.getSummary(),
 		exchangeRateRepository.getRate(),
@@ -346,6 +371,47 @@ export default async function DashboardPage() {
 
 	// Get exchange rate (fallback to 60 if failed)
 	const usdToDop = exchangeRate?.usd_to_dop ?? 60
+
+	// Build chart data with currency conversion to DOP
+	const categoryMap = new Map((categories || []).map((category) => [category.id, category]))
+	const categoryTotals = new Map<string, number>()
+	for (const tx of transactions) {
+		if (tx.type_transation !== TypeTransaction.BILL) continue
+		if (!tx.category_id) continue
+		const amountDOP = convertAmountToDOP(Math.abs(tx.amount), tx.currency, usdToDop)
+		categoryTotals.set(tx.category_id, (categoryTotals.get(tx.category_id) || 0) + amountDOP)
+	}
+
+	const categorysData = Array.from(categoryTotals.entries()).map(([categoryId, total]) => {
+		const category = categoryMap.get(categoryId)
+		return {
+			id: categoryId,
+			label: category?.name || 'Uncategorized',
+			value: total,
+			color: category?.color || '#6B7280',
+		}
+	})
+
+	const monthlyMap = new Map<string, { Ingresos: number; Gastos: number }>()
+	for (const tx of transactions) {
+		const date = new Date(tx.created_at)
+		if (Number.isNaN(date.getTime())) continue
+		const month = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`
+		if (!monthlyMap.has(month)) {
+			monthlyMap.set(month, { Ingresos: 0, Gastos: 0 })
+		}
+		const bucket = monthlyMap.get(month)!
+		const amountDOP = convertAmountToDOP(Math.abs(tx.amount), tx.currency, usdToDop)
+		if (tx.type_transation === TypeTransaction.INCOME) {
+			bucket.Ingresos += amountDOP
+		} else if (tx.type_transation === TypeTransaction.BILL) {
+			bucket.Gastos += amountDOP
+		}
+	}
+
+	const getMonthlySummary = Array.from(monthlyMap.entries())
+		.sort(([a], [b]) => a.localeCompare(b))
+		.map(([month, values]) => ({ month, ...values }))
 
 	// Calculate patrimony totals
 	const accountsTotal = Array.isArray(accounts) 
@@ -378,7 +444,7 @@ export default async function DashboardPage() {
 					/>
 				</div>
 				<div id="stats-grid">
-					<StatsGrid accounts={accounts} transactions={transactions} t={t} />
+					<StatsGrid accounts={accounts} transactions={transactions} usdToDop={usdToDop} t={t} />
 				</div>
 
 				<AnimatedTabs
@@ -426,12 +492,13 @@ export default async function DashboardPage() {
 											<CardContent>
 												<div className="space-y-4">
 													{Array.isArray(categories) ? categories.slice(0, 4).map((category) => (
-														<CategoryCard
-															key={category.id}
-															category={category}
-															transactions={transactions}
-															t={t}
-														/>
+															<CategoryCard
+																key={category.id}
+																category={category}
+																transactions={transactions}
+																usdToDop={usdToDop}
+																t={t}
+															/>
 													)) : []}
 												</div>
 											</CardContent>

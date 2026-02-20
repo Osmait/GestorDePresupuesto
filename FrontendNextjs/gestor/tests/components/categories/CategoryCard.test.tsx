@@ -24,6 +24,12 @@ vi.mock('next-intl', () => ({
     },
 }))
 
+vi.mock('@/hooks/queries/useExchangeRateQuery', () => ({
+	useExchangeRateQuery: () => ({
+		data: { usd_to_dop: 60 },
+	}),
+}))
+
 describe('CategoryCard', () => {
     const mockCategory = {
         id: 'cat1',
@@ -55,7 +61,8 @@ describe('CategoryCard', () => {
         expect(screen.getByText('🍔')).toBeInTheDocument()
         expect(screen.getByText('2 transactions')).toBeInTheDocument()
         // Total: 50 + 30 = 80
-        expect(screen.getByText((content) => content.includes('80'))).toBeInTheDocument()
+        expect(screen.getByText('Total (DOP)')).toBeInTheDocument()
+        expect(screen.getAllByText((content) => content.includes('80')).length).toBeGreaterThan(0)
     })
 
     it('shows correct activity badge', () => {

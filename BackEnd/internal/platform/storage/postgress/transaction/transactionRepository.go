@@ -78,7 +78,7 @@ func (repo *TransactionRepository) ResolveAndValidateCurrencyForAccount(ctx cont
 
 func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,created_at FROM transactions WHERE  user_id = $1 ORDER BY created_at DESC", id)
+		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,COALESCE(currency, 'DOP'),created_at FROM transactions WHERE  user_id = $1 ORDER BY created_at DESC", id)
 	if err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id 
 	for rows.Next() {
 		transaction := transaction.Transaction{}
 		var budgetID sql.NullString
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetID, &transaction.CreatedAt); err == nil {
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetID, &transaction.Currency, &transaction.CreatedAt); err == nil {
 			if budgetID.Valid {
 				transaction.BudgetId = budgetID.String
 			}
@@ -112,7 +112,7 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id 
 
 func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,created_at FROM transactions WHERE  account_id = $1 and created_at BETWEEN $2 and $3 ORDER BY created_at DESC", id, date1, date2)
+		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,COALESCE(currency, 'DOP'),created_at FROM transactions WHERE  account_id = $1 and created_at BETWEEN $2 and $3 ORDER BY created_at DESC", id, date1, date2)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	for rows.Next() {
 		transaction := transaction.Transaction{}
 		var budgetID sql.NullString
-		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetID, &transaction.CreatedAt); err == nil {
+		if err = rows.Scan(&transaction.Id, &transaction.Name, &transaction.Description, &transaction.Amount, &transaction.TypeTransation, &transaction.AccountId, &transaction.CategoryId, &budgetID, &transaction.Currency, &transaction.CreatedAt); err == nil {
 			if budgetID.Valid {
 				transaction.BudgetId = budgetID.String
 			}
@@ -145,9 +145,12 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	return transactions, nil
 }
 
-func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string) (float64, error) {
+func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string, usdToDop float64) (float64, error) {
+	if usdToDop <= 0 {
+		usdToDop = 60
+	}
 	rows, err := repo.db.QueryContext(ctx,
-		"SELECT   sum(amount)  as currentBudget FROM  transactions   WHERE  budget_id = $1 AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE) ", budgetID)
+		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)", budgetID, usdToDop)
 	if err != nil {
 		return 0, err
 	}
@@ -182,12 +185,15 @@ func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Conte
 	return total, nil
 }
 
-func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string) (map[string]float64, error) {
-	query := `SELECT budget_id, COALESCE(SUM(amount), 0) FROM transactions 
+func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string, usdToDop float64) (map[string]float64, error) {
+	if usdToDop <= 0 {
+		usdToDop = 60
+	}
+	query := `SELECT budget_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions 
 		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill' 
 		AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
 		GROUP BY budget_id`
-	rows, err := repo.db.QueryContext(ctx, query, userId)
+	rows, err := repo.db.QueryContext(ctx, query, userId, usdToDop)
 	if err != nil {
 		return nil, err
 	}
@@ -311,7 +317,7 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	if isCount {
 		queryBuilder.WriteString("SELECT COUNT(*) FROM transactions")
 	} else {
-		queryBuilder.WriteString("SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, created_at FROM transactions")
+		queryBuilder.WriteString("SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at FROM transactions")
 	}
 
 	// WHERE clause
@@ -459,6 +465,7 @@ func (repo *TransactionRepository) scanTransactions(rows *sql.Rows) ([]*transact
 			&transaction.AccountId,
 			&transaction.CategoryId,
 			&budgetID,
+			&transaction.Currency,
 			&transaction.CreatedAt,
 		)
 		if err != nil {
@@ -480,7 +487,7 @@ func (repo *TransactionRepository) scanTransactions(rows *sql.Rows) ([]*transact
 }
 
 func (repo *TransactionRepository) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateTo time.Time) ([]*transaction.Transaction, error) {
-	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, created_at 
+	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at 
 		FROM transactions 
 		WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3 
 		ORDER BY created_at DESC`

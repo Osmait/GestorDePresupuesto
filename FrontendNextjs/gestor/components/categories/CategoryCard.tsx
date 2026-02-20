@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog'
 import { Category } from '@/types/category'
 import { Transaction } from '@/types/transaction'
-import { formatCurrency } from '@/lib/utils'
+import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 
 export interface CategoryCardProps {
     category: Category
@@ -37,7 +37,21 @@ export function CategoryCard({ category, transactions, onDelete, onEdit }: Categ
     const tForms = useTranslations('forms')
     const router = useRouter()
     const categoryTransactions = transactions.filter(t => t.category_id === category.id)
-    const totalAmount = categoryTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
+    const { data: exchangeRateData } = useExchangeRateQuery()
+    const usdToDopRate = exchangeRateData?.usd_to_dop ?? 60
+    const totals = categoryTransactions.reduce(
+        (acc, transaction) => {
+            const amount = Math.abs(transaction.amount)
+            if ((transaction.currency || 'DOP') === 'USD') {
+                acc.usd += amount
+            } else {
+                acc.dop += amount
+            }
+            return acc
+        },
+        { dop: 0, usd: 0 }
+    )
+    const totalAmountDOP = totals.dop + (totals.usd * usdToDopRate)
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -107,9 +121,11 @@ export function CategoryCard({ category, transactions, onDelete, onEdit }: Categ
                     </div>
                     <div className="text-right">
                         <p className="font-bold text-xl text-foreground">
-                            {formatCurrency(totalAmount)}
+                            {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totalAmountDOP)}
                         </p>
-                        <p className="text-xs text-muted-foreground">Total</p>
+                        <p className="text-xs text-muted-foreground">Total (DOP)</p>
+                        <p className="text-[11px] text-muted-foreground">DOP: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totals.dop)}</p>
+                        <p className="text-[11px] text-muted-foreground">USD: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.usd)}</p>
                     </div>
                 </div>
 

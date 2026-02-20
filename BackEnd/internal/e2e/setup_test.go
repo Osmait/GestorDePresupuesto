@@ -200,9 +200,9 @@ func (suite *E2ETestSuite) setupServices() {
 	userService := userSvc.NewUserService(userRepository)
 	authService := authSvc.NewAuthService(userRepository, suite.config)
 	accountService := accountSvc.NewAccountService(accountRepository)
-	categoryService := categorySvc.NewCategoryServices(categoryRepository)                // Fixed name
-	budgetService := budgetSvc.NewBudgetServices(budgetRepository, transactionRepository) // Fixed name and added second parameter
-	transactionService := transactionSvc.NewTransactionService(transactionRepository)
+	categoryService := categorySvc.NewCategoryServices(categoryRepository) // Fixed name
+	budgetService := budgetSvc.NewBudgetServices(budgetRepository, transactionRepository, nil)
+	transactionService := transactionSvc.NewTransactionService(transactionRepository, budgetRepository, nil, nil, nil, nil)
 
 	// Setup routes
 	suite.setupRoutes(userService, authService, accountService, categoryService, budgetService, transactionService)

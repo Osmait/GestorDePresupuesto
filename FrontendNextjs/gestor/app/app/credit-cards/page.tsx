@@ -7,6 +7,7 @@ import { CreditCardItem } from '@/components/creditcards/CreditCardItem'
 import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModal'
 import { PaymentModal } from '@/components/creditcards/PaymentModal'
 import { CreditCardPaymentHistory } from '@/components/creditcards/CreditCardPaymentHistory'
+import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -29,6 +30,7 @@ export default function CreditCardsPage() {
 	const [historyOpen, setHistoryOpen] = useState(false)
 	const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null)
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+	const { data: exchangeRateData } = useExchangeRateQuery()
 
 	useEffect(() => {
 		loadCards()
@@ -134,14 +136,36 @@ export default function CreditCardsPage() {
 	}
 
 	const cardsList = cards || []
-	const totalDebt = cardsList.reduce(
-		(sum, card) => sum + (card.balances || []).reduce((s, b) => s + Math.max(0, -b.current_balance), 0),
+	const usdToDopRate = exchangeRateData?.usd_to_dop || 0
+
+	const totalDebtDOP = cardsList.reduce(
+		(sum, card) => sum + (card.balances || [])
+			.filter((b) => b.currency === 'DOP')
+			.reduce((s, b) => s + Math.max(0, -b.current_balance), 0),
 		0
 	)
-	const totalLimit = cardsList.reduce(
-		(sum, card) => sum + (card.balances || []).reduce((s, b) => s + b.credit_limit, 0),
+	const totalDebtUSD = cardsList.reduce(
+		(sum, card) => sum + (card.balances || [])
+			.filter((b) => b.currency === 'USD')
+			.reduce((s, b) => s + Math.max(0, -b.current_balance), 0),
 		0
 	)
+	const totalDebtUSDInDOP = totalDebtUSD * usdToDopRate
+	const totalDebt = totalDebtDOP + totalDebtUSDInDOP
+
+	const totalLimitDOP = cardsList.reduce(
+		(sum, card) => sum + (card.balances || [])
+			.filter((b) => b.currency === 'DOP')
+			.reduce((s, b) => s + b.credit_limit, 0),
+		0
+	)
+	const totalLimitUSD = cardsList.reduce(
+		(sum, card) => sum + (card.balances || [])
+			.filter((b) => b.currency === 'USD')
+			.reduce((s, b) => s + b.credit_limit, 0),
+		0
+	)
+	const totalLimit = totalLimitDOP + (totalLimitUSD * usdToDopRate)
 	const avgUtilization = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0
 
 	if (loading) {
@@ -193,10 +217,22 @@ export default function CreditCardsPage() {
 						<CardTitle className="text-sm font-medium text-muted-foreground">Total Debt</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="flex items-center gap-2">
-							<span className="text-2xl font-bold text-destructive">
+						<div className="space-y-1">
+							<p className="text-xs text-muted-foreground">
+								DOP: {totalDebtDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
+							</p>
+							<p className="text-xs text-muted-foreground">
+								USD: {totalDebtUSD.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
+							</p>
+							<p className="text-xs text-muted-foreground">
+								USD→DOP: {totalDebtUSDInDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
+							</p>
+							<span className="text-2xl font-bold text-destructive block">
 								{totalDebt.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
 							</span>
+							{usdToDopRate > 0 && (
+								<p className="text-xs text-muted-foreground">Rate: 1 USD = {usdToDopRate.toFixed(2)} DOP</p>
+							)}
 						</div>
 					</CardContent>
 				</Card>
