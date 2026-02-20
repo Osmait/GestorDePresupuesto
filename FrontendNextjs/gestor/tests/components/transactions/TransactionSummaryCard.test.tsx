@@ -22,6 +22,12 @@ vi.mock('@/components/common/AnimatedFlashNumber', () => ({
     )
 }))
 
+vi.mock('@/hooks/queries/useExchangeRateQuery', () => ({
+	useExchangeRateQuery: () => ({
+		data: { usd_to_dop: 60 },
+	}),
+}))
+
 describe('TransactionSummaryCard', () => {
     const mockTransactions = [
         {
