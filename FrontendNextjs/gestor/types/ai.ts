@@ -10,6 +10,7 @@ export interface TokenUsage {
 
 export interface AIExtractRequest {
   account_id: string
+  account_currency?: string
   document_type: DocumentType
   language?: string
   files: Array<{

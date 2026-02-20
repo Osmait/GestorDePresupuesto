@@ -61,7 +61,9 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 			return
 		}
 
-		const result = await extract(files, accountId, documentType)
+		const selectedAccount = accounts.find((a) => a.id === accountId)
+
+		const result = await extract(files, accountId, documentType, selectedAccount?.currency || 'DOP')
 
 		if ('success' in result && result.success) {
 			const response = result as AIExtractResponse
@@ -135,6 +137,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					accountId: txn.account_id,
 					categoryId: txn.category_id || '',
 					budgetId: txn.budget_id,
+					currency: txn.currency || 'DOP',
 					createdAt: txn.created_at ? new Date(txn.created_at) : undefined,
 				})
 				saved++
