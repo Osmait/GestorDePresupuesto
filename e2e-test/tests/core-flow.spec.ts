@@ -97,12 +97,13 @@ test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ 
   const selects = transactionModal.locator('button[role="combobox"]');
 
   // Set Account
-  await selects.nth(1).click();
+  // Current order: currency (0), type (1), account (2), category (3)
+  await selects.nth(2).click();
   // Wait for options and select our account
   await page.getByRole('option', { name: accountName }).first().click();
 
   // Set Category
-  await selects.nth(2).click();
+  await selects.nth(3).click();
   await page.getByRole('option', { name: categoryName }).first().click();
 
   // Submit Transaction

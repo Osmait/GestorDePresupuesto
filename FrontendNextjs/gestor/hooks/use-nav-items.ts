@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import {
     LayoutDashboard,
     CreditCard,
+    CreditCard as CreditCardIcon,
     ArrowUpDown,
     Tags,
     PiggyBank,
@@ -82,6 +83,13 @@ export function useNavItems() {
             href: '/app/certificates',
             icon: FileCheck,
             description: t('certificatesDesc')
+        },
+        {
+            title: t('creditCards'),
+            href: '/app/credit-cards',
+            icon: CreditCardIcon,
+            badge: t('new'),
+            description: t('creditCardsDesc')
         },
         {
             title: t('analytics'),

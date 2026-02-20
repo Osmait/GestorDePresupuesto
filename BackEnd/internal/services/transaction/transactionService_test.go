@@ -23,6 +23,11 @@ func (m *MockTransaction) Save(ctx context.Context, transaction *transaction.Tra
 	return args.Error(0)
 }
 
+func (m *MockTransaction) ResolveAndValidateCurrencyForAccount(ctx context.Context, userId string, accountId string, currency string) (string, error) {
+	args := m.Called(ctx, userId, accountId, currency)
+	return args.String(0), args.Error(1)
+}
+
 func (m *MockTransaction) Update(ctx context.Context, id string, transaction *transaction.Transaction) error {
 	args := m.Called(ctx, id, transaction)
 	return args.Error(0)
@@ -36,6 +41,11 @@ func (m *MockTransaction) FindAll(ctx context.Context, date1 string, date2 strin
 func (m *MockTransaction) FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
+}
+
+func (m *MockTransaction) BalanceByAccountAndCurrency(ctx context.Context, accountId string, currency string) (float64, error) {
+	args := m.Called(ctx, accountId, currency)
+	return args.Get(0).(float64), args.Error(1)
 }
 
 func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string) (float64, error) {
@@ -156,13 +166,14 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockAICache.On("InvalidateUserAnalysis", mock.Anything).Return()
 
 	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
+	mockRepo.On("ResolveAndValidateCurrencyForAccount", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("DOP", nil)
 	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything).Return(1000.0, nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
 	transaction := utils.GetNewRandomTransaction()
 	transaction.TypeTransation = "bill" // Force bill to trigger budget check
-	err := s.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId, transaction.CreatedAt)
+	err := s.CreateTransaction(ctx, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId, transaction.Currency, transaction.CreatedAt)
 	time.Sleep(100 * time.Millisecond) // Allow goroutine to start
 	assert.NoError(t, err, "CreateAccount should not return an error")
 	mockRepo.AssertExpectations(t)

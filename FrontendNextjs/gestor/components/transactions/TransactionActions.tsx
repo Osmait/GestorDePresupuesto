@@ -60,7 +60,7 @@ export function TransactionActions() {
                     }
                 }}
                 createTransaction={async (...args) => {
-                    const [name, description, amount, type_transation, account_id, category_id, _budget_id, created_at_arg] = args;
+                    const [name, description, amount, type_transation, account_id, category_id, _budget_id, _currency, created_at_arg] = args;
                     const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString();
 
                     const _optimisticTx = {

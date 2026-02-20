@@ -13,6 +13,7 @@ type TransactionRequest struct {
 	AccountId      string    `json:"account_id" validate:"required" binding:"required" example:"acc_123456789"`
 	CategoryId     string    `json:"category_id" validate:"required" binding:"required" example:"cat_987654321"`
 	BudgetId       string    `json:"budget_id" example:"budget_555666777"`
+	Currency       string    `json:"currency" example:"DOP"`
 	CreatedAt      time.Time `json:"created_at" example:"2023-01-01T15:04:05Z"`
 }
 

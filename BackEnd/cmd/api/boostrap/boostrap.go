@@ -27,6 +27,7 @@ import (
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
 	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
+	creditcardRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/creditcard"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
 	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
@@ -43,6 +44,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	"github.com/osmait/gestorDePresupuesto/internal/services/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/services/creditcard"
 	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
@@ -137,6 +139,7 @@ func Run() error {
 		repositories.categoryRepository,
 		repositories.transactionRepository,
 		services.certificateService,
+		services.creditCardService,
 		services.exchangeService,
 	)
 
@@ -241,6 +244,7 @@ type repositories struct {
 	notificationRepository *notificationRepo.NotificationRepository
 	refreshTokenRepository authRepo.RefreshTokenRepositoryInterface
 	certificateRepository  certificateRepo.CertificateRepositoryInterface
+	creditCardRepository   creditcardRepo.CreditCardRepositoryInterface
 }
 
 // initializeRepositories creates all repository instances
@@ -257,6 +261,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		notificationRepository: notificationRepo.NewNotificationRepository(db),
 		refreshTokenRepository: authRepo.NewRefreshTokenRepository(db),
 		certificateRepository:  certificateRepo.NewCertificateRepository(db),
+		creditCardRepository:   creditcardRepo.NewCreditCardRepository(db),
 	}
 }
 
@@ -277,6 +282,7 @@ type services struct {
 	aiService           *aiService.Service
 	aiCache             *aiService.AICacheService
 	certificateService  *certificate.CertificateService
+	creditCardService   *creditcard.CreditCardService
 	exchangeService     *exchange.ExchangeRateService
 }
 
@@ -303,6 +309,8 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 
 	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService)
 
+	creditCardService := creditcard.NewCreditCardService(repos.creditCardRepository, repos.accountRepository, transactionService)
+
 	exchangeService := exchange.NewExchangeRateService()
 
 	return &services{
@@ -321,6 +329,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		aiService:           aiSvc,
 		aiCache:             aiCacheSvc,
 		certificateService:  certificateService,
+		creditCardService:   creditCardService,
 		exchangeService:     exchangeService,
 	}
 }

@@ -24,6 +24,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	"github.com/osmait/gestorDePresupuesto/internal/services/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/services/creditcard"
 	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
@@ -60,6 +61,7 @@ type Server struct {
 	categoryRepo        categoryRepo.CategoryRepoInterface
 	transactionRepo     transactionRepo.TransactionRepositoryInterface
 	certificateService  *certificate.CertificateService
+	creditCardService   *creditcard.CreditCardService
 	exchangeService     *exchange.ExchangeRateService
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
@@ -89,6 +91,7 @@ func New(ctx context.Context,
 	catRepo categoryRepo.CategoryRepoInterface,
 	txnRepo transactionRepo.TransactionRepositoryInterface,
 	certificateSvc *certificate.CertificateService,
+	creditCardSvc *creditcard.CreditCardService,
 	exchangeSvc *exchange.ExchangeRateService,
 ) (context.Context, *Server) {
 	srv := Server{
@@ -111,6 +114,7 @@ func New(ctx context.Context,
 		categoryRepo:        catRepo,
 		transactionRepo:     txnRepo,
 		certificateService:  certificateSvc,
+		creditCardService:   creditCardSvc,
 		exchangeService:     exchangeSvc,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
@@ -162,6 +166,7 @@ func (s *Server) registerRoutes() {
 	routes.SearchRoutes(s.Engine, s.searchService)
 	routes.InvestmentRoutes(s.Engine, s.investmentService)
 	routes.CertificateRoutes(s.Engine, s.certificateService)
+	routes.CreditCardRoutes(s.Engine, s.creditCardService)
 	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.aiCache)
 }
 

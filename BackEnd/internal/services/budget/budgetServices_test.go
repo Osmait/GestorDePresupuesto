@@ -61,6 +61,11 @@ func (m *MockTransaction) Save(ctx context.Context, transaction *transaction.Tra
 	return args.Error(0)
 }
 
+func (m *MockTransaction) ResolveAndValidateCurrencyForAccount(ctx context.Context, userId string, accountId string, currency string) (string, error) {
+	args := m.Called(ctx, userId, accountId, currency)
+	return args.String(0), args.Error(1)
+}
+
 func (m *MockTransaction) Update(ctx context.Context, id string, transaction *transaction.Transaction) error {
 	args := m.Called(ctx, id, transaction)
 	return args.Error(0)
@@ -74,6 +79,11 @@ func (m *MockTransaction) FindAll(ctx context.Context, date1 string, date2 strin
 func (m *MockTransaction) FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error) {
 	args := m.Called(ctx, id)
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
+}
+
+func (m *MockTransaction) BalanceByAccountAndCurrency(ctx context.Context, accountId string, currency string) (float64, error) {
+	args := m.Called(ctx, accountId, currency)
+	return args.Get(0).(float64), args.Error(1)
 }
 
 func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string) (float64, error) {

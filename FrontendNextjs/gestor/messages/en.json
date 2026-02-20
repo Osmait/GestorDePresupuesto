@@ -53,6 +53,8 @@
     "investmentsDesc": "Investment portfolio",
     "certificates": "Certificates",
     "certificatesDesc": "Financial certificates and interest tracking",
+    "creditCards": "Credit Cards",
+    "creditCardsDesc": "Manage credit cards and payments",
     "analytics": "Analytics",
     "analyticsDesc": "Reports and visualization",
     "settings": "Settings",

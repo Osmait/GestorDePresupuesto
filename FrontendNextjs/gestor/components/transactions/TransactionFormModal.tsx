@@ -1,5 +1,5 @@
 'use client';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -21,6 +21,7 @@ import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery';
 import { useTransactionContext } from './TransactionContext';
 import { TypeTransaction } from '@/types/transaction';
 import { useTranslations, useLocale } from 'next-intl';
+import { getCreditCardRepository } from '@/lib/repositoryConfig';
 
 const transactionSchema = z.object({
   name: z.string().min(2, 'El nombre es requerido'),
@@ -30,6 +31,7 @@ const transactionSchema = z.object({
   account_id: z.string().min(1, 'Selecciona una cuenta'),
   category_id: z.string().min(1, 'Selecciona una categoría'),
   budget_id: z.string().optional(),
+  currency: z.string().length(3, 'Selecciona una moneda'),
   created_at: z.date(),
 });
 type TransactionFormValues = z.infer<typeof transactionSchema>;
@@ -45,12 +47,19 @@ type TransactionFormModalProps = {
     _account_id: string,
     _category_id: string,
     _budget_id?: string,
+    _currency?: string,
     _created_at?: Date
   ) => Promise<void>;
   isLoading: boolean;
   error: string | null;
   formRef: React.MutableRefObject<{ reset: () => void } | null>;
 };
+
+const CURRENCIES = [
+  { code: 'DOP', name: 'Peso Dominicano', symbol: 'RD$' },
+  { code: 'USD', name: 'Dólar Estadounidense', symbol: 'US$' },
+  { code: 'EUR', name: 'Euro', symbol: '€' },
+];
 
 export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error }: Omit<TransactionFormModalProps, 'formRef'>) {
   const t = useTranslations('forms');
@@ -62,6 +71,8 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
   const { editingTransaction, updateTransaction } = useTransactionContext();
 
   const isEditing = !!editingTransaction;
+  const [cardCurrencies, setCardCurrencies] = useState<string[]>([])
+  const [cardCurrenciesLoaded, setCardCurrenciesLoaded] = useState(false)
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -73,9 +84,52 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
       account_id: '',
       category_id: '',
       budget_id: undefined,
+      currency: 'DOP',
       created_at: new Date(),
     },
   });
+
+  const selectedAccountId = form.watch('account_id')
+  const selectedAccount = accounts.find((acc) => acc.id === selectedAccountId)
+  const selectedAccountType = selectedAccount?.type || 'bank'
+  const selectedAccountCurrency = selectedAccount?.currency || 'DOP'
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadCardCurrencies() {
+      if (!selectedAccountId || selectedAccountType !== 'credit_card') {
+        setCardCurrencies([])
+        setCardCurrenciesLoaded(false)
+        return
+      }
+
+      setCardCurrenciesLoaded(false)
+      try {
+        const repo = await getCreditCardRepository()
+        const card = await repo.findById(selectedAccountId)
+        const currencies = (card?.balances || []).map((b) => b.currency)
+
+        if (cancelled) return
+
+        setCardCurrencies(currencies)
+        setCardCurrenciesLoaded(true)
+
+        if (currencies.length > 0 && !currencies.includes(form.getValues('currency'))) {
+          form.setValue('currency', currencies[0])
+        }
+      } catch {
+        if (cancelled) return
+        setCardCurrencies([])
+        setCardCurrenciesLoaded(false)
+      }
+    }
+
+    void loadCardCurrencies()
+    return () => {
+      cancelled = true
+    }
+  }, [selectedAccountId, selectedAccountType, form])
 
   // Effect to populate form when editing
   useEffect(() => {
@@ -88,6 +142,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
         account_id: editingTransaction.account_id,
         category_id: editingTransaction.category_id,
         budget_id: editingTransaction.budget_id || undefined,
+        currency: editingTransaction.currency || 'DOP',
         created_at: new Date(editingTransaction.created_at || new Date()),
       });
     } else {
@@ -99,11 +154,11 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
         account_id: '',
         category_id: '',
         budget_id: undefined,
+        currency: 'DOP',
         created_at: new Date(),
       });
     }
   }, [editingTransaction, form]);
-
 
   async function onSubmit(values: TransactionFormValues) {
     try {
@@ -117,17 +172,19 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
           values.account_id,
           values.category_id,
           values.budget_id,
+          values.currency,
           values.created_at
         );
       } else {
         await createTransaction(
           values.name,
-          values.description || '', // Allow empty description
+          values.description || '',
           values.amount,
           values.type_transaction,
           values.account_id,
           values.category_id,
           values.budget_id,
+          values.currency,
           values.created_at
         );
       }
@@ -135,6 +192,19 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
       setOpen(false);
     } catch {
       // Error is handled via the error prop
+    }
+  }
+
+  async function handleAccountChange(accountId: string, onChange: (_value: string) => void) {
+    onChange(accountId)
+    const selected = accounts.find(acc => acc.id === accountId)
+    if (!selected || isEditing) {
+      return
+    }
+
+    if ((selected.type || 'bank') === 'bank') {
+      form.setValue('currency', selected.currency || 'DOP')
+      return
     }
   }
 
@@ -158,8 +228,8 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
               </FormItem>
             )} />
 
-            {/* Row 2: Monto y Tipo */}
-            <div className="grid grid-cols-2 gap-4">
+            {/* Row 2: Monto, Moneda y Tipo */}
+            <div className="grid grid-cols-3 gap-4">
               <FormField control={form.control} name="amount" render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t('amount')}</FormLabel>
@@ -173,11 +243,46 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
                 </FormItem>
               )} />
 
+              <FormField control={form.control} name="currency" render={({ field }) => (
+                <FormItem>
+                  <FormLabel>{t('currency')}</FormLabel>
+                  <FormControl>
+                    <Select value={field.value} onValueChange={field.onChange} disabled={selectedAccountType === 'bank'}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="DOP" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(selectedAccountType === 'credit_card' && cardCurrencies.length > 0
+                          ? CURRENCIES.filter(c => cardCurrencies.includes(c.code))
+                          : CURRENCIES).map(c => (
+                          <SelectItem key={c.code} value={c.code}>
+                            {c.code}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </FormControl>
+                  {selectedAccountType === 'bank' && selectedAccountId ? (
+                    <p className="text-xs text-muted-foreground">
+                      La moneda en cuentas bancarias es fija: {selectedAccountCurrency}
+                    </p>
+                  ) : null}
+                  {selectedAccountType === 'credit_card' && selectedAccountId && cardCurrenciesLoaded && cardCurrencies.length === 0 ? (
+                    <p className="text-xs text-destructive">
+                      Esta tarjeta no tiene balances configurados para registrar transacciones.
+                    </p>
+                  ) : null}
+                  <FormMessage />
+                </FormItem>
+              )} />
+
               <FormField control={form.control} name="type_transaction" render={({ field }) => (
                 <FormItem>
                   <FormLabel>{t('type')}</FormLabel>
                   <FormControl>
-                    <Select value={field.value} onValueChange={field.onChange}>
+                    <Select value={field.value} onValueChange={(value) => {
+                      void handleAccountChange(value, field.onChange)
+                    }}>
                       <SelectTrigger>
                         <SelectValue placeholder={t('select')} />
                       </SelectTrigger>
@@ -308,7 +413,13 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
         {error && (
           <Alert variant="destructive" className="mt-4">
             <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              {error.includes('currency must match account currency')
+                ? 'La moneda de la transacción debe coincidir con la moneda de la cuenta bancaria.'
+                : error.includes('card does not have a balance in currency')
+                  ? 'La tarjeta no tiene un balance disponible en esa moneda.'
+                  : error}
+            </AlertDescription>
           </Alert>
         )}
       </DialogContent>
