@@ -127,7 +127,8 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		let saved = 0
 		let failed = 0
 
-		for (const txn of selectedTransactions) {
+		for (let index = 0; index < selectedTransactions.length; index++) {
+			const txn = selectedTransactions[index]
 			try {
 				await createTransaction.mutateAsync({
 					name: txn.name,
@@ -141,8 +142,32 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					createdAt: txn.created_at ? new Date(txn.created_at) : undefined,
 				})
 				saved++
-			} catch {
+			} catch (error) {
 				failed++
+				const err = error as Error & {
+					status?: number
+					code?: string
+					details?: unknown
+					requestId?: string
+				}
+				console.error('[AIExtractionModal] Failed to save extracted transaction', {
+					index,
+					requestId: err?.requestId,
+					status: err?.status,
+					code: err?.code,
+					message: err?.message,
+					details: err?.details,
+					transaction: {
+						name: txn.name,
+						type_transation: txn.type_transation,
+						amount: txn.amount,
+						currency: txn.currency,
+						account_id: txn.account_id,
+						category_id: txn.category_id,
+						budget_id: txn.budget_id,
+						created_at: txn.created_at,
+					},
+				})
 			}
 		}
 

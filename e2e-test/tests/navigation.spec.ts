@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 
-test.describe('Navigation & Sections', () => {
+test.describe('Navigation & Sections @smoke', () => {
     test.beforeEach(async ({ page }) => {
         // Go to dashboard, assuming already logged in via global setup
         await page.goto('/app');
@@ -21,6 +21,8 @@ test.describe('Navigation & Sections', () => {
         { name: 'Transacciones', href: '/app/transactions', heading: /Transacciones|Transactions/i },
         { name: 'Presupuestos', href: '/app/budget', heading: /Presupuestos|Budgets/i },
         { name: 'Inversiones', href: '/app/investments', heading: /Inversiones|Investments/i },
+        { name: 'Certificados', href: '/app/certificates', heading: /Certificates|Certificados/i },
+        { name: 'Tarjetas', href: '/app/credit-cards', heading: /Credit Cards|Tarjetas/i },
         { name: 'Analíticas', href: '/app/analysis', heading: /Analíticas|Analytics/i },
     ];
 

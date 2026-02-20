@@ -1,7 +1,7 @@
 
 import { test, expect } from '@playwright/test';
 
-test('Core Flow: Login (Demo), Create Account, Category, Transaction', async ({ page }) => {
+test('Core Flow: Login (Demo), Create Account, Category, Transaction @prod-write', async ({ page }) => {
   // 1. App Load (Authenticated via global setup)
   await page.goto('/app');
 
