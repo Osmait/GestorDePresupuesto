@@ -21,7 +21,7 @@ func TestTransactionRequest(t *testing.T) {
 
 func TestTransactionResponse(t *testing.T) {
 	transaction := utils.GetNewRandomTransaction()
-	transactionResponse := NewTransactionResponse(transaction.Id, transaction.Name, transaction.Description, transaction.TypeTransation, transaction.AccountId, transaction.CategoryId, transaction.Amount, transaction.CreatedAt)
+	transactionResponse := NewTransactionResponse(transaction.Id, transaction.Name, transaction.Description, transaction.TypeTransation, transaction.AccountId, transaction.CategoryId, transaction.Amount, transaction.Currency, transaction.CreatedAt)
 
 	assert.Equal(t, transaction.Id, transactionResponse.Id)
 	assert.Equal(t, transaction.Name, transactionResponse.Name)
@@ -29,5 +29,6 @@ func TestTransactionResponse(t *testing.T) {
 	assert.Equal(t, transaction.TypeTransation, transactionResponse.TypeTransation)
 	assert.Equal(t, transaction.AccountId, transactionResponse.AccountId)
 	assert.Equal(t, transaction.Amount, transactionResponse.Amount)
+	assert.Equal(t, transaction.Currency, transactionResponse.Currency)
 	assert.Equal(t, transaction.CreatedAt, transactionResponse.CreatedAt)
 }
