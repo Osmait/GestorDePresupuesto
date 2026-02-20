@@ -17,6 +17,9 @@ export interface CardPayment {
 	from_account_id: string
 	currency: string
 	amount: number
+	source_currency?: string
+	source_amount?: number
+	exchange_rate?: number
 	includes_interest: boolean
 	interest_amount: number
 	payment_date: string
@@ -78,6 +81,7 @@ export interface CreatePaymentDTO {
 	from_account_id: string
 	currency: string
 	amount: number
+	exchange_rate?: number
 	includes_interest?: boolean
 	interest_amount?: number
 	notes?: string

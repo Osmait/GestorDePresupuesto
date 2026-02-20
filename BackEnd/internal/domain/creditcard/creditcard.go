@@ -37,6 +37,9 @@ type CardPayment struct {
 	FromAccountId    string
 	Currency         string
 	Amount           float64
+	SourceCurrency   string
+	SourceAmount     float64
+	ExchangeRate     float64
 	IncludesInterest bool
 	InterestAmount   float64
 	PaymentDate      time.Time
@@ -92,5 +95,9 @@ func (cb *CardBalance) UtilizationPercent() float64 {
 	if cb.CreditLimit == 0 {
 		return 0
 	}
-	return (cb.CurrentBalance * -1 / cb.CreditLimit) * 100
+	debt := cb.CurrentBalance * -1
+	if debt < 0 {
+		debt = 0
+	}
+	return (debt / cb.CreditLimit) * 100
 }

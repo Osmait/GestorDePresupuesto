@@ -12,6 +12,7 @@ type Transaction struct {
 	CategoryId     string    `json:"category_id"`
 	BudgetId       string    `json:"budget_id"`
 	UserId         string    `json:"user_id"`
+	Currency       string    `json:"currency"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -24,5 +25,6 @@ func NewTransaction(Id, Name, Description, TypeTransation, AccountId, categoryId
 		TypeTransation: TypeTransation,
 		AccountId:      AccountId,
 		CategoryId:     categoryId,
+		Currency:       "DOP",
 	}
 }

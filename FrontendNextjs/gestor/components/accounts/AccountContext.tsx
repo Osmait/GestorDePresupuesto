@@ -25,6 +25,9 @@ export function AccountProvider({ children }: { children: ReactNode }) {
     const deleteMutation = useDeleteAccountMutation()
 
     const error = queryError ? (queryError as Error).message : null
+    const bankAccounts = Array.isArray(accounts)
+        ? accounts.filter((acc) => (acc.type || 'bank') !== 'credit_card')
+        : []
 
     const createAccount = async (name: string, bank: string, initial_balance: number) => {
         await createMutation.mutateAsync({ name, bank, initial_balance })
@@ -44,7 +47,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 
     return (
         <AccountContext.Provider value={{
-            accounts,
+            accounts: bankAccounts,
             isLoading,
             error,
             createAccount,

@@ -16,6 +16,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { accountRepository } from '@/lib/repositoryConfig'
+import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 
 interface PaymentModalProps {
 	open: boolean
@@ -33,6 +34,8 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 	const [includesInterest, setIncludesInterest] = useState(false)
 	const [interestAmount, setInterestAmount] = useState('')
 	const [notes, setNotes] = useState('')
+	const [exchangeRate, setExchangeRate] = useState('')
+	const { data: rateData } = useExchangeRateQuery()
 
 	useEffect(() => {
 		if (open) {
@@ -56,13 +59,22 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 	const handleSubmit = async (e: React.FormEvent) => {
 		e.preventDefault()
 		if (!card) return
+		const paymentAmount = parseFloat(amount)
+		if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
+			return
+		}
+		if (paymentAmount > currentDebt) {
+			return
+		}
+		const parsedRate = parseFloat(exchangeRate)
 
 		setLoading(true)
 		try {
 			await onSubmit({
 				from_account_id: fromAccountId,
 				currency,
-				amount: parseFloat(amount),
+				amount: paymentAmount,
+				exchange_rate: needsExchangeRate ? parsedRate : undefined,
 				includes_interest: includesInterest,
 				interest_amount: includesInterest ? parseFloat(interestAmount) || 0 : 0,
 				notes: notes || undefined,
@@ -82,10 +94,37 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 		setIncludesInterest(false)
 		setInterestAmount('')
 		setNotes('')
+		setExchangeRate('')
 	}
 
 	const selectedBalance = card?.balances.find((b) => b.currency === currency)
-	const currentDebt = selectedBalance ? Math.abs(selectedBalance.current_balance) : 0
+	const currentDebt = selectedBalance ? Math.max(0, -selectedBalance.current_balance) : 0
+	const selectedAccount = accounts.find((a) => a.id === fromAccountId)
+	const sourceCurrency = selectedAccount?.currency || 'DOP'
+	const needsExchangeRate = sourceCurrency !== currency
+	const recommendedRate = needsExchangeRate && currency === 'USD' && sourceCurrency === 'DOP' ? rateData?.usd_to_dop : undefined
+
+	useEffect(() => {
+		if (!needsExchangeRate) {
+			setExchangeRate('')
+			return
+		}
+		if (recommendedRate && !exchangeRate) {
+			setExchangeRate(recommendedRate.toFixed(4))
+		}
+	}, [needsExchangeRate, recommendedRate, exchangeRate])
+
+	const parsedRate = parseFloat(exchangeRate)
+	const exchangeRateValid = !needsExchangeRate || (Number.isFinite(parsedRate) && parsedRate > 0)
+	const debitPreview = (() => {
+		const paymentAmount = parseFloat(amount)
+		if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) return 0
+		if (!needsExchangeRate) return paymentAmount
+		if (!exchangeRateValid) return 0
+		if (currency === 'USD' && sourceCurrency === 'DOP') return paymentAmount * parsedRate
+		if (currency === 'DOP' && sourceCurrency === 'USD') return paymentAmount / parsedRate
+		return 0
+	})()
 
 	return (
 		<Dialog open={open} onOpenChange={onClose}>
@@ -103,7 +142,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							<SelectContent>
 								{accounts.map((account) => (
 									<SelectItem key={account.id} value={account.id}>
-										{account.name} ({account.bank})
+										{account.name} ({account.bank}) - {account.currency || 'DOP'}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -119,7 +158,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							<SelectContent>
 								{card?.balances.map((b) => (
 									<SelectItem key={b.currency} value={b.currency}>
-										{b.currency} (Debt: {Math.abs(b.current_balance).toLocaleString()})
+										{b.currency} (Debt: {Math.max(0, -b.current_balance).toLocaleString()})
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -132,6 +171,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							id="amount"
 							type="number"
 							step="0.01"
+							max={currentDebt > 0 ? currentDebt : undefined}
 							value={amount}
 							onChange={(e) => setAmount(e.target.value)}
 							placeholder={currentDebt.toString()}
@@ -140,7 +180,39 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 						<p className="text-xs text-muted-foreground">
 							Current debt: {currentDebt.toLocaleString()} {currency}
 						</p>
+						{parseFloat(amount) > currentDebt && currentDebt > 0 ? (
+							<p className="text-xs text-destructive">
+								Payment amount cannot exceed current debt.
+							</p>
+						) : null}
 					</div>
+
+					{needsExchangeRate && (
+						<div className="space-y-2 rounded-md border p-3">
+							<Label htmlFor="exchangeRate">Exchange Rate ({currency} to {sourceCurrency})</Label>
+							<Input
+								id="exchangeRate"
+								type="number"
+								step="0.0001"
+								value={exchangeRate}
+								onChange={(e) => setExchangeRate(e.target.value)}
+								placeholder={recommendedRate ? recommendedRate.toFixed(4) : 'Enter rate'}
+								required
+							/>
+							{recommendedRate ? (
+								<p className="text-xs text-muted-foreground">
+									Recommended rate from API: {recommendedRate.toFixed(4)}
+								</p>
+							) : (
+								<p className="text-xs text-muted-foreground">
+									Could not fetch recommended rate. Enter custom rate.
+								</p>
+							)}
+							<p className="text-xs text-muted-foreground">
+								Estimated debit from account: {debitPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })} {sourceCurrency}
+							</p>
+						</div>
+					)}
 
 					<div className="space-y-2">
 						<div className="flex items-center justify-between">
@@ -176,7 +248,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 						<Button type="button" variant="outline" onClick={onClose}>
 							Cancel
 						</Button>
-						<Button type="submit" disabled={loading || !fromAccountId}>
+						<Button type="submit" disabled={loading || !fromAccountId || !exchangeRateValid || parseFloat(amount) > currentDebt}>
 							{loading ? 'Processing...' : 'Make Payment'}
 						</Button>
 					</DialogFooter>

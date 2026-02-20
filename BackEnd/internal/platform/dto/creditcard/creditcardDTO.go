@@ -56,6 +56,7 @@ type CreatePaymentRequest struct {
 	FromAccountId    string  `json:"from_account_id" binding:"required"`
 	Currency         string  `json:"currency" binding:"required,len=3"`
 	Amount           float64 `json:"amount" binding:"required,gt=0"`
+	ExchangeRate     float64 `json:"exchange_rate"`
 	IncludesInterest bool    `json:"includes_interest"`
 	InterestAmount   float64 `json:"interest_amount" binding:"gte=0"`
 	Notes            string  `json:"notes"`
@@ -101,6 +102,9 @@ type PaymentResponse struct {
 	FromAccountId    string                   `json:"from_account_id"`
 	Currency         string                   `json:"currency"`
 	Amount           float64                  `json:"amount"`
+	SourceCurrency   string                   `json:"source_currency"`
+	SourceAmount     float64                  `json:"source_amount"`
+	ExchangeRate     float64                  `json:"exchange_rate"`
 	IncludesInterest bool                     `json:"includes_interest"`
 	InterestAmount   float64                  `json:"interest_amount"`
 	PaymentDate      time.Time                `json:"payment_date"`
@@ -116,6 +120,9 @@ func NewPaymentResponse(p *creditcard.CardPayment) *PaymentResponse {
 		FromAccountId:    p.FromAccountId,
 		Currency:         p.Currency,
 		Amount:           p.Amount,
+		SourceCurrency:   p.SourceCurrency,
+		SourceAmount:     p.SourceAmount,
+		ExchangeRate:     p.ExchangeRate,
 		IncludesInterest: p.IncludesInterest,
 		InterestAmount:   p.InterestAmount,
 		PaymentDate:      p.PaymentDate,

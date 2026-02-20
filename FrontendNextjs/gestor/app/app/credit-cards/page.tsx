@@ -6,6 +6,7 @@ import { creditCardRepository } from '@/lib/repositoryConfig'
 import { CreditCardItem } from '@/components/creditcards/CreditCardItem'
 import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModal'
 import { PaymentModal } from '@/components/creditcards/PaymentModal'
+import { CreditCardPaymentHistory } from '@/components/creditcards/CreditCardPaymentHistory'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -25,6 +26,7 @@ export default function CreditCardsPage() {
 	const [loading, setLoading] = useState(true)
 	const [formOpen, setFormOpen] = useState(false)
 	const [paymentOpen, setPaymentOpen] = useState(false)
+	const [historyOpen, setHistoryOpen] = useState(false)
 	const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null)
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 
@@ -111,6 +113,11 @@ export default function CreditCardsPage() {
 		setPaymentOpen(true)
 	}
 
+	const handleViewPayments = (card: CreditCard) => {
+		setSelectedCard(card)
+		setHistoryOpen(true)
+	}
+
 	const handleFormClose = () => {
 		setFormOpen(false)
 		setSelectedCard(null)
@@ -121,9 +128,14 @@ export default function CreditCardsPage() {
 		setSelectedCard(null)
 	}
 
+	const handleHistoryClose = () => {
+		setHistoryOpen(false)
+		setSelectedCard(null)
+	}
+
 	const cardsList = cards || []
 	const totalDebt = cardsList.reduce(
-		(sum, card) => sum + (card.balances || []).reduce((s, b) => s + Math.abs(b.current_balance), 0),
+		(sum, card) => sum + (card.balances || []).reduce((s, b) => s + Math.max(0, -b.current_balance), 0),
 		0
 	)
 	const totalLimit = cardsList.reduce(
@@ -225,6 +237,7 @@ export default function CreditCardsPage() {
 							onEdit={handleEdit}
 							onDelete={handleDelete}
 							onPay={handlePay}
+							onViewPayments={handleViewPayments}
 						/>
 					))}
 				</div>
@@ -241,6 +254,12 @@ export default function CreditCardsPage() {
 				open={paymentOpen}
 				onClose={handlePaymentClose}
 				onSubmit={handlePayment}
+				card={selectedCard}
+			/>
+
+			<CreditCardPaymentHistory
+				open={historyOpen}
+				onClose={handleHistoryClose}
 				card={selectedCard}
 			/>
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { CreditCard, CardBalance } from '@/types/creditcard'
-import { formatCurrency, getUtilizationColor, getUtilizationBgColor } from '@/types/creditcard'
+import { formatCurrency, getUtilizationColor } from '@/types/creditcard'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
@@ -19,11 +19,16 @@ interface CreditCardItemProps {
 	onEdit: (card: CreditCard) => void
 	onDelete: (card: CreditCard) => void
 	onPay: (card: CreditCard) => void
+	onViewPayments: (card: CreditCard) => void
 }
 
-export function CreditCardItem({ card, onEdit, onDelete, onPay }: CreditCardItemProps) {
-	const primaryBalance = card.balances[0]
-	const totalDebt = card.balances.reduce((sum, b) => sum + Math.abs(b.current_balance), 0)
+export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }: CreditCardItemProps) {
+	const totalDebtByCurrency = card.balances
+		.map((balance) => ({
+			currency: balance.currency,
+			debt: Math.max(0, -balance.current_balance),
+		}))
+		.filter((item) => item.debt > 0)
 
 	return (
 		<Card className="overflow-hidden">
@@ -49,6 +54,7 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay }: CreditCardItem
 						<DropdownMenuContent align="end">
 							<DropdownMenuItem onClick={() => onEdit(card)}>Edit</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => onPay(card)}>Make Payment</DropdownMenuItem>
+							<DropdownMenuItem onClick={() => onViewPayments(card)}>View Payments</DropdownMenuItem>
 							<DropdownMenuItem onClick={() => onDelete(card)} className="text-destructive">
 								Delete
 							</DropdownMenuItem>
@@ -79,17 +85,32 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay }: CreditCardItem
 				</div>
 
 				{card.next_due_date && (
-					<div className="flex items-center justify-between pt-2 border-t">
+					<div className="pt-2 border-t space-y-1">
 						<span className="text-sm text-muted-foreground">Total Debt</span>
-						<span className="text-lg font-bold text-destructive">
-							{formatCurrency(totalDebt, primaryBalance?.currency || 'DOP')}
-						</span>
+						{totalDebtByCurrency.length > 0 ? (
+							totalDebtByCurrency.map((item) => (
+								<div key={item.currency} className="flex items-center justify-between">
+									<span className="text-xs text-muted-foreground">{item.currency}</span>
+									<span className="text-base font-bold text-destructive">
+										{formatCurrency(item.debt, item.currency)}
+									</span>
+								</div>
+							))
+						) : (
+							<div className="flex items-center justify-between">
+								<span className="text-xs text-muted-foreground">No debt</span>
+								<span className="text-base font-bold">0</span>
+							</div>
+						)}
 					</div>
 				)}
 
 				<Button className="w-full" onClick={() => onPay(card)}>
 					<DollarSign className="h-4 w-4 mr-2" />
 					Pay Card
+				</Button>
+				<Button variant="outline" className="w-full" onClick={() => onViewPayments(card)}>
+					View Payments
 				</Button>
 			</CardContent>
 		</Card>
@@ -98,7 +119,7 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay }: CreditCardItem
 
 function BalanceBar({ balance }: { balance: CardBalance }) {
 	const utilization = balance.utilization_percent
-	const debt = Math.abs(balance.current_balance)
+	const debt = Math.max(0, -balance.current_balance)
 
 	return (
 		<div className="space-y-2">

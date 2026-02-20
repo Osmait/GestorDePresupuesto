@@ -40,6 +40,14 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
+
+		log.Debug().
+			Str("user_id", userID).
+			Str("account_id", transactionRequest.AccountId).
+			Str("currency", transactionRequest.Currency).
+			Float64("amount", transactionRequest.Amount).
+			Msg("Creating transaction")
+
 		err := transactionservice.CreateTransaction(
 			ctx,
 			transactionRequest.Name,
@@ -50,6 +58,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			userID,
 			transactionRequest.CategoryId,
 			transactionRequest.BudgetId,
+			transactionRequest.Currency,
 			transactionRequest.CreatedAt,
 		)
 		if err != nil {

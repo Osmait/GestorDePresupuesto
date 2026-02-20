@@ -43,6 +43,19 @@ func (r *CreditCardRepository) FindCardById(ctx context.Context, accountId strin
 	return card, nil
 }
 
+func (r *CreditCardRepository) FindCardByAccountId(ctx context.Context, accountId string) (*creditcard.CreditCard, error) {
+	query := `SELECT account_id, bank, last_four_digits, cut_day, due_day, created_at, updated_at
+		FROM credit_cards WHERE account_id = $1`
+	row := r.db.QueryRowContext(ctx, query, accountId)
+
+	card := &creditcard.CreditCard{}
+	err := row.Scan(&card.AccountId, &card.Bank, &card.LastFourDigits, &card.CutDay, &card.DueDay, &card.CreatedAt, &card.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return card, nil
+}
+
 func (r *CreditCardRepository) FindAllCards(ctx context.Context, userId string) ([]*creditcard.CreditCard, error) {
 	query := `SELECT cc.account_id, cc.bank, cc.last_four_digits, cc.cut_day, cc.due_day, cc.created_at, cc.updated_at
 		FROM credit_cards cc
@@ -194,11 +207,29 @@ func (r *CreditCardRepository) DeleteBalance(ctx context.Context, id string) err
 	return err
 }
 
+func (r *CreditCardRepository) UpdateBalanceByAmount(ctx context.Context, cardId string, currency string, amount float64) error {
+	query := `UPDATE card_balances SET current_balance = current_balance + $1, updated_at = $2 
+		WHERE card_id = $3 AND currency = $4`
+	result, err := r.db.ExecContext(ctx, query, amount, time.Now(), cardId, currency)
+	if err != nil {
+		log.Error().Err(err).Str("card_id", cardId).Str("currency", currency).Float64("amount", amount).Msg("Failed to update card balance by amount")
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *CreditCardRepository) SavePayment(ctx context.Context, payment *creditcard.CardPayment) error {
-	query := `INSERT INTO card_payments (id, card_id, from_account_id, currency, amount, includes_interest, interest_amount, payment_date, status, notes, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
+	query := `INSERT INTO card_payments (id, card_id, from_account_id, currency, amount, source_currency, source_amount, exchange_rate, includes_interest, interest_amount, payment_date, status, notes, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
 	_, err := r.db.ExecContext(ctx, query, payment.Id, payment.CardId, payment.FromAccountId, payment.Currency,
-		payment.Amount, payment.IncludesInterest, payment.InterestAmount, payment.PaymentDate, payment.Status, payment.Notes, payment.CreatedAt)
+		payment.Amount, payment.SourceCurrency, payment.SourceAmount, payment.ExchangeRate, payment.IncludesInterest, payment.InterestAmount, payment.PaymentDate, payment.Status, payment.Notes, payment.CreatedAt)
 	if err != nil {
 		log.Error().Err(err).Str("card_id", payment.CardId).Msg("Failed to save card payment")
 	}
@@ -206,13 +237,13 @@ func (r *CreditCardRepository) SavePayment(ctx context.Context, payment *creditc
 }
 
 func (r *CreditCardRepository) FindPaymentById(ctx context.Context, id string) (*creditcard.CardPayment, error) {
-	query := `SELECT id, card_id, from_account_id, currency, amount, includes_interest, interest_amount, payment_date, status, notes, created_at
+	query := `SELECT id, card_id, from_account_id, currency, amount, COALESCE(source_currency, ''), COALESCE(source_amount, 0), COALESCE(exchange_rate, 1), includes_interest, interest_amount, payment_date, status, notes, created_at
 		FROM card_payments WHERE id = $1`
 	row := r.db.QueryRowContext(ctx, query, id)
 
 	payment := &creditcard.CardPayment{}
 	err := row.Scan(&payment.Id, &payment.CardId, &payment.FromAccountId, &payment.Currency, &payment.Amount,
-		&payment.IncludesInterest, &payment.InterestAmount, &payment.PaymentDate, &payment.Status, &payment.Notes, &payment.CreatedAt)
+		&payment.SourceCurrency, &payment.SourceAmount, &payment.ExchangeRate, &payment.IncludesInterest, &payment.InterestAmount, &payment.PaymentDate, &payment.Status, &payment.Notes, &payment.CreatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -220,7 +251,7 @@ func (r *CreditCardRepository) FindPaymentById(ctx context.Context, id string) (
 }
 
 func (r *CreditCardRepository) FindPaymentsByCard(ctx context.Context, cardId string) ([]*creditcard.CardPayment, error) {
-	query := `SELECT id, card_id, from_account_id, currency, amount, includes_interest, interest_amount, payment_date, status, notes, created_at
+	query := `SELECT id, card_id, from_account_id, currency, amount, COALESCE(source_currency, ''), COALESCE(source_amount, 0), COALESCE(exchange_rate, 1), includes_interest, interest_amount, payment_date, status, notes, created_at
 		FROM card_payments WHERE card_id = $1 ORDER BY payment_date DESC`
 	rows, err := r.db.QueryContext(ctx, query, cardId)
 	if err != nil {
@@ -236,7 +267,7 @@ func (r *CreditCardRepository) FindPaymentsByCard(ctx context.Context, cardId st
 	for rows.Next() {
 		payment := &creditcard.CardPayment{}
 		if err = rows.Scan(&payment.Id, &payment.CardId, &payment.FromAccountId, &payment.Currency, &payment.Amount,
-			&payment.IncludesInterest, &payment.InterestAmount, &payment.PaymentDate, &payment.Status, &payment.Notes, &payment.CreatedAt); err == nil {
+			&payment.SourceCurrency, &payment.SourceAmount, &payment.ExchangeRate, &payment.IncludesInterest, &payment.InterestAmount, &payment.PaymentDate, &payment.Status, &payment.Notes, &payment.CreatedAt); err == nil {
 			payments = append(payments, payment)
 		}
 	}
@@ -247,7 +278,7 @@ func (r *CreditCardRepository) FindPaymentsByCard(ctx context.Context, cardId st
 }
 
 func (r *CreditCardRepository) FindPaymentsByCardAndCurrency(ctx context.Context, cardId string, currency string) ([]*creditcard.CardPayment, error) {
-	query := `SELECT id, card_id, from_account_id, currency, amount, includes_interest, interest_amount, payment_date, status, notes, created_at
+	query := `SELECT id, card_id, from_account_id, currency, amount, COALESCE(source_currency, ''), COALESCE(source_amount, 0), COALESCE(exchange_rate, 1), includes_interest, interest_amount, payment_date, status, notes, created_at
 		FROM card_payments WHERE card_id = $1 AND currency = $2 ORDER BY payment_date DESC`
 	rows, err := r.db.QueryContext(ctx, query, cardId, currency)
 	if err != nil {
@@ -263,7 +294,7 @@ func (r *CreditCardRepository) FindPaymentsByCardAndCurrency(ctx context.Context
 	for rows.Next() {
 		payment := &creditcard.CardPayment{}
 		if err = rows.Scan(&payment.Id, &payment.CardId, &payment.FromAccountId, &payment.Currency, &payment.Amount,
-			&payment.IncludesInterest, &payment.InterestAmount, &payment.PaymentDate, &payment.Status, &payment.Notes, &payment.CreatedAt); err == nil {
+			&payment.SourceCurrency, &payment.SourceAmount, &payment.ExchangeRate, &payment.IncludesInterest, &payment.InterestAmount, &payment.PaymentDate, &payment.Status, &payment.Notes, &payment.CreatedAt); err == nil {
 			payments = append(payments, payment)
 		}
 	}
@@ -271,4 +302,16 @@ func (r *CreditCardRepository) FindPaymentsByCardAndCurrency(ctx context.Context
 		return nil, err
 	}
 	return payments, nil
+}
+
+func (r *CreditCardRepository) GetTotalPaymentsByCardAndCurrency(ctx context.Context, cardId string, currency string) (float64, error) {
+	query := `SELECT COALESCE(SUM(amount), 0) FROM card_payments WHERE card_id = $1 AND currency = $2 AND status = 'completed'`
+	row := r.db.QueryRowContext(ctx, query, cardId, currency)
+
+	var total float64
+	err := row.Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
 }

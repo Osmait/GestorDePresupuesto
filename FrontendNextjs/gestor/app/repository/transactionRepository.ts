@@ -16,8 +16,9 @@ export class TransactionRepository extends BaseRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    currency?: string,
   ) {
-    return {
+    const body: Record<string, any> = {
       name,
       description,
       amount,
@@ -25,7 +26,9 @@ export class TransactionRepository extends BaseRepository {
       account_id,
       category_id,
       budget_id: budget_id || null,
+      currency: currency && currency.length === 3 ? currency : "DOP",
     };
+    return body;
   }
 
   async findAll(filters?: TransactionFilters): Promise<PaginatedTransactionResponse> {
@@ -79,21 +82,22 @@ export class TransactionRepository extends BaseRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    currency?: string,
     created_at?: Date,
   ): Promise<void> {
     try {
       const body = {
         ...this.buildTransactionBody(
-          name, description, amount, typeTransaction, account_id, category_id, budget_id
+          name, description, amount, typeTransaction, account_id, category_id, budget_id, currency
         ),
         created_at: created_at ? created_at.toISOString() : new Date().toISOString()
       };
 
-      console.log("body", body);
+      console.log("[TransactionRepository] Creating transaction with body:", JSON.stringify(body, null, 2));
       const data = await this.post("/transaction", body);
-      console.log("transaction created", data);
+      console.log("[TransactionRepository] Transaction created:", data);
     } catch (error) {
-      console.error("Error creating transaction:", error);
+      console.error("[TransactionRepository] Error creating transaction:", error);
       throw error;
     }
   }
@@ -107,12 +111,13 @@ export class TransactionRepository extends BaseRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    currency?: string,
     created_at?: Date,
   ): Promise<void> {
     try {
       const body = {
         ...this.buildTransactionBody(
-          name, description, amount, typeTransaction, account_id, category_id, budget_id
+          name, description, amount, typeTransaction, account_id, category_id, budget_id, currency
         ),
         created_at: created_at ? created_at.toISOString() : undefined
       };

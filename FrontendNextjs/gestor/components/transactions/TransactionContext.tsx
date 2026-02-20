@@ -119,16 +119,16 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     const pagination = data?.pagination || null
 
     const createTransaction = async (...args: any[]) => {
-        const [name, description, amount, type, accountId, categoryId, budgetId, createdAt] = args
+        const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
         await createMutation.mutateAsync({
-            name, description, amount, type, accountId, categoryId, budgetId, createdAt
+            name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt
         })
     }
 
     const updateTransaction = async (id: string, ...args: any[]) => {
-        const [name, description, amount, type, accountId, categoryId, budgetId, createdAt] = args
+        const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
         await updateMutation.mutateAsync({
-            id, name, description, amount, type, accountId, categoryId, budgetId, createdAt
+            id, name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt
         })
         setEditingTransaction(null)
     }

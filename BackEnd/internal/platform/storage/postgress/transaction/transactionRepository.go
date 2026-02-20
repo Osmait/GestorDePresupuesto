@@ -23,9 +23,57 @@ func NewTransactionRepository(db *sql.DB) *TransactionRepository {
 }
 
 func (repo *TransactionRepository) Save(ctx context.Context, transaction *transaction.Transaction) error {
-	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, $10)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId, transaction.CreatedAt)
+	currency := transaction.Currency
+	if currency == "" {
+		currency = "DOP"
+	}
+	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id,currency,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId, currency, transaction.CreatedAt)
 
 	return err
+}
+
+func (repo *TransactionRepository) ResolveAndValidateCurrencyForAccount(ctx context.Context, userId string, accountId string, currency string) (string, error) {
+	query := `SELECT account_type, currency FROM account WHERE id = $1 AND user_id = $2`
+	row := repo.db.QueryRowContext(ctx, query, accountId, userId)
+
+	var accountType string
+	var accountCurrency string
+	if err := row.Scan(&accountType, &accountCurrency); err != nil {
+		return "", err
+	}
+	if accountType == "" {
+		accountType = "bank"
+	}
+	if accountCurrency == "" {
+		accountCurrency = "DOP"
+	}
+
+	resolvedCurrency := currency
+	if resolvedCurrency == "" {
+		resolvedCurrency = accountCurrency
+	}
+	if resolvedCurrency == "" {
+		resolvedCurrency = "DOP"
+	}
+
+	if accountType == "credit_card" {
+		cardBalanceQuery := `SELECT 1 FROM card_balances WHERE card_id = $1 AND currency = $2 LIMIT 1`
+		cardBalanceRow := repo.db.QueryRowContext(ctx, cardBalanceQuery, accountId, resolvedCurrency)
+		var exists int
+		if err := cardBalanceRow.Scan(&exists); err != nil {
+			if err == sql.ErrNoRows {
+				return "", fmt.Errorf("card does not have a balance in currency %s", resolvedCurrency)
+			}
+			return "", err
+		}
+		return resolvedCurrency, nil
+	}
+
+	if resolvedCurrency != accountCurrency {
+		return "", fmt.Errorf("currency must match account currency (%s)", accountCurrency)
+	}
+
+	return resolvedCurrency, nil
 }
 
 func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error) {
@@ -119,47 +167,74 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 		log.Error().Err(err).Msg("error iterating over budget rows")
 		return 0, err
 	}
+	return 0, nil
+}
 
-	return currentBudget, nil
+func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Context, accountId string, currency string) (float64, error) {
+	query := `SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE account_id = $1 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))`
+	row := repo.db.QueryRowContext(ctx, query, accountId, currency)
+
+	var total float64
+	err := row.Scan(&total)
+	if err != nil {
+		return 0, err
+	}
+	return total, nil
 }
 
 func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string) (map[string]float64, error) {
-	rows, err := repo.db.QueryContext(ctx,
-		"SELECT budget_id, sum(amount) as currentBudget FROM transactions WHERE user_id = $1 AND budget_id IS NOT NULL AND budget_id != '' AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE) GROUP BY budget_id", userId)
+	query := `SELECT budget_id, COALESCE(SUM(amount), 0) FROM transactions 
+		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill' 
+		AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
+		GROUP BY budget_id`
+	rows, err := repo.db.QueryContext(ctx, query, userId)
 	if err != nil {
 		return nil, err
 	}
 	defer func() {
-		err = rows.Close()
-		if err != nil {
+		if err = rows.Close(); err != nil {
 			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
 
 	budgets := make(map[string]float64)
 	for rows.Next() {
-		var budgetID string
-		var currentBudget float64
-		if err = rows.Scan(&budgetID, &currentBudget); err == nil {
-			budgets[budgetID] = currentBudget
+		var budgetId string
+		var total float64
+		if err = rows.Scan(&budgetId, &total); err == nil {
+			budgets[budgetId] = total
 		}
 	}
 	if err = rows.Err(); err != nil {
-		log.Error().Err(err).Msg("error iterating over transaction rows (FindCurrentBudgets)")
 		return nil, err
 	}
-
 	return budgets, nil
-}
-
-func (r *TransactionRepository) Update(ctx context.Context, id string, transaction *transaction.Transaction) error {
-	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3, type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, created_at = $8 WHERE id = $9`
-	_, err := r.db.ExecContext(ctx, query, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.CategoryId, transaction.BudgetId, transaction.CreatedAt, id)
-	return err
 }
 
 func (repo *TransactionRepository) Delete(ctx context.Context, id string, userId string) error {
 	result, err := repo.db.ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND user_id = $2", id, userId)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
+func (repo *TransactionRepository) Update(ctx context.Context, id string, t *transaction.Transaction) error {
+	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3, 
+		type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, currency = $8 
+		WHERE id = $9`
+	currency := t.Currency
+	if currency == "" {
+		currency = "DOP"
+	}
+	result, err := repo.db.ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id)
 	if err != nil {
 		return err
 	}

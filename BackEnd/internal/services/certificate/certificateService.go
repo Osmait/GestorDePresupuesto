@@ -15,7 +15,7 @@ import (
 )
 
 type TransactionCreator interface {
-	CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, createdAt time.Time) error
+	CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error
 }
 
 type CertificateService struct {
@@ -343,7 +343,7 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 			if cert.InterestType == certificate.InterestTypeSimple && cert.PayoutAccountId != nil && s.transactionService != nil {
 				transactionName := cert.Bank + " - Interest Payment"
 				transactionDesc := "Certificate interest payment for period " + periodStart.Format("2006-01-02") + " to " + periodEnd.Format("2006-01-02")
-				_ = s.transactionService.CreateTransaction(ctx, transactionName, transactionDesc, result.NetInterest, "income", *cert.PayoutAccountId, userId, "", "", nextPaymentDate)
+				_ = s.transactionService.CreateTransaction(ctx, transactionName, transactionDesc, result.NetInterest, "income", *cert.PayoutAccountId, userId, "", "", cert.Currency, nextPaymentDate)
 			}
 
 			lastPayment = payment

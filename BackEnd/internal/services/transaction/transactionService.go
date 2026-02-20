@@ -44,7 +44,7 @@ func NewTransactionService(transactionRepository transactionRepo.TransactionRepo
 }
 
 // CreateTransaction records a new transaction, checks for budget thresholds, and triggers alerts if necessary.
-func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, createdAt time.Time) error {
+func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
@@ -54,8 +54,14 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 		amount = amount * -1
 	}
 
+	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, userId, accountId, currency)
+	if err != nil {
+		return err
+	}
+
 	transaction := transaction.NewTransaction(id, name, description, typeTransaction, accountId, categoryId, amount)
 	transaction.UserId = userId
+	transaction.Currency = resolvedCurrency
 	if !createdAt.IsZero() {
 		transaction.CreatedAt = createdAt
 	} else {
@@ -153,6 +159,7 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 			transaction.AccountId,
 			transaction.CategoryId,
 			transaction.Amount,
+			transaction.Currency,
 			transaction.CreatedAt)
 		transactionResponse.BudgetId = transaction.BudgetId
 		transactionResponseList = append(transactionResponseList, transactionResponse)
@@ -179,6 +186,7 @@ func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, id string)
 			transaction.AccountId,
 			transaction.CategoryId,
 			transaction.Amount,
+			transaction.Currency,
 			transaction.CreatedAt)
 		transactionResponse.BudgetId = transaction.BudgetId
 		transactionResponseList = append(transactionResponseList, transactionResponse)
@@ -316,6 +324,7 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 			transaction.AccountId,
 			transaction.CategoryId,
 			transaction.Amount,
+			transaction.Currency,
 			transaction.CreatedAt,
 		)
 		transactionResponse.BudgetId = transaction.BudgetId
@@ -329,6 +338,12 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 	if transaction.TypeTransation == BILL {
 		transaction.Amount = transaction.Amount * -1
 	}
+
+	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, transaction.UserId, transaction.AccountId, transaction.Currency)
+	if err != nil {
+		return err
+	}
+	transaction.Currency = resolvedCurrency
 
 	budget, _ := s.budgetRepository.FindByCategory(ctx, transaction.CategoryId)
 	if budget != nil {

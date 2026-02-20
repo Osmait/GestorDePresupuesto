@@ -49,6 +49,17 @@ func (repo *AccountRepository) FindAll(ctx context.Context, userId string) ([]*a
 	return accounts, nil
 }
 
+func (repo *AccountRepository) FindById(ctx context.Context, id string) (*account.Account, error) {
+	row := repo.db.QueryRowContext(ctx, "SELECT id, name_account, bank, balance, user_id, account_type, currency, created_at FROM account WHERE id = $1", id)
+
+	acc := &account.Account{}
+	err := row.Scan(&acc.Id, &acc.Name, &acc.Bank, &acc.InitialBalance, &acc.UserId, &acc.Type, &acc.Currency, &acc.CreatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return acc, nil
+}
+
 func (repo *AccountRepository) Delete(ctx context.Context, id string, userId string) error {
 	result, err := repo.db.ExecContext(ctx, "DELETE FROM account WHERE id = $1 AND user_id = $2", id, userId)
 	if err != nil {
@@ -86,6 +97,18 @@ func (repo *AccountRepository) Balance(ctx context.Context, id string) (float64,
 		return 0, err
 	}
 
+	return total, nil
+}
+
+func (repo *AccountRepository) BalanceByCurrency(ctx context.Context, id string, currency string) (float64, error) {
+	query := "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE account_id = $1 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))"
+	row := repo.db.QueryRowContext(ctx, query, id, currency)
+
+	var total float64
+	err := row.Scan(&total)
+	if err != nil {
+		return 0, err
+	}
 	return total, nil
 }
 

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
@@ -15,13 +16,14 @@ import (
 )
 
 type TransactionServiceInterface interface {
-	CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, createdAt time.Time) error
+	CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error
 }
 
 type AccountRepositoryInterface interface {
 	Save(ctx context.Context, account *account.Account) error
 	FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error)
 	Delete(ctx context.Context, id string, userId string) error
+	BalanceByCurrency(ctx context.Context, id string, currency string) (float64, error)
 }
 
 type CreditCardService struct {
@@ -55,8 +57,14 @@ func (s *CreditCardService) CreateCreditCard(ctx context.Context, req *dto.Creat
 	}
 	accountId := uuid.String()
 
+	primaryCurrency := "DOP"
+	if len(req.Balances) > 0 {
+		primaryCurrency = req.Balances[0].Currency
+	}
+
 	acc := account.NewCreditCardAccount(accountId, req.Name, req.Bank)
 	acc.UserId = userId
+	acc.Currency = primaryCurrency
 	if err := s.accountRepo.Save(ctx, acc); err != nil {
 		log.Error().Err(err).Str("user_id", userId).Msg("Failed to save credit card account")
 		return nil, err
@@ -101,7 +109,7 @@ func (s *CreditCardService) FindCardById(ctx context.Context, accountId string, 
 		return nil, err
 	}
 
-	return s.buildCardResponse(card, acc, balances), nil
+	return s.buildCardResponse(ctx, card, acc, balances), nil
 }
 
 func (s *CreditCardService) FindAllCards(ctx context.Context, userId string) ([]*dto.CreditCardResponse, error) {
@@ -120,7 +128,7 @@ func (s *CreditCardService) FindAllCards(ctx context.Context, userId string) ([]
 		if err != nil {
 			continue
 		}
-		responses = append(responses, s.buildCardResponse(card, acc, balances))
+		responses = append(responses, s.buildCardResponse(ctx, card, acc, balances))
 	}
 	return responses, nil
 }
@@ -213,8 +221,24 @@ func (s *CreditCardService) CreatePayment(ctx context.Context, cardId string, us
 		return nil, errors.New("unauthorized: source account does not belong to user")
 	}
 
+	fromCurrency := fromAccount.Currency
+	if fromCurrency == "" {
+		fromCurrency = "DOP"
+	}
+
+	sourceAmount, err := convertPaymentAmount(req.Amount, req.Currency, fromCurrency, req.ExchangeRate)
+	if err != nil {
+		return nil, err
+	}
+
 	uuid, _ := ksuid.NewRandom()
 	payment := creditcard.NewCardPayment(uuid.String(), cardId, req.FromAccountId, req.Currency, req.Amount)
+	payment.SourceCurrency = fromCurrency
+	payment.SourceAmount = sourceAmount
+	payment.ExchangeRate = req.ExchangeRate
+	if payment.ExchangeRate == 0 {
+		payment.ExchangeRate = 1
+	}
 	payment.IncludesInterest = req.IncludesInterest
 	payment.InterestAmount = req.InterestAmount
 	payment.Notes = req.Notes
@@ -238,14 +262,36 @@ func (s *CreditCardService) CreatePayment(ctx context.Context, cardId string, us
 	if req.Notes != "" {
 		transactionDesc += " - " + req.Notes
 	}
-	_ = s.transactionRepo.CreateTransaction(ctx, "Card Payment", transactionDesc, req.Amount, "bill", req.FromAccountId, userId, "", "", time.Now())
+	_ = s.transactionRepo.CreateTransaction(ctx, "Card Payment", transactionDesc, sourceAmount, "bill", req.FromAccountId, userId, "", "", fromCurrency, time.Now())
 
 	if req.IncludesInterest && req.InterestAmount > 0 {
-		_ = s.transactionRepo.CreateTransaction(ctx, "Interest Charge", "Interest paid to "+cardName, req.InterestAmount, "bill", req.FromAccountId, userId, "", "", time.Now())
+		interestSourceAmount, convErr := convertPaymentAmount(req.InterestAmount, req.Currency, fromCurrency, req.ExchangeRate)
+		if convErr != nil {
+			interestSourceAmount = req.InterestAmount
+		}
+		_ = s.transactionRepo.CreateTransaction(ctx, "Interest Charge", "Interest paid to "+cardName, interestSourceAmount, "bill", req.FromAccountId, userId, "", "", fromCurrency, time.Now())
 	}
 
 	log.Info().Str("card_id", cardId).Str("user_id", userId).Float64("amount", req.Amount).Msg("Card payment created")
 	return dto.NewPaymentResponse(payment), nil
+}
+
+func convertPaymentAmount(cardAmount float64, cardCurrency string, sourceCurrency string, rate float64) (float64, error) {
+	if cardCurrency == sourceCurrency {
+		return cardAmount, nil
+	}
+	if rate <= 0 {
+		return 0, errors.New("exchange_rate is required when paying with a different currency")
+	}
+
+	if cardCurrency == "USD" && sourceCurrency == "DOP" {
+		return cardAmount * rate, nil
+	}
+	if cardCurrency == "DOP" && sourceCurrency == "USD" {
+		return cardAmount / rate, nil
+	}
+
+	return 0, fmt.Errorf("unsupported currency conversion from %s to %s", sourceCurrency, cardCurrency)
 }
 
 func (s *CreditCardService) FindPaymentsByCard(ctx context.Context, cardId string, userId string) ([]*dto.PaymentResponse, error) {
@@ -291,13 +337,17 @@ func (s *CreditCardService) GetSummary(ctx context.Context, userId string) (*dto
 			continue
 		}
 
-		cardResp := s.buildCardResponse(card, acc, balances)
+		cardResp := s.buildCardResponse(ctx, card, acc, balances)
 		summary.ByCard = append(summary.ByCard, cardResp)
 		summary.TotalCards++
 
-		for _, b := range balances {
+		for _, b := range cardResp.Balances {
 			currency := b.Currency
-			summary.TotalDebt[currency] += -b.CurrentBalance
+			debt := -b.CurrentBalance
+			if debt < 0 {
+				debt = 0
+			}
+			summary.TotalDebt[currency] += debt
 			summary.TotalCreditLimit[currency] += b.CreditLimit
 			currencyCardCount[currency]++
 		}
@@ -312,10 +362,15 @@ func (s *CreditCardService) GetSummary(ctx context.Context, userId string) (*dto
 	return summary, nil
 }
 
-func (s *CreditCardService) buildCardResponse(card *creditcard.CreditCard, acc *account.Account, balances []*creditcard.CardBalance) *dto.CreditCardResponse {
+func (s *CreditCardService) buildCardResponse(ctx context.Context, card *creditcard.CreditCard, acc *account.Account, balances []*creditcard.CardBalance) *dto.CreditCardResponse {
 	var balanceResponses []*dto.BalanceResponse
 	for _, b := range balances {
-		balanceResponses = append(balanceResponses, dto.NewBalanceResponse(b))
+		transactionsBalance, _ := s.accountRepo.BalanceByCurrency(ctx, card.AccountId, b.Currency)
+		realBalance := b.CurrentBalance + transactionsBalance
+
+		balanceCopy := *b
+		balanceCopy.CurrentBalance = realBalance
+		balanceResponses = append(balanceResponses, dto.NewBalanceResponse(&balanceCopy))
 	}
 
 	return &dto.CreditCardResponse{
