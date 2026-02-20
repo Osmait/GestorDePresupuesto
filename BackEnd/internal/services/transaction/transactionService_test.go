@@ -48,13 +48,13 @@ func (m *MockTransaction) BalanceByAccountAndCurrency(ctx context.Context, accou
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string) (float64, error) {
-	args := m.Called(ctx, budgetId)
+func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string, usdToDop float64) (float64, error) {
+	args := m.Called(ctx, budgetId, usdToDop)
 	return args.Get(0).(float64), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string) (map[string]float64, error) {
-	args := m.Called(ctx, userId)
+func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string, usdToDop float64) (map[string]float64, error) {
+	args := m.Called(ctx, userId, usdToDop)
 	return args.Get(0).(map[string]float64), args.Error(1)
 }
 
@@ -160,14 +160,14 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockBudgetRepo := &MockBudgetRepository{}
 	mockCache := &MockCache{}
 	mockAICache := &MockAICache{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache)
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache, nil)
 
 	mockCache.On("DeleteByPrefix", mock.Anything).Return()
 	mockAICache.On("InvalidateUserAnalysis", mock.Anything).Return()
 
 	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
 	mockRepo.On("ResolveAndValidateCurrencyForAccount", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("DOP", nil)
-	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything).Return(1000.0, nil)
+	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything, mock.Anything).Return(1000.0, nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
@@ -184,7 +184,7 @@ func TestFindAllTransaction(t *testing.T) {
 	mockBudgetRepo := &MockBudgetRepository{}
 	mockCache := &MockCache{}
 	mockAICache := &MockAICache{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache)
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache, nil)
 
 	expectedTransactions := []*transaction.Transaction{}
 	for i := 0; i < 10; i++ {
@@ -207,7 +207,7 @@ func TestDeleteTransaction(t *testing.T) {
 	mockBudgetRepo := &MockBudgetRepository{}
 	mockCache := &MockCache{}
 	mockAICache := &MockAICache{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache)
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache, nil)
 
 	mockCache.On("DeleteByPrefix", mock.Anything).Return()
 	mockAICache.On("InvalidateUserAnalysis", mock.Anything).Return()
@@ -226,7 +226,7 @@ func TestFindAllTransactionofAllAccount(t *testing.T) {
 	mockBudgetRepo := &MockBudgetRepository{}
 	mockCache := &MockCache{}
 	mockAICache := &MockAICache{}
-	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache)
+	s := NewTransactionService(mockRepo, mockBudgetRepo, nil, mockCache, mockAICache, nil)
 
 	expectedTransactions := []*transaction.Transaction{}
 	for i := 0; i < 5; i++ {

@@ -305,20 +305,28 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		aiCacheInvalidator = aiCacheSvc
 	}
 
-	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator)
+	exchangeService := exchange.NewExchangeRateService()
+
+	usdToDopRateFn := func(ctx context.Context) (float64, error) {
+		rateResp, err := exchangeService.GetUSDtoDOP(ctx)
+		if err != nil {
+			return 0, err
+		}
+		return rateResp.USDToDOP, nil
+	}
+
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator, usdToDopRateFn)
 
 	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService)
 
 	creditCardService := creditcard.NewCreditCardService(repos.creditCardRepository, repos.accountRepository, transactionService)
-
-	exchangeService := exchange.NewExchangeRateService()
 
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),
 		transactionService:  transactionService,
 		userService:         user.NewUserService(repos.userRepository),
 		authService:         auth.NewAuthServiceWithRefreshTokens(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, repos.refreshTokenRepository, cfg),
-		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
+		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository, usdToDopRateFn),
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService),
 		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository),

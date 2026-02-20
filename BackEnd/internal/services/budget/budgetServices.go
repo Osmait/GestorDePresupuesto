@@ -15,13 +15,15 @@ import (
 type BudgetServices struct {
 	repository      budgetRepo.BudgetRepoInterface
 	transactionRepo transactionRepo.TransactionRepositoryInterface
+	usdToDopRateFn  func(context.Context) (float64, error)
 }
 
 // NewBudgetServices creates a new instance of BudgetServices.
-func NewBudgetServices(repo budgetRepo.BudgetRepoInterface, transactionRepo transactionRepo.TransactionRepositoryInterface) *BudgetServices {
+func NewBudgetServices(repo budgetRepo.BudgetRepoInterface, transactionRepo transactionRepo.TransactionRepositoryInterface, usdToDopRateFn func(context.Context) (float64, error)) *BudgetServices {
 	return &BudgetServices{
 		repository:      repo,
 		transactionRepo: transactionRepo,
+		usdToDopRateFn:  usdToDopRateFn,
 	}
 }
 
@@ -51,7 +53,14 @@ func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.Bud
 	if err != nil {
 		return nil, err
 	}
-	currentBudgets, err := b.transactionRepo.FindCurrentBudgets(ctx, userId)
+	usdToDop := 60.0
+	if b.usdToDopRateFn != nil {
+		if rate, rateErr := b.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
+			usdToDop = rate
+		}
+	}
+
+	currentBudgets, err := b.transactionRepo.FindCurrentBudgets(ctx, userId, usdToDop)
 	if err != nil {
 		return nil, err
 	}

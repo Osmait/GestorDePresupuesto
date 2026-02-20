@@ -31,15 +31,17 @@ type TransactionService struct {
 	notificationService   *notification.NotificationService
 	cache                 cache.CacheRepository
 	aiCache               AICacheInvalidator
+	usdToDopRateFn        func(context.Context) (float64, error)
 }
 
-func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator) *TransactionService {
+func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator, usdToDopRateFn func(context.Context) (float64, error)) *TransactionService {
 	return &TransactionService{
 		transactionRepository: transactionRepository,
 		budgetRepository:      budgetReposiotry,
 		notificationService:   notificationService,
 		cache:                 cache,
 		aiCache:               aiCache,
+		usdToDopRateFn:        usdToDopRateFn,
 	}
 }
 
@@ -94,7 +96,14 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 	if budget != nil && typeTransaction == BILL {
 		log.Debug().Str("budget_id", budget.Id).Msg("checking budget thresholds for transaction")
 		go func() {
-			currentSpent, err := s.transactionRepository.FindCurrentBudget(context.Background(), budget.Id)
+			usdToDop := 60.0
+			if s.usdToDopRateFn != nil {
+				if rate, rateErr := s.usdToDopRateFn(context.Background()); rateErr == nil && rate > 0 {
+					usdToDop = rate
+				}
+			}
+
+			currentSpent, err := s.transactionRepository.FindCurrentBudget(context.Background(), budget.Id, usdToDop)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to get current budget details for alert")
 				return
@@ -103,12 +112,16 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 			// budget.Amount is positive, currentSpent is negative (bills). Make it positive for calculation.
 			spentPositive := currentSpent * -1
 			limit := budget.Amount
+			currentTransactionImpact := amount * -1
+			if resolvedCurrency == "USD" {
+				currentTransactionImpact = currentTransactionImpact * usdToDop
+			}
 
 			log.Debug().Float64("current_spent", spentPositive).Float64("limit", limit).Msg("budget status")
 
 			if limit > 0 {
 				percentage := spentPositive / limit
-				previousSpent := spentPositive - (amount * -1) // remove current transaction
+				previousSpent := spentPositive - currentTransactionImpact // remove current transaction with conversion if needed
 				previousPercentage := previousSpent / limit
 
 				log.Debug().Float64("percentage", percentage).Float64("previous_percentage", previousPercentage).Msg("budget percentages")
