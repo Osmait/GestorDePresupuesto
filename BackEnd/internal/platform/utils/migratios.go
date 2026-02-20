@@ -124,6 +124,8 @@ func SetupPostgreSQLSchema(db *sql.DB) error {
 		bank VARCHAR(255),
 		balance float,
 		user_id VARCHAR NOT NULL,
+		account_type VARCHAR(20) NOT NULL DEFAULT 'bank',
+		currency VARCHAR(3) NOT NULL DEFAULT 'DOP',
 		created_at timestamptz NOT NULL DEFAULT (now()),
 		FOREIGN KEY (user_id) REFERENCES users (id)
 	);
@@ -231,6 +233,8 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		bank VARCHAR(255),
 		balance REAL,
 		user_id VARCHAR NOT NULL,
+		account_type VARCHAR(20) NOT NULL DEFAULT 'bank',
+		currency VARCHAR(3) NOT NULL DEFAULT 'DOP',
 		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
 		FOREIGN KEY (user_id) REFERENCES users (id)
 	);
@@ -367,6 +371,45 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		FOREIGN KEY (user_id) REFERENCES users(id),
 		FOREIGN KEY (payout_account_id) REFERENCES account(id) ON DELETE SET NULL,
 		FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS credit_cards (
+		account_id VARCHAR(32) PRIMARY KEY,
+		bank VARCHAR(255) NOT NULL,
+		last_four_digits VARCHAR(4),
+		cut_day INTEGER NOT NULL CHECK (cut_day >= 1 AND cut_day <= 28),
+		due_day INTEGER NOT NULL CHECK (due_day >= 1 AND due_day <= 28),
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS card_balances (
+		id VARCHAR(32) PRIMARY KEY,
+		card_id VARCHAR(32) NOT NULL,
+		currency VARCHAR(3) NOT NULL,
+		current_balance REAL NOT NULL DEFAULT 0,
+		credit_limit REAL NOT NULL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (card_id) REFERENCES credit_cards(account_id) ON DELETE CASCADE,
+		UNIQUE(card_id, currency)
+	);
+
+	CREATE TABLE IF NOT EXISTS card_payments (
+		id VARCHAR(32) PRIMARY KEY,
+		card_id VARCHAR(32) NOT NULL,
+		from_account_id VARCHAR(32) NOT NULL,
+		currency VARCHAR(3) NOT NULL,
+		amount REAL NOT NULL,
+		includes_interest BOOLEAN DEFAULT 0,
+		interest_amount REAL DEFAULT 0,
+		payment_date DATETIME NOT NULL DEFAULT (datetime('now')),
+		status VARCHAR(20) NOT NULL DEFAULT 'completed',
+		notes TEXT,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (card_id) REFERENCES credit_cards(account_id) ON DELETE CASCADE,
+		FOREIGN KEY (from_account_id) REFERENCES account(id) ON DELETE CASCADE
 	);
 	`
 

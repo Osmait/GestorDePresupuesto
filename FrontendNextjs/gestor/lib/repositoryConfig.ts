@@ -13,6 +13,7 @@ import { SearchRepository } from '@/app/repository/searchRepository'
 import { InvestmentRepository } from '@/app/repository/investmentRepository'
 import { CertificateRepository } from '@/app/repository/certificateRepository'
 import { ExchangeRateRepository } from '@/app/repository/exchangeRateRepository'
+import { CreditCardRepository } from '@/app/repository/creditcardRepository'
 
 // Crear instancias únicas
 let accountRepositoryInstance: AccountRepository | null = null;
@@ -25,6 +26,7 @@ let searchRepositoryInstance: SearchRepository | null = null;
 let investmentRepositoryInstance: InvestmentRepository | null = null;
 let certificateRepositoryInstance: CertificateRepository | null = null;
 let exchangeRateRepositoryInstance: ExchangeRateRepository | null = null;
+let creditCardRepositoryInstance: CreditCardRepository | null = null;
 
 // Funciones para obtener repositorios (con singleton pattern)
 export const getAccountRepository = async () => {
@@ -97,6 +99,13 @@ export const getExchangeRateRepository = async () => {
   return exchangeRateRepositoryInstance;
 };
 
+export const getCreditCardRepository = async () => {
+  if (!creditCardRepositoryInstance) {
+    creditCardRepositoryInstance = new CreditCardRepository();
+  }
+  return creditCardRepositoryInstance;
+};
+
 // Exportar instancias directas para compatibilidad
 export const accountRepository = new AccountRepository();
 export const authRepository = new AuthRepository();
@@ -108,6 +117,7 @@ export const searchRepository = new SearchRepository();
 export const investmentRepository = new InvestmentRepository();
 export const certificateRepository = new CertificateRepository();
 export const exchangeRateRepository = new ExchangeRateRepository();
+export const creditCardRepository = new CreditCardRepository();
 
 // Función para verificar si estamos en modo mock
 export const isMockMode = (): boolean => USE_MOCKS;
@@ -128,4 +138,5 @@ export type IAnalyticsRepository = AnalyticsRepository;
 export type ISearchRepository = SearchRepository;
 export type IInvestmentRepository = InvestmentRepository;
 export type ICertificateRepository = CertificateRepository;
-export type IExchangeRateRepository = ExchangeRateRepository; 
+export type IExchangeRateRepository = ExchangeRateRepository;
+export type ICreditCardRepository = CreditCardRepository; 
