@@ -5,6 +5,7 @@ export const ANALYTICS_KEYS = {
     all: ['analytics'] as const,
     categoryExpenses: () => [...ANALYTICS_KEYS.all, 'categoryExpenses'] as const,
     monthlySummary: () => [...ANALYTICS_KEYS.all, 'monthlySummary'] as const,
+    dashboardSummary: () => [...ANALYTICS_KEYS.all, 'dashboardSummary'] as const,
 }
 
 export function useGetCategoryExpenses() {
@@ -23,6 +24,16 @@ export function useGetMonthlySummary() {
         queryFn: async () => {
             const repo = await getAnalyticsRepository()
             return repo.getMonthlySummary()
+        },
+    })
+}
+
+export function useGetDashboardSummary() {
+    return useQuery({
+        queryKey: ANALYTICS_KEYS.dashboardSummary(),
+        queryFn: async () => {
+            const repo = await getAnalyticsRepository()
+            return repo.getDashboardSummary()
         },
     })
 }

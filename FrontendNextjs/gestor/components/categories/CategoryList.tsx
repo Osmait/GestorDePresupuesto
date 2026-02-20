@@ -1,8 +1,8 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { useGetCategories, useDeleteCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
+import { useGetDashboardSummary } from '@/hooks/queries/useAnalyticsQuery'
 import { useCategoryContext } from '@/components/categories/CategoryContext'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Tag } from 'lucide-react'
@@ -16,14 +16,15 @@ import { CategorySummaryCard } from './CategorySummaryCard'
 export function CategoryList() {
     const t = useTranslations('categories')
     const { data: categoriesData, isLoading: isLoadingCategories } = useGetCategories()
-    const { data: transactionsData, isLoading: isLoadingTransactions } = useGetAllTransactions()
+    const { data: dashboardSummary, isLoading: isLoadingDashboardSummary } = useGetDashboardSummary()
     const categories = categoriesData ?? []
-    const transactions = transactionsData ?? []
+    const categoryExpenses = dashboardSummary?.category_expenses ?? []
+    const categoryStatsById = new Map(categoryExpenses.map((item) => [item.id, item]))
     const { setEditingCategory, setModalOpen } = useCategoryContext()
 
     const deleteCategoryMutation = useDeleteCategoryMutation()
 
-    const isLoading = isLoadingCategories || isLoadingTransactions
+    const isLoading = isLoadingCategories || isLoadingDashboardSummary
 
     const handleDeleteCategory = async (categoryId: string) => {
         await deleteCategoryMutation.mutateAsync(categoryId)
@@ -45,7 +46,7 @@ export function CategoryList() {
             transition={{ duration: 0.5 }}
         >
             <div className="mb-8">
-                <CategorySummaryCard categories={categories} transactions={transactions} />
+                <CategorySummaryCard categories={categories} categoryExpenses={categoryExpenses} />
             </div>
 
             <AnimatedTabs
@@ -68,7 +69,7 @@ export function CategoryList() {
                                         >
                                             <CategoryCard
                                                 category={category}
-                                                transactions={transactions}
+                                                stats={categoryStatsById.get(category.id || '')}
                                                 onDelete={() => handleDeleteCategory(category.id!)}
                                                 onEdit={() => handleEditCategory(category)}
                                             />

@@ -34,3 +34,16 @@ func GetMonthlySummary(analyticsService *analytics.AnalyticsService) gin.Handler
 		c.JSON(http.StatusOK, analyticsdto.NewGetMonthlySummaryResponse(monthlySummary))
 	}
 }
+
+func GetDashboardSummary(analyticsService *analytics.AnalyticsService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		userID := c.GetString("X-User-Id")
+		summary, err := analyticsService.GetDashboardSummary(c.Request.Context(), userID)
+		if err != nil {
+			errorHandler.ResponseByTypeOfErr(err, c)
+			return
+		}
+
+		c.JSON(http.StatusOK, analyticsdto.NewDashboardSummaryResponse(summary))
+	}
+}

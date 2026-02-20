@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { CategoryCard } from '@/components/categories/CategoryCard'
 import { vi } from 'vitest'
-import userEvent from '@testing-library/user-event'
 
 vi.mock('next/navigation', () => ({
     useRouter: () => ({
@@ -24,12 +23,6 @@ vi.mock('next-intl', () => ({
     },
 }))
 
-vi.mock('@/hooks/queries/useExchangeRateQuery', () => ({
-	useExchangeRateQuery: () => ({
-		data: { usd_to_dop: 60 },
-	}),
-}))
-
 describe('CategoryCard', () => {
     const mockCategory = {
         id: 'cat1',
@@ -41,17 +34,21 @@ describe('CategoryCard', () => {
         updated_at: ''
     }
 
-    const mockTransactions = [
-        { id: 't1', category_id: 'cat1', amount: 50, name: 'Lunch', type_transation: 'bill' as const },
-        { id: 't2', category_id: 'cat1', amount: 30, name: 'Dinner', type_transation: 'bill' as const },
-        { id: 't3', category_id: 'other', amount: 100, name: 'Other', type_transation: 'bill' as const }
-    ] as any[]
+    const mockStats = {
+        id: 'cat1',
+        label: 'Food',
+        value: 80,
+        color: '#FF5733',
+        transaction_count: 2,
+        dop_total: 80,
+        usd_total: 0,
+    }
 
     it('renders category details correctly', () => {
         render(
             <CategoryCard
                 category={mockCategory}
-                transactions={mockTransactions}
+                stats={mockStats}
                 onDelete={vi.fn()}
                 onEdit={vi.fn()}
             />
@@ -69,7 +66,7 @@ describe('CategoryCard', () => {
         render(
             <CategoryCard
                 category={mockCategory}
-                transactions={mockTransactions}
+                stats={mockStats}
                 onDelete={vi.fn()}
                 onEdit={vi.fn()}
             />

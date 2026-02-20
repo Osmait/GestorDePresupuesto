@@ -22,12 +22,6 @@ vi.mock('@/components/common/AnimatedFlashNumber', () => ({
     )
 }))
 
-vi.mock('@/hooks/queries/useExchangeRateQuery', () => ({
-	useExchangeRateQuery: () => ({
-		data: { usd_to_dop: 60 },
-	}),
-}))
-
 describe('TransactionSummaryCard', () => {
     const mockTransactions = [
         {
@@ -56,7 +50,23 @@ describe('TransactionSummaryCard', () => {
     ]
 
     it('calculates and displays totals correctly', () => {
-        render(<TransactionSummaryCard transactions={mockTransactions} />)
+        render(
+            <TransactionSummaryCard
+                transactions={mockTransactions}
+                summary={{
+                    total_income: 5000,
+                    total_expenses: 1500,
+                    net_amount: 3500,
+                    income_dop: 5000,
+                    income_usd: 0,
+                    expenses_dop: 1500,
+                    expenses_usd: 0,
+                    usd_to_dop_rate: 60,
+                    income_count: 1,
+                    expense_count: 1,
+                }}
+            />
+        )
 
         // Income
         expect(screen.getByText('Total Income')).toBeInTheDocument()
@@ -72,7 +82,7 @@ describe('TransactionSummaryCard', () => {
     })
 
     it('handles empty transactions list', () => {
-        render(<TransactionSummaryCard transactions={[]} />)
+        render(<TransactionSummaryCard transactions={[]} summary={null} />)
         // Should verify counts are 0
         expect(screen.getAllByText('$0').length).toBeGreaterThan(0)
     })

@@ -4,7 +4,37 @@ import { createContext, useContext, useState, useEffect, useCallback, ReactNode 
 import { DateRange } from 'react-day-picker'
 import { useRouter } from 'next/navigation'
 import { useGetTransactions, useCreateTransactionMutation, useDeleteTransactionMutation, useUpdateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
-import { TransactionFilters } from '@/types/transaction'
+import { TransactionFilters, TransactionSummary } from '@/types/transaction'
+
+const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
+
+function getDatePartsInTimeZone(date: Date, timeZone: string): { year: number; month: number; day: number } {
+    const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(date)
+
+    const year = Number(parts.find((part) => part.type === 'year')?.value || '0')
+    const month = Number(parts.find((part) => part.type === 'month')?.value || '1')
+    const day = Number(parts.find((part) => part.type === 'day')?.value || '1')
+
+    return { year, month, day }
+}
+
+function formatDateInTimeZone(date: Date, timeZone: string): string {
+    const { year, month, day } = getDatePartsInTimeZone(date, timeZone)
+    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function getCurrentMonthRangeInSantoDomingo(): DateRange {
+    const now = new Date()
+    const { year, month } = getDatePartsInTimeZone(now, SANTO_DOMINGO_TZ)
+    const from = new Date(year, month - 1, 1)
+    const to = new Date(year, month - 1 + 1, 0)
+    return { from, to }
+}
 
 // Filter Type
 export interface TransactionFiltersState {
@@ -28,6 +58,7 @@ interface TransactionContextType {
     // Data
     transactions: any[]
     pagination: any
+    summary: TransactionSummary | null
     isLoading: boolean
     error: string | null
     createTransaction: (..._args: any[]) => Promise<void>
@@ -46,7 +77,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 
     // Filter State
     const [filters, setFilters] = useState<TransactionFiltersState>({
-        dateRange: { from: undefined, to: undefined },
+        dateRange: getCurrentMonthRangeInSantoDomingo(),
         type: 'all',
         account: 'all',
         category: 'all',
@@ -64,8 +95,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     const updateURLWithFilters = useCallback((newFilters: TransactionFiltersState) => {
         const params = new URLSearchParams()
 
-        if (newFilters.dateRange.from) params.set('dateFrom', newFilters.dateRange.from.toISOString().split('T')[0])
-        if (newFilters.dateRange.to) params.set('dateTo', newFilters.dateRange.to.toISOString().split('T')[0])
+        if (newFilters.dateRange.from) params.set('dateFrom', formatDateInTimeZone(newFilters.dateRange.from, SANTO_DOMINGO_TZ))
+        if (newFilters.dateRange.to) params.set('dateTo', formatDateInTimeZone(newFilters.dateRange.to, SANTO_DOMINGO_TZ))
         if (newFilters.type && newFilters.type !== 'all') params.set('type', newFilters.type)
         if (newFilters.account && newFilters.account !== 'all') params.set('account', newFilters.account)
         if (newFilters.category && newFilters.category !== 'all') params.set('category', newFilters.category)
@@ -83,12 +114,16 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     // Map Context Filters -> API Filters
     useEffect(() => {
         const apiFilters: TransactionFilters = {
-            page: 1, limit: 50, sort_by: (filters.sortBy as any) || 'created_at', sort_order: filters.sortOrder || 'desc'
+            page: 1,
+            limit: 50,
+            sort_by: (filters.sortBy as any) || 'created_at',
+            sort_order: filters.sortOrder || 'desc',
+            include_summary: true,
         }
 
         if (filters.dateRange.from && filters.dateRange.to) {
-            apiFilters.date_from = filters.dateRange.from.toISOString().split('T')[0]
-            apiFilters.date_to = filters.dateRange.to.toISOString().split('T')[0]
+            apiFilters.date_from = formatDateInTimeZone(filters.dateRange.from, SANTO_DOMINGO_TZ)
+            apiFilters.date_to = formatDateInTimeZone(filters.dateRange.to, SANTO_DOMINGO_TZ)
         }
         if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
         if (filters.account !== 'all') apiFilters.account_id = filters.account
@@ -117,6 +152,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
     // Adapters for Legacy Interface
     const transactions = data?.transactions || []
     const pagination = data?.pagination || null
+    const summary = data?.summary || null
 
     const createTransaction = async (...args: any[]) => {
         const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
@@ -141,7 +177,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 
     const clearFilters = useCallback(() => {
         const clearedFilters = {
-            dateRange: { from: undefined, to: undefined },
+            dateRange: getCurrentMonthRangeInSantoDomingo(),
             type: 'all', account: 'all', category: 'all', budget: 'all', minAmount: '', maxAmount: '', search: '',
             sortBy: 'created_at', sortOrder: 'desc' as 'asc' | 'desc'
         }
@@ -161,6 +197,7 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
             reloadCurrentView,
             transactions,
             pagination,
+            summary,
             isLoading: isLoadingTx,
             error: errorTx ? (errorTx as Error).message : null,
             createTransaction,

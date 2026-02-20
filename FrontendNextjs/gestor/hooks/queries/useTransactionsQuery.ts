@@ -21,7 +21,8 @@ export function useGetTransactions(filters?: TransactionFilters) {
             const response = await repo.findAll(filters)
             return {
                 transactions: response.data || [],
-                pagination: response.pagination || null
+                pagination: response.pagination || null,
+                summary: response.summary || null,
             }
         },
         placeholderData: keepPreviousData

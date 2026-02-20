@@ -1,5 +1,5 @@
 import { BaseRepository } from "@/lib/base-repository";
-import { CategoryExpense, MonthlySummary } from "@/types/analytics";
+import { CategoryExpense, DashboardSummary, MonthlySummary } from "@/types/analytics";
 
 export class AnalyticsRepository extends BaseRepository {
 	async getCategoryExpenses(): Promise<CategoryExpense[]> {
@@ -19,6 +19,29 @@ export class AnalyticsRepository extends BaseRepository {
 		} catch (error) {
 			console.error("Error fetching monthly summary:", error);
 			return [];
+		}
+	}
+
+	async getDashboardSummary(): Promise<DashboardSummary> {
+		try {
+			const data = await this.get<DashboardSummary>("/analytics/dashboard-summary");
+			return data;
+		} catch (error) {
+			console.error("Error fetching dashboard summary:", error);
+			return {
+				total_income: 0,
+				total_expenses: 0,
+				net_amount: 0,
+				usd_to_dop_rate: 60,
+				accounts_total: 0,
+				investments_total: 0,
+				certificates_total: 0,
+				accounts_count: 0,
+				investments_count: 0,
+				certificates_count: 0,
+				category_expenses: [],
+				monthly_summary: [],
+			};
 		}
 	}
 }

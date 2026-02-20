@@ -64,6 +64,11 @@ type TransactionSummary struct {
 	TotalIncome       float64                    `json:"total_income" example:"5000.00"`
 	TotalExpenses     float64                    `json:"total_expenses" example:"3000.00"`
 	NetAmount         float64                    `json:"net_amount" example:"2000.00"`
+	IncomeDOP         float64                    `json:"income_dop" example:"4500.00"`
+	IncomeUSD         float64                    `json:"income_usd" example:"10.00"`
+	ExpensesDOP       float64                    `json:"expenses_dop" example:"2800.00"`
+	ExpensesUSD       float64                    `json:"expenses_usd" example:"5.00"`
+	UsdToDopRate      float64                    `json:"usd_to_dop_rate" example:"60.00"`
 	IncomeCount       int                        `json:"income_count" example:"15"`
 	ExpenseCount      int                        `json:"expense_count" example:"35"`
 	AverageIncome     float64                    `json:"average_income" example:"333.33"`
@@ -106,10 +111,15 @@ func NewPaginatedTransactionResponseWithSummary(
 }
 
 // CalculateSummary calculates summary statistics from a list of transactions
-func CalculateSummary(transactions []*TransactionResponse, filteredCount int64) TransactionSummary {
+func CalculateSummary(transactions []*TransactionResponse, filteredCount int64, usdToDopRate float64) TransactionSummary {
+	if usdToDopRate <= 0 {
+		usdToDopRate = 60
+	}
+
 	summary := TransactionSummary{
 		FilteredRecords:   filteredCount,
 		CategoryBreakdown: make(map[string]CategorySummary),
+		UsdToDopRate:      usdToDopRate,
 	}
 
 	if len(transactions) == 0 {
@@ -120,28 +130,47 @@ func CalculateSummary(transactions []*TransactionResponse, filteredCount int64) 
 	categoryCounts := make(map[string]int)
 
 	for _, transaction := range transactions {
-		amount := transaction.Amount
+		amountAbs := math.Abs(transaction.Amount)
+		currency := transaction.Currency
+		if currency == "" {
+			currency = "DOP"
+		}
+
+		amountDOP := amountAbs
+		if currency == "USD" {
+			amountDOP = amountAbs * usdToDopRate
+		}
 
 		switch transaction.TypeTransation {
 		case "income":
-			summary.TotalIncome += amount
+			summary.TotalIncome += amountDOP
+			if currency == "USD" {
+				summary.IncomeUSD += amountAbs
+			} else {
+				summary.IncomeDOP += amountAbs
+			}
 			summary.IncomeCount++
 
-			if amount > summary.LargestIncome {
-				summary.LargestIncome = amount
+			if amountDOP > summary.LargestIncome {
+				summary.LargestIncome = amountDOP
 			}
-		case "expense":
-			summary.TotalExpenses += amount
+		case "bill", "expense":
+			summary.TotalExpenses += amountDOP
+			if currency == "USD" {
+				summary.ExpensesUSD += amountAbs
+			} else {
+				summary.ExpensesDOP += amountAbs
+			}
 			summary.ExpenseCount++
 
-			if amount > summary.LargestExpense {
-				summary.LargestExpense = amount
+			if amountDOP > summary.LargestExpense {
+				summary.LargestExpense = amountDOP
 			}
 		}
 
 		// Category breakdown
 		if transaction.CategoryId != "" {
-			categoryTotals[transaction.CategoryId] += amount
+			categoryTotals[transaction.CategoryId] += amountDOP
 			categoryCounts[transaction.CategoryId]++
 		}
 	}

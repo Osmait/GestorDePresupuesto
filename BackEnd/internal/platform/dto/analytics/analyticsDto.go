@@ -3,20 +3,26 @@ package analyticsdto
 import "github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
 
 type GetCategoryExpensesResponse struct {
-	ID    string  `json:"id"`
-	Label string  `json:"label"`
-	Value float64 `json:"value"`
-	Color string  `json:"color"`
+	ID               string  `json:"id"`
+	Label            string  `json:"label"`
+	Value            float64 `json:"value"`
+	Color            string  `json:"color"`
+	TransactionCount int     `json:"transaction_count"`
+	DopTotal         float64 `json:"dop_total"`
+	UsdTotal         float64 `json:"usd_total"`
 }
 
 func NewGetCategoryExpensesResponse(categoryExpenses []*analytics.CategoryExpense) []GetCategoryExpensesResponse {
 	var response []GetCategoryExpensesResponse
 	for _, categoryExpense := range categoryExpenses {
 		response = append(response, GetCategoryExpensesResponse{
-			ID:    categoryExpense.ID,
-			Label: categoryExpense.Label,
-			Value: categoryExpense.Value,
-			Color: categoryExpense.Color,
+			ID:               categoryExpense.ID,
+			Label:            categoryExpense.Label,
+			Value:            categoryExpense.Value,
+			Color:            categoryExpense.Color,
+			TransactionCount: categoryExpense.TransactionCount,
+			DopTotal:         categoryExpense.DopTotal,
+			UsdTotal:         categoryExpense.UsdTotal,
 		})
 	}
 	return response
@@ -38,4 +44,40 @@ func NewGetMonthlySummaryResponse(monthlySummaries []*analytics.MonthlySummary) 
 		})
 	}
 	return response
+}
+
+type DashboardSummaryResponse struct {
+	TotalIncome       float64                       `json:"total_income"`
+	TotalExpenses     float64                       `json:"total_expenses"`
+	NetAmount         float64                       `json:"net_amount"`
+	UsdToDopRate      float64                       `json:"usd_to_dop_rate"`
+	AccountsTotal     float64                       `json:"accounts_total"`
+	InvestmentsTotal  float64                       `json:"investments_total"`
+	CertificatesTotal float64                       `json:"certificates_total"`
+	AccountsCount     int                           `json:"accounts_count"`
+	InvestmentsCount  int                           `json:"investments_count"`
+	CertificatesCount int                           `json:"certificates_count"`
+	CategoryExpenses  []GetCategoryExpensesResponse `json:"category_expenses"`
+	MonthlySummary    []GetMonthlySummaryResponse   `json:"monthly_summary"`
+}
+
+func NewDashboardSummaryResponse(summary *analytics.DashboardSummary) DashboardSummaryResponse {
+	if summary == nil {
+		return DashboardSummaryResponse{}
+	}
+
+	return DashboardSummaryResponse{
+		TotalIncome:       summary.TotalIncome,
+		TotalExpenses:     summary.TotalExpenses,
+		NetAmount:         summary.NetAmount,
+		UsdToDopRate:      summary.UsdToDopRate,
+		AccountsTotal:     summary.AccountsTotal,
+		InvestmentsTotal:  summary.InvestmentsTotal,
+		CertificatesTotal: summary.CertificatesTotal,
+		AccountsCount:     summary.AccountsCount,
+		InvestmentsCount:  summary.InvestmentsCount,
+		CertificatesCount: summary.CertificatesCount,
+		CategoryExpenses:  NewGetCategoryExpensesResponse(summary.CategoryExpenses),
+		MonthlySummary:    NewGetMonthlySummaryResponse(summary.MonthlySummary),
+	}
 }
