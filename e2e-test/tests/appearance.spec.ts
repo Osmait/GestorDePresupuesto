@@ -1,7 +1,7 @@
 
 import { test, expect } from '@playwright/test';
 
-test.describe('Appearance & Settings', () => {
+test.describe('Appearance & Settings @smoke', () => {
     test.beforeEach(async ({ page }) => {
         console.log("$E2E_TARGET_URL", process.env.E2E_TARGET_URL);
         // Go to dashboard
@@ -27,8 +27,8 @@ test.describe('Appearance & Settings', () => {
         // UserNav shows initials. 
         await page.locator('header').getByRole('button').last().click(); // Usually UserNav is last
 
-        // Check for "Tema" text
-        await expect(page.getByText('Tema', { exact: true })).toBeVisible();
+        // Check for theme section text (ES/EN)
+        await expect(page.locator('.px-2').filter({ hasText: /Tema|Theme/i }).first()).toBeVisible();
 
         // Click Mode Toggle. It's inside the dropdown.
         // The component <ModeToggle /> usually renders a button with Sun/Moon icon.
@@ -39,7 +39,7 @@ test.describe('Appearance & Settings', () => {
         // We can assume the dropdown is open. Look for button with Moon/Sun.
 
         // 1. Click the toggle button to open the Theme menu
-        await page.locator('.px-2').filter({ has: page.getByText('Tema', { exact: true }) }).getByRole('button').click();
+        await page.locator('.px-2').filter({ has: page.getByText(/Tema|Theme/i) }).getByRole('button').click();
 
         // 2. Click "Dark" option from the dropdown
         await page.getByRole('menuitem', { name: /Dark|Oscuro/i }).click();
@@ -49,7 +49,7 @@ test.describe('Appearance & Settings', () => {
         await expect(page.locator('html')).toHaveClass(/dark/);
 
         // Toggle back
-        await page.locator('.px-2').filter({ has: page.getByText('Tema', { exact: true }) }).getByRole('button').click();
+        await page.locator('.px-2').filter({ has: page.getByText(/Tema|Theme/i) }).getByRole('button').click();
         await page.getByRole('menuitem', { name: /Light|Claro/i }).click();
         await expect(page.locator('html')).not.toHaveClass(/dark/);
     });
