@@ -17,10 +17,11 @@ import (
 var transactionExtractionPrompt string
 
 type ExtractorInput struct {
-	DocumentType string         `json:"document_type"`
-	AccountID    string         `json:"account_id"`
-	Categories   []CategoryData `json:"categories"`
-	Language     string         `json:"language"`
+	DocumentType    string         `json:"document_type"`
+	AccountID       string         `json:"account_id"`
+	AccountCurrency string         `json:"account_currency"`
+	Categories      []CategoryData `json:"categories"`
+	Language        string         `json:"language"`
 }
 
 type CategoryData struct {
@@ -82,12 +83,13 @@ func (e *TransactionExtractor) BuildPrompt(input interface{}) (string, error) {
 	}
 
 	data := map[string]interface{}{
-		"DocumentType": inp.DocumentType,
-		"AccountID":    inp.AccountID,
-		"IsStatement":  inp.DocumentType == "statement",
-		"Categories":   inp.Categories,
-		"Timestamp":    time.Now().Unix(),
-		"Language":     language,
+		"DocumentType":    inp.DocumentType,
+		"AccountID":       inp.AccountID,
+		"AccountCurrency": strings.ToUpper(strings.TrimSpace(inp.AccountCurrency)),
+		"IsStatement":     inp.DocumentType == "statement",
+		"Categories":      inp.Categories,
+		"Timestamp":       time.Now().Unix(),
+		"Language":        language,
 	}
 
 	var buf strings.Builder
@@ -127,8 +129,25 @@ func (e *TransactionExtractor) ParseResponse(rawJSON string) (interface{}, error
 			txn.Amount = -txn.Amount
 		}
 
+		txn.Currency = normalizeCurrency(txn.Currency)
+
 		transactions[i] = txn
 	}
 
 	return transactions, nil
+}
+
+func normalizeCurrency(currency string) string {
+	value := strings.ToUpper(strings.TrimSpace(currency))
+	value = strings.ReplaceAll(value, "$", "")
+	value = strings.ReplaceAll(value, " ", "")
+
+	switch value {
+	case "USD", "US", "US$", "DOLLAR", "DOLLARS":
+		return "USD"
+	case "DOP", "RD", "RD$", "PESO", "PESODOMINICANO", "PESODOMINICANOS":
+		return "DOP"
+	default:
+		return "DOP"
+	}
 }

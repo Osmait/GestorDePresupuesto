@@ -154,19 +154,36 @@ export function TransactionPreview({
 											<label className="text-xs text-muted-foreground mb-1 block">
 												{t('amount')}
 											</label>
-											<Input
-												type="number"
-												value={editForm.amount}
+										<Input
+											type="number"
+											value={editForm.amount}
 												onChange={(e) =>
 													setEditForm({
 														...editForm,
 														amount: parseFloat(e.target.value) || 0,
 													})
 												}
-												placeholder={t('amount')}
-											/>
-										</div>
+											placeholder={t('amount')}
+										/>
 									</div>
+									<div>
+										<label className="text-xs text-muted-foreground mb-1 block">Currency</label>
+										<Select
+											value={editForm.currency || 'DOP'}
+											onValueChange={(v) =>
+												setEditForm({ ...editForm, currency: v as 'DOP' | 'USD' })
+											}
+										>
+											<SelectTrigger>
+												<SelectValue placeholder="DOP" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="DOP">DOP</SelectItem>
+												<SelectItem value="USD">USD</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+								</div>
 
 									<div>
 										<label className="text-xs text-muted-foreground mb-1 block">
@@ -302,7 +319,7 @@ export function TransactionPreview({
 												isIncome ? 'text-green-600' : 'text-red-600'
 											)}
 										>
-											{isIncome ? '+' : '-'}${transaction.amount.toFixed(2)}
+											{isIncome ? '+' : '-'}{transaction.currency || 'DOP'} {transaction.amount.toFixed(2)}
 										</span>
 										<Button
 											variant="ghost"

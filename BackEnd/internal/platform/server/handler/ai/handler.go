@@ -76,10 +76,11 @@ func (h *Handler) ExtractTransactions(c *gin.Context) {
 	}
 
 	input := &tasks.ExtractorInput{
-		DocumentType: req.DocumentType,
-		AccountID:    req.AccountID,
-		Categories:   categoryData,
-		Language:     req.Language,
+		DocumentType:    req.DocumentType,
+		AccountID:       req.AccountID,
+		AccountCurrency: req.AccountCurrency,
+		Categories:      categoryData,
+		Language:        req.Language,
 	}
 
 	files := make([]domain.DocumentFile, len(req.Files))

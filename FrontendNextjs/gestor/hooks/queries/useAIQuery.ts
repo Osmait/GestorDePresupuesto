@@ -28,12 +28,14 @@ export function useExtractFromFile() {
   const extract = async (
     files: File[],
     accountId: string,
-    documentType: DocumentType
+    documentType: DocumentType,
+    accountCurrency?: string
   ) => {
     const preparedFiles = await aiRepository.prepareFiles(files)
     
     return extractMutation.mutateAsync({
       account_id: accountId,
+      account_currency: accountCurrency,
       document_type: documentType,
       files: preparedFiles,
     })
