@@ -214,7 +214,7 @@ func validatePasswordStrength(fl validator.FieldLevel) bool {
 // Custom validator: transaction_type - validates transaction types
 func validateTransactionType(fl validator.FieldLevel) bool {
 	txType := fl.Field().String()
-	return txType == "income" || txType == "bill"
+	return txType == "income" || txType == "bill" || txType == "loan_disbursement" || txType == "loan_collection"
 }
 
 // Custom validator: positive_amount - ensures positive financial amounts

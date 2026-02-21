@@ -27,6 +27,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/creditcard"
 	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/services/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
@@ -62,6 +63,7 @@ type Server struct {
 	transactionRepo     transactionRepo.TransactionRepositoryInterface
 	certificateService  *certificate.CertificateService
 	creditCardService   *creditcard.CreditCardService
+	loanService         *loan.LoanService
 	exchangeService     *exchange.ExchangeRateService
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
@@ -92,6 +94,7 @@ func New(ctx context.Context,
 	txnRepo transactionRepo.TransactionRepositoryInterface,
 	certificateSvc *certificate.CertificateService,
 	creditCardSvc *creditcard.CreditCardService,
+	loanSvc *loan.LoanService,
 	exchangeSvc *exchange.ExchangeRateService,
 ) (context.Context, *Server) {
 	srv := Server{
@@ -115,6 +118,7 @@ func New(ctx context.Context,
 		transactionRepo:     txnRepo,
 		certificateService:  certificateSvc,
 		creditCardService:   creditCardSvc,
+		loanService:         loanSvc,
 		exchangeService:     exchangeSvc,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
@@ -167,6 +171,7 @@ func (s *Server) registerRoutes() {
 	routes.InvestmentRoutes(s.Engine, s.investmentService)
 	routes.CertificateRoutes(s.Engine, s.certificateService)
 	routes.CreditCardRoutes(s.Engine, s.creditCardService)
+	routes.LoanRoutes(s.Engine, s.loanService)
 	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.aiCache)
 }
 

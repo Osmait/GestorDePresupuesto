@@ -264,7 +264,7 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		transaction_name VARCHAR NOT NULL,
 		transaction_description TEXT,
 		amount REAL NOT NULL,
-		type_transation VARCHAR NOT NULL CHECK (type_transation IN ('bill', 'income')),
+		type_transation VARCHAR NOT NULL CHECK (type_transation IN ('bill', 'income', 'loan_disbursement', 'loan_collection')),
 		account_id VARCHAR NOT NULL,
 		user_id VARCHAR NOT NULL,
 		category_id VARCHAR NOT NULL,

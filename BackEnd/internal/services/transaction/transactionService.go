@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
@@ -18,7 +19,9 @@ import (
 )
 
 const (
-	BILL = "bill"
+	BILL              = "bill"
+	LOAN_DISBURSEMENT = "loan_disbursement"
+	LOAN_COLLECTION   = "loan_collection"
 )
 
 type AICacheInvalidator interface {
@@ -52,8 +55,11 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 		return err
 	}
 	id := uuid.String()
-	if typeTransaction == BILL {
+	if typeTransaction == BILL || typeTransaction == LOAN_DISBURSEMENT {
 		amount = amount * -1
+	}
+	if typeTransaction == LOAN_COLLECTION {
+		amount = math.Abs(amount)
 	}
 
 	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, userId, accountId, currency)
