@@ -20,6 +20,7 @@ import { Transaction, TypeTransaction } from '@/types/transaction';
 import { Category } from '@/types/category';
 import { useContext, useState } from 'react';
 import { TransactionContext } from './TransactionContext';
+import { useTranslations } from 'next-intl';
 
 interface TransactionItemProps {
   transaction: Transaction;
@@ -29,6 +30,7 @@ interface TransactionItemProps {
 }
 
 export default function TransactionItem({ transaction, category, onTransactionDeleted, onEdit }: TransactionItemProps) {
+  const t = useTranslations('transactions')
   const context = useContext(TransactionContext);
   const setEditingTransaction = context?.setEditingTransaction;
   const setModalOpen = context?.setModalOpen;
@@ -40,7 +42,31 @@ export default function TransactionItem({ transaction, category, onTransactionDe
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
-  const isIncome = transaction.type_transation === TypeTransaction.INCOME;
+  const isIncome = transaction.type_transation === TypeTransaction.INCOME || transaction.type_transation === TypeTransaction.LOAN_COLLECTION;
+
+  const getCategoryIcon = (icon?: string) => {
+    if (!icon) return '🏷️'
+    const normalized = icon.trim().toLowerCase()
+    if (normalized === 'hand-coins' || normalized === 'hand_coins' || normalized === 'handcoins') return '💸'
+    if (normalized === 'landmark' || normalized === 'bank' || normalized === 'coins') return '💰'
+    if (normalized.includes('-') || normalized.includes('_')) return '🏷️'
+    return icon
+  }
+
+  const getLoanMovementLabel = () => {
+    if (transaction.type_transation === TypeTransaction.LOAN_COLLECTION) {
+      return t('loanPrincipalCollection')
+    }
+
+    const categoryName = category?.name?.trim().toLowerCase()
+    if (transaction.type_transation === TypeTransaction.INCOME && categoryName === 'intereses cobrados') {
+      return t('loanInterestIncome')
+    }
+
+    return null
+  }
+
+  const loanMovementLabel = getLoanMovementLabel()
 
   const handleDeleteTransaction = async () => {
     if (!transaction.id || !onTransactionDeleted) return;
@@ -72,9 +98,14 @@ export default function TransactionItem({ transaction, category, onTransactionDe
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <p className="font-semibold text-foreground">{transaction.name}</p>
+                {loanMovementLabel && (
+                  <Badge variant="secondary" className="text-[10px] font-medium">
+                    {loanMovementLabel}
+                  </Badge>
+                )}
                 {category && (
                   <Badge variant="outline" className={`text-xs`} style={{ backgroundColor: category.color }} >
-                    <span aria-hidden="true">{category.icon}</span> {category.name}
+                    <span aria-hidden="true">{getCategoryIcon(category.icon)}</span> {category.name}
                   </Badge>
                 )}
               </div>

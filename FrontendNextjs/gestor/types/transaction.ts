@@ -1,6 +1,8 @@
 export enum TypeTransaction {
   BILL = "bill",
   INCOME = "income",
+  LOAN_DISBURSEMENT = "loan_disbursement",
+  LOAN_COLLECTION = "loan_collection",
 }
 
 export interface Transaction {

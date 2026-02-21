@@ -59,8 +59,13 @@ function SearchResults({
             >
               <span className="truncate min-w-0 flex-1">{tx.name || tx.description}</span>
               {tx.amount !== undefined && tx.amount !== null && (
-                <span className={cn("text-xs font-mono flex-shrink-0", tx.type_transation === "income" ? "text-green-500" : "text-red-500")}>
-                  {tx.type_transation === "income" ? "+" : "-"}${Math.abs(tx.amount).toLocaleString()}
+                <span
+                  className={cn(
+                    "text-xs font-mono flex-shrink-0",
+                    tx.type_transation === "income" || tx.type_transation === "loan_collection" ? "text-green-500" : "text-red-500"
+                  )}
+                >
+                  {(tx.type_transation === "income" || tx.type_transation === "loan_collection") ? "+" : "-"}${Math.abs(tx.amount).toLocaleString()}
                 </span>
               )}
             </div>

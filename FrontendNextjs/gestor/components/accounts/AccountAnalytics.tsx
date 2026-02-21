@@ -34,7 +34,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                 if (t.category_id) {
                     incomeMap[t.category_id] = (incomeMap[t.category_id] || 0) + amount
                 }
-            } else {
+            } else if (t.type_transation === 'bill') {
                 expense += amount
                 if (t.category_id) {
                     expenseMap[t.category_id] = (expenseMap[t.category_id] || 0) + amount
@@ -73,7 +73,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
             // To go back in time:
             // If transaction was Income (+), we SUBTRACT it to get previous balance.
             // If transaction was Expense (-), we ADD it (using abs amount) to get previous balance.
-            if (t.type_transation === 'income') {
+            if (t.amount >= 0) {
                 balanceTracker -= t.amount
             } else {
                 balanceTracker += Math.abs(t.amount)
@@ -92,7 +92,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
         // Top Expenses by Concept Logic
         const expenseByNameMap: Record<string, number> = {}
         transactions.forEach(t => {
-            if (t.type_transation !== 'income') {
+            if (t.type_transation === 'bill') {
                 expenseByNameMap[t.name] = (expenseByNameMap[t.name] || 0) + Math.abs(t.amount)
             }
         })

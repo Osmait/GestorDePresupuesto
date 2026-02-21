@@ -146,4 +146,15 @@ export abstract class BaseRepository {
       method: "DELETE",
     });
   }
+
+  protected async patch<T>(endpoint: string, data?: any): Promise<T | void> {
+    const response = await this.authenticatedFetch(endpoint, {
+      method: "PATCH",
+      body: data ? JSON.stringify(data) : undefined,
+    });
+
+    if (response.headers.get("content-type")?.includes("application/json")) {
+      return response.json();
+    }
+  }
 }

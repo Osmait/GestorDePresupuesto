@@ -11,7 +11,8 @@ import {
     BarChart,
     TrendingUp,
     Shield,
-    FileCheck,
+	FileCheck,
+	HandCoins,
 } from 'lucide-react'
 import { useAdmin } from './useAdmin'
 
@@ -84,10 +85,16 @@ export function useNavItems() {
             icon: FileCheck,
             description: t('certificatesDesc')
         },
-        {
-            title: t('creditCards'),
-            href: '/app/credit-cards',
-            icon: CreditCardIcon,
+		{
+			title: t('loans'),
+			href: '/app/loans',
+			icon: HandCoins,
+			description: t('loansDesc')
+		},
+		{
+			title: t('creditCards'),
+			href: '/app/credit-cards',
+			icon: CreditCardIcon,
             badge: t('new'),
             description: t('creditCardsDesc')
         },

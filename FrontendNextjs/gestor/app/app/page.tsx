@@ -88,7 +88,7 @@ function TransactionItem({ transaction, category, locale }: {
 	category?: Category
 	locale?: string
 }) {
-	const isIncome = transaction.type_transation === TypeTransaction.INCOME
+	const isIncome = transaction.type_transation === TypeTransaction.INCOME || transaction.type_transation === TypeTransaction.LOAN_COLLECTION
 	const transactionCurrency = transaction.currency || 'DOP'
 
 	return (
