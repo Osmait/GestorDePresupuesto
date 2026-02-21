@@ -1,5 +1,6 @@
 'use client'
 
+import { useEffect } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
@@ -30,9 +31,10 @@ type BudgetFormValues = z.infer<typeof budgetSchema>
 interface BudgetFormModalProps {
     open: boolean
     setOpen: (_v: boolean) => void
+    initialCategoryId?: string
 }
 
-export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
+export function BudgetFormModal({ open, setOpen, initialCategoryId }: BudgetFormModalProps) {
     const t = useTranslations('forms')
     const { createBudget, updateBudget, editingBudget, setEditingBudget, isLoading, error } = useBudgetContext()
     const { data: categories = [] } = useGetCategories()
@@ -64,6 +66,11 @@ export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
             form.reset()
         }
     }
+
+    useEffect(() => {
+        if (!open || isEditing || !initialCategoryId) return
+        form.setValue('category_id', initialCategoryId)
+    }, [form, initialCategoryId, isEditing, open])
 
     return (
         <Dialog open={open} onOpenChange={handleOpenChange}>
@@ -115,4 +122,3 @@ export function BudgetFormModal({ open, setOpen }: BudgetFormModalProps) {
         </Dialog>
     )
 }
-

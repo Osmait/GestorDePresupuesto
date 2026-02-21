@@ -95,16 +95,18 @@ function CertificatesContent() {
 
 	if (error) {
 		return (
-			<Alert variant="destructive">
-				<AlertCircle className="h-4 w-4" />
-				<AlertTitle>Error</AlertTitle>
-				<AlertDescription>Failed to load certificates. Please try again.</AlertDescription>
-			</Alert>
+			<div className="container mx-auto p-6">
+				<Alert variant="destructive">
+					<AlertCircle className="h-4 w-4" />
+					<AlertTitle>Error</AlertTitle>
+					<AlertDescription>Failed to load certificates. Please try again.</AlertDescription>
+				</Alert>
+			</div>
 		)
 	}
 
 	return (
-		<div className="space-y-6">
+		<div className="container mx-auto p-6 space-y-6">
 			<div className="flex justify-between items-center">
 				<div>
 					<h1 className="text-3xl font-bold">Certificates</h1>

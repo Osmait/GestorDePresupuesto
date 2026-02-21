@@ -18,6 +18,7 @@ export function CalendarDateRangePicker({
   value?: DateRange | undefined
   onChange?: (_range: DateRange | undefined) => void
 }) {
+  const [isDesktop, setIsDesktop] = React.useState(false)
   const [internalDate, setInternalDate] = React.useState<DateRange | undefined>({
     from: new Date(2023, 0, 20),
     to: addDays(new Date(2023, 0, 20), 20),
@@ -27,6 +28,19 @@ export function CalendarDateRangePicker({
     if (onChange) onChange(range)
     else setInternalDate(range)
   }
+
+  React.useEffect(() => {
+    if (typeof window.matchMedia !== 'function') {
+      setIsDesktop(true)
+      return
+    }
+
+    const mediaQuery = window.matchMedia("(min-width: 1024px)")
+    const handleChange = () => setIsDesktop(mediaQuery.matches)
+    handleChange()
+    mediaQuery.addEventListener("change", handleChange)
+    return () => mediaQuery.removeEventListener("change", handleChange)
+  }, [])
 
   return (
     <div className={cn("grid gap-2", className)}>
@@ -55,14 +69,14 @@ export function CalendarDateRangePicker({
             )}
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="end">
+        <PopoverContent className="w-auto p-0" align="start">
           <Calendar
             initialFocus
             mode="range"
             defaultMonth={date?.from}
             selected={date}
             onSelect={setDate}
-            numberOfMonths={2}
+            numberOfMonths={isDesktop ? 2 : 1}
           />
         </PopoverContent>
       </Popover>

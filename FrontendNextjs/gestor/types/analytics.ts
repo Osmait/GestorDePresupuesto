@@ -28,3 +28,13 @@ export interface DashboardSummary {
 	category_expenses: CategoryExpense[]
 	monthly_summary: MonthlySummary[]
 }
+
+export interface AnalyticsQueryFilters {
+	date_from?: string
+	date_to?: string
+	account_id?: string
+	category_id?: string
+	type?: 'income' | 'bill'
+	min_amount?: number
+	max_amount?: number
+}

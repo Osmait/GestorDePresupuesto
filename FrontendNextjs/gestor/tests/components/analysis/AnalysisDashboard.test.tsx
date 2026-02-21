@@ -11,7 +11,7 @@ vi.mock('next/dynamic', () => ({
             if (props.t?.income && props.t?.month && !props.t?.day) testId = 'nivo-line'
             if (props.t?.category) testId = 'nivo-bar'
             if (props.nivoTheme && !props.t) testId = 'nivo-pie'
-            if (props.t?.expenses && props.t?.income && !props.t?.month) testId = 'nivo-radar'
+            if (props.t?.expenses && !props.t?.month && !props.t?.day) testId = 'nivo-radar'
             if (props.t?.day) testId = 'nivo-heatmap'
             
             // Filter out non-DOM props to avoid React warnings
@@ -25,6 +25,10 @@ vi.mock('next/dynamic', () => ({
 // Mock theme
 vi.mock('next-themes', () => ({
     useTheme: () => ({ theme: 'light' })
+}))
+
+vi.mock('next/navigation', () => ({
+    useRouter: () => ({ push: vi.fn() })
 }))
 
 
@@ -58,7 +62,18 @@ vi.mock('next-intl', () => ({
 // Mock context
 vi.mock('@/components/analysis/AnalysisContext', () => ({
     useAnalysisContext: () => ({
-        filters: {}
+        filters: {
+            filterMode: 'month',
+            month: 'all',
+            year: '2026',
+            dateRange: { from: undefined, to: undefined },
+            account: 'all',
+            category: 'all',
+            type: 'all',
+            minAmount: '',
+            maxAmount: '',
+            search: '',
+        }
     })
 }))
 
@@ -69,16 +84,28 @@ vi.mock('@/hooks/queries/useAccountsQuery', () => ({
 vi.mock('@/hooks/queries/useCategoriesQuery', () => ({
     useGetCategories: () => ({ data: [], isLoading: false })
 }))
+vi.mock('@/hooks/queries/useBudgetsQuery', () => ({
+    useGetBudgets: () => ({ data: [], isLoading: false })
+}))
 vi.mock('@/hooks/queries/useTransactionsQuery', () => ({
     useGetAllTransactions: () => ({ data: [], isLoading: false })
 }))
 vi.mock('@/hooks/queries/useAnalyticsQuery', () => ({
-    useGetCategoryExpenses: () => ({
-        data: [{ id: 'cat1', label: 'Food', value: 500, color: '#f00' }],
-        isLoading: false
-    }),
-    useGetMonthlySummary: () => ({
-        data: [{ month: 'Jan', Ingresos: 1000, Gastos: -500 }],
+    useGetDashboardSummary: () => ({
+        data: {
+            total_income: 1000,
+            total_expenses: 500,
+            net_amount: 500,
+            usd_to_dop_rate: 60,
+            accounts_total: 0,
+            investments_total: 0,
+            certificates_total: 0,
+            accounts_count: 0,
+            investments_count: 0,
+            certificates_count: 0,
+            category_expenses: [{ id: 'cat1', label: 'Food', value: 500, color: '#f00', transaction_count: 3, dop_total: 500, usd_total: 0 }],
+            monthly_summary: [{ month: 'Jan', Ingresos: 1000, Gastos: 500 }],
+        },
         isLoading: false
     })
 }))

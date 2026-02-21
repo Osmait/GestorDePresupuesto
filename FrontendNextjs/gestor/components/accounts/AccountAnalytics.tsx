@@ -18,7 +18,7 @@ interface AccountAnalyticsProps {
 const COLORS = ['#10b981', '#ef4444'] // Green for Income, Red for Expense
 
 export function AccountAnalytics({ transactions, categories, currentBalance }: AccountAnalyticsProps) {
-    const t = useTranslations('analytics')
+    const t = useTranslations('analysis')
     const locale = useLocale()
 
     const stats = useMemo(() => {

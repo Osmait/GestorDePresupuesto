@@ -1,5 +1,14 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Locator } from '@playwright/test'
 import { createBankAccountFromQuickActions, gotoApp } from './helpers/app'
+
+async function ensureCardBackVisible(card: Locator) {
+	const viewDetailsButton = card.getByRole('button', { name: /View details/i })
+	if (await viewDetailsButton.isVisible()) {
+		await viewDetailsButton.dispatchEvent('click')
+	}
+
+	await expect(card.getByRole('button', { name: /Pay Card/i })).toBeVisible()
+}
 
 test.describe('Credit Cards @prod-write', () => {
 	test('create, update, pay and delete credit card', async ({ page }) => {
@@ -29,8 +38,9 @@ test.describe('Credit Cards @prod-write', () => {
 		await formModal.getByRole('button', { name: /^Create$/i }).click()
 		await expect(formModal).not.toBeVisible({ timeout: 20000 })
 
-		const card = page.getByRole('heading', { name: cardName }).first().locator('xpath=ancestor::*[contains(@class,"card")][1]')
+		const card = page.locator('[data-testid^="credit-card-item-"]').filter({ hasText: cardName }).first()
 		await expect(card).toBeVisible({ timeout: 20000 })
+		await ensureCardBackVisible(card)
 
 		await card.getByRole('button', { name: /Pay Card/i }).click()
 		const paymentModal = page.getByRole('dialog', { name: /Pay Credit Card/i })
@@ -43,14 +53,17 @@ test.describe('Credit Cards @prod-write', () => {
 		await paymentModal.getByRole('button', { name: /Make Payment/i }).click()
 		await expect(paymentModal).not.toBeVisible({ timeout: 20000 })
 
-		await card.getByRole('button', { name: /View Payments/i }).click()
+		await ensureCardBackVisible(card)
+		await card.getByRole('button', { name: /View Payments/i }).dispatchEvent('click')
 		const historyModal = page.getByRole('dialog', { name: /Payment History/i })
 		await expect(historyModal).toBeVisible()
 		await expect(historyModal).toContainText(accountName)
 		await page.keyboard.press('Escape')
 
 		// Update card
-		await card.getByRole('button').first().click()
+		await ensureCardBackVisible(card)
+		await card.getByRole('button', { name: /Card options/i }).dispatchEvent('pointerdown')
+		await expect(page.getByRole('menuitem', { name: /Edit/i })).toBeVisible({ timeout: 10000 })
 		await page.getByRole('menuitem', { name: /Edit/i }).click()
 
 		const editModal = page.getByRole('dialog', { name: /Edit Credit Card/i })
@@ -63,13 +76,15 @@ test.describe('Credit Cards @prod-write', () => {
 			await page.keyboard.press('Escape')
 		}
 
-		const updatedCard = page.locator('[class*="card"]:visible').filter({
+		const updatedCard = page.locator('[data-testid^="credit-card-item-"]').filter({
 			hasText: new RegExp(`${cardName}(-UPD)?`),
 		}).first()
 		await expect(updatedCard).toBeVisible({ timeout: 20000 })
+		await ensureCardBackVisible(updatedCard)
 
 		// Delete card
-		await updatedCard.getByRole('button').first().click()
+		await updatedCard.getByRole('button', { name: /Card options/i }).dispatchEvent('pointerdown')
+		await expect(page.getByRole('menuitem', { name: /Delete/i })).toBeVisible({ timeout: 10000 })
 		await page.getByRole('menuitem', { name: /Delete/i }).click()
 
 		const deleteDialog = page.getByRole('dialog', { name: /Delete Credit Card/i })

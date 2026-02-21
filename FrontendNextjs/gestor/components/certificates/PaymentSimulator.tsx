@@ -17,6 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { ChevronDown, ChevronUp, Calculator } from 'lucide-react'
 import { Certificate, InterestType, formatCurrency } from '@/types/certificate'
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 const simulatorSchema = z.object({
 	capital: z.coerce.number().min(0.01, 'Capital must be greater than 0'),
@@ -138,9 +139,16 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 			}
 		: null
 
+	const chartData = results.length > 0
+		? results.map((row) => ({
+			...row,
+			totalWithNet: row.capital + row.accumulatedNet,
+		}))
+		: []
+
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+			<DialogContent className="w-[95vw] sm:max-w-[900px] max-h-[90vh] overflow-y-auto">
 				<DialogHeader>
 					<DialogTitle className="flex items-center gap-2">
 						<Calculator className="h-5 w-5" />
@@ -149,7 +157,7 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 				</DialogHeader>
 
 				<form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
-					<div className="grid grid-cols-2 gap-4">
+					<div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
 						<div className="space-y-2">
 							<Label htmlFor="capital">Capital Base</Label>
 							<Input
@@ -233,7 +241,7 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 
 				{results.length > 0 && totals && (
 					<div className="space-y-4 mt-4 pt-4 border-t">
-						<div className="grid grid-cols-3 gap-4">
+						<div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
 							<div className="p-3 rounded-lg bg-muted">
 								<p className="text-xs text-muted-foreground">Total Interés Bruto</p>
 								<p className="text-lg font-semibold">{formatCurrency(totals.totalGross)}</p>
@@ -245,6 +253,59 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 							<div className="p-3 rounded-lg bg-green-500/10">
 								<p className="text-xs text-muted-foreground">Total Interés Neto</p>
 								<p className="text-lg font-semibold text-green-500">{formatCurrency(totals.totalNet)}</p>
+							</div>
+						</div>
+
+						<div className="rounded-lg border p-3">
+							<p className="mb-3 text-xs text-muted-foreground">Evolución Mensual</p>
+							<div className="h-56 w-full">
+								<ResponsiveContainer width="100%" height="100%">
+									<LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
+										<CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+										<XAxis
+											dataKey="month"
+											tickLine={false}
+											axisLine={false}
+											tick={{ fontSize: 11, fill: 'currentColor' }}
+										/>
+										<YAxis
+											tickLine={false}
+											axisLine={false}
+											tick={{ fontSize: 11, fill: 'currentColor' }}
+											tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
+										/>
+										<Tooltip
+											contentStyle={{
+												borderRadius: '8px',
+												border: '1px solid hsl(var(--border))',
+												background: 'hsl(var(--card))',
+											}}
+											formatter={(value: number | string | undefined, name: string | undefined) => {
+												const numericValue = typeof value === 'number' ? value : Number(value || 0)
+												if (name === 'capital') return [formatCurrency(numericValue), 'Capital']
+												if (name === 'totalWithNet') return [formatCurrency(numericValue), 'Capital + Neto']
+												return [String(value ?? ''), name || '']
+											}}
+											labelFormatter={(label) => `Mes ${label}`}
+										/>
+										<Line
+											type="monotone"
+											dataKey="capital"
+											stroke="hsl(var(--success))"
+											strokeWidth={2}
+											dot={false}
+											name="capital"
+										/>
+										<Line
+											type="monotone"
+											dataKey="totalWithNet"
+											stroke="hsl(var(--primary))"
+											strokeWidth={2}
+											dot={false}
+											name="totalWithNet"
+										/>
+									</LineChart>
+								</ResponsiveContainer>
 							</div>
 						</div>
 
@@ -269,27 +330,27 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 
 						{showDetail && (
 							<div className="rounded-lg border overflow-hidden">
-								<div className="overflow-x-auto">
-									<table className="w-full text-sm">
+								<div className="w-full max-w-full overflow-x-auto">
+									<table className="w-full min-w-[820px] table-auto text-sm">
 										<thead className="bg-muted">
 											<tr>
-												<th className="px-3 py-2 text-left">Mes</th>
-												<th className="px-3 py-2 text-right">Capital</th>
-												<th className="px-3 py-2 text-right">Bruto</th>
-												<th className="px-3 py-2 text-right">Impuesto</th>
-												<th className="px-3 py-2 text-right">Neto</th>
-												<th className="px-3 py-2 text-right">Acumulado</th>
+												<th className="px-3 py-2 text-left whitespace-nowrap">Mes</th>
+												<th className="px-3 py-2 text-right whitespace-nowrap">Capital</th>
+												<th className="px-3 py-2 text-right whitespace-nowrap">Bruto</th>
+												<th className="px-3 py-2 text-right whitespace-nowrap">Impuesto</th>
+												<th className="px-3 py-2 text-right whitespace-nowrap">Neto</th>
+												<th className="px-3 py-2 text-right whitespace-nowrap">Acumulado</th>
 											</tr>
 										</thead>
 										<tbody>
 											{results.map((row) => (
 												<tr key={row.month} className="border-t">
-													<td className="px-3 py-2">{row.month}</td>
-													<td className="px-3 py-2 text-right">{formatCurrency(row.capital)}</td>
-													<td className="px-3 py-2 text-right">{formatCurrency(row.grossInterest)}</td>
-													<td className="px-3 py-2 text-right text-orange-500">-{formatCurrency(row.taxWithheld)}</td>
-													<td className="px-3 py-2 text-right text-green-500">{formatCurrency(row.netInterest)}</td>
-													<td className="px-3 py-2 text-right font-medium">{formatCurrency(row.accumulatedNet)}</td>
+													<td className="px-3 py-2 whitespace-nowrap">{row.month}</td>
+													<td className="px-3 py-2 text-right whitespace-nowrap">{formatCurrency(row.capital)}</td>
+													<td className="px-3 py-2 text-right whitespace-nowrap">{formatCurrency(row.grossInterest)}</td>
+													<td className="px-3 py-2 text-right text-orange-500 whitespace-nowrap">-{formatCurrency(row.taxWithheld)}</td>
+													<td className="px-3 py-2 text-right text-green-500 whitespace-nowrap">{formatCurrency(row.netInterest)}</td>
+													<td className="px-3 py-2 text-right font-medium whitespace-nowrap">{formatCurrency(row.accumulatedNet)}</td>
 												</tr>
 											))}
 										</tbody>

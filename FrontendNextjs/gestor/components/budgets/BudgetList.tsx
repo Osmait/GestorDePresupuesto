@@ -5,6 +5,8 @@ import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { BudgetsPageSkeleton } from './BudgetsPageSkeleton'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Budget } from '@/types/budget'
 import { Transaction } from '@/types/transaction'
 import { PiggyBank, AlertTriangle, PlusCircle } from 'lucide-react'
@@ -17,6 +19,8 @@ import { BudgetSummaryCard } from './BudgetSummaryCard'
 
 export function BudgetList() {
     const t = useTranslations('budgets')
+    const router = useRouter()
+    const searchParams = useSearchParams()
     const { budgets, isLoading, error, deleteBudget, setEditingBudget, isModalOpen, setModalOpen } = useBudgetContext()
     const { data: categories = [] } = useGetCategories()
     const { data: transactions = [] } = useGetAllTransactions()
@@ -29,6 +33,17 @@ export function BudgetList() {
         setEditingBudget(budget)
         setModalOpen(true)
     }
+
+    const suggestedCategoryId = searchParams.get('category') || ''
+
+    useEffect(() => {
+        const shouldOpenCreate = searchParams.get('create') === '1'
+        if (!shouldOpenCreate) return
+
+        setEditingBudget(null)
+        setModalOpen(true)
+        router.replace('/app/budget', { scroll: false })
+    }, [router, searchParams, setEditingBudget, setModalOpen])
 
     if (isLoading) {
         return <BudgetsPageSkeleton />
@@ -62,7 +77,7 @@ export function BudgetList() {
                     <PlusCircle className="h-4 w-4 mr-2" />
                     {t('createFirstBudget')}
                 </Button>
-                <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} />
+                <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} initialCategoryId={suggestedCategoryId} />
             </div>
         )
     }
@@ -104,7 +119,7 @@ export function BudgetList() {
             </div>
 
             {/* Context-controlled Modal for Edit/Create */}
-            <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} />
+            <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} initialCategoryId={suggestedCategoryId} />
         </motion.div>
     )
 }

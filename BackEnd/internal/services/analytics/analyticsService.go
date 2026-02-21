@@ -3,6 +3,7 @@ package analytics
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
@@ -35,6 +36,16 @@ type AnalyticsService struct {
 	investmentRepository  investmentRepo.InvestmentRepoInterface
 	certificateRepository certificateRepo.CertificateRepositoryInterface
 	usdToDopRateFn        func(context.Context) (float64, error)
+}
+
+type DashboardFilters struct {
+	DateFrom        time.Time
+	DateTo          time.Time
+	AccountID       string
+	CategoryID      string
+	TransactionType string
+	MinAmount       *float64
+	MaxAmount       *float64
 }
 
 func (s *AnalyticsService) GetCategoryExpenses(ctx context.Context, userID string) ([]*analytics.CategoryExpense, error) {
@@ -93,8 +104,9 @@ func (s *AnalyticsService) GetMonthlySummary(ctx context.Context, userID string)
 	return monthlySummaries, nil
 }
 
-func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID string) (*analytics.DashboardSummary, error) {
-	dateFrom, dateTo := currentYearRangeInSantoDomingo()
+func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID string, filters DashboardFilters) (*analytics.DashboardSummary, error) {
+	dateFrom, dateTo := normalizeDashboardDateRange(filters.DateFrom, filters.DateTo)
+	transactionType := normalizeTransactionType(filters.TransactionType)
 
 	usdToDop := 60.0
 	if s.usdToDopRateFn != nil {
@@ -103,17 +115,50 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		}
 	}
 
-	categoryExpensesRepo, err := s.repo.GetCategoryExpensesInRange(ctx, userID, usdToDop, dateFrom, dateTo)
+	categoryExpensesRepo, err := s.repo.GetCategoryExpensesInRange(
+		ctx,
+		userID,
+		usdToDop,
+		dateFrom,
+		dateTo,
+		filters.AccountID,
+		filters.CategoryID,
+		transactionType,
+		filters.MinAmount,
+		filters.MaxAmount,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting category expenses: %w", err)
 	}
 
-	monthlySummariesRepo, err := s.repo.GetMonthlySummaryInRange(ctx, userID, usdToDop, dateFrom, dateTo)
+	monthlySummariesRepo, err := s.repo.GetMonthlySummaryInRange(
+		ctx,
+		userID,
+		usdToDop,
+		dateFrom,
+		dateTo,
+		filters.AccountID,
+		filters.CategoryID,
+		transactionType,
+		filters.MinAmount,
+		filters.MaxAmount,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary: %w", err)
 	}
 
-	totalsRepo, err := s.repo.GetTotalsInRange(ctx, userID, usdToDop, dateFrom, dateTo)
+	totalsRepo, err := s.repo.GetTotalsInRange(
+		ctx,
+		userID,
+		usdToDop,
+		dateFrom,
+		dateTo,
+		filters.AccountID,
+		filters.CategoryID,
+		transactionType,
+		filters.MinAmount,
+		filters.MaxAmount,
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting totals: %w", err)
 	}
@@ -208,6 +253,26 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		CategoryExpenses:  categoryExpenses,
 		MonthlySummary:    monthlySummaries,
 	}, nil
+}
+
+func normalizeDashboardDateRange(dateFrom time.Time, dateTo time.Time) (time.Time, time.Time) {
+	if dateFrom.IsZero() || dateTo.IsZero() {
+		return currentYearRangeInSantoDomingo()
+	}
+
+	if dateTo.Before(dateFrom) {
+		return dateTo, dateFrom
+	}
+
+	return dateFrom, dateTo
+}
+
+func normalizeTransactionType(transactionType string) string {
+	normalized := strings.ToLower(strings.TrimSpace(transactionType))
+	if normalized == "bill" || normalized == "income" {
+		return normalized
+	}
+	return ""
 }
 
 func currentYearRangeInSantoDomingo() (time.Time, time.Time) {
