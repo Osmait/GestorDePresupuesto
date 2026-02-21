@@ -35,4 +35,6 @@ export interface AnalyticsQueryFilters {
 	account_id?: string
 	category_id?: string
 	type?: 'income' | 'bill'
+	min_amount?: number
+	max_amount?: number
 }

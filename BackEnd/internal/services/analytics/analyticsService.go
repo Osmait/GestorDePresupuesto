@@ -44,6 +44,8 @@ type DashboardFilters struct {
 	AccountID       string
 	CategoryID      string
 	TransactionType string
+	MinAmount       *float64
+	MaxAmount       *float64
 }
 
 func (s *AnalyticsService) GetCategoryExpenses(ctx context.Context, userID string) ([]*analytics.CategoryExpense, error) {
@@ -122,6 +124,8 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		filters.AccountID,
 		filters.CategoryID,
 		transactionType,
+		filters.MinAmount,
+		filters.MaxAmount,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting category expenses: %w", err)
@@ -136,6 +140,8 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		filters.AccountID,
 		filters.CategoryID,
 		transactionType,
+		filters.MinAmount,
+		filters.MaxAmount,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary: %w", err)
@@ -150,6 +156,8 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		filters.AccountID,
 		filters.CategoryID,
 		transactionType,
+		filters.MinAmount,
+		filters.MaxAmount,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting totals: %w", err)

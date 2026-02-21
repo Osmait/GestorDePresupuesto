@@ -29,6 +29,12 @@ export class AnalyticsRepository extends BaseRepository {
 			if (filters?.date_to) params.set('date_to', filters.date_to)
 			if (filters?.account_id && filters.account_id !== 'all') params.set('account_id', filters.account_id)
 			if (filters?.category_id && filters.category_id !== 'all') params.set('category_id', filters.category_id)
+			if (typeof filters?.min_amount === 'number' && !Number.isNaN(filters.min_amount) && filters.min_amount >= 0) {
+				params.set('min_amount', String(filters.min_amount))
+			}
+			if (typeof filters?.max_amount === 'number' && !Number.isNaN(filters.max_amount) && filters.max_amount >= 0) {
+				params.set('max_amount', String(filters.max_amount))
+			}
 			if (filters?.type && filters.type !== 'income' && filters.type !== 'bill') {
 				// noop, guard invalid values
 			} else if (filters?.type) {

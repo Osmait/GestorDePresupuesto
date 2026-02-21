@@ -17,7 +17,7 @@ type AnalyticsRepository struct {
 	db *sql.DB
 }
 
-func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string) ([]*analytics.CategoryExpenseRepository, error) {
+func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *float64, maxAmount *float64) ([]*analytics.CategoryExpenseRepository, error) {
 	if usdToDop <= 0 {
 		usdToDop = 60
 	}
@@ -40,11 +40,25 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 			AND (NULLIF($5, '') IS NULL OR t.account_id::text = $5)
 			AND (NULLIF($6, '') IS NULL OR t.category_id::text = $6)
 			AND ($7 = '' OR $7 = 'bill')
+			AND ($8::numeric IS NULL OR ABS(t.amount) >= $8)
+			AND ($9::numeric IS NULL OR ABS(t.amount) <= $9)
 			AND t.created_at >= $3 AND t.created_at <= $4
 		GROUP BY c.id, c.name, c.color
 	`
 
-	rows, err := a.db.QueryContext(ctx, query, userID, usdToDop, dateFrom, dateTo, accountID, categoryID, transactionType)
+	rows, err := a.db.QueryContext(
+		ctx,
+		query,
+		userID,
+		usdToDop,
+		dateFrom,
+		dateTo,
+		accountID,
+		categoryID,
+		transactionType,
+		nullableFloatArg(minAmount),
+		nullableFloatArg(maxAmount),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting category expenses in range: %w", err)
 	}
@@ -174,7 +188,7 @@ func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID stri
 	return monthlySummaries, nil
 }
 
-func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string) ([]*analytics.MonthlySummaryRepository, error) {
+func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *float64, maxAmount *float64) ([]*analytics.MonthlySummaryRepository, error) {
 	if usdToDop <= 0 {
 		usdToDop = 60
 	}
@@ -198,12 +212,26 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 			AND (NULLIF($5, '') IS NULL OR account_id::text = $5)
 			AND (NULLIF($6, '') IS NULL OR category_id::text = $6)
 			AND (NULLIF($7, '') IS NULL OR type_transation::text = $7)
+			AND ($8::numeric IS NULL OR ABS(amount) >= $8)
+			AND ($9::numeric IS NULL OR ABS(amount) <= $9)
 			AND created_at >= $3 AND created_at <= $4
 		GROUP BY year, month
 		ORDER BY year, month
 	`
 
-	rows, err := a.db.QueryContext(ctx, query, userID, usdToDop, dateFrom, dateTo, accountID, categoryID, transactionType)
+	rows, err := a.db.QueryContext(
+		ctx,
+		query,
+		userID,
+		usdToDop,
+		dateFrom,
+		dateTo,
+		accountID,
+		categoryID,
+		transactionType,
+		nullableFloatArg(minAmount),
+		nullableFloatArg(maxAmount),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary in range: %w", err)
 	}
@@ -257,7 +285,7 @@ func (a *AnalyticsRepository) GetTotals(ctx context.Context, userID string, usdT
 	return &totals, nil
 }
 
-func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string) (*analytics.TotalsRepository, error) {
+func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *float64, maxAmount *float64) (*analytics.TotalsRepository, error) {
 	if usdToDop <= 0 {
 		usdToDop = 60
 	}
@@ -279,13 +307,35 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 			AND (NULLIF($5, '') IS NULL OR account_id::text = $5)
 			AND (NULLIF($6, '') IS NULL OR category_id::text = $6)
 			AND (NULLIF($7, '') IS NULL OR type_transation::text = $7)
+			AND ($8::numeric IS NULL OR ABS(amount) >= $8)
+			AND ($9::numeric IS NULL OR ABS(amount) <= $9)
 			AND created_at >= $3 AND created_at <= $4
 	`
 
 	var totals analytics.TotalsRepository
-	if err := a.db.QueryRowContext(ctx, query, userID, usdToDop, dateFrom, dateTo, accountID, categoryID, transactionType).Scan(&totals.TotalIncome, &totals.TotalBill); err != nil {
+	if err := a.db.QueryRowContext(
+		ctx,
+		query,
+		userID,
+		usdToDop,
+		dateFrom,
+		dateTo,
+		accountID,
+		categoryID,
+		transactionType,
+		nullableFloatArg(minAmount),
+		nullableFloatArg(maxAmount),
+	).Scan(&totals.TotalIncome, &totals.TotalBill); err != nil {
 		return nil, err
 	}
 
 	return &totals, nil
+}
+
+func nullableFloatArg(value *float64) any {
+	if value == nil {
+		return nil
+	}
+
+	return *value
 }

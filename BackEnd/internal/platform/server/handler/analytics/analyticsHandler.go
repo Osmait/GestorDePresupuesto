@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -55,6 +56,18 @@ func GetDashboardSummary(analyticsService *analytics.AnalyticsService) gin.Handl
 		if dateToStr := c.Query("date_to"); dateToStr != "" {
 			if parsed, parseErr := time.Parse("2006-01-02", dateToStr); parseErr == nil {
 				filters.DateTo = parsed
+			}
+		}
+
+		if minAmountStr := c.Query("min_amount"); minAmountStr != "" {
+			if parsed, parseErr := strconv.ParseFloat(minAmountStr, 64); parseErr == nil && parsed >= 0 {
+				filters.MinAmount = &parsed
+			}
+		}
+
+		if maxAmountStr := c.Query("max_amount"); maxAmountStr != "" {
+			if parsed, parseErr := strconv.ParseFloat(maxAmountStr, 64); parseErr == nil && parsed >= 0 {
+				filters.MaxAmount = &parsed
 			}
 		}
 
