@@ -56,12 +56,11 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 					</div>
 
 					<div
-						className={isFlipped ? 'pointer-events-auto absolute inset-0 cursor-pointer' : 'pointer-events-none absolute inset-0'}
+						className={isFlipped ? 'pointer-events-auto absolute inset-0' : 'pointer-events-none absolute inset-0'}
 						style={{
 							backfaceVisibility: 'hidden',
 							transform: 'rotateY(180deg)',
 						}}
-						onClick={() => setIsFlipped(false)}
 					>
 						<div className='relative flex h-full flex-col space-y-4 overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground'>
 							<div className='pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent' />
