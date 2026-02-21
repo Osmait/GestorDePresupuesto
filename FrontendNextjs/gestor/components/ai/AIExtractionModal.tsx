@@ -21,7 +21,7 @@ import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useCreateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
-import { DocumentType, AIExtractResponse } from '@/types/ai'
+import { DocumentType, AIExtractResponse, AIPotentialDuplicate } from '@/types/ai'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 
@@ -41,6 +41,9 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 	const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set())
 	const [step, setStep] = useState<'upload' | 'preview' | 'saving'>('upload')
 	const [showQuickCategory, setShowQuickCategory] = useState(false)
+	const [potentialDuplicatesByTransactionId, setPotentialDuplicatesByTransactionId] = useState<
+		Record<string, AIPotentialDuplicate>
+	>({})
 	const [pendingCategorySelection, setPendingCategorySelection] = useState<{
 		index: number
 	} | null>(null)
@@ -67,8 +70,30 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 
 		if ('success' in result && result.success) {
 			const response = result as AIExtractResponse
-			setExtractedTransactions(response.data.transactions)
-			setSelectedIndices(new Set(response.data.transactions.map((_, i) => i)))
+			const normalizedTransactions = response.data.transactions.map((transaction) => ({
+				...transaction,
+				account_id: transaction.account_id || accountId,
+				currency: transaction.currency || selectedAccount?.currency || 'DOP',
+			}))
+			setExtractedTransactions(normalizedTransactions)
+
+			const duplicatesMap = (response.data.potential_duplicates || []).reduce(
+				(acc, duplicate) => {
+					acc[duplicate.extracted_transaction_id] = duplicate
+					return acc
+				},
+				{} as Record<string, AIPotentialDuplicate>
+			)
+			setPotentialDuplicatesByTransactionId(duplicatesMap)
+
+			const initialSelection = new Set<number>()
+			normalizedTransactions.forEach((transaction, index) => {
+				const duplicateInfo = duplicatesMap[transaction.id]
+				if (duplicateInfo?.match_type !== 'duplicate') {
+					initialSelection.add(index)
+				}
+			})
+			setSelectedIndices(initialSelection)
 			setStep('preview')
 			toast.success(t('extractedCount', { count: response.data.count }))
 		} else {
@@ -129,13 +154,22 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 
 		for (let index = 0; index < selectedTransactions.length; index++) {
 			const txn = selectedTransactions[index]
+			const resolvedAccountId = txn.account_id || accountId
+			if (!resolvedAccountId) {
+				failed++
+				console.error('[AIExtractionModal] Missing account_id for extracted transaction', {
+					index,
+					transaction: txn,
+				})
+				continue
+			}
 			try {
 				await createTransaction.mutateAsync({
 					name: txn.name,
 					description: txn.description || '',
 					amount: txn.amount,
 					type: txn.type_transation as TypeTransaction,
-					accountId: txn.account_id,
+					accountId: resolvedAccountId,
 					categoryId: txn.category_id || '',
 					budgetId: txn.budget_id,
 					currency: txn.currency || 'DOP',
@@ -187,6 +221,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		setSelectedIndices(new Set())
 		setStep('upload')
 		setShowQuickCategory(false)
+		setPotentialDuplicatesByTransactionId({})
 		setPendingCategorySelection(null)
 		reset()
 		onOpenChange(false)
@@ -196,6 +231,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		setStep('upload')
 		setExtractedTransactions([])
 		setSelectedIndices(new Set())
+		setPotentialDuplicatesByTransactionId({})
 	}
 
 	return (
@@ -303,6 +339,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 							<TransactionPreview
 								transactions={extractedTransactions}
 								categories={categories}
+								potentialDuplicatesByTransactionId={potentialDuplicatesByTransactionId}
 								onEdit={handleEdit}
 								onRemove={handleRemove}
 								onSelect={handleSelect}

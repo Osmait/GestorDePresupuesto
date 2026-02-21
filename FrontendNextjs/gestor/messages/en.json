@@ -607,6 +607,8 @@
     "preview": {
       "noTransactions": "No transactions detected in the document",
       "selectedCount": "{selected} of {total} selected",
+      "duplicateWarningTitle": "We detected similar or potentially duplicated transactions",
+      "duplicateWarningDescription": "Transactions marked as possible duplicates are unselected by default so you can review them before saving.",
       "selectAll": "Select all",
       "deselectAll": "Deselect all",
       "name": "Name",
@@ -620,7 +622,14 @@
       "invalidDate": "Invalid date",
       "income": "Income",
       "expense": "Expense",
-      "noCategoryMatched": "No category matched"
+      "noCategoryMatched": "No category matched",
+      "possibleDuplicate": "Possible duplicate",
+      "possibleDuplicateCount": "{count} possible duplicate",
+      "possibleDuplicateCount_plural": "{count} possible duplicates",
+      "similarTransaction": "Similar transaction",
+      "similarTransactionCount": "{count} similar transaction",
+      "similarTransactionCount_plural": "{count} similar transactions",
+      "matchedWith": "Matches \"{name}\" on {date}"
     },
     "quickCategory": {
       "title": "Create Category",

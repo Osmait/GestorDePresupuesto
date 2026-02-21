@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession } from 'next-auth/react'
-import { useRouter } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { CertificateProvider, useCertificates } from '@/components/certificates/CertificateContext'
 import { CertificateSummaryCard } from '@/components/certificates/CertificateSummaryCard'
 import { CertificatesList } from '@/components/certificates/CertificatesList'
@@ -24,6 +24,11 @@ function CertificatesContent() {
 	const [historyCertificateId, setHistoryCertificateId] = useState<string | null>(null)
 	const [isSimulatorOpen, setIsSimulatorOpen] = useState(false)
 	const [simulatorCertificate, setSimulatorCertificate] = useState<Certificate | null>(null)
+	const router = useRouter()
+	const pathname = usePathname()
+	const searchParams = useSearchParams()
+	const selectedCertificateId = searchParams.get('selected') || ''
+	const openParam = searchParams.get('open') || ''
 
 	const accounts = accountsData?.map((a: any) => ({
 		id: a.id,
@@ -59,6 +64,30 @@ function CertificatesContent() {
 	const handleOpenSimulator = () => {
 		setSimulatorCertificate(null)
 		setIsSimulatorOpen(true)
+	}
+
+	useEffect(() => {
+		if (!selectedCertificateId) return
+		const element = document.getElementById(`certificate-card-${selectedCertificateId}`)
+		if (!element) return
+		element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+	}, [selectedCertificateId, certificates])
+
+	useEffect(() => {
+		if (!selectedCertificateId || openParam !== 'history') return
+		setHistoryCertificateId(selectedCertificateId)
+	}, [selectedCertificateId, openParam])
+
+	const handleHistoryOpenChange = (open: boolean) => {
+		if (open) return
+
+		setHistoryCertificateId(null)
+		const params = new URLSearchParams(searchParams.toString())
+		if (params.has('open') || params.has('selected')) {
+			params.delete('open')
+			params.delete('selected')
+			router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false })
+		}
 	}
 
 	const handleSimulateFromForm = (data: { capital: number; rate: number; taxRate: number; interestType: string; reinvestInterest: boolean }) => {
@@ -124,6 +153,7 @@ function CertificatesContent() {
 				onDelete={handleDelete}
 				onViewHistory={handleViewHistory}
 				onSimulate={handleSimulate}
+				selectedId={selectedCertificateId}
 			/>
 
 			<CertificateFormModal
@@ -138,7 +168,7 @@ function CertificatesContent() {
 			<CertificatePaymentHistory
 				certificateId={historyCertificateId}
 				open={!!historyCertificateId}
-				onOpenChange={(open) => !open && setHistoryCertificateId(null)}
+				onOpenChange={handleHistoryOpenChange}
 			/>
 
 			<PaymentSimulator

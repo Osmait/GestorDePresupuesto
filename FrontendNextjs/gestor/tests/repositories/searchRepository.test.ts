@@ -19,11 +19,11 @@ describe('SearchRepository', () => {
     describe('search', () => {
         it('returns empty result for empty query', async () => {
             const result = await repo.search('')
-            expect(result).toEqual({ transactions: [], categories: [], accounts: [], budgets: [] })
+            expect(result).toEqual({ transactions: [], categories: [], accounts: [], budgets: [], loans: [], certificates: [] })
         })
 
         it('fetches search results', async () => {
-            const mockData = { transactions: [{ id: 't1' }], categories: [], accounts: [], budgets: [] }
+            const mockData = { transactions: [{ id: 't1' }], categories: [], accounts: [], budgets: [], loans: [], certificates: [] }
             mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(mockData) })
             const result = await repo.search('test')
             expect(result.transactions).toHaveLength(1)
@@ -32,7 +32,7 @@ describe('SearchRepository', () => {
         it('returns empty result on error', async () => {
             mockFetch.mockRejectedValue(new Error('Network'))
             const result = await repo.search('test')
-            expect(result).toEqual({ transactions: [], categories: [], accounts: [], budgets: [] })
+            expect(result).toEqual({ transactions: [], categories: [], accounts: [], budgets: [], loans: [], certificates: [] })
         })
     })
 })

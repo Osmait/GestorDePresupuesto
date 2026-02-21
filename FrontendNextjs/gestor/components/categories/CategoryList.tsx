@@ -9,6 +9,8 @@ import { Tag } from 'lucide-react'
 import { Category } from '@/types/category'
 import { CategoriesSkeleton } from '@/components/skeletons/categories-skeleton'
 import { useTranslations } from 'next-intl'
+import { useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
 import { CategoryCard } from './CategoryCard'
 import { CategorySummaryCard } from './CategorySummaryCard'
 
@@ -21,6 +23,8 @@ export function CategoryList() {
     const categoryExpenses = dashboardSummary?.category_expenses ?? []
     const categoryStatsById = new Map(categoryExpenses.map((item) => [item.id, item]))
     const { setEditingCategory, setModalOpen } = useCategoryContext()
+    const searchParams = useSearchParams()
+    const selectedCategoryId = searchParams.get('selected') || ''
 
     const deleteCategoryMutation = useDeleteCategoryMutation()
 
@@ -34,6 +38,13 @@ export function CategoryList() {
         setEditingCategory(category)
         setModalOpen(true)
     }
+
+    useEffect(() => {
+        if (!selectedCategoryId) return
+        const element = document.getElementById(`category-card-${selectedCategoryId}`)
+        if (!element) return
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, [selectedCategoryId, categories])
 
     if (isLoading) {
         return <CategoriesSkeleton />
@@ -62,10 +73,12 @@ export function CategoryList() {
                                     {categories.map((category) => (
                                         <motion.div
                                             key={category.id}
+                                            id={`category-card-${category.id}`}
                                             initial={{ opacity: 0, y: 15 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, scale: 0.95 }}
                                             transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                                            className={selectedCategoryId === category.id ? 'rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : ''}
                                         >
                                             <CategoryCard
                                                 category={category}

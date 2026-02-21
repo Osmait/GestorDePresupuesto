@@ -18,6 +18,25 @@ type ExtractData struct {
 	Transactions        []*transaction.Transaction `json:"transactions"`
 	Count               int                        `json:"count"`
 	UnmatchedCategories int                        `json:"unmatched_categories"`
+	PotentialDuplicates []PotentialDuplicate       `json:"potential_duplicates"`
+}
+
+type PotentialDuplicate struct {
+	ExtractedTransactionID string               `json:"extracted_transaction_id"`
+	MatchType              string               `json:"match_type"`
+	Score                  float64              `json:"score"`
+	Candidates             []DuplicateCandidate `json:"candidates"`
+}
+
+type DuplicateCandidate struct {
+	ID             string  `json:"id"`
+	Name           string  `json:"name"`
+	Amount         float64 `json:"amount"`
+	TypeTransation string  `json:"type_transation"`
+	AccountID      string  `json:"account_id"`
+	Currency       string  `json:"currency"`
+	CreatedAt      string  `json:"created_at"`
+	Score          float64 `json:"score"`
 }
 
 type SpendingAnalysisResponse struct {
@@ -94,6 +113,7 @@ func ToExtractResponse(result *domain.AIResult) *ExtractResponse {
 			Transactions:        transactions,
 			Count:               len(transactions),
 			UnmatchedCategories: unmatched,
+			PotentialDuplicates: []PotentialDuplicate{},
 		},
 		Usage:          result.Usage,
 		ProcessingTime: result.ProcessingTime.Milliseconds(),

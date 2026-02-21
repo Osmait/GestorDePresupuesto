@@ -26,6 +26,7 @@ const (
 
 type AICacheInvalidator interface {
 	InvalidateUserAnalysis(userID string)
+	InvalidateUserExtractions(userID string)
 }
 
 type TransactionService struct {
@@ -91,6 +92,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 
 	if s.aiCache != nil {
 		s.aiCache.InvalidateUserAnalysis(userId)
+		s.aiCache.InvalidateUserExtractions(userId)
 	}
 
 	// Check Budget Thresholds
@@ -389,6 +391,7 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 
 	if s.aiCache != nil {
 		s.aiCache.InvalidateUserAnalysis(transaction.UserId)
+		s.aiCache.InvalidateUserExtractions(transaction.UserId)
 	}
 	return nil
 }
@@ -401,6 +404,7 @@ func (s TransactionService) DeleteTransaction(ctx context.Context, id string, us
 
 		if s.aiCache != nil {
 			s.aiCache.InvalidateUserAnalysis(userId)
+			s.aiCache.InvalidateUserExtractions(userId)
 		}
 	}
 	return err

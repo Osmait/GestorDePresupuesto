@@ -71,6 +71,12 @@ func (c *AICacheService) InvalidateUserAnalysis(userID string) {
 	atomic.StoreInt32(&c.analysisCount, 0)
 }
 
+func (c *AICacheService) InvalidateUserExtractions(userID string) {
+	prefix := fmt.Sprintf("ai:extract:%s:", userID)
+	c.cache.DeleteByPrefix(prefix)
+	atomic.StoreInt32(&c.extractionCount, 0)
+}
+
 func (c *AICacheService) buildExtractionKey(userID, fileHash, docType string) string {
 	return fmt.Sprintf("ai:extract:%s:%s:%s", userID, fileHash, docType)
 }

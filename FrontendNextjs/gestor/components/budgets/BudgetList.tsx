@@ -35,6 +35,7 @@ export function BudgetList() {
     }
 
     const suggestedCategoryId = searchParams.get('category') || ''
+    const selectedBudgetId = searchParams.get('selected') || ''
 
     useEffect(() => {
         const shouldOpenCreate = searchParams.get('create') === '1'
@@ -44,6 +45,13 @@ export function BudgetList() {
         setModalOpen(true)
         router.replace('/app/budget', { scroll: false })
     }, [router, searchParams, setEditingBudget, setModalOpen])
+
+    useEffect(() => {
+        if (!selectedBudgetId) return
+        const element = document.getElementById(`budget-card-${selectedBudgetId}`)
+        if (!element) return
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, [selectedBudgetId, budgets])
 
     if (isLoading) {
         return <BudgetsPageSkeleton />
@@ -100,10 +108,12 @@ export function BudgetList() {
                         return (
                             <motion.div
                                 key={budget.id}
+                                id={`budget-card-${budget.id}`}
                                 initial={{ opacity: 0, y: 15 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
                                 transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                                className={selectedBudgetId === budget.id ? 'rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : ''}
                             >
                                 <BudgetCard
                                     budget={budget}

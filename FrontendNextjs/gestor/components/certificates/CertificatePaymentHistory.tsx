@@ -22,6 +22,7 @@ interface CertificatePaymentHistoryProps {
 
 export function CertificatePaymentHistory({ certificateId, open, onOpenChange }: CertificatePaymentHistoryProps) {
 	const { data: certificate, isLoading } = useGetCertificate(certificateId || '')
+	const payments = certificate?.payments ?? []
 
 	if (!certificateId) return null
 
@@ -38,15 +39,15 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 						<div className="grid grid-cols-3 gap-4 p-4 rounded-lg bg-muted/50">
 							<div>
 								<p className="text-xs text-muted-foreground">Total Gross Interest</p>
-								<p className="text-lg font-semibold">{formatCurrency(certificate.summary.total_gross_interest)}</p>
+								<p className="text-lg font-semibold">{formatCurrency(certificate.summary?.total_gross_interest || 0)}</p>
 							</div>
 							<div>
 								<p className="text-xs text-muted-foreground">Total Tax Withheld</p>
-								<p className="text-lg font-semibold text-orange-500">{formatCurrency(certificate.summary.total_tax_withheld)}</p>
+								<p className="text-lg font-semibold text-orange-500">{formatCurrency(certificate.summary?.total_tax_withheld || 0)}</p>
 							</div>
 							<div>
 								<p className="text-xs text-muted-foreground">Total Net Interest</p>
-								<p className="text-lg font-semibold text-green-500">{formatCurrency(certificate.summary.total_net_interest)}</p>
+								<p className="text-lg font-semibold text-green-500">{formatCurrency(certificate.summary?.total_net_interest || 0)}</p>
 							</div>
 						</div>
 
@@ -56,7 +57,7 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 								<TabsTrigger value="chart">Chart</TabsTrigger>
 							</TabsList>
 							<TabsContent value="history" className="mt-4">
-								{certificate.payments.length === 0 ? (
+								{payments.length === 0 ? (
 									<div className="py-8 text-center text-muted-foreground">No payments recorded yet.</div>
 								) : (
 									<ScrollArea className="h-[400px]">
@@ -72,7 +73,7 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 												</TableRow>
 											</TableHeader>
 											<TableBody>
-												{certificate.payments.map((payment) => (
+												{payments.map((payment) => (
 													<TableRow key={payment.id}>
 														<TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
 														<TableCell className="text-right">{formatCurrency(payment.applied_capital)}</TableCell>
@@ -88,7 +89,7 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 								)}
 							</TabsContent>
 							<TabsContent value="chart" className="mt-4">
-								<CertificateChart certificate={certificate} payments={certificate.payments} />
+								<CertificateChart certificate={certificate} payments={payments} />
 							</TabsContent>
 						</Tabs>
 					</div>

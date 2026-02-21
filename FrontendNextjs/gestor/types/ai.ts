@@ -27,10 +27,29 @@ export interface AIExtractResponse {
     transactions: Transaction[]
     count: number
     unmatched_categories: number
+    potential_duplicates: AIPotentialDuplicate[]
   }
   usage: TokenUsage
   processing_time_ms: number
   model_used: string
+}
+
+export interface AIDuplicateCandidate {
+	id: string
+	name: string
+	amount: number
+	type_transation: Transaction['type_transation']
+	account_id: string
+	currency: string
+	created_at: string
+	score: number
+}
+
+export interface AIPotentialDuplicate {
+	extracted_transaction_id: string
+	match_type: 'duplicate' | 'similar'
+	score: number
+	candidates: AIDuplicateCandidate[]
 }
 
 export interface AIError {

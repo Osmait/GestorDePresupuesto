@@ -155,6 +155,10 @@ func (m *MockAICache) InvalidateUserAnalysis(userID string) {
 	m.Called(userID)
 }
 
+func (m *MockAICache) InvalidateUserExtractions(userID string) {
+	m.Called(userID)
+}
+
 func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockRepo := &MockTransaction{}
 	mockBudgetRepo := &MockBudgetRepository{}
@@ -164,6 +168,7 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 
 	mockCache.On("DeleteByPrefix", mock.Anything).Return()
 	mockAICache.On("InvalidateUserAnalysis", mock.Anything).Return()
+	mockAICache.On("InvalidateUserExtractions", mock.Anything).Return()
 
 	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
 	mockRepo.On("ResolveAndValidateCurrencyForAccount", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("DOP", nil)
@@ -211,6 +216,7 @@ func TestDeleteTransaction(t *testing.T) {
 
 	mockCache.On("DeleteByPrefix", mock.Anything).Return()
 	mockAICache.On("InvalidateUserAnalysis", mock.Anything).Return()
+	mockAICache.On("InvalidateUserExtractions", mock.Anything).Return()
 
 	expectedTransactions := utils.GetNewRandomTransaction()
 

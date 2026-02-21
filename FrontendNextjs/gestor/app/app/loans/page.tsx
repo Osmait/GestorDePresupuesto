@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { loanRepository } from '@/lib/repositoryConfig'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { ACCOUNT_KEYS } from '@/hooks/queries/useAccountsQuery'
@@ -31,6 +31,7 @@ import { Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { useQueryClient } from '@tanstack/react-query'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 
 const initialCreateForm: CreateLoanDTO = {
 	borrower_name: '',
@@ -62,6 +63,12 @@ export default function LoansPage() {
 	const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
 	const [paymentDestination, setPaymentDestination] = useState('')
 	const [paymentNotes, setPaymentNotes] = useState('')
+	const router = useRouter()
+	const pathname = usePathname()
+	const searchParams = useSearchParams()
+	const selectedLoanIdParam = searchParams.get('selected') || ''
+	const openParam = searchParams.get('open') || ''
+	const lastAutoOpenKeyRef = useRef('')
 	const { data: accounts = [] } = useGetAccounts()
 
 	const accountOptions = useMemo(() => accounts.filter((account) => account.type !== 'credit_card'), [accounts])
@@ -69,6 +76,46 @@ export default function LoansPage() {
 	useEffect(() => {
 		void loadData()
 	}, [])
+
+	useEffect(() => {
+		const selectedId = selectedLoanIdParam
+		const shouldOpenDetails = openParam === 'details'
+
+		if (!shouldOpenDetails || !selectedId) {
+			lastAutoOpenKeyRef.current = ''
+			return
+		}
+
+		const autoOpenKey = `${selectedId}:${openParam}`
+		if (lastAutoOpenKeyRef.current === autoOpenKey) {
+			return
+		}
+		lastAutoOpenKeyRef.current = autoOpenKey
+
+		if (!selectedId) return
+
+		const matchedLoan = loans.find((item) => item.id === selectedId)
+		if (matchedLoan) {
+			const row = document.getElementById(`loan-row-${selectedId}`)
+			row?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+		}
+
+		if (shouldOpenDetails) {
+			void openDetails(selectedId)
+		}
+	}, [selectedLoanIdParam, openParam, loans])
+
+	const handleDetailsOpenChange = (open: boolean) => {
+		setDetailsOpen(open)
+		if (open) return
+
+		const params = new URLSearchParams(searchParams.toString())
+		if (params.has('open') || params.has('selected')) {
+			params.delete('open')
+			params.delete('selected')
+			router.replace(params.toString() ? `${pathname}?${params.toString()}` : pathname, { scroll: false })
+		}
+	}
 
 	useEffect(() => {
 		if (accountOptions.length > 0 && !createForm.source_account_id) {
@@ -281,7 +328,11 @@ export default function LoansPage() {
 							</TableHeader>
 							<TableBody>
 								{loans.map((loan) => (
-									<TableRow key={loan.id}>
+									<TableRow
+										id={`loan-row-${loan.id}`}
+										key={loan.id}
+										className={selectedLoanIdParam === loan.id ? 'bg-primary/5 ring-1 ring-primary/40' : ''}
+									>
 										<TableCell>
 											<div className='font-medium'>{loan.borrower_name}</div>
 											<div className='text-xs text-muted-foreground'>{loan.borrower_contact || '-'}</div>
@@ -422,7 +473,7 @@ export default function LoansPage() {
 				</DialogContent>
 			</Dialog>
 
-			<Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+			<Dialog open={detailsOpen} onOpenChange={handleDetailsOpenChange}>
 				<DialogContent className='w-[95vw] max-w-5xl max-h-[88vh] overflow-hidden p-0'>
 					<DialogHeader className='border-b border-border/60 px-6 py-4'>
 						<DialogTitle>{t('loanDetails')}</DialogTitle>

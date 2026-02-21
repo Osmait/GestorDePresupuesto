@@ -156,7 +156,7 @@ func (s *CertificateService) FindById(ctx context.Context, id string, userId str
 
 	certResponse := dto.NewCertificateResponse(cert, effectiveCapital, nextPaymentDate, projected)
 
-	var paymentResponses []dto.PaymentResponse
+	paymentResponses := make([]dto.PaymentResponse, 0, len(payments))
 	var totalGross, totalTax, totalNet float64
 	for _, p := range payments {
 		paymentResponses = append(paymentResponses, *dto.NewPaymentResponse(p))

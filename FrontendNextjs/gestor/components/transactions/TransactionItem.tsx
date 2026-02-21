@@ -27,9 +27,10 @@ interface TransactionItemProps {
   category?: Category;
   onTransactionDeleted?: () => void;
   onEdit?: (_transaction: Transaction) => void;
+  onOpenDetails?: (_transaction: Transaction) => void;
 }
 
-export default function TransactionItem({ transaction, category, onTransactionDeleted, onEdit }: TransactionItemProps) {
+export default function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, onOpenDetails }: TransactionItemProps) {
   const t = useTranslations('transactions')
   const context = useContext(TransactionContext);
   const setEditingTransaction = context?.setEditingTransaction;
@@ -81,10 +82,11 @@ export default function TransactionItem({ transaction, category, onTransactionDe
       setIsDeleting(false);
     }
   };
-  console.log({ category });
-  console.log({ transaction });
   return (
-    <Card className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20">
+    <Card
+      className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20 cursor-pointer"
+      onClick={() => onOpenDetails?.(transaction)}
+    >
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
@@ -131,13 +133,20 @@ export default function TransactionItem({ transaction, category, onTransactionDe
             </div>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label="Opciones de transacción">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  aria-label="Opciones de transacción"
+                  onClick={(event) => event.stopPropagation()}
+                >
                   <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
                 {(setEditingTransaction && setModalOpen) || onEdit ? (
-                  <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={() => {
+                  <DropdownMenuItem className="flex items-center gap-2 cursor-pointer" onClick={(event) => {
+                    event.stopPropagation()
                     if (onEdit) {
                       onEdit(transaction);
                     } else if (setEditingTransaction && setModalOpen) {
@@ -151,7 +160,10 @@ export default function TransactionItem({ transaction, category, onTransactionDe
                 ) : null}
                 <DropdownMenuItem
                   className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
-                  onClick={() => setShowDeleteDialog(true)}
+                  onClick={(event) => {
+                    event.stopPropagation()
+                    setShowDeleteDialog(true)
+                  }}
                 >
                   <Trash2 className="h-4 w-4" />
                   Eliminar transacción

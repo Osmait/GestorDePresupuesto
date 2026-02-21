@@ -338,7 +338,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService),
 		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn),
 		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService),
-		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),
+		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository, repos.loanRepository, repos.certificateRepository),
 		quoteService:        quoteService,
 		notificationService: notificationService,
 		aiService:           aiSvc,

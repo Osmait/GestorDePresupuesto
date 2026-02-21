@@ -607,6 +607,8 @@
     "preview": {
       "noTransactions": "No se detectaron transacciones en el documento",
       "selectedCount": "{selected} de {total} seleccionadas",
+      "duplicateWarningTitle": "Detectamos movimientos similares o posiblemente duplicados",
+      "duplicateWarningDescription": "Las transacciones marcadas como posible duplicidad quedan desmarcadas por defecto para que las revises antes de guardar.",
       "selectAll": "Seleccionar todo",
       "deselectAll": "Deseleccionar todo",
       "name": "Nombre",
@@ -620,7 +622,14 @@
       "invalidDate": "Fecha inválida",
       "income": "Ingreso",
       "expense": "Gasto",
-      "noCategoryMatched": "Sin categoría coincidente"
+      "noCategoryMatched": "Sin categoría coincidente",
+      "possibleDuplicate": "Posible duplicidad",
+      "possibleDuplicateCount": "{count} posible duplicidad",
+      "possibleDuplicateCount_plural": "{count} posibles duplicidades",
+      "similarTransaction": "Transacción similar",
+      "similarTransactionCount": "{count} transacción similar",
+      "similarTransactionCount_plural": "{count} transacciones similares",
+      "matchedWith": "Coincide con \"{name}\" del {date}"
     },
     "quickCategory": {
       "title": "Crear Categoría",
