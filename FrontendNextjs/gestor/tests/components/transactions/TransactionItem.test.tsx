@@ -3,6 +3,10 @@ import TransactionItem from '@/components/transactions/TransactionItem'
 import { vi } from 'vitest'
 import { TypeTransaction } from '@/types/transaction'
 
+vi.mock('next-intl', () => ({
+    useTranslations: () => (key: string) => key,
+}))
+
 // Mock dependencies
 vi.mock('lucide-react', async () => {
     const actual = await vi.importActual('lucide-react')
