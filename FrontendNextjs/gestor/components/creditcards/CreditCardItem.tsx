@@ -1,18 +1,19 @@
 'use client'
 
+import { useState } from 'react'
 import { CreditCard, CardBalance } from '@/types/creditcard'
 import { formatCurrency, getUtilizationColor } from '@/types/creditcard'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { CreditCard as CardIcon, Calendar, DollarSign, MoreVertical } from 'lucide-react'
+import { DollarSign, MoreVertical, ArrowLeftRight } from 'lucide-react'
 import {
 	DropdownMenu,
 	DropdownMenuContent,
 	DropdownMenuItem,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { CreditCardAtroposVisual } from '@/components/creditcards/CreditCardAtroposVisual'
 
 interface CreditCardItemProps {
 	card: CreditCard
@@ -23,6 +24,8 @@ interface CreditCardItemProps {
 }
 
 export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }: CreditCardItemProps) {
+	const [isFlipped, setIsFlipped] = useState(false)
+
 	const totalDebtByCurrency = card.balances
 		.map((balance) => ({
 			currency: balance.currency,
@@ -31,89 +34,92 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 		.filter((item) => item.debt > 0)
 
 	return (
-		<Card className="overflow-hidden">
-			<CardHeader className="pb-2">
-				<div className="flex items-center justify-between">
-					<div className="flex items-center gap-2">
-						<div className="p-2 bg-primary/10 rounded-lg">
-							<CardIcon className="h-5 w-5 text-primary" />
-						</div>
-						<div>
-							<CardTitle className="text-lg">{card.name}</CardTitle>
-							<p className="text-sm text-muted-foreground">
-								{card.bank} •••• {card.last_four_digits || '****'}
-							</p>
-						</div>
+		<div className='h-full' data-testid={`credit-card-item-${card.id}`}>
+			<div className='relative h-[460px]' style={{ perspective: '1200px' }}>
+				<div
+					className='relative h-full w-full transition-transform duration-500'
+					style={{
+						transformStyle: 'preserve-3d',
+						transform: isFlipped ? 'rotateY(180deg)' : 'rotateY(0deg)',
+					}}
+				>
+					<div
+						className={isFlipped ? 'pointer-events-none absolute inset-0' : 'pointer-events-auto absolute inset-0 cursor-pointer'}
+						style={{ backfaceVisibility: 'hidden' }}
+						onClick={() => setIsFlipped(true)}
+					>
+						<CreditCardAtroposVisual
+							card={card}
+							totalDebtByCurrency={totalDebtByCurrency}
+							onFlip={() => setIsFlipped(true)}
+						/>
 					</div>
-					<DropdownMenu>
-						<DropdownMenuTrigger asChild>
-							<Button variant="ghost" size="icon">
-								<MoreVertical className="h-4 w-4" />
-							</Button>
-						</DropdownMenuTrigger>
-						<DropdownMenuContent align="end">
-							<DropdownMenuItem onClick={() => onEdit(card)}>Edit</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => onPay(card)}>Make Payment</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => onViewPayments(card)}>View Payments</DropdownMenuItem>
-							<DropdownMenuItem onClick={() => onDelete(card)} className="text-destructive">
-								Delete
-							</DropdownMenuItem>
-						</DropdownMenuContent>
-					</DropdownMenu>
-				</div>
-			</CardHeader>
-			<CardContent className="space-y-4">
-				{card.balances.map((balance) => (
-					<BalanceBar key={balance.id} balance={balance} />
-				))}
 
-				<div className="grid grid-cols-2 gap-4 pt-2 border-t">
-					<div className="flex items-center gap-2">
-						<Calendar className="h-4 w-4 text-muted-foreground" />
-						<div>
-							<p className="text-xs text-muted-foreground">Cut Day</p>
-							<p className="text-sm font-medium">{card.cut_day}</p>
-						</div>
-					</div>
-					<div className="flex items-center gap-2">
-						<DollarSign className="h-4 w-4 text-muted-foreground" />
-						<div>
-							<p className="text-xs text-muted-foreground">Due Day</p>
-							<p className="text-sm font-medium">{card.due_day}</p>
-						</div>
-					</div>
-				</div>
-
-				{card.next_due_date && (
-					<div className="pt-2 border-t space-y-1">
-						<span className="text-sm text-muted-foreground">Total Debt</span>
-						{totalDebtByCurrency.length > 0 ? (
-							totalDebtByCurrency.map((item) => (
-								<div key={item.currency} className="flex items-center justify-between">
-									<span className="text-xs text-muted-foreground">{item.currency}</span>
-									<span className="text-base font-bold text-destructive">
-										{formatCurrency(item.debt, item.currency)}
-									</span>
+					<div
+						className={isFlipped ? 'pointer-events-auto absolute inset-0 cursor-pointer' : 'pointer-events-none absolute inset-0'}
+						style={{
+							backfaceVisibility: 'hidden',
+							transform: 'rotateY(180deg)',
+						}}
+						onClick={() => setIsFlipped(false)}
+					>
+						<div className='relative flex h-full flex-col space-y-4 overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground'>
+							<div className='pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent' />
+							<div className='flex items-center justify-between'>
+								<div className='relative'>
+									<p className='text-sm font-semibold'>{card.name}</p>
+									<p className='text-xs text-muted-foreground'>{card.bank} •••• {card.last_four_digits || '****'}</p>
 								</div>
-							))
-						) : (
-							<div className="flex items-center justify-between">
-								<span className="text-xs text-muted-foreground">No debt</span>
-								<span className="text-base font-bold">0</span>
+								<div className='relative flex items-center gap-1' onClick={(event) => event.stopPropagation()}>
+									<Button
+										variant='ghost'
+										size='sm'
+										onClick={() => setIsFlipped(false)}
+										className='gap-1 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+									>
+										<ArrowLeftRight className='h-3.5 w-3.5' />
+										Back
+									</Button>
+									<DropdownMenu>
+										<DropdownMenuTrigger asChild>
+											<Button variant='ghost' size='icon' aria-label='Card options' className='text-muted-foreground hover:bg-accent hover:text-accent-foreground'>
+												<MoreVertical className='h-4 w-4' />
+											</Button>
+										</DropdownMenuTrigger>
+										<DropdownMenuContent align='end'>
+											<DropdownMenuItem onClick={() => onEdit(card)}>Edit</DropdownMenuItem>
+											<DropdownMenuItem onClick={() => onDelete(card)} className='text-destructive'>
+												Delete
+											</DropdownMenuItem>
+										</DropdownMenuContent>
+									</DropdownMenu>
+								</div>
 							</div>
-						)}
-					</div>
-				)}
 
-				<Button className="w-full" onClick={() => onPay(card)}>
-					<DollarSign className="h-4 w-4 mr-2" />
-					Pay Card
-				</Button>
-				<Button variant="outline" className="w-full" onClick={() => onViewPayments(card)}>
-					View Payments
-				</Button>
-			</CardContent>
-		</Card>
+							<div className='relative space-y-4 rounded-xl border border-border/60 bg-muted/20 p-3' onClick={(event) => event.stopPropagation()}>
+								{card.balances.map((balance) => (
+									<BalanceBar key={balance.id} balance={balance} />
+								))}
+							</div>
+
+							<div className='relative mt-auto space-y-2 pt-2' onClick={(event) => event.stopPropagation()}>
+								<Button variant='secondary' className='w-full' onClick={() => onPay(card)}>
+									<DollarSign className='mr-2 h-4 w-4' />
+									Pay Card
+								</Button>
+								<Button
+									variant='ghost'
+									className='w-full justify-center border border-border/60 text-foreground hover:bg-accent'
+									onClick={() => onViewPayments(card)}
+								>
+									View Payments
+								</Button>
+							</div>
+						</div>
+					</div>
+				</div>
+			</div>
+		</div>
 	)
 }
 

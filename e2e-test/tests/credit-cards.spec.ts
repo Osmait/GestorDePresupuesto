@@ -29,8 +29,9 @@ test.describe('Credit Cards @prod-write', () => {
 		await formModal.getByRole('button', { name: /^Create$/i }).click()
 		await expect(formModal).not.toBeVisible({ timeout: 20000 })
 
-		const card = page.getByRole('heading', { name: cardName }).first().locator('xpath=ancestor::*[contains(@class,"card")][1]')
+		const card = page.locator('[data-testid^="credit-card-item-"]').filter({ hasText: cardName }).first()
 		await expect(card).toBeVisible({ timeout: 20000 })
+		await card.getByRole('button', { name: /View details/i }).click()
 
 		await card.getByRole('button', { name: /Pay Card/i }).click()
 		const paymentModal = page.getByRole('dialog', { name: /Pay Credit Card/i })
@@ -50,7 +51,7 @@ test.describe('Credit Cards @prod-write', () => {
 		await page.keyboard.press('Escape')
 
 		// Update card
-		await card.getByRole('button').first().click()
+		await card.getByRole('button', { name: /Card options/i }).click()
 		await page.getByRole('menuitem', { name: /Edit/i }).click()
 
 		const editModal = page.getByRole('dialog', { name: /Edit Credit Card/i })
@@ -67,9 +68,12 @@ test.describe('Credit Cards @prod-write', () => {
 			hasText: new RegExp(`${cardName}(-UPD)?`),
 		}).first()
 		await expect(updatedCard).toBeVisible({ timeout: 20000 })
+		if (await updatedCard.getByRole('button', { name: /View details/i }).isVisible()) {
+			await updatedCard.getByRole('button', { name: /View details/i }).click()
+		}
 
 		// Delete card
-		await updatedCard.getByRole('button').first().click()
+		await updatedCard.getByRole('button', { name: /Card options/i }).click()
 		await page.getByRole('menuitem', { name: /Delete/i }).click()
 
 		const deleteDialog = page.getByRole('dialog', { name: /Delete Credit Card/i })

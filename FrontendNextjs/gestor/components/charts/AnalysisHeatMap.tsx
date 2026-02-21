@@ -21,6 +21,7 @@ const AnalysisHeatMap = ({ data, nivoTheme, t }: AnalysisHeatMapProps) => {
             axisRight={null} 
             axisBottom={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: t.month, legendOffset: 36, legendPosition: 'middle' }} 
             axisLeft={{ tickSize: 5, tickPadding: 5, tickRotation: 0, legend: t.day, legendOffset: -50, legendPosition: 'middle' }} 
+            colors={{ type: 'sequential', scheme: 'yellow_orange_red' }}
             borderColor={{ from: 'color', modifiers: [['darker', 0.4]] }} 
             labelTextColor={{ from: 'color', modifiers: [['darker', 1.8]] }} 
             theme={nivoTheme} 

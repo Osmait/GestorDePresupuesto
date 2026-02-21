@@ -89,6 +89,8 @@ export abstract class BaseRepository {
             errorCode = errorData.error.code;
             errorDetails = errorData.error.details;
           }
+        } else if (typeof errorData?.err === 'string') {
+          errorMessage = errorData.err;
         } else if (typeof errorData?.message === 'string') {
           errorMessage = errorData.message;
         }

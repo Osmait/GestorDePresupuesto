@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
 import { DateRange } from 'react-day-picker'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useGetTransactions, useCreateTransactionMutation, useDeleteTransactionMutation, useUpdateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { TransactionFilters, TransactionSummary } from '@/types/transaction'
 
@@ -34,6 +34,32 @@ function getCurrentMonthRangeInSantoDomingo(): DateRange {
     const from = new Date(year, month - 1, 1)
     const to = new Date(year, month - 1 + 1, 0)
     return { from, to }
+}
+
+function parseDateFromParam(value: string | null): Date | undefined {
+    if (!value) return undefined
+    const date = new Date(`${value}T00:00:00`)
+    if (Number.isNaN(date.getTime())) return undefined
+    return date
+}
+
+function buildInitialFiltersFromURL(searchParams: URLSearchParams): TransactionFiltersState {
+    const from = parseDateFromParam(searchParams.get('dateFrom'))
+    const to = parseDateFromParam(searchParams.get('dateTo'))
+    const defaultRange = getCurrentMonthRangeInSantoDomingo()
+
+    return {
+        dateRange: { from: from || defaultRange.from, to: to || defaultRange.to },
+        type: searchParams.get('type') || 'all',
+        account: searchParams.get('account') || 'all',
+        category: searchParams.get('category') || 'all',
+        budget: searchParams.get('budget') || 'all',
+        minAmount: searchParams.get('minAmount') || '',
+        maxAmount: searchParams.get('maxAmount') || '',
+        search: searchParams.get('search') || '',
+        sortBy: searchParams.get('sortBy') || 'created_at',
+        sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
+    }
 }
 
 // Filter Type
@@ -74,20 +100,10 @@ export const TransactionContext = createContext<TransactionContextType | undefin
 
 export function TransactionProvider({ children }: { children: ReactNode }) {
     const router = useRouter()
+    const searchParams = useSearchParams()
 
     // Filter State
-    const [filters, setFilters] = useState<TransactionFiltersState>({
-        dateRange: getCurrentMonthRangeInSantoDomingo(),
-        type: 'all',
-        account: 'all',
-        category: 'all',
-        budget: 'all',
-        minAmount: '',
-        maxAmount: '',
-        search: '',
-        sortBy: 'created_at',
-        sortOrder: 'desc',
-    })
+    const [filters, setFilters] = useState<TransactionFiltersState>(() => buildInitialFiltersFromURL(searchParams))
 
     // React Query Hooks
     const [activeFilters, setActiveFilters] = useState<TransactionFilters>({})

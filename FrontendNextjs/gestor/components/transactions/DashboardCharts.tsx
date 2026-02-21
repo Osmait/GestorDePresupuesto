@@ -26,19 +26,17 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 	const { theme } = useTheme()
 	const t = useTranslations('charts')
 
-
-
-	const truncate = (str: string, n: number) => str.length > n ? str.slice(0, n) : str
-
-	const pieData = categorysData ? categorysData.map(cat => {
-		return {
-			...cat,
-			id: truncate(cat.label || cat.id, 12),
-			originalId: cat.id,
-			originalLabel: cat.label,
-			value: Math.abs(cat.value),
-		}
-	}) : []
+	const pieData = categorysData
+		? [...categorysData]
+			.map((cat) => ({
+				...cat,
+				id: cat.id,
+				label: cat.label || cat.id,
+				value: Math.abs(cat.value),
+			}))
+			.filter((cat) => cat.value > 0)
+			.sort((a, b) => b.value - a.value)
+		: []
 
 	// Transform data to use translated keys
 	const barData = monthSummary ? monthSummary.map(month => {
@@ -96,7 +94,7 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 		<div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-10">
 			<div className="bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center">
 				<h3 className="font-semibold mb-2 text-lg text-foreground">{t('expensesByCategory')}</h3>
-				<div className="h-64 w-full">
+				<div className="h-[320px] w-full">
                     <DashboardPieChart 
                         data={pieData}
                         theme={theme}
@@ -127,4 +125,3 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 		</div>
 	)
 }
-

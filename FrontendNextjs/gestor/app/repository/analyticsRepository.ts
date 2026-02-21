@@ -1,5 +1,5 @@
 import { BaseRepository } from "@/lib/base-repository";
-import { CategoryExpense, DashboardSummary, MonthlySummary } from "@/types/analytics";
+import { AnalyticsQueryFilters, CategoryExpense, DashboardSummary, MonthlySummary } from "@/types/analytics";
 
 export class AnalyticsRepository extends BaseRepository {
 	async getCategoryExpenses(): Promise<CategoryExpense[]> {
@@ -22,9 +22,24 @@ export class AnalyticsRepository extends BaseRepository {
 		}
 	}
 
-	async getDashboardSummary(): Promise<DashboardSummary> {
+	async getDashboardSummary(filters?: AnalyticsQueryFilters): Promise<DashboardSummary> {
 		try {
-			const data = await this.get<DashboardSummary>("/analytics/dashboard-summary");
+			const params = new URLSearchParams();
+			if (filters?.date_from) params.set('date_from', filters.date_from)
+			if (filters?.date_to) params.set('date_to', filters.date_to)
+			if (filters?.account_id && filters.account_id !== 'all') params.set('account_id', filters.account_id)
+			if (filters?.category_id && filters.category_id !== 'all') params.set('category_id', filters.category_id)
+			if (filters?.type && filters.type !== 'income' && filters.type !== 'bill') {
+				// noop, guard invalid values
+			} else if (filters?.type) {
+				params.set('type', filters.type)
+			}
+
+			const endpoint = params.toString()
+				? `/analytics/dashboard-summary?${params.toString()}`
+				: '/analytics/dashboard-summary'
+
+			const data = await this.get<DashboardSummary>(endpoint);
 			return data;
 		} catch (error) {
 			console.error("Error fetching dashboard summary:", error);

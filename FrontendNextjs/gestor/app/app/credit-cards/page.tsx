@@ -11,7 +11,7 @@ import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Plus, CreditCard as CardIcon, AlertCircle } from 'lucide-react'
+import { Plus, CreditCard as CardIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import {
 	Dialog,
@@ -181,15 +181,20 @@ export default function CreditCardsPage() {
 	const totalLimitUSD = summary ? summaryLimitUSD : localTotalLimitUSD
 	const totalLimit = totalLimitDOP + (totalLimitUSD * usdToDopRate)
 	const avgUtilization = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0
+	const utilizationStatus = avgUtilization > 60 ? 'High Risk' : avgUtilization > 30 ? 'Watch' : 'Healthy'
+	const utilizationStatusClass = avgUtilization > 60
+		? 'text-destructive'
+		: avgUtilization > 30
+			? 'text-warning'
+			: 'text-success'
 
 	if (loading) {
 		return (
 			<div className="container mx-auto p-6 space-y-6">
 				<Skeleton className="h-8 w-48" />
 				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-					<Skeleton className="h-24" />
-					<Skeleton className="h-24" />
-					<Skeleton className="h-24" />
+					<Skeleton className="h-36 md:col-span-2" />
+					<Skeleton className="h-36" />
 				</div>
 				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
 					<Skeleton className="h-64" />
@@ -213,53 +218,40 @@ export default function CreditCardsPage() {
 				</Button>
 			</div>
 
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-				<Card>
-					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">Total Cards</CardTitle>
+			<div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+				<Card className='border-border/60 bg-card/60 md:col-span-2'>
+					<CardHeader className='pb-1'>
+						<CardTitle className='text-sm font-medium text-muted-foreground'>General Summary</CardTitle>
 					</CardHeader>
-					<CardContent>
-						<div className="flex items-center gap-2">
-							<CardIcon className="h-5 w-5 text-primary" />
-							<span className="text-2xl font-bold">{cardsList.length}</span>
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">Total Debt</CardTitle>
-					</CardHeader>
-					<CardContent>
-						<div className="space-y-1">
-							<p className="text-xs text-muted-foreground">
-								DOP: {totalDebtDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
-							</p>
-							<p className="text-xs text-muted-foreground">
-								USD: {totalDebtUSD.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-							</p>
-							<p className="text-xs text-muted-foreground">
-								USD→DOP: {totalDebtUSDInDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
-							</p>
-							<span className="text-2xl font-bold text-destructive block">
+					<CardContent className='space-y-3 pt-0'>
+						<div className='flex items-center gap-2'>
+							<CardIcon className='h-5 w-5 text-primary' />
+							<span className='text-3xl font-semibold text-foreground'>
 								{totalDebt.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
 							</span>
-							{usdToDopRate > 0 && (
-								<p className="text-xs text-muted-foreground">Rate: 1 USD = {usdToDopRate.toFixed(2)} DOP</p>
-							)}
 						</div>
+
+						<div className='grid grid-cols-1 gap-1 text-[12px] text-muted-foreground sm:grid-cols-2'>
+							<p>DOP: {totalDebtDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}</p>
+							<p>USD: {totalDebtUSD.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</p>
+							<p>USD→DOP: {totalDebtUSDInDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}</p>
+							<p>{cardsList.length} active cards</p>
+						</div>
+
+						{usdToDopRate > 0 && (
+							<p className='text-[11px] text-muted-foreground'>Rate: 1 USD = {usdToDopRate.toFixed(2)} DOP</p>
+						)}
 					</CardContent>
 				</Card>
 
-				<Card>
-					<CardHeader className="pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">Avg Utilization</CardTitle>
+				<Card className='border-border/60 bg-card/60'>
+					<CardHeader className='pb-1'>
+						<CardTitle className='text-sm font-medium text-muted-foreground'>Credit Health</CardTitle>
 					</CardHeader>
-					<CardContent>
-						<div className="flex items-center gap-2">
-							<span className="text-2xl font-bold">{avgUtilization.toFixed(1)}%</span>
-							{avgUtilization > 60 && <AlertCircle className="h-5 w-5 text-orange-500" />}
-						</div>
+					<CardContent className='space-y-3 pt-0'>
+						<p className='text-3xl font-semibold text-foreground'>{avgUtilization.toFixed(1)}%</p>
+						<p className={`text-sm font-medium ${utilizationStatusClass}`}>{utilizationStatus}</p>
+						<p className='text-[12px] text-muted-foreground'>Target: below 30%</p>
 					</CardContent>
 				</Card>
 			</div>
@@ -279,7 +271,7 @@ export default function CreditCardsPage() {
 					</div>
 				</Card>
 			) : (
-				<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+				<div className='grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3'>
 					{cardsList.map((card) => (
 						<CreditCardItem
 							key={card.id}
