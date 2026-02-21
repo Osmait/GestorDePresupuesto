@@ -35,7 +35,7 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 
 	return (
 		<div className='h-full' data-testid={`credit-card-item-${card.id}`}>
-			<div className='relative h-[460px]' style={{ perspective: '1200px' }}>
+			<div className='relative h-[320px]' style={{ perspective: '1200px' }}>
 				<div
 					className='relative h-full w-full transition-transform duration-500'
 					style={{
@@ -44,9 +44,8 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 					}}
 				>
 					<div
-						className={isFlipped ? 'pointer-events-none absolute inset-0' : 'pointer-events-auto absolute inset-0 cursor-pointer'}
+						className={isFlipped ? 'pointer-events-none absolute inset-0' : 'pointer-events-auto absolute inset-0'}
 						style={{ backfaceVisibility: 'hidden' }}
-						onClick={() => setIsFlipped(true)}
 					>
 						<CreditCardAtroposVisual
 							card={card}
@@ -62,7 +61,7 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 							transform: 'rotateY(180deg)',
 						}}
 					>
-						<div className='relative flex h-full flex-col space-y-4 overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground'>
+						<div className='relative flex h-full flex-col space-y-3 overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground'>
 							<div className='pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent' />
 							<div className='flex items-center justify-between'>
 								<div className='relative'>
@@ -101,7 +100,7 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 								))}
 							</div>
 
-							<div className='relative mt-auto space-y-2 pt-2' onClick={(event) => event.stopPropagation()}>
+							<div className='relative space-y-2 pt-1' onClick={(event) => event.stopPropagation()}>
 								<Button variant='secondary' className='w-full' onClick={() => onPay(card)}>
 									<DollarSign className='mr-2 h-4 w-4' />
 									Pay Card

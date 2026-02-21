@@ -25,7 +25,7 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 	}, [])
 
 	const visualContent = (
-		<div className='relative overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground'>
+		<div className='relative cursor-pointer overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground' onClick={onFlip}>
 			<div className='pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent' />
 			<div className='relative space-y-4'>
 				<div className='flex items-center justify-between'>
@@ -44,7 +44,10 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 						size='sm'
 						type='button'
 						onPointerDown={(event) => event.stopPropagation()}
-						onClick={onFlip}
+						onClick={(event) => {
+							event.stopPropagation()
+							onFlip()
+						}}
 						className='h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground'
 					>
 						<ArrowLeftRight className='h-3 w-3' />
@@ -103,6 +106,7 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 
 	return (
 		<Atropos
+			onClick={onFlip}
 			activeOffset={16}
 			shadowScale={0.98}
 			rotateXMax={5}

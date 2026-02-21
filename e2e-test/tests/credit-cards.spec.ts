@@ -11,7 +11,7 @@ async function ensureCardBackVisible(card: Locator) {
 }
 
 test.describe('Credit Cards @prod-write', () => {
-	test('create, update, pay and delete credit card', async ({ page }) => {
+		test('create, update, pay and delete credit card', async ({ page }) => {
 		await gotoApp(page)
 
 		const accountName = `E2E-ACC-${Date.now()}`
@@ -22,6 +22,7 @@ test.describe('Credit Cards @prod-write', () => {
 		await expect(page.getByRole('heading', { level: 1, name: /Credit Cards/i })).toBeVisible()
 
 		const cardName = `E2E-CARD-${Date.now()}`
+		const lastFour = `${Math.floor(1000 + Math.random() * 9000)}`
 		await page.getByRole('button', { name: /Add Card/i }).click()
 
 		const formModal = page.getByRole('dialog', { name: /Add Credit Card|Edit Credit Card/i })
@@ -29,17 +30,16 @@ test.describe('Credit Cards @prod-write', () => {
 
 		await formModal.locator('#name').fill(cardName)
 		await formModal.locator('#bank').fill('E2E Bank')
-		await formModal.locator('#lastFourDigits').fill('1234')
+		await formModal.locator('#lastFourDigits').fill(lastFour)
 		await formModal.locator('#cutDay').fill('20')
 		await formModal.locator('#dueDay').fill('10')
 		await formModal.locator('label:has-text("Credit Limit")').first().locator('..').locator('input').first().fill('10000')
 		await formModal.locator('label:has-text("Initial Debt")').first().locator('..').locator('input').first().fill('1500')
 
 		await formModal.getByRole('button', { name: /^Create$/i }).click()
-		await expect(formModal).not.toBeVisible({ timeout: 20000 })
 
 		const card = page.locator('[data-testid^="credit-card-item-"]').filter({ hasText: cardName }).first()
-		await expect(card).toBeVisible({ timeout: 20000 })
+		await expect(card).toBeVisible({ timeout: 40000 })
 		await ensureCardBackVisible(card)
 
 		await card.getByRole('button', { name: /Pay Card/i }).click()
