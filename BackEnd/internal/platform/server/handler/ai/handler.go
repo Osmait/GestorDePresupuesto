@@ -1124,7 +1124,7 @@ func monthsUntilTargetDate(targetDate string) (int, bool) {
 		return 0, false
 	}
 
-	monthsAvailable := int(math.Ceil(parsedDate.Sub(time.Now()).Hours() / (24 * 30)))
+	monthsAvailable := int(math.Ceil(time.Until(parsedDate).Hours() / (24 * 30)))
 	if monthsAvailable < 0 {
 		monthsAvailable = 0
 	}

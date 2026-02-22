@@ -15,6 +15,13 @@ vi.mock('@/hooks/useAdmin', () => ({
     })
 }))
 
+vi.mock('@/hooks/useFeatureFlags', () => ({
+    useFeatureFlags: () => ({
+        isEnabled: () => true,
+        isLoading: false,
+    })
+}))
+
 describe('useNavItems', () => {
     it('returns navigation items array', () => {
         const { result } = renderHook(() => useNavItems())
