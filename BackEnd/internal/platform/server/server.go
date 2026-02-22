@@ -131,6 +131,8 @@ func New(ctx context.Context,
 func (s *Server) registerRoutes() {
 	// Basic middleware
 	s.Engine.Use(cors.AllowAll())
+	s.Engine.Use(middleware.RequestContext())
+	s.Engine.Use(middleware.RequestLogging(s.config))
 
 	// Error handling middleware (must be first)
 	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
@@ -148,6 +150,7 @@ func (s *Server) registerRoutes() {
 
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
+	s.Engine.Use(middleware.AttachUserContext())
 
 	// Notification Route (SSE)
 	notificationH := notificationHandler.NewNotificationHandler(s.notificationService)

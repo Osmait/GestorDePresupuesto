@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useSession } from 'next-auth/react'
+import { ApiError, toApiError } from '@/lib/api-error'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080'
 
@@ -40,7 +41,7 @@ export function useFeatureFlags() {
 			})
 
 			if (!response.ok) {
-				throw new Error(`failed to load feature flags: ${response.status}`)
+				throw await toApiError(response, 'Failed to load feature flags')
 			}
 
 			const data = await response.json()
@@ -71,7 +72,15 @@ export function useFeatureFlags() {
 		try {
 			const loadedFlags = await loadFlags()
 			setFlags(loadedFlags)
-		} catch {
+		} catch (error) {
+			if (error instanceof ApiError) {
+				console.warn('[useFeatureFlags] Failed to load feature flags', {
+					status: error.status,
+					code: error.code,
+					requestId: error.requestId,
+					message: error.message,
+				})
+			}
 			if (!hasLoadedFlags) {
 				hasLoadedFlags = true
 				cachedFlags = {}

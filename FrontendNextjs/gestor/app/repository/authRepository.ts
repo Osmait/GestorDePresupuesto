@@ -1,3 +1,5 @@
+import { normalizeUserError, toApiError } from '@/lib/api-error'
+
 // Auth response from backend /auth/login endpoint
 export interface AuthTokenResponse {
   access_token: string
@@ -41,11 +43,12 @@ export class AuthRepository {
     try {
       const response = await fetch(`${this.url}/auth/login`, options);
       if (!response.ok) {
+				console.error(normalizeUserError(await toApiError(response, 'Login failed')))
         return null;
       }
       return await response.json();
     } catch (error) {
-      console.error("Login error:", error);
+      console.error(normalizeUserError(error, 'Login error'));
       return null;
     }
   }
@@ -62,12 +65,12 @@ export class AuthRepository {
     try {
       const response = await fetch(`${this.url}/auth/refresh`, options);
       if (!response.ok) {
-        console.error("Token refresh failed:", response.status);
+				console.error(normalizeUserError(await toApiError(response, 'Token refresh failed')))
         return null;
       }
       return await response.json();
     } catch (error) {
-      console.error("Refresh error:", error);
+      console.error(normalizeUserError(error, 'Refresh error'));
       return null;
     }
   }
@@ -154,13 +157,11 @@ export class AuthRepository {
     try {
       const response = await fetch(`${this.url}/auth/demo`, options);
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error("Demo login failed:", errorData);
-        throw new Error(errorData || "Error creating demo account");
+				throw await toApiError(response, 'Error creating demo account')
       }
       return await response.json(); // Returns the token string
     } catch (error) {
-      console.log(error);
+			console.error(normalizeUserError(error, 'Demo login failed'))
       throw error;
     }
   }

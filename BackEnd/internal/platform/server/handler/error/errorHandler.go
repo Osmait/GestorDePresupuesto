@@ -1,31 +1,42 @@
 package errorHandler
 
 import (
-	"net/http"
-	"time"
+	"context"
+	"errors"
 
 	"github.com/gin-gonic/gin"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 )
 
 func ResponseByTypeOfErr(err error, ctx *gin.Context) {
+	if err == nil {
+		return
+	}
+
+	if _, ok := apperrors.AsAppError(err); ok {
+		_ = ctx.Error(err)
+		return
+	}
+
+	operation := ctx.Request.Method + " " + ctx.FullPath()
 	switch {
 	case errorhttp.IsErrNotDuplicate(err):
-		errorResponse := errorhttp.NewErrorApp(http.StatusConflict, ctx.Request.URL.Path, err.Error(), time.Now())
-		ctx.AbortWithStatusJSON(http.StatusConflict, errorResponse)
+		_ = ctx.Error(apperrors.NewConflictError("resource", err.Error()).WithCause(err).WithContext(ctx.Request.Context()).WithOperation(operation))
 		return
 	case errorhttp.IsErrNotBadRequest(err):
-		errorResponse := errorhttp.NewErrorApp(http.StatusBadRequest, ctx.Request.URL.Path, err.Error(), time.Now())
-		ctx.AbortWithStatusJSON(http.StatusBadRequest, errorResponse)
+		_ = ctx.Error(apperrors.NewValidationError("BAD_REQUEST", err.Error()).WithCause(err).WithContext(ctx.Request.Context()).WithOperation(operation))
 		return
 	case errorhttp.IsErrNotFound(err):
-		errorResponse := errorhttp.NewErrorApp(http.StatusNotFound, ctx.Request.URL.Path, err.Error(), time.Now())
-		ctx.AbortWithStatusJSON(http.StatusNotFound, errorResponse)
+		_ = ctx.Error(apperrors.NewNotFoundError("resource", err.Error()).WithCause(err).WithContext(ctx.Request.Context()).WithOperation(operation))
 		return
 
 	default:
-		errorResponse := errorhttp.NewErrorApp(http.StatusInternalServerError, ctx.Request.URL.Path, err.Error(), time.Now())
-		ctx.AbortWithStatusJSON(http.StatusInternalServerError, errorResponse)
+		wrapped := apperrors.NewInternalError("internal server error", err).WithContext(ctx.Request.Context()).WithOperation(operation)
+		if errors.Is(err, context.Canceled) {
+			wrapped = apperrors.NewInternalError("request cancelled", err).WithContext(ctx.Request.Context()).WithOperation(operation)
+		}
+		_ = ctx.Error(wrapped)
 		return
 
 	}

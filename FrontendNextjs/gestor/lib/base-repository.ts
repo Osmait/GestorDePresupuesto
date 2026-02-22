@@ -1,5 +1,6 @@
 import { getSession } from "next-auth/react";
 import { auth } from "@/auth";
+import { ApiError } from '@/lib/api-error'
 
 export abstract class BaseRepository {
   protected readonly baseUrl = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
@@ -98,16 +99,12 @@ export abstract class BaseRepository {
         // ignore json parse error
       }
 
-      const error = new Error(errorMessage) as Error & {
-        status?: number;
-        code?: string;
-        details?: unknown;
-        requestId?: string;
-      };
-      error.status = response.status;
-      error.code = errorCode;
-      error.details = errorDetails;
-      error.requestId = requestId;
+      const error = new ApiError(errorMessage, {
+        status: response.status,
+        code: errorCode,
+        details: errorDetails,
+        requestId,
+      })
       throw error;
     }
 

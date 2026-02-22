@@ -6,6 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	authDomain "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/rs/zerolog/log"
@@ -28,17 +29,17 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 		var authRequest authDomain.AuthRequest
 		err := ctx.Bind(&authRequest)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, err)
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid login payload").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.Login"))
 			return
 		}
 		token, err := authService.Login(ctx, &authRequest)
 		if err != nil {
 			switch {
 			case errors.Is(err, errorhttp.ErrBadRequest):
-				ctx.JSON(http.StatusBadRequest, err)
+				_ = ctx.Error(apperrors.NewValidationError("INVALID_CREDENTIALS", "Invalid email or password").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.Login"))
 				return
 			}
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "problem with password or email "})
+			_ = ctx.Error(apperrors.NewInternalError("authentication failed", err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.Login"))
 			return
 		}
 		ctx.JSON(http.StatusOK, token)
@@ -62,7 +63,7 @@ func LoginWithTokens(authService *auth.AuthService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var authRequest authDomain.AuthRequest
 		if err := ctx.ShouldBindJSON(&authRequest); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid login payload").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.LoginWithTokens"))
 			return
 		}
 
@@ -73,11 +74,11 @@ func LoginWithTokens(authService *auth.AuthService) gin.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, errorhttp.ErrBadRequest):
-				ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
+				_ = ctx.Error(apperrors.NewUnauthorizedError("invalid email or password").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.LoginWithTokens"))
 				return
 			}
 			log.Error().Err(err).Msg("login failed")
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "authentication failed"})
+			_ = ctx.Error(apperrors.NewInternalError("authentication failed", err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.LoginWithTokens"))
 			return
 		}
 
@@ -102,7 +103,7 @@ func RefreshTokens(authService *auth.AuthService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var request authDomain.RefreshRequest
 		if err := ctx.ShouldBindJSON(&request); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "refresh_token is required"})
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_REQUEST", "refresh_token is required").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.RefreshTokens"))
 			return
 		}
 
@@ -113,17 +114,17 @@ func RefreshTokens(authService *auth.AuthService) gin.HandlerFunc {
 		if err != nil {
 			switch {
 			case errors.Is(err, auth.ErrInvalidRefreshToken):
-				ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid refresh token"})
+				_ = ctx.Error(apperrors.NewUnauthorizedError("invalid refresh token").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.RefreshTokens"))
 				return
 			case errors.Is(err, auth.ErrRefreshTokenExpired):
-				ctx.JSON(http.StatusUnauthorized, gin.H{"error": "refresh token expired"})
+				_ = ctx.Error(apperrors.NewUnauthorizedError("refresh token expired").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.RefreshTokens"))
 				return
 			case errors.Is(err, auth.ErrTokenReuse):
-				ctx.JSON(http.StatusUnauthorized, gin.H{"error": "token reuse detected - please login again"})
+				_ = ctx.Error(apperrors.NewUnauthorizedError("token reuse detected - please login again").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.RefreshTokens"))
 				return
 			}
 			log.Error().Err(err).Msg("token refresh failed")
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "token refresh failed"})
+			_ = ctx.Error(apperrors.NewInternalError("token refresh failed", err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.RefreshTokens"))
 			return
 		}
 
@@ -147,13 +148,13 @@ func Logout(authService *auth.AuthService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		var request authDomain.RefreshRequest
 		if err := ctx.ShouldBindJSON(&request); err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "refresh_token is required"})
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_REQUEST", "refresh_token is required").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.Logout"))
 			return
 		}
 
 		if err := authService.Logout(ctx, request.RefreshToken); err != nil {
 			log.Error().Err(err).Msg("logout failed")
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "logout failed"})
+			_ = ctx.Error(apperrors.NewInternalError("logout failed", err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.Logout"))
 			return
 		}
 
@@ -177,13 +178,13 @@ func LogoutAll(authService *auth.AuthService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId, exists := ctx.Get("X-User-Id")
 		if !exists {
-			ctx.JSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			_ = ctx.Error(apperrors.NewUnauthorizedError("authentication required").WithContext(ctx.Request.Context()).WithOperation("AuthHandler.LogoutAll"))
 			return
 		}
 
 		if err := authService.LogoutAll(ctx, userId.(string)); err != nil {
 			log.Error().Err(err).Msg("logout all failed")
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "logout failed"})
+			_ = ctx.Error(apperrors.NewInternalError("logout failed", err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.LogoutAll"))
 			return
 		}
 
@@ -207,7 +208,7 @@ func DemoLogin(authService *auth.AuthService) gin.HandlerFunc {
 		token, err := authService.CreateDemoUser(ctx, ip)
 		if err != nil {
 			log.Error().Err(err).Msg("demo user creation failed")
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			_ = ctx.Error(apperrors.NewInternalError("demo user creation failed", err).WithContext(ctx.Request.Context()).WithOperation("AuthHandler.DemoLogin"))
 			return
 		}
 		ctx.JSON(http.StatusOK, token)

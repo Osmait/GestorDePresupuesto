@@ -3,49 +3,23 @@ import { BaseRepository } from "@/lib/base-repository";
 
 export class BudgetRepository extends BaseRepository {
   async findAll(): Promise<Budget[]> {
-    try {
-      const budgets = await this.get<Budget[]>("/budget");
-      return budgets;
-    } catch (error) {
-      console.error("Error fetching budgets:", error);
-      return [];
-    }
+    return this.get<Budget[]>("/budget");
   }
 
   async create(category_id: string, amount: number): Promise<void> {
-    try {
-      await this.post("/budget", { category_id, amount });
-    } catch (error) {
-      console.error("Error creating budget:", error);
-      throw error;
-    }
+    await this.post("/budget", { category_id, amount });
   }
 
 
   async delete(id: string): Promise<void> {
-    try {
-      await this.deleteRequest(`/budget/${id}`);
-    } catch (error) {
-      console.error("Error deleting budget:", error);
-      throw error;
-    }
+    await this.deleteRequest(`/budget/${id}`);
   }
 
   async update(id: string, category_id: string, amount: number): Promise<void> {
-    try {
-      await this.put(`/budget/${id}`, { category_id, amount });
-    } catch (error) {
-      console.error("Error updating budget:", error);
-      throw error;
-    }
+    await this.put(`/budget/${id}`, { category_id, amount });
   }
 
-  async findById(id: string): Promise<Budget | null> {
-    try {
-      return await this.get<Budget>(`/budget/${id}`);
-    } catch (error) {
-      console.error("Error fetching budget by id:", error);
-      return null;
-    }
+  async findById(id: string): Promise<Budget> {
+    return this.get<Budget>(`/budget/${id}`);
   }
 }
