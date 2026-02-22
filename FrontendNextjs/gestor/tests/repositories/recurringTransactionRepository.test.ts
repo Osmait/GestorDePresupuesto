@@ -24,10 +24,9 @@ describe('RecurringTransactionRepository', () => {
             expect(result).toEqual(mockData)
         })
 
-        it('returns empty array on error', async () => {
+        it('throws on error', async () => {
             mockFetch.mockRejectedValue(new Error('Network'))
-            const result = await repo.findAll()
-            expect(result).toEqual([])
+            await expect(repo.findAll()).rejects.toThrow('Network')
         })
     })
 

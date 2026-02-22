@@ -2,6 +2,8 @@ package middleware
 
 import (
 	"context"
+	"fmt"
+	"regexp"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -173,6 +175,8 @@ func logError(ctx context.Context, c *gin.Context, appErr *apperrors.AppError, c
 	// Add request ID if available
 	if appErr.RequestID != "" {
 		fields["request_id"] = appErr.RequestID
+	} else if requestID := c.GetString("X-Request-ID"); requestID != "" {
+		fields["request_id"] = requestID
 	}
 
 	// Add details if available
@@ -184,6 +188,10 @@ func logError(ctx context.Context, c *gin.Context, appErr *apperrors.AppError, c
 	if config.LogStackTrace && appErr.Severity >= apperrors.SeverityHigh {
 		if appErr.Cause != nil {
 			fields["cause"] = appErr.Cause.Error()
+			fields["cause_type"] = fmt.Sprintf("%T", appErr.Cause)
+			if sqlState := extractSQLState(appErr.Cause.Error()); sqlState != "" {
+				fields["sql_state"] = sqlState
+			}
 		}
 	}
 
@@ -232,9 +240,24 @@ func sendErrorResponse(c *gin.Context, appErr *apperrors.AppError, config ErrorH
 	c.Header("Content-Type", "application/json")
 	c.Header("X-Error-Type", string(appErr.Type))
 	c.Header("X-Error-Code", appErr.Code)
+	if appErr.RequestID != "" {
+		c.Header("X-Request-ID", appErr.RequestID)
+	} else if requestID := c.GetString("X-Request-ID"); requestID != "" {
+		c.Header("X-Request-ID", requestID)
+	}
 
 	// Send response
 	c.JSON(appErr.ToHTTPStatus(), errorResponse)
+}
+
+var sqlStatePattern = regexp.MustCompile(`(?i)sqlstate\s*([0-9a-z]{5})`)
+
+func extractSQLState(message string) string {
+	matches := sqlStatePattern.FindStringSubmatch(strings.TrimSpace(message))
+	if len(matches) >= 2 {
+		return strings.ToUpper(matches[1])
+	}
+	return ""
 }
 
 // getSafeErrorMessage returns a safe error message for the client

@@ -2,8 +2,10 @@ package quote
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 )
 
@@ -18,17 +20,17 @@ func NewQuoteHandler(quoteService *quote.QuoteService) *QuoteHandler {
 func (h *QuoteHandler) GetQuote(ctx *gin.Context) {
 	symbol := ctx.Param("symbol")
 	if symbol == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "symbol is required"})
+		_ = ctx.Error(apperrors.NewValidationError("SYMBOL_REQUIRED", "symbol is required").WithContext(ctx.Request.Context()).WithOperation("QuoteHandler.GetQuote"))
 		return
 	}
 
 	price, currency, name, err := h.quoteService.GetQuote(symbol)
 	if err != nil {
-		if err.Error() == "quote not found" {
-			ctx.JSON(http.StatusNotFound, gin.H{"error": "quote not found"})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch quote: " + err.Error()})
+		if strings.Contains(strings.ToLower(err.Error()), "not found") {
+			_ = ctx.Error(apperrors.NewNotFoundError("QUOTE", symbol).WithCause(err).WithContext(ctx.Request.Context()).WithOperation("QuoteHandler.GetQuote"))
+			return
 		}
+		_ = ctx.Error(apperrors.NewInternalError("failed to fetch quote", err).WithContext(ctx.Request.Context()).WithOperation("QuoteHandler.GetQuote"))
 		return
 	}
 

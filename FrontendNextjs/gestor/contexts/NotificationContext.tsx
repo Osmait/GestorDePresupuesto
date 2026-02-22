@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { useNotification } from '@/hooks/useNotification'
+import { normalizeUserError, toApiError } from '@/lib/api-error'
 
 export interface NotificationItem {
     id: string
@@ -38,30 +39,30 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const token = session?.accessToken || (session?.user as any)?.accessToken
         if (!token) return
 
-        const fetchHistory = async () => {
-            try {
-                const res = await fetch(`${BASE_URL}/notifications/history`, {
-                    headers: {
-                        Authorization: `Bearer ${token}`
-                    }
-                })
-                if (res.ok) {
-                    const data = await res.json()
-                    // Map backend data to frontend model
-                    const mapped = (Array.isArray(data) ? data : []).map((n: any) => ({
-                        id: n.id,
-                        type: n.type,
-                        message: n.message,
-                        amount: n.amount,
-                        timestamp: new Date(n.created_at).getTime(),
-                        read: n.is_read
-                    }))
-                    setNotifications(mapped)
-                }
-            } catch (error) {
-                console.error("Failed to fetch notification history", error)
-            }
-        }
+		const fetchHistory = async () => {
+			try {
+				const res = await fetch(`${BASE_URL}/notifications/history`, {
+					headers: {
+						Authorization: `Bearer ${token}`
+					}
+				})
+				if (!res.ok) {
+					throw await toApiError(res, 'Failed to fetch notification history')
+				}
+				const data = await res.json()
+				const mapped = (Array.isArray(data) ? data : []).map((n: any) => ({
+					id: n.id,
+					type: n.type,
+					message: n.message,
+					amount: n.amount,
+					timestamp: new Date(n.created_at).getTime(),
+					read: n.is_read
+				}))
+				setNotifications(mapped)
+			} catch (error) {
+				console.error(normalizeUserError(error, 'Failed to fetch notification history'))
+			}
+		}
 
         fetchHistory()
     }, [session])
@@ -90,17 +91,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const token = session?.accessToken || (session?.user as any)?.accessToken
         if (!token) return
 
-        try {
-            await fetch(`${BASE_URL}/notifications/${id}/read`, {
-                method: 'PATCH',
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            })
-        } catch (error) {
-            console.error("Failed to mark notification as read", error)
-        }
-    }, [session])
+		try {
+			const res = await fetch(`${BASE_URL}/notifications/${id}/read`, {
+				method: 'PATCH',
+				headers: {
+					Authorization: `Bearer ${token}`
+				}
+			})
+			if (!res.ok) {
+				throw await toApiError(res, 'Failed to mark notification as read')
+			}
+		} catch (error) {
+			console.error(normalizeUserError(error, 'Failed to mark notification as read'))
+		}
+	}, [session])
 
     const markAllAsRead = useCallback(async () => {
         setNotifications(prev => prev.map(n => ({ ...n, read: true })))
@@ -109,17 +113,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const token = session?.accessToken || (session?.user as any)?.accessToken
         if (!token) return
 
-        try {
-            await fetch(`${BASE_URL}/notifications/read-all`, {
-                method: 'PATCH',
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            })
-        } catch (error) {
-            console.error("Failed to mark all as read", error)
-        }
-    }, [session])
+		try {
+			const res = await fetch(`${BASE_URL}/notifications/read-all`, {
+				method: 'PATCH',
+				headers: {
+					Authorization: `Bearer ${token}`
+				}
+			})
+			if (!res.ok) {
+				throw await toApiError(res, 'Failed to mark all notifications as read')
+			}
+		} catch (error) {
+			console.error(normalizeUserError(error, 'Failed to mark all as read'))
+		}
+	}, [session])
 
     const clearNotifications = useCallback(async () => {
         setNotifications([])
@@ -128,17 +135,20 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
         const token = session?.accessToken || (session?.user as any)?.accessToken
         if (!token) return
 
-        try {
-            await fetch(`${BASE_URL}/notifications`, {
-                method: 'DELETE',
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            })
-        } catch (error) {
-            console.error("Failed to delete all notifications", error)
-        }
-    }, [session])
+		try {
+			const res = await fetch(`${BASE_URL}/notifications`, {
+				method: 'DELETE',
+				headers: {
+					Authorization: `Bearer ${token}`
+				}
+			})
+			if (!res.ok) {
+				throw await toApiError(res, 'Failed to delete notifications')
+			}
+		} catch (error) {
+			console.error(normalizeUserError(error, 'Failed to delete notifications'))
+		}
+	}, [session])
 
     return (
         <NotificationContext.Provider value={{ notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications }}>

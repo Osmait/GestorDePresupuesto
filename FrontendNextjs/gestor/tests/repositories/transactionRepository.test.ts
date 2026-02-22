@@ -25,12 +25,11 @@ describe('TransactionRepository', () => {
             expect(result.data).toHaveLength(1)
         })
 
-        it('returns empty response on error', async () => {
-            mockFetch.mockRejectedValue(new Error('Network'))
-            const result = await repo.findAll()
-            expect(result.data).toEqual([])
-        })
-    })
+		it('throws on error', async () => {
+			mockFetch.mockRejectedValue(new Error('Network'))
+			await expect(repo.findAll()).rejects.toThrow('Network')
+		})
+	})
 
     describe('findAllSimple', () => {
         it('returns transaction data array', async () => {

@@ -7,6 +7,7 @@ import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
+import { normalizeUserError, toApiError } from '@/lib/api-error'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080'
 
@@ -57,20 +58,24 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		return [selectedUser, ...availableUsers]
 	}, [availableUsers, selectedUser])
 
+	const requestJson = async <T,>(url: string, init?: RequestInit): Promise<T> => {
+		const response = await fetch(url, init)
+		if (!response.ok) {
+			throw await toApiError(response)
+		}
+		return response.json() as Promise<T>
+	}
+
 	const loadCatalog = async () => {
 		setIsLoading(true)
 		try {
-			const response = await fetch(`${BASE_URL}/admin/features`, {
+			const data = await requestJson<{ data?: FeatureItem[] }>(`${BASE_URL}/admin/features`, {
 				headers: { Authorization: `Bearer ${token}` },
 			})
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
-			const data = await response.json()
 			setCatalogFeatures(data?.data || [])
 			setPendingGlobal({})
-		} catch (error: any) {
-			toast.error(`Error loading feature catalog: ${error.message}`)
+		} catch (error) {
+			toast.error(normalizeUserError(error, 'Unable to load feature catalog'))
 		} finally {
 			setIsLoading(false)
 		}
@@ -85,17 +90,13 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 
 		setIsLoading(true)
 		try {
-			const response = await fetch(`${BASE_URL}/admin/users/${userID}/features`, {
+			const data = await requestJson<{ data?: FeatureItem[] }>(`${BASE_URL}/admin/users/${userID}/features`, {
 				headers: { Authorization: `Bearer ${token}` },
 			})
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
-			const data = await response.json()
 			setFeatures(data?.data || [])
 			setPending({})
-		} catch (error: any) {
-			toast.error(`Error loading feature flags: ${error.message}`)
+		} catch (error) {
+			toast.error(normalizeUserError(error, 'Unable to load feature flags'))
 		} finally {
 			setIsLoading(false)
 		}
@@ -115,17 +116,12 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 					params.set('q', userSearch.trim())
 				}
 
-				const response = await fetch(`${BASE_URL}/users?${params.toString()}`, {
+				const data = await requestJson<UserResponse[]>(`${BASE_URL}/users?${params.toString()}`, {
 					headers: { Authorization: `Bearer ${token}` },
 				})
-				if (!response.ok) {
-					throw new Error(`failed: ${response.status}`)
-				}
-
-				const data = await response.json()
 				setAvailableUsers(data || [])
-			} catch (error: any) {
-				toast.error(`Error searching users: ${error.message}`)
+			} catch (error) {
+				toast.error(normalizeUserError(error, 'Unable to search users'))
 			} finally {
 				setIsSearchingUsers(false)
 			}
@@ -183,7 +179,7 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 				reason: 'admin toggle',
 			}))
 
-			const response = await fetch(`${BASE_URL}/admin/users/${selectedUserId}/features`, {
+			await requestJson(`${BASE_URL}/admin/users/${selectedUserId}/features`, {
 				method: 'PUT',
 				headers: {
 					'Content-Type': 'application/json',
@@ -192,14 +188,10 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 				body: JSON.stringify({ overrides }),
 			})
 
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
-
 			toast.success('Feature flags updated')
 			await loadUserFlags(selectedUserId)
-		} catch (error: any) {
-			toast.error(`Error saving feature flags: ${error.message}`)
+		} catch (error) {
+			toast.error(normalizeUserError(error, 'Unable to save feature flags'))
 		} finally {
 			setIsSaving(false)
 		}
@@ -215,7 +207,7 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		try {
 			for (const featureKey of keys) {
 				const enabled = pendingGlobal[featureKey]
-				const response = await fetch(`${BASE_URL}/admin/features/${featureKey}/global`, {
+				await requestJson(`${BASE_URL}/admin/features/${featureKey}/global`, {
 					method: 'PATCH',
 					headers: {
 						'Content-Type': 'application/json',
@@ -223,9 +215,6 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 					},
 					body: JSON.stringify({ enabled, reason: 'admin global toggle' }),
 				})
-				if (!response.ok) {
-					throw new Error(`failed: ${response.status}`)
-				}
 			}
 
 			toast.success('Global feature overrides updated')
@@ -233,8 +222,8 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 			if (selectedUserId) {
 				await loadUserFlags(selectedUserId)
 			}
-		} catch (error: any) {
-			toast.error(`Error saving global feature overrides: ${error.message}`)
+		} catch (error) {
+			toast.error(normalizeUserError(error, 'Unable to save global overrides'))
 		} finally {
 			setIsSaving(false)
 		}
@@ -242,21 +231,18 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 
 	const resetGlobalOverride = async (featureKey: string) => {
 		try {
-			const response = await fetch(`${BASE_URL}/admin/features/${featureKey}/global`, {
+			await requestJson(`${BASE_URL}/admin/features/${featureKey}/global`, {
 				method: 'DELETE',
 				headers: { Authorization: `Bearer ${token}` },
 			})
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
 
 			toast.success(`Reset global override for ${featureKey}`)
 			await loadCatalog()
 			if (selectedUserId) {
 				await loadUserFlags(selectedUserId)
 			}
-		} catch (error: any) {
-			toast.error(`Error resetting global override: ${error.message}`)
+		} catch (error) {
+			toast.error(normalizeUserError(error, 'Unable to reset global override'))
 		}
 	}
 
@@ -266,18 +252,15 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		}
 
 		try {
-			const response = await fetch(`${BASE_URL}/admin/users/${selectedUserId}/features/${featureKey}`, {
+			await requestJson(`${BASE_URL}/admin/users/${selectedUserId}/features/${featureKey}`, {
 				method: 'DELETE',
 				headers: { Authorization: `Bearer ${token}` },
 			})
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
 
 			toast.success(`Reset ${featureKey} to default`)
 			await loadUserFlags(selectedUserId)
-		} catch (error: any) {
-			toast.error(`Error resetting override: ${error.message}`)
+		} catch (error) {
+			toast.error(normalizeUserError(error, 'Unable to reset user override'))
 		}
 	}
 

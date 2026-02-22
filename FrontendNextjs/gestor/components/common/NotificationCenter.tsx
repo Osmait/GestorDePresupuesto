@@ -16,6 +16,7 @@ import { useNotificationContext, NotificationItem } from '@/contexts/Notificatio
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
+import { normalizeUserError, toApiError } from '@/lib/api-error'
 
 import { useSession } from "next-auth/react"
 
@@ -30,17 +31,20 @@ export function NotificationCenter() {
         const token = session?.accessToken || (session?.user as any)?.accessToken
         if (!token) return
 
-        try {
-            await fetch(`${BASE_URL}/notifications/test`, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${token}`
-                }
-            })
-        } catch (error) {
-            console.error("Failed to trigger test notification", error)
-        }
-    }
+		try {
+			const response = await fetch(`${BASE_URL}/notifications/test`, {
+				method: 'POST',
+				headers: {
+					Authorization: `Bearer ${token}`
+				}
+			})
+			if (!response.ok) {
+				throw await toApiError(response, 'Failed to trigger test notification')
+			}
+		} catch (error) {
+			console.error(normalizeUserError(error, 'Failed to trigger test notification'))
+		}
+	}
 
     return (
         <DropdownMenu>

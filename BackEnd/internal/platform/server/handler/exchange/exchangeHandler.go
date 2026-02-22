@@ -5,6 +5,7 @@ import (
 	"strconv"
 
 	"github.com/gin-gonic/gin"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	exchangeService "github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 )
 
@@ -23,13 +24,13 @@ func ConvertCurrency(service *exchangeService.ExchangeRateService) gin.HandlerFu
 	return func(ctx *gin.Context) {
 		amountStr := ctx.Query("amount")
 		if amountStr == "" {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "amount parameter is required"})
+			_ = ctx.Error(apperrors.NewValidationError("AMOUNT_REQUIRED", "amount parameter is required").WithContext(ctx.Request.Context()).WithOperation("ExchangeHandler.ConvertCurrency"))
 			return
 		}
 
 		amount, err := strconv.ParseFloat(amountStr, 64)
 		if err != nil {
-			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid amount"})
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_AMOUNT", "invalid amount").WithCause(err).WithContext(ctx.Request.Context()).WithOperation("ExchangeHandler.ConvertCurrency"))
 			return
 		}
 

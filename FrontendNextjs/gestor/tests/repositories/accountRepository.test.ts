@@ -45,12 +45,10 @@ describe('AccountRepository', () => {
             ])
         })
 
-        it('returns empty array on error', async () => {
+        it('throws on error', async () => {
             mockFetch.mockRejectedValue(new Error('Network error'))
 
-            const result = await repo.findAll()
-
-            expect(result).toEqual([])
+            await expect(repo.findAll()).rejects.toThrow('Network error')
         })
     })
 
@@ -87,12 +85,10 @@ describe('AccountRepository', () => {
             expect(result).toEqual({ id: '1', name: 'Checking', bank: 'Bank A', current_balance: 1000 })
         })
 
-        it('returns null on error', async () => {
+        it('throws on error', async () => {
             mockFetch.mockRejectedValue(new Error('Not found'))
 
-            const result = await repo.findById('invalid')
-
-            expect(result).toBeNull()
+            await expect(repo.findById('invalid')).rejects.toThrow('Not found')
         })
     })
 })
