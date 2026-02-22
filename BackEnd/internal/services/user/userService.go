@@ -338,3 +338,18 @@ func (u *UserService) GetAllUsers(ctx context.Context) ([]*dto.UserResponse, err
 		return response, nil
 	})
 }
+
+func (u *UserService) GetUsersFiltered(ctx context.Context, query string, limit int, offset int) ([]*dto.UserResponse, error) {
+	return apperrors.SafeCallWithResult(ctx, "GetUsersFiltered", func() ([]*dto.UserResponse, error) {
+		users, err := u.userRepository.FindAllFiltered(ctx, query, limit, offset)
+		if err != nil {
+			return nil, apperrors.WrapDatabaseError(ctx, err, "FindAllFiltered users")
+		}
+
+		response := make([]*dto.UserResponse, 0, len(users))
+		for _, user := range users {
+			response = append(response, dto.NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.Role, user.CreatedAt))
+		}
+		return response, nil
+	})
+}

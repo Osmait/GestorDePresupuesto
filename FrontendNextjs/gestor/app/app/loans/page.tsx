@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
 import { useQueryClient } from '@tanstack/react-query'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 
 const initialCreateForm: CreateLoanDTO = {
 	borrower_name: '',
@@ -70,12 +71,17 @@ export default function LoansPage() {
 	const openParam = searchParams.get('open') || ''
 	const lastAutoOpenKeyRef = useRef('')
 	const { data: accounts = [] } = useGetAccounts()
+	const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
+	const isLoansModuleEnabled = isEnabled('module_loans')
 
 	const accountOptions = useMemo(() => accounts.filter((account) => account.type !== 'credit_card'), [accounts])
 
 	useEffect(() => {
+		if (isFeatureFlagsLoading || !isLoansModuleEnabled) {
+			return
+		}
 		void loadData()
-	}, [])
+	}, [isFeatureFlagsLoading, isLoansModuleEnabled])
 
 	useEffect(() => {
 		const selectedId = selectedLoanIdParam
@@ -253,6 +259,20 @@ export default function LoansPage() {
 		if (status === 'active') return 'secondary'
 		if (status === 'defaulted') return 'destructive'
 		return 'outline'
+	}
+
+	if (isFeatureFlagsLoading) {
+		return <div className='container mx-auto p-6'>{t('loading')}</div>
+	}
+
+	if (!isLoansModuleEnabled) {
+		return (
+			<div className='container mx-auto space-y-4 p-6'>
+				<h1 className='text-2xl font-semibold'>{t('title')}</h1>
+				<p className='text-muted-foreground'>This module is currently disabled for your account.</p>
+				<Button variant='outline' onClick={() => router.push('/app')}>Go to dashboard</Button>
+			</div>
+		)
 	}
 
 	if (loading) {

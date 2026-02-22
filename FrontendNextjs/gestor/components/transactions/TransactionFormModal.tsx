@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -16,12 +16,16 @@ import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { es, enUS } from 'date-fns/locale';
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery';
-import { useGetCategories } from '@/hooks/queries/useCategoriesQuery';
+import { useGetCategories, useCreateCategoryMutation } from '@/hooks/queries/useCategoriesQuery';
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery';
+import { useSuggestCategoryMutation } from '@/hooks/queries/useAIQuery';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { useTransactionContext } from './TransactionContext';
 import { TypeTransaction } from '@/types/transaction';
 import { useTranslations, useLocale } from 'next-intl';
 import { getCreditCardRepository } from '@/lib/repositoryConfig';
+import { AICategorySuggestion } from '@/types/ai';
+import { toast } from 'sonner';
 
 const transactionSchema = z.object({
   name: z.string().min(2, 'El nombre es requerido'),
@@ -55,6 +59,39 @@ type TransactionFormModalProps = {
   formRef: React.MutableRefObject<{ reset: () => void } | null>;
 };
 
+function ensureUniqueCategoryName(baseName: string, existingNames: string[]): string {
+	const normalized = new Set(existingNames.map((name) => name.trim().toLowerCase()))
+	const cleanBase = baseName.trim() || 'Nueva categoría'
+
+	if (!normalized.has(cleanBase.toLowerCase())) {
+		return cleanBase
+	}
+
+	let candidate = `${cleanBase} - IA`
+	let index = 2
+	while (normalized.has(candidate.toLowerCase())) {
+		candidate = `${cleanBase} - IA ${index}`
+		index++
+	}
+
+	return candidate
+}
+
+function isSameSuggestion(a: AICategorySuggestion | null, b: AICategorySuggestion | null) {
+	if (!a || !b) {
+		return false
+	}
+
+	return (
+		a.category_id === b.category_id &&
+		a.category_name === b.category_name &&
+		a.new_category_name === b.new_category_name &&
+		a.confidence === b.confidence &&
+		Math.abs(a.score - b.score) < 0.0001 &&
+		a.reason === b.reason
+	)
+}
+
 const CURRENCIES = [
   { code: 'DOP', name: 'Peso Dominicano', symbol: 'RD$' },
   { code: 'USD', name: 'Dólar Estadounidense', symbol: 'US$' },
@@ -66,13 +103,24 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
   const tTx = useTranslations('transactions');
   const locale = useLocale();
   const { data: accounts = [] } = useGetAccounts();
-  const { data: categories = [] } = useGetCategories();
+  const { data: categories = [], refetch: refetchCategories } = useGetCategories();
   useGetBudgets(); // Keep hook for cache but don't use data directly
   const { editingTransaction, updateTransaction } = useTransactionContext();
+  const suggestCategoryMutation = useSuggestCategoryMutation()
+  const createCategoryMutation = useCreateCategoryMutation()
+  const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
+  const suggestionRequestRef = useRef(0)
+  const suggestCategoryFnRef = useRef(suggestCategoryMutation.mutateAsync)
+  const lastSuggestionInputRef = useRef('')
+
+  useEffect(() => {
+		suggestCategoryFnRef.current = suggestCategoryMutation.mutateAsync
+  }, [suggestCategoryMutation.mutateAsync])
 
   const isEditing = !!editingTransaction;
   const [cardCurrencies, setCardCurrencies] = useState<string[]>([])
   const [cardCurrenciesLoaded, setCardCurrenciesLoaded] = useState(false)
+  const [categorySuggestion, setCategorySuggestion] = useState<AICategorySuggestion | null>(null)
 
   const form = useForm<TransactionFormValues>({
     resolver: zodResolver(transactionSchema),
@@ -90,6 +138,12 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
   });
 
   const selectedAccountId = form.watch('account_id')
+  const typedName = form.watch('name')
+  const typedDescription = form.watch('description')
+  const typedAmount = form.watch('amount')
+  const typedType = form.watch('type_transaction')
+  const selectedCategoryId = form.watch('category_id')
+  const isCategorySuggestionsEnabled = isEnabled('ai_category_suggestions')
   const selectedAccount = accounts.find((acc) => acc.id === selectedAccountId)
   const selectedAccountType = selectedAccount?.type || 'bank'
   const selectedAccountCurrency = selectedAccount?.currency || 'DOP'
@@ -160,6 +214,101 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
     }
   }, [editingTransaction, form]);
 
+  useEffect(() => {
+	if (isEditing) {
+		lastSuggestionInputRef.current = ''
+		setCategorySuggestion(null)
+		return
+	}
+
+	if (!isCategorySuggestionsEnabled) {
+		lastSuggestionInputRef.current = ''
+		setCategorySuggestion(null)
+		return
+	}
+
+	if (isFeatureFlagsLoading) {
+		return
+	}
+
+	if (!typedName || typedName.trim().length < 3 || !selectedAccountId || !typedAmount || typedAmount <= 0 || selectedCategoryId) {
+		lastSuggestionInputRef.current = ''
+		setCategorySuggestion(null)
+		return
+	}
+
+	const timeout = setTimeout(async () => {
+		const normalizedName = typedName.trim().toLowerCase()
+		const normalizedDescription = (typedDescription || '').trim().toLowerCase()
+		const numericAmount = Number(typedAmount)
+		if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
+			lastSuggestionInputRef.current = ''
+			setCategorySuggestion(null)
+			return
+		}
+
+		const currentInputSignature = [
+			normalizedName,
+			normalizedDescription,
+			numericAmount.toFixed(2),
+			typedType,
+			selectedAccountId,
+			(form.getValues('currency') || 'DOP').toUpperCase(),
+		].join('|')
+
+		if (currentInputSignature === lastSuggestionInputRef.current) {
+			return
+		}
+		lastSuggestionInputRef.current = currentInputSignature
+
+		const currentRequest = suggestionRequestRef.current + 1
+		suggestionRequestRef.current = currentRequest
+
+		const suggestionType = typedType === TypeTransaction.INCOME ? 'income' : 'bill'
+		try {
+			const result = await suggestCategoryFnRef.current({
+				name: typedName,
+				description: typedDescription || '',
+				amount: numericAmount,
+				type_transation: suggestionType,
+				account_id: selectedAccountId,
+				currency: form.getValues('currency') || 'DOP',
+			})
+
+			if (currentRequest !== suggestionRequestRef.current) {
+				return
+			}
+
+			if ('success' in result && result.success && result.data) {
+				const nextSuggestion = result.data
+				setCategorySuggestion((prev) => (isSameSuggestion(prev, nextSuggestion) ? prev : nextSuggestion))
+				return
+			}
+
+			lastSuggestionInputRef.current = ''
+			setCategorySuggestion(null)
+		} catch {
+			if (currentRequest === suggestionRequestRef.current) {
+				lastSuggestionInputRef.current = ''
+				setCategorySuggestion(null)
+			}
+		}
+	}, 450)
+
+	return () => clearTimeout(timeout)
+  }, [
+	typedName,
+	typedDescription,
+	typedAmount,
+	typedType,
+	selectedAccountId,
+	selectedCategoryId,
+	isEditing,
+	isFeatureFlagsLoading,
+	isCategorySuggestionsEnabled,
+	form,
+  ])
+
   async function onSubmit(values: TransactionFormValues) {
     try {
       if (isEditing) {
@@ -193,6 +342,50 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
     } catch {
       // Error is handled via the error prop
     }
+  }
+
+  const applyCategorySuggestion = () => {
+	if (!categorySuggestion) {
+		return
+	}
+	form.setValue('category_id', categorySuggestion.category_id, { shouldValidate: true, shouldDirty: true })
+	setCategorySuggestion(null)
+  }
+
+  const createCategoryFromSuggestion = async () => {
+	if (!categorySuggestion) {
+		return
+	}
+
+	const suggestedName = ensureUniqueCategoryName(
+		categorySuggestion.new_category_name || categorySuggestion.category_name,
+		categories.map((category) => category.name)
+	)
+	if (!suggestedName) {
+		return
+	}
+
+	try {
+		await createCategoryMutation.mutateAsync({
+			name: suggestedName,
+			icon: '📦',
+			color: '#22c55e',
+		})
+
+		const refreshed = await refetchCategories()
+		const createdCategory = (refreshed.data || []).find(
+			(category) => category.name.toLowerCase() === suggestedName.toLowerCase()
+		)
+
+		if (createdCategory) {
+			form.setValue('category_id', createdCategory.id, { shouldValidate: true, shouldDirty: true })
+		}
+
+		setCategorySuggestion(null)
+		toast.success(t('categoryCreated', { name: suggestedName }))
+	} catch {
+		toast.error(t('failedToCreateCategory'))
+	}
   }
 
   async function handleAccountChange(accountId: string, onChange: (_value: string) => void) {
@@ -336,6 +529,32 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
                     </Select>
                   </FormControl>
                   <FormMessage />
+					{categorySuggestion && (
+						<div className='mt-2 flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-xs'>
+							<span>
+								{t('aiSuggestionLabel', {
+									name: categorySuggestion.category_name,
+									confidence: t(`confidence.${categorySuggestion.confidence}`),
+								})}
+							</span>
+							<Button type='button' variant='ghost' size='sm' onClick={applyCategorySuggestion}>
+								{t('apply')}
+							</Button>
+							<Button
+								type='button'
+								variant='outline'
+								size='sm'
+								onClick={createCategoryFromSuggestion}
+								disabled={createCategoryMutation.isPending}
+								title={ensureUniqueCategoryName(
+									categorySuggestion.new_category_name || categorySuggestion.category_name,
+									categories.map((category) => category.name)
+								)}
+							>
+								{t('createSuggestedCategory')}
+							</Button>
+						</div>
+					)}
                 </FormItem>
               )} />
             </div>

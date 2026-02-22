@@ -21,14 +21,33 @@ import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useCreateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
-import { DocumentType, AIExtractResponse, AIPotentialDuplicate } from '@/types/ai'
+import { DocumentType, AIExtractResponse, AIPotentialDuplicate, AICategorySuggestion } from '@/types/ai'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
+import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 
 interface AIExtractionModalProps {
 	open: boolean
 	onOpenChange: (open: boolean) => void
 	defaultAccountId?: string
+}
+
+function ensureUniqueCategoryName(baseName: string, existingNames: string[]): string {
+	const normalized = new Set(existingNames.map((name) => name.trim().toLowerCase()))
+	const cleanBase = baseName.trim() || 'Nueva categoría'
+
+	if (!normalized.has(cleanBase.toLowerCase())) {
+		return cleanBase
+	}
+
+	let candidate = `${cleanBase} (IA)`
+	let index = 2
+	while (normalized.has(candidate.toLowerCase())) {
+		candidate = `${cleanBase} (IA ${index})`
+		index++
+	}
+
+	return candidate
 }
 
 export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIExtractionModalProps) {
@@ -44,12 +63,16 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 	const [potentialDuplicatesByTransactionId, setPotentialDuplicatesByTransactionId] = useState<
 		Record<string, AIPotentialDuplicate>
 	>({})
+	const [categorySuggestionsByTransactionId, setCategorySuggestionsByTransactionId] = useState<
+		Record<string, AICategorySuggestion>
+	>({})
 	const [pendingCategorySelection, setPendingCategorySelection] = useState<{
 		index: number
 	} | null>(null)
 
 	const { extract, isExtracting, extractData, reset } = useExtractFromFile()
-	const { data: categories = [] } = useGetCategories()
+	const { isEnabled } = useFeatureFlags()
+	const { data: categories = [], refetch: refetchCategories } = useGetCategories()
 	const { data: accounts = [] } = useGetAccounts()
 	const createTransaction = useCreateTransactionMutation()
 	const createCategoryMutation = useCreateCategoryMutation()
@@ -85,6 +108,19 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 				{} as Record<string, AIPotentialDuplicate>
 			)
 			setPotentialDuplicatesByTransactionId(duplicatesMap)
+
+			const categorySuggestionsMap = isEnabled('ai_category_suggestions')
+				? (response.data.category_suggestions || []).reduce(
+						(acc, suggestion) => {
+							if (suggestion.transaction_id) {
+								acc[suggestion.transaction_id] = suggestion
+							}
+							return acc
+						},
+						{} as Record<string, AICategorySuggestion>
+				  )
+				: {}
+			setCategorySuggestionsByTransactionId(categorySuggestionsMap)
 
 			const initialSelection = new Set<number>()
 			normalizedTransactions.forEach((transaction, index) => {
@@ -222,6 +258,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		setStep('upload')
 		setShowQuickCategory(false)
 		setPotentialDuplicatesByTransactionId({})
+		setCategorySuggestionsByTransactionId({})
 		setPendingCategorySelection(null)
 		reset()
 		onOpenChange(false)
@@ -232,6 +269,67 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		setExtractedTransactions([])
 		setSelectedIndices(new Set())
 		setPotentialDuplicatesByTransactionId({})
+		setCategorySuggestionsByTransactionId({})
+	}
+
+	const handleApplyCategorySuggestion = (transactionId: string) => {
+		const suggestion = categorySuggestionsByTransactionId[transactionId]
+		if (!suggestion) {
+			return
+		}
+
+		setExtractedTransactions((prev) =>
+			prev.map((transaction) =>
+				transaction.id === transactionId
+					? {
+						...transaction,
+						category_id: suggestion.category_id,
+					}
+					: transaction
+			)
+		)
+
+		toast.success(t('appliedCategorySuggestion', { name: suggestion.category_name }))
+	}
+
+	const handleCreateCategoryFromSuggestion = async (transactionId: string, categoryName: string) => {
+		const normalizedName = ensureUniqueCategoryName(
+			categoryName,
+			categories.map((category) => category.name)
+		)
+		if (!normalizedName) {
+			return
+		}
+
+		try {
+			await createCategoryMutation.mutateAsync({
+				name: normalizedName,
+				icon: '📦',
+				color: '#22c55e',
+			})
+
+			const refreshed = await refetchCategories()
+			const createdCategory = (refreshed.data || []).find(
+				(category) => category.name.toLowerCase() === normalizedName.toLowerCase()
+			)
+
+			if (createdCategory) {
+				setExtractedTransactions((prev) =>
+					prev.map((transaction) =>
+						transaction.id === transactionId
+							? {
+								...transaction,
+								category_id: createdCategory.id,
+							}
+							: transaction
+					)
+				)
+			}
+
+			toast.success(t('categoryCreated', { name: normalizedName }))
+		} catch {
+			toast.error(t('failedToCreateCategory'))
+		}
 	}
 
 	return (
@@ -340,9 +438,12 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 								transactions={extractedTransactions}
 								categories={categories}
 								potentialDuplicatesByTransactionId={potentialDuplicatesByTransactionId}
+								categorySuggestionsByTransactionId={categorySuggestionsByTransactionId}
 								onEdit={handleEdit}
 								onRemove={handleRemove}
 								onSelect={handleSelect}
+								onApplyCategorySuggestion={handleApplyCategorySuggestion}
+								onCreateCategoryFromSuggestion={handleCreateCategoryFromSuggestion}
 								selectedIndices={selectedIndices}
 								onCreateCategory={handleCreateCategoryRequest}
 							/>

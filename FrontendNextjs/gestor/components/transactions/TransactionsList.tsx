@@ -40,7 +40,12 @@ export default function TransactionsList() {
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
 
     const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME)
-    const expenseTransactions = transactions.filter(t => t.type_transation === TypeTransaction.BILL)
+    const expenseTransactions = transactions.filter((t) =>
+        t.type_transation === TypeTransaction.BILL ||
+        t.type_transation === TypeTransaction.LOAN_DISBURSEMENT ||
+        t.type_transation === TypeTransaction.INVESTMENT_PURCHASE ||
+        t.type_transation === TypeTransaction.INVESTMENT_FUNDING
+    )
 
     const getFilteredTransactions = () => {
         switch (currentFilter) {

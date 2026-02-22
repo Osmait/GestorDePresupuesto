@@ -2,17 +2,18 @@
 
 import { useState, useRef } from 'react'
 import { Button } from '@/components/ui/button'
-import { Filter, PlusCircle, Lightbulb } from 'lucide-react'
+import { Filter, PlusCircle, Lightbulb, Link2, PiggyBank } from 'lucide-react'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import TransactionFormModal from '@/components/transactions/TransactionFormModal'
-import { AIExtractionButton, SpendingInsightsModal } from '@/components/ai'
+import { AIExtractionButton, ReconciliationModal, SavingsPlanModal, SpendingInsightsModal } from '@/components/ai'
 import { useTransactionContext } from './TransactionContext'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useTranslations } from 'next-intl'
+import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 
 export function TransactionActions() {
     const t = useTranslations('transactions')
@@ -20,19 +21,40 @@ export function TransactionActions() {
     const tAI = useTranslations('ai.common')
     const [drawerOpen, setDrawerOpen] = useState(false)
     const [insightsOpen, setInsightsOpen] = useState(false)
+    const [reconciliationOpen, setReconciliationOpen] = useState(false)
+    const [savingsPlanOpen, setSavingsPlanOpen] = useState(false)
     const formRef = useRef<{ reset: () => void } | null>(null)
 
     const { filters, setFilters, clearFilters, createTransaction, isLoading, error, isModalOpen, setModalOpen, setEditingTransaction } = useTransactionContext()
     const { data: accounts = [] } = useGetAccounts()
     const { data: categories = [] } = useGetCategories()
+    const { isEnabled } = useFeatureFlags()
+
+    const canUseExtraction = isEnabled('ai_extraction')
+    const canUseReconciliation = isEnabled('ai_reconciliation')
+    const canUseSavingsPlan = isEnabled('ai_savings_plan')
 
     return (
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-            <Button variant="outline" size="sm" className="sm:size-default" onClick={() => setInsightsOpen(true)}>
-                <Lightbulb className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">{tAI('insights')}</span>
-            </Button>
-            <AIExtractionButton variant="outline" size="sm" className="sm:size-default" />
+            {canUseExtraction && (
+                <Button variant="outline" size="sm" className="sm:size-default" onClick={() => setInsightsOpen(true)}>
+                    <Lightbulb className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">{tAI('insights')}</span>
+                </Button>
+            )}
+            {canUseExtraction && <AIExtractionButton variant="outline" size="sm" className="sm:size-default" />}
+            {canUseReconciliation && (
+                <Button variant="outline" size="sm" className="sm:size-default" onClick={() => setReconciliationOpen(true)}>
+                    <Link2 className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">{tAI('reconcile')}</span>
+                </Button>
+            )}
+            {canUseSavingsPlan && (
+                <Button variant="outline" size="sm" className="sm:size-default" onClick={() => setSavingsPlanOpen(true)}>
+                    <PiggyBank className="h-4 w-4 sm:mr-2" />
+                    <span className="hidden sm:inline">{tAI('savingsPlan')}</span>
+                </Button>
+            )}
             <Button variant="outline" size="sm" className="sm:size-default border-border/50" onClick={() => setDrawerOpen(true)}>
                 <Filter className="h-4 w-4 sm:mr-2" aria-hidden="true" />
                 <span className="hidden sm:inline">{t('filters')}</span>
@@ -49,7 +71,9 @@ export function TransactionActions() {
                 <span className="hidden sm:inline">{t('addTransaction')}</span>
             </Button>
 
-            <SpendingInsightsModal open={insightsOpen} onOpenChange={setInsightsOpen} />
+            {canUseExtraction && <SpendingInsightsModal open={insightsOpen} onOpenChange={setInsightsOpen} />}
+            {canUseReconciliation && <ReconciliationModal open={reconciliationOpen} onOpenChange={setReconciliationOpen} />}
+            {canUseSavingsPlan && <SavingsPlanModal open={savingsPlanOpen} onOpenChange={setSavingsPlanOpen} />}
 
             <TransactionFormModal
                 open={isModalOpen}

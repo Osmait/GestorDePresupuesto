@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { CreditCard, CreditCardSummary, CreateCreditCardDTO, CreatePaymentDTO } from '@/types/creditcard'
 import { creditCardRepository } from '@/lib/repositoryConfig'
 import { CreditCardItem } from '@/components/creditcards/CreditCardItem'
@@ -21,6 +22,7 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog'
+import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 
 export default function CreditCardsPage() {
 	const [cards, setCards] = useState<CreditCard[]>([])
@@ -31,11 +33,17 @@ export default function CreditCardsPage() {
 	const [historyOpen, setHistoryOpen] = useState(false)
 	const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null)
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+	const router = useRouter()
 	const { data: exchangeRateData } = useExchangeRateQuery()
+	const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
+	const isCreditCardsModuleEnabled = isEnabled('module_credit_cards')
 
 	useEffect(() => {
+		if (isFeatureFlagsLoading || !isCreditCardsModuleEnabled) {
+			return
+		}
 		loadCards()
-	}, [])
+	}, [isFeatureFlagsLoading, isCreditCardsModuleEnabled])
 
 	const loadCards = async () => {
 		try {
@@ -187,6 +195,28 @@ export default function CreditCardsPage() {
 		: avgUtilization > 30
 			? 'text-warning'
 			: 'text-success'
+
+	if (isFeatureFlagsLoading) {
+		return (
+			<div className="container mx-auto p-6 space-y-6">
+				<Skeleton className="h-8 w-48" />
+				<div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+					<Skeleton className="h-36 md:col-span-2" />
+					<Skeleton className="h-36" />
+				</div>
+			</div>
+		)
+	}
+
+	if (!isCreditCardsModuleEnabled) {
+		return (
+			<div className="container mx-auto p-6 space-y-4">
+				<h1 className="text-2xl font-semibold">Credit Cards</h1>
+				<p className="text-muted-foreground">This module is currently disabled for your account.</p>
+				<Button variant="outline" onClick={() => router.push('/app')}>Go to dashboard</Button>
+			</div>
+		)
+	}
 
 	if (loading) {
 		return (

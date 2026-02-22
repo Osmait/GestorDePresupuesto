@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Trash2, RefreshCw } from "lucide-react";
 import { EditableUserTable } from "./user-table";
 import { CreateUserModal } from "./create-user-modal";
+import { FeatureFlagsPanel } from "./feature-flags-panel";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
@@ -180,6 +181,8 @@ export default function AdminDashboard() {
                         />
                     </CardContent>
                 </Card>
+
+                <FeatureFlagsPanel users={users} token={(session as any)?.accessToken || ''} />
             </div>
         </div>
     );

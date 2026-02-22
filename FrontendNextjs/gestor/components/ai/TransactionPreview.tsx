@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
-import { AIPotentialDuplicate } from '@/types/ai'
+import { AIPotentialDuplicate, AICategorySuggestion } from '@/types/ai'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { useTranslations } from 'next-intl'
@@ -25,22 +25,46 @@ interface TransactionPreviewProps {
 	transactions: Transaction[]
 	categories: Category[]
 	potentialDuplicatesByTransactionId?: Record<string, AIPotentialDuplicate>
+	categorySuggestionsByTransactionId?: Record<string, AICategorySuggestion>
 	onEdit: (index: number, transaction: Transaction) => void
 	onRemove: (index: number) => void
 	onSelect: (index: number, selected: boolean) => void
 	selectedIndices: Set<number>
 	onCreateCategory?: () => void
+	onApplyCategorySuggestion?: (transactionId: string) => void
+	onCreateCategoryFromSuggestion?: (transactionId: string, categoryName: string) => void
+}
+
+function buildUniqueCategoryName(baseName: string, existingNames: string[]): string {
+	const normalizedExisting = new Set(existingNames.map((name) => name.trim().toLowerCase()))
+	const cleanBase = baseName.trim() || 'Nueva categoría'
+
+	if (!normalizedExisting.has(cleanBase.toLowerCase())) {
+		return cleanBase
+	}
+
+	let candidate = `${cleanBase} - IA`
+	let suffix = 2
+	while (normalizedExisting.has(candidate.toLowerCase())) {
+		candidate = `${cleanBase} - IA ${suffix}`
+		suffix++
+	}
+
+	return candidate
 }
 
 export function TransactionPreview({
 	transactions,
 	categories,
 	potentialDuplicatesByTransactionId,
+	categorySuggestionsByTransactionId,
 	onEdit,
 	onRemove,
 	onSelect,
 	selectedIndices,
 	onCreateCategory,
+	onApplyCategorySuggestion,
+	onCreateCategoryFromSuggestion,
 }: TransactionPreviewProps) {
 	const t = useTranslations('ai.preview')
 	const tCommon = useTranslations('ai.common')
@@ -152,6 +176,13 @@ export function TransactionPreview({
 					const isIncome = transaction.type_transation === TypeTransaction.INCOME
 					const hasCategory = !!transaction.category_id
 					const duplicateInfo = potentialDuplicatesByTransactionId?.[transaction.id]
+					const categorySuggestion = categorySuggestionsByTransactionId?.[transaction.id]
+					const createSuggestedName = categorySuggestion
+						? buildUniqueCategoryName(
+							categorySuggestion.new_category_name || categorySuggestion.category_name,
+							categories.map((category) => category.name)
+						)
+						: ''
 					const isPossibleDuplicate = duplicateInfo?.match_type === 'duplicate'
 					const isSimilarTransaction = duplicateInfo?.match_type === 'similar'
 
@@ -334,6 +365,45 @@ export function TransactionPreview({
 													date: formatDate(duplicateInfo.candidates[0].created_at),
 												})}
 											</p>
+										)}
+										{categorySuggestion && (!hasCategory || transaction.category_id !== categorySuggestion.category_id) && (
+											<div className='mt-2 flex items-center gap-2 flex-wrap'>
+												<span
+													className={cn(
+														'text-[11px] px-2 py-0.5 rounded',
+														categorySuggestion.confidence === 'high'
+															? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+															: categorySuggestion.confidence === 'medium'
+																? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+																: 'bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300'
+													)}
+												>
+													{t('suggestedCategory', {
+														name: categorySuggestion.category_name,
+														confidence: t(`confidence.${categorySuggestion.confidence}`),
+													})}
+												</span>
+												<Button
+													variant='outline'
+													size='sm'
+													onClick={() => onApplyCategorySuggestion?.(transaction.id)}
+												>
+													{t('applySuggestion')}
+												</Button>
+												<Button
+													variant='secondary'
+													size='sm'
+													title={createSuggestedName}
+													onClick={() =>
+														onCreateCategoryFromSuggestion?.(
+															transaction.id,
+															createSuggestedName
+														)
+													}
+												>
+													{t('createSuggestedCategory')}
+												</Button>
+											</div>
 										)}
 										<p className="text-sm text-muted-foreground">
 											{transaction.description}

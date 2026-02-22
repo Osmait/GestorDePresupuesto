@@ -32,11 +32,46 @@ vi.mock('@/hooks/queries/useAIQuery', () => ({
     useAnalyzeSpendingMutation: () => ({
         mutateAsync: vi.fn(),
         isPending: false
-    })
+    }),
+    useReconciliationPreviewMutation: () => ({
+        mutateAsync: vi.fn(),
+        isPending: false,
+        data: null,
+    }),
+    useReconciliationApplyMutation: () => ({
+        mutateAsync: vi.fn(),
+        isPending: false,
+        data: null,
+    }),
+    useSavingsPlanMutation: () => ({
+        mutateAsync: vi.fn(),
+        isPending: false,
+        data: null,
+    }),
 }))
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key
+}))
+
+vi.mock('@/hooks/useFeatureFlags', () => ({
+    useFeatureFlags: () => ({
+        flags: {
+            ai_extraction: true,
+            ai_reconciliation: true,
+            ai_savings_plan: true,
+        },
+        isLoading: false,
+        isEnabled: (key: string) => ['ai_extraction', 'ai_reconciliation', 'ai_savings_plan'].includes(key),
+        refresh: vi.fn(),
+    }),
+}))
+
+vi.mock('@/components/ai', () => ({
+    AIExtractionButton: () => <button type="button">extractFromDocument</button>,
+    SpendingInsightsModal: () => <div data-testid="spending-insights-modal">Insights Modal</div>,
+    ReconciliationModal: () => <div data-testid="reconciliation-modal">Reconciliation Modal</div>,
+    SavingsPlanModal: () => <div data-testid="savings-plan-modal">Savings Plan Modal</div>,
 }))
 
 // Mock child components
@@ -50,10 +85,6 @@ vi.mock('@/components/transactions/TransactionSort', () => ({
 
 vi.mock('@/components/ai/AIExtractionModal', () => ({
     AIExtractionModal: () => <div data-testid="ai-extraction-modal">AI Modal</div>
-}))
-
-vi.mock('@/components/ai/SpendingInsightsModal', () => ({
-    SpendingInsightsModal: () => <div data-testid="spending-insights-modal">Insights Modal</div>
 }))
 
 function createWrapper() {
