@@ -264,7 +264,7 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		transaction_name VARCHAR NOT NULL,
 		transaction_description TEXT,
 		amount REAL NOT NULL,
-		type_transation VARCHAR NOT NULL CHECK (type_transation IN ('bill', 'income', 'loan_disbursement', 'loan_collection')),
+		type_transation VARCHAR NOT NULL CHECK (type_transation IN ('bill', 'income', 'loan_disbursement', 'loan_collection', 'investment_purchase', 'investment_funding')),
 		account_id VARCHAR NOT NULL,
 		user_id VARCHAR NOT NULL,
 		category_id VARCHAR NOT NULL,
@@ -297,10 +297,15 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		quantity REAL NOT NULL,
 		purchase_price REAL NOT NULL,
 		current_price REAL NOT NULL,
+		source_account_id VARCHAR,
+		source_amount REAL NOT NULL DEFAULT 0,
+		settlement_currency VARCHAR(10),
+		exchange_rate REAL,
 		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
 		updated_at DATETIME,
 		user_id VARCHAR NOT NULL,
-		FOREIGN KEY (user_id) REFERENCES users (id)
+		FOREIGN KEY (user_id) REFERENCES users (id),
+		FOREIGN KEY (source_account_id) REFERENCES account (id)
 	);
 	CREATE TABLE IF NOT EXISTS recurring_transactions (
 		id VARCHAR PRIMARY KEY,
@@ -320,6 +325,31 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		FOREIGN KEY (account_id) REFERENCES account(id) ON DELETE SET NULL,
 		FOREIGN KEY (category_id) REFERENCES categorys(id) ON DELETE SET NULL,
 		FOREIGN KEY (budget_id) REFERENCES budgets(id) ON DELETE SET NULL
+	);
+
+	CREATE TABLE IF NOT EXISTS investment_funding_balances (
+		user_id VARCHAR NOT NULL,
+		currency VARCHAR(10) NOT NULL,
+		available_amount REAL NOT NULL DEFAULT 0,
+		updated_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		PRIMARY KEY (user_id, currency),
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE TABLE IF NOT EXISTS investment_funding_movements (
+		id VARCHAR PRIMARY KEY,
+		user_id VARCHAR NOT NULL,
+		currency VARCHAR(10) NOT NULL,
+		amount REAL NOT NULL,
+		movement_type VARCHAR(30) NOT NULL,
+		description TEXT,
+		reference_type VARCHAR(40),
+		reference_id VARCHAR(255),
+		counter_currency VARCHAR(10),
+		counter_amount REAL,
+		exchange_rate REAL,
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 	);
 
 	CREATE TABLE IF NOT EXISTS notifications (

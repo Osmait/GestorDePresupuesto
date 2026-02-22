@@ -1,5 +1,5 @@
 import { BaseRepository } from "@/lib/base-repository";
-import { CreateInvestmentDTO, Investment, InvestmentFilters, UpdateInvestmentDTO } from "@/types/investment";
+import { CreateInvestmentDTO, FundBrokerDTO, FundingBalance, Investment, InvestmentFilters, UpdateInvestmentDTO } from "@/types/investment";
 
 export class InvestmentRepository extends BaseRepository {
     async findAll(filters?: InvestmentFilters): Promise<Investment[]> {
@@ -32,6 +32,24 @@ export class InvestmentRepository extends BaseRepository {
         } catch (error) {
             console.error("Error creating investment:", error);
             throw error;
+        }
+    }
+
+    async fundBroker(payload: FundBrokerDTO): Promise<void> {
+        try {
+            await this.post('/investments/funding', payload)
+        } catch (error) {
+            console.error('Error funding broker:', error)
+            throw error
+        }
+    }
+
+    async getFundingBalances(): Promise<FundingBalance[]> {
+        try {
+            return await this.get<FundingBalance[]>('/investments/funding/balances')
+        } catch (error) {
+            console.error('Error fetching funding balances:', error)
+            return []
         }
     }
 

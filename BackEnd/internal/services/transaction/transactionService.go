@@ -19,9 +19,11 @@ import (
 )
 
 const (
-	BILL              = "bill"
-	LOAN_DISBURSEMENT = "loan_disbursement"
-	LOAN_COLLECTION   = "loan_collection"
+	BILL                = "bill"
+	LOAN_DISBURSEMENT   = "loan_disbursement"
+	LOAN_COLLECTION     = "loan_collection"
+	INVESTMENT_PURCHASE = "investment_purchase"
+	INVESTMENT_FUNDING  = "investment_funding"
 )
 
 type AICacheInvalidator interface {
@@ -51,12 +53,17 @@ func NewTransactionService(transactionRepository transactionRepo.TransactionRepo
 
 // CreateTransaction records a new transaction, checks for budget thresholds, and triggers alerts if necessary.
 func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error {
+	_, err := s.CreateTransactionWithID(ctx, name, description, amount, typeTransaction, accountId, userId, categoryId, budgetId, currency, createdAt)
+	return err
+}
+
+func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) (string, error) {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
-		return err
+		return "", err
 	}
 	id := uuid.String()
-	if typeTransaction == BILL || typeTransaction == LOAN_DISBURSEMENT {
+	if typeTransaction == BILL || typeTransaction == LOAN_DISBURSEMENT || typeTransaction == INVESTMENT_PURCHASE || typeTransaction == INVESTMENT_FUNDING {
 		amount = amount * -1
 	}
 	if typeTransaction == LOAN_COLLECTION {
@@ -65,7 +72,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 
 	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, userId, accountId, currency)
 	if err != nil {
-		return err
+		return "", err
 	}
 
 	transaction := transaction.NewTransaction(id, name, description, typeTransaction, accountId, categoryId, amount)
@@ -86,7 +93,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 
 	err = s.transactionRepository.Save(ctx, transaction)
 	if err != nil {
-		return err
+		return "", err
 	}
 	s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", userId))
 
@@ -161,7 +168,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 		}()
 	}
 
-	return nil
+	return id, nil
 }
 
 // FindAll retrieves transactions based on date range and account ID.

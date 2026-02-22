@@ -78,7 +78,7 @@ func (c *AICacheService) InvalidateUserExtractions(userID string) {
 }
 
 func (c *AICacheService) buildExtractionKey(userID, fileHash, docType string) string {
-	return fmt.Sprintf("ai:extract:%s:%s:%s", userID, fileHash, docType)
+	return fmt.Sprintf("ai:extract:v2:%s:%s:%s", userID, fileHash, docType)
 }
 
 func (c *AICacheService) buildAnalysisKey(userID, dateFrom, dateTo string) string {

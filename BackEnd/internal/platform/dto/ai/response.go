@@ -19,6 +19,28 @@ type ExtractData struct {
 	Count               int                        `json:"count"`
 	UnmatchedCategories int                        `json:"unmatched_categories"`
 	PotentialDuplicates []PotentialDuplicate       `json:"potential_duplicates"`
+	CategorySuggestions []CategorySuggestion       `json:"category_suggestions"`
+}
+
+type SuggestCategoryResponse struct {
+	Success bool                     `json:"success"`
+	Data    *CategorySuggestion      `json:"data,omitempty"`
+	Items   []CategorySuggestionItem `json:"items,omitempty"`
+}
+
+type CategorySuggestion struct {
+	TransactionID   string  `json:"transaction_id,omitempty"`
+	CategoryID      string  `json:"category_id"`
+	CategoryName    string  `json:"category_name"`
+	NewCategoryName string  `json:"new_category_name,omitempty"`
+	Confidence      string  `json:"confidence"`
+	Score           float64 `json:"score"`
+	Reason          string  `json:"reason"`
+}
+
+type CategorySuggestionItem struct {
+	Index      int                 `json:"index"`
+	Suggestion *CategorySuggestion `json:"suggestion,omitempty"`
 }
 
 type PotentialDuplicate struct {
@@ -93,6 +115,99 @@ type ErrorResponse struct {
 	Code    string `json:"code,omitempty"`
 }
 
+type ReconciliationPreviewResponse struct {
+	Success bool                      `json:"success"`
+	Data    ReconciliationPreviewData `json:"data"`
+}
+
+type ReconciliationPreviewData struct {
+	SessionID      string               `json:"session_id"`
+	ExtractedCount int                  `json:"extracted_count"`
+	ExactMatches   []ReconciliationItem `json:"exact_matches"`
+	SimilarMatches []ReconciliationItem `json:"similar_matches"`
+	Unmatched      []ReconciliationItem `json:"unmatched"`
+}
+
+type ReconciliationItem struct {
+	Extracted  *transaction.Transaction `json:"extracted"`
+	Candidates []DuplicateCandidate     `json:"candidates"`
+	Score      float64                  `json:"score"`
+	Status     string                   `json:"status"`
+}
+
+type SavingsPlanResponse struct {
+	Success bool            `json:"success"`
+	Data    SavingsPlanData `json:"data"`
+}
+
+type ReconciliationApplyResponse struct {
+	Success bool                  `json:"success"`
+	Data    ReconciliationSummary `json:"data"`
+}
+
+type ReconciliationSummary struct {
+	SessionID   string                     `json:"session_id"`
+	Linked      int                        `json:"linked"`
+	Created     int                        `json:"created"`
+	Ignored     int                        `json:"ignored"`
+	Failed      int                        `json:"failed"`
+	FailedItems []ReconciliationFailedItem `json:"failed_items,omitempty"`
+}
+
+type ReconciliationFailedItem struct {
+	ExtractedTransactionID string `json:"extracted_transaction_id"`
+	Action                 string `json:"action"`
+	Code                   string `json:"code"`
+	Message                string `json:"message"`
+}
+
+type SavingsPlanData struct {
+	TargetAmount            float64 `json:"target_amount"`
+	CurrentAverageSavings   float64 `json:"current_average_savings"`
+	RecommendedMonthlySave  float64 `json:"recommended_monthly_save"`
+	RecommendedWeeklySave   float64 `json:"recommended_weekly_save"`
+	EstimatedMonthsToTarget int     `json:"estimated_months_to_target"`
+	FeasibleByDate          bool    `json:"feasible_by_date"`
+	TargetDate              string  `json:"target_date,omitempty"`
+}
+
+type SavingsGoal struct {
+	ID           string  `json:"id"`
+	Name         string  `json:"name"`
+	TargetAmount float64 `json:"target_amount"`
+	CurrentSaved float64 `json:"current_saved"`
+	ProgressPct  float64 `json:"progress_pct"`
+	TargetDate   string  `json:"target_date,omitempty"`
+	AccountID    string  `json:"account_id,omitempty"`
+	Status       string  `json:"status"`
+	CreatedAt    string  `json:"created_at"`
+	UpdatedAt    string  `json:"updated_at"`
+}
+
+type SavingsGoalResponse struct {
+	Success bool        `json:"success"`
+	Data    SavingsGoal `json:"data"`
+}
+
+type SavingsGoalListResponse struct {
+	Success bool          `json:"success"`
+	Data    []SavingsGoal `json:"data"`
+}
+
+type SavingsGoalProgressResponse struct {
+	Success bool                    `json:"success"`
+	Data    SavingsGoalProgressData `json:"data"`
+}
+
+type SavingsGoalProgressData struct {
+	Goal                    SavingsGoal `json:"goal"`
+	CurrentAverageSavings   float64     `json:"current_average_savings"`
+	RecommendedMonthlySave  float64     `json:"recommended_monthly_save"`
+	RecommendedWeeklySave   float64     `json:"recommended_weekly_save"`
+	EstimatedMonthsToTarget int         `json:"estimated_months_to_target"`
+	FeasibleByDate          bool        `json:"feasible_by_date"`
+}
+
 func ToExtractResponse(result *domain.AIResult) *ExtractResponse {
 	transactions, ok := result.Data.([]*transaction.Transaction)
 	if !ok {
@@ -114,6 +229,7 @@ func ToExtractResponse(result *domain.AIResult) *ExtractResponse {
 			Count:               len(transactions),
 			UnmatchedCategories: unmatched,
 			PotentialDuplicates: []PotentialDuplicate{},
+			CategorySuggestions: []CategorySuggestion{},
 		},
 		Usage:          result.Usage,
 		ProcessingTime: result.ProcessingTime.Milliseconds(),

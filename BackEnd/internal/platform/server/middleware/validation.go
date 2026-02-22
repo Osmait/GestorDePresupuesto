@@ -159,7 +159,7 @@ func (vm *ValidationMiddleware) formatFieldError(e validator.FieldError) string 
 	case "password_strength":
 		return fmt.Sprintf("%s must contain at least one uppercase, one lowercase, one number, and one special character", field)
 	case "transaction_type":
-		return fmt.Sprintf("%s must be either 'income' or 'bill'", field)
+		return fmt.Sprintf("%s has an invalid transaction type", field)
 	case "positive_amount":
 		return fmt.Sprintf("%s must be a positive number", field)
 	case "printascii":
@@ -214,7 +214,7 @@ func validatePasswordStrength(fl validator.FieldLevel) bool {
 // Custom validator: transaction_type - validates transaction types
 func validateTransactionType(fl validator.FieldLevel) bool {
 	txType := fl.Field().String()
-	return txType == "income" || txType == "bill" || txType == "loan_disbursement" || txType == "loan_collection"
+	return txType == "income" || txType == "bill" || txType == "loan_disbursement" || txType == "loan_collection" || txType == "investment_purchase" || txType == "investment_funding"
 }
 
 // Custom validator: positive_amount - ensures positive financial amounts

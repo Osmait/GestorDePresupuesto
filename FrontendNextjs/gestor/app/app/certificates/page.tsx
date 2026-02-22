@@ -13,8 +13,10 @@ import { PaymentSimulator } from '@/components/certificates/PaymentSimulator'
 import { CertificatesPageSkeleton } from '@/components/certificates/CertificatesPageSkeleton'
 import { Certificate, CreateCertificateDTO, UpdateCertificateDTO } from '@/types/certificate'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { AlertCircle } from 'lucide-react'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 
 function CertificatesContent() {
 	const { certificates, summary, isLoading, error, createCertificate, updateCertificate, deleteCertificate } = useCertificates()
@@ -183,6 +185,8 @@ function CertificatesContent() {
 export default function CertificatesPage() {
 	const { status } = useSession()
 	const router = useRouter()
+	const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
+	const isCertificatesModuleEnabled = isEnabled('module_certificates')
 
 	useEffect(() => {
 		if (status === 'unauthenticated') {
@@ -190,8 +194,18 @@ export default function CertificatesPage() {
 		}
 	}, [status, router])
 
-	if (status === 'loading') {
+	if (status === 'loading' || isFeatureFlagsLoading) {
 		return <CertificatesPageSkeleton />
+	}
+
+	if (!isCertificatesModuleEnabled) {
+		return (
+			<div className="container mx-auto p-6 space-y-4">
+				<h1 className="text-2xl font-semibold">Certificates</h1>
+				<p className="text-muted-foreground">This module is currently disabled for your account.</p>
+				<Button variant="outline" onClick={() => router.push('/app')}>Go to dashboard</Button>
+			</div>
+		)
 	}
 
 	return (

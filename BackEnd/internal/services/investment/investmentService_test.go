@@ -45,14 +45,33 @@ func (m *MockInvestmentRepository) Delete(ctx context.Context, id string) error 
 	return args.Error(0)
 }
 
+func (m *MockInvestmentRepository) GetFundingBalances(ctx context.Context, userId string) ([]*domainInvestment.FundingBalance, error) {
+	args := m.Called(ctx, userId)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).([]*domainInvestment.FundingBalance), args.Error(1)
+}
+
+func (m *MockInvestmentRepository) AddFunding(ctx context.Context, movement *domainInvestment.FundingMovement) error {
+	args := m.Called(ctx, movement)
+	return args.Error(0)
+}
+
+func (m *MockInvestmentRepository) ConsumeFundingForInvestment(ctx context.Context, inv *domainInvestment.Investment, currency string, requiredAmount float64) error {
+	args := m.Called(ctx, inv, currency, requiredAmount)
+	return args.Error(0)
+}
+
 func TestCreateInvestment(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo, nil)
+	investmentService := NewInvestmentService(mockRepo, nil, nil, nil, nil)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
+	requiredAmount := investment.Quantity * investment.PurchasePrice
 
-	mockRepo.On("Save", ctx, mock.MatchedBy(func(inv *domainInvestment.Investment) bool {
+	mockRepo.On("ConsumeFundingForInvestment", ctx, mock.MatchedBy(func(inv *domainInvestment.Investment) bool {
 		return inv.ID == investment.ID &&
 			inv.UserID == investment.UserID &&
 			inv.Name == investment.Name &&
@@ -60,9 +79,9 @@ func TestCreateInvestment(t *testing.T) {
 			inv.Quantity == investment.Quantity &&
 			inv.PurchasePrice == investment.PurchasePrice &&
 			inv.CurrentPrice == investment.CurrentPrice
-	})).Return(nil)
+	}), "USD", requiredAmount).Return(nil)
 
-	err := investmentService.Create(ctx, investment.ID, investment.UserID, "stock", investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice)
+	err := investmentService.Create(ctx, investment.ID, investment.UserID, "stock", investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice, "USD")
 
 	assert.NoError(t, err, "CreateInvestment should not return an error")
 	mockRepo.AssertExpectations(t)
@@ -70,16 +89,17 @@ func TestCreateInvestment(t *testing.T) {
 
 func TestCreateInvestment_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo, nil)
+	investmentService := NewInvestmentService(mockRepo, nil, nil, nil, nil)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
+	requiredAmount := investment.Quantity * investment.PurchasePrice
 
-	mockRepo.On("Save", ctx, mock.MatchedBy(func(inv *domainInvestment.Investment) bool {
+	mockRepo.On("ConsumeFundingForInvestment", ctx, mock.MatchedBy(func(inv *domainInvestment.Investment) bool {
 		return inv.ID == investment.ID
-	})).Return(ErrRepositoryFailure)
+	}), "USD", requiredAmount).Return(ErrRepositoryFailure)
 
-	err := investmentService.Create(ctx, investment.ID, investment.UserID, "stock", investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice)
+	err := investmentService.Create(ctx, investment.ID, investment.UserID, "stock", investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice, "USD")
 
 	assert.Error(t, err, "CreateInvestment should return an error when repository fails")
 	assert.Equal(t, ErrRepositoryFailure, err)
@@ -88,7 +108,7 @@ func TestCreateInvestment_RepositoryError(t *testing.T) {
 
 func TestFindAllInvestments(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo, nil)
+	investmentService := NewInvestmentService(mockRepo, nil, nil, nil, nil)
 
 	ctx := context.Background()
 	userId := "test-user-id"
@@ -111,7 +131,7 @@ func TestFindAllInvestments(t *testing.T) {
 
 func TestFindAllInvestments_EmptyResult(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo, nil)
+	investmentService := NewInvestmentService(mockRepo, nil, nil, nil, nil)
 
 	ctx := context.Background()
 	userId := "test-user-id"
@@ -128,7 +148,7 @@ func TestFindAllInvestments_EmptyResult(t *testing.T) {
 
 func TestFindAllInvestments_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo, nil)
+	investmentService := NewInvestmentService(mockRepo, nil, nil, nil, nil)
 
 	ctx := context.Background()
 	userId := "test-user-id"
@@ -145,7 +165,7 @@ func TestFindAllInvestments_RepositoryError(t *testing.T) {
 
 func TestDeleteInvestment(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo, nil)
+	investmentService := NewInvestmentService(mockRepo, nil, nil, nil, nil)
 
 	ctx := context.Background()
 	investment := utils.GetNewRandomInvestment()
@@ -160,7 +180,7 @@ func TestDeleteInvestment(t *testing.T) {
 
 func TestDeleteInvestment_RepositoryError(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
-	investmentService := NewInvestmentService(mockRepo, nil)
+	investmentService := NewInvestmentService(mockRepo, nil, nil, nil, nil)
 
 	ctx := context.Background()
 	investmentId := "test-id"

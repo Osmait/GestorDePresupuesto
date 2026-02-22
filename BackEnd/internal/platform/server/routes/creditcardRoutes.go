@@ -1,13 +1,16 @@
 package routes
 
 import (
+	"database/sql"
+
 	"github.com/gin-gonic/gin"
 	handler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/creditcard"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/services/creditcard"
 )
 
-func CreditCardRoutes(s *gin.Engine, creditCardService *creditcard.CreditCardService) {
-	cardGroup := s.Group("/credit-cards")
+func CreditCardRoutes(s *gin.Engine, creditCardService *creditcard.CreditCardService, db *sql.DB) {
+	cardGroup := s.Group("/credit-cards", middleware.RequireFeature(db, "module_credit_cards"))
 	{
 		cardGroup.POST("", handler.CreateCreditCard(creditCardService))
 		cardGroup.GET("", handler.FindAllCreditCards(creditCardService))
