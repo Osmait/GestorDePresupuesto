@@ -194,6 +194,42 @@ func (u *UserService) DeleteUser(ctx context.Context, id string) error {
 	})
 }
 
+// SoftDeleteUser marks a user as deleted without removing their data.
+func (u *UserService) SoftDeleteUser(ctx context.Context, id string) error {
+	return apperrors.SafeCall(ctx, "SoftDeleteUser", func() error {
+		if id == "" {
+			return apperrors.NewValidationError("INVALID_ID", "user ID is required").
+				WithContext(ctx).
+				WithOperation("SoftDeleteUser").
+				WithDetails(map[string]interface{}{
+					"field": "id",
+				})
+		}
+
+		foundUser, err := u.userRepository.FindUserById(ctx, id)
+		if err != nil {
+			if errorhttp.IsErrNotFound(err) {
+				return apperrors.NewNotFoundError("user", id).
+					WithContext(ctx).
+					WithOperation("SoftDeleteUser")
+			}
+			return apperrors.WrapDatabaseError(ctx, err, "FindUserById for soft delete")
+		}
+
+		if foundUser.Id == "" {
+			return apperrors.NewNotFoundError("user", id).
+				WithContext(ctx).
+				WithOperation("SoftDeleteUser")
+		}
+
+		if err := u.userRepository.SoftDelete(ctx, id); err != nil {
+			return apperrors.WrapDatabaseError(ctx, err, "SoftDelete user")
+		}
+
+		return nil
+	})
+}
+
 // UpdateUser modifies an existing user's information.
 func (u *UserService) UpdateUser(ctx context.Context, id string, userRequest *dto.UserRequest) error {
 	return apperrors.SafeCall(ctx, "UpdateUser", func() error {
