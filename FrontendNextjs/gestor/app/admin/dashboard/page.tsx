@@ -13,7 +13,6 @@ import { Users, Trash2, RefreshCw } from "lucide-react";
 import { EditableUserTable } from "./user-table";
 import { CreateUserModal } from "./create-user-modal";
 import { FeatureFlagsPanel } from "./feature-flags-panel";
-import { normalizeUserError, toApiError } from '@/lib/api-error'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
@@ -26,30 +25,28 @@ export default function AdminDashboard() {
     const [isCleaning, setIsCleaning] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
 
-	const requestJson = useCallback(async <T,>(url: string, init?: RequestInit): Promise<T> => {
-		const response = await fetch(url, init)
-		if (!response.ok) {
-			throw await toApiError(response)
-		}
-		return response.json() as Promise<T>
-	}, [])
-
     const fetchUsers = useCallback(async () => {
         setIsLoadingUsers(true);
         try {
             const token = (session as any)?.accessToken;
-            const data = await requestJson<UserResponse[]>(`${BASE_URL}/users`, {
+            const response = await fetch(`${BASE_URL}/users`, {
                 headers: {
                     Authorization: `Bearer ${token}`,
                 },
             });
+
+            if (!response.ok) {
+                throw new Error(`Failed to fetch users: ${response.status}`);
+            }
+
+            const data = await response.json();
             setUsers(data);
-        } catch (error) {
-            toast.error(normalizeUserError(error, 'Unable to load users'));
+        } catch (error: any) {
+            toast.error(`Error loading users: ${error.message}`);
         } finally {
             setIsLoadingUsers(false);
         }
-    }, [session, requestJson]);
+    }, [session]);
 
     useEffect(() => {
         if (!isAdminLoading && !isAdmin) {
@@ -63,7 +60,7 @@ export default function AdminDashboard() {
         setIsSaving(true);
         try {
             const token = (session as any)?.accessToken;
-            await requestJson(`${BASE_URL}/users`, {
+            const response = await fetch(`${BASE_URL}/users`, {
                 method: "PUT",
                 headers: {
                     "Content-Type": "application/json",
@@ -72,14 +69,39 @@ export default function AdminDashboard() {
                 body: JSON.stringify(updatedUsers),
             });
 
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`Failed to save changes: ${response.status} - ${errorText}`);
+            }
+
             toast.success(`${updatedUsers.length} users updated successfully`);
             fetchUsers();
-        } catch (error) {
-            toast.error(normalizeUserError(error, 'Unable to save user changes'));
+        } catch (error: any) {
+            toast.error(`Error saving changes: ${error.message}`);
         } finally {
             setIsSaving(false);
         }
     };
+
+    const handleDelete = async (userId: string) => {
+        try {
+            const token = (session as any)?.accessToken
+            const response = await fetch(`${BASE_URL}/users/${userId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            })
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                throw new Error(`Failed to delete user: ${response.status} - ${errorText}`)
+            }
+
+            toast.success('User disabled successfully')
+            fetchUsers()
+        } catch (error: any) {
+            toast.error(`Error deleting user: ${error.message}`)
+        }
+    }
 
     const handleCleanup = async () => {
         if (!confirm("Are you sure? This will delete ALL demo users immediately.")) return;
@@ -95,13 +117,14 @@ export default function AdminDashboard() {
             });
 
             if (!response.ok) {
-				throw await toApiError(response, 'Unable to clean demo users')
-			}
+                const errorText = await response.text();
+                throw new Error(`Failed: ${response.status} - ${errorText}`);
+            }
 
             toast.success("Success: All demo users have been deleted.");
             fetchUsers(); // Refresh the list
-        } catch (error) {
-            toast.error(normalizeUserError(error, 'Unable to clean demo users'));
+        } catch (error: any) {
+            toast.error(`Error: ${error.message}`);
         } finally {
             setIsCleaning(false);
         }
@@ -174,6 +197,7 @@ export default function AdminDashboard() {
                         <EditableUserTable
                             users={users}
                             onSave={handleSave}
+                            onDelete={handleDelete}
                             isLoading={isLoadingUsers}
                         />
                     </CardContent>
