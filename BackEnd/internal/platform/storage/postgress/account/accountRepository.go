@@ -34,7 +34,7 @@ func (repo *AccountRepository) FindAll(ctx context.Context, userId string) ([]*a
 			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
-	var accounts []*account.Account
+	accounts := make([]*account.Account, 0)
 	for rows.Next() {
 		acc := account.Account{}
 		if err = rows.Scan(&acc.Id, &acc.Name, &acc.Bank, &acc.InitialBalance, &acc.Type, &acc.Currency); err == nil {

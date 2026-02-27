@@ -50,7 +50,7 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.Acc
 	if err != nil {
 		return nil, err
 	}
-	var accountResponses []*dto.AccountResponse
+	accountResponses := make([]*dto.AccountResponse, 0)
 
 	for _, account := range accounts {
 		balance := balances[account.Id]
