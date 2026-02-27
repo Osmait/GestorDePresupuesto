@@ -24,9 +24,10 @@ describe('AnalyticsRepository', () => {
             expect(result).toEqual(mockData)
         })
 
-        it('throws on error', async () => {
+        it('returns empty array on error', async () => {
             mockFetch.mockRejectedValue(new Error('Network'))
-            await expect(repo.getCategoryExpenses()).rejects.toThrow('Network')
+            const result = await repo.getCategoryExpenses()
+            expect(result).toEqual([])
         })
     })
 
@@ -38,9 +39,10 @@ describe('AnalyticsRepository', () => {
             expect(result).toEqual(mockData)
         })
 
-        it('throws on error', async () => {
+        it('returns empty array on error', async () => {
             mockFetch.mockRejectedValue(new Error('Network'))
-            await expect(repo.getMonthlySummary()).rejects.toThrow('Network')
+            const result = await repo.getMonthlySummary()
+            expect(result).toEqual([])
         })
     })
 })

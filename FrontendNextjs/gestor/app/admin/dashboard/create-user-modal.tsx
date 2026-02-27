@@ -18,7 +18,6 @@ import {
 import { CreateUserRequest } from "@/types/user";
 import { toast } from "sonner";
 import { useSession } from "next-auth/react";
-import { normalizeUserError, toApiError } from '@/lib/api-error'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
@@ -68,9 +67,9 @@ export function CreateUserModal({ onUserCreated }: CreateUserModalProps) {
         }
 
         setIsLoading(true);
-		try {
-			const token = (session as any)?.accessToken;
-			const response = await fetch(`${BASE_URL}/users`, {
+        try {
+            const token = (session as any)?.accessToken;
+            const response = await fetch(`${BASE_URL}/users`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -79,19 +78,20 @@ export function CreateUserModal({ onUserCreated }: CreateUserModalProps) {
                 body: JSON.stringify(formData),
             });
 
-			if (!response.ok) {
-				throw await toApiError(response, 'Failed to create user')
-			}
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(errorText || `Failed to create user: ${response.status}`);
+            }
 
             toast.success(`User "${formData.name} ${formData.last_name}" created successfully`);
             setIsOpen(false);
             resetForm();
             onUserCreated();
-		} catch (error) {
-			toast.error(normalizeUserError(error, 'Error creating user'));
-		} finally {
-			setIsLoading(false);
-		}
+        } catch (error: any) {
+            toast.error(`Error creating user: ${error.message}`);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     const resetForm = () => {
