@@ -224,7 +224,8 @@ func SetupSQLiteSchema(db *sql.DB) error {
 		confirmed BOOLEAN DEFAULT 0,
 		ip_address VARCHAR(45),
 		role VARCHAR(20) DEFAULT 'USER',
-		created_at DATETIME NOT NULL DEFAULT (datetime('now'))
+		created_at DATETIME NOT NULL DEFAULT (datetime('now')),
+		deleted_at DATETIME NULL
 	);
 
 	CREATE TABLE IF NOT EXISTS account (

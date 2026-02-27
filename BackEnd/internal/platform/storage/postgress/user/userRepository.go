@@ -148,8 +148,13 @@ func (u *UserRepository) Update(ctx context.Context, user *domainUser.User) erro
 	return err
 }
 
+func (u *UserRepository) SoftDelete(ctx context.Context, id string) error {
+	_, err := u.db.ExecContext(ctx, "UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL", id)
+	return err
+}
+
 func (u *UserRepository) FindUserById(ctx context.Context, id string) (*domainUser.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users WHERE id = $1", id)
+	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users WHERE id = $1 AND deleted_at IS NULL", id)
 	if err != nil {
 		return nil, err
 	}
@@ -203,7 +208,7 @@ func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*domainUs
 }
 
 func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*domainUser.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE email = $1", email)
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE email = $1 AND deleted_at IS NULL", email)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +240,7 @@ func (u *UserRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (u *UserRepository) FindAll(ctx context.Context) ([]*domainUser.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users ORDER BY created_at DESC")
+	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -274,19 +279,20 @@ func (u *UserRepository) FindAllFiltered(ctx context.Context, query string, limi
 	baseQuery := `
 		SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at
 		FROM users
+		WHERE deleted_at IS NULL
 	`
-	whereClause := ""
+	extraClause := ""
 	args := make([]interface{}, 0)
 	argIndex := 1
 
 	query = strings.TrimSpace(query)
 	if query != "" {
-		whereClause = fmt.Sprintf(" WHERE LOWER(name) LIKE LOWER($%d) OR LOWER(last_name) LIKE LOWER($%d) OR LOWER(email) LIKE LOWER($%d)", argIndex, argIndex, argIndex)
+		extraClause = fmt.Sprintf(" AND (LOWER(name) LIKE LOWER($%d) OR LOWER(last_name) LIKE LOWER($%d) OR LOWER(email) LIKE LOWER($%d))", argIndex, argIndex, argIndex)
 		args = append(args, "%"+query+"%")
 		argIndex++
 	}
 
-	finalQuery := fmt.Sprintf("%s%s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", baseQuery, whereClause, argIndex, argIndex+1)
+	finalQuery := fmt.Sprintf("%s%s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", baseQuery, extraClause, argIndex, argIndex+1)
 	args = append(args, limit, offset)
 
 	rows, err := u.db.QueryContext(ctx, finalQuery, args...)

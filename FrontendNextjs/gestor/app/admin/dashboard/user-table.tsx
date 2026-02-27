@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Save, X, Search, ChevronUp, ChevronDown, ChevronsUpDown, Filter } from "lucide-react";
+import { Save, X, Search, ChevronUp, ChevronDown, ChevronsUpDown, Filter, Trash2 } from "lucide-react";
 import { format } from "date-fns";
 import { UserResponse } from "@/types/user";
 import { Input } from "@/components/ui/input";
@@ -21,19 +21,21 @@ import {
 interface EditableUserTableProps {
     users: UserResponse[];
     onSave: (_updatedUsers: UserResponse[]) => Promise<void>;
+    onDelete: (_userId: string) => Promise<void>;
     isLoading: boolean;
 }
 
 type SortField = keyof UserResponse;
 type SortOrder = "asc" | "desc" | null;
 
-export function EditableUserTable({ users, onSave, isLoading }: EditableUserTableProps) {
+export function EditableUserTable({ users, onSave, onDelete, isLoading }: EditableUserTableProps) {
     const [editedUsers, setEditedUsers] = useState<Record<string, UserResponse>>({});
     const [searchTerm, setSearchTerm] = useState("");
     const [roleFilter, setRoleFilter] = useState<string>("ALL");
     const [sortField, setSortField] = useState<SortField | null>(null);
     const [sortOrder, setSortOrder] = useState<SortOrder>(null);
     const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+    const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
     // Sorting and Filtering Logic
     const filteredAndSortedUsers = useMemo(() => {
@@ -102,6 +104,14 @@ export function EditableUserTable({ users, onSave, isLoading }: EditableUserTabl
             setEditedUsers({ ...editedUsers, [userId]: updatedUser });
         }
     };
+
+    const deleteTarget = deleteTargetId ? users.find((u) => u.id === deleteTargetId) : null;
+
+    const handleConfirmDelete = async () => {
+        if (!deleteTargetId) return
+        await onDelete(deleteTargetId)
+        setDeleteTargetId(null)
+    }
 
     const hasChanges = Object.keys(editedUsers).length > 0;
 
@@ -201,12 +211,13 @@ export function EditableUserTable({ users, onSave, isLoading }: EditableUserTabl
                                     <div className="flex items-center">Created <SortIcon field="created_at" /></div>
                                 </TableHead>
                                 <TableHead className="text-right min-w-[100px]">ID</TableHead>
+                                <TableHead className="min-w-[80px]">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {isLoading ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center">
+                                    <TableCell colSpan={7} className="h-24 text-center">
                                         <div className="flex items-center justify-center gap-2">
                                             <span className="animate-pulse">Loading users...</span>
                                         </div>
@@ -214,7 +225,7 @@ export function EditableUserTable({ users, onSave, isLoading }: EditableUserTabl
                                 </TableRow>
                             ) : filteredAndSortedUsers.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={6} className="h-24 text-center text-muted-foreground">
+                                    <TableCell colSpan={7} className="h-24 text-center text-muted-foreground">
                                         No users found matching your criteria.
                                     </TableCell>
                                 </TableRow>
@@ -270,6 +281,16 @@ export function EditableUserTable({ users, onSave, isLoading }: EditableUserTabl
                                             <TableCell className="text-right font-mono text-xs text-muted-foreground px-4 py-2 opacity-50 group-hover:opacity-100 transition-opacity">
                                                 {user.id.slice(0, 8)}...
                                             </TableCell>
+                                            <TableCell className="px-2 py-2">
+                                                <Button
+                                                    variant="ghost"
+                                                    size="sm"
+                                                    className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                                    onClick={() => setDeleteTargetId(user.id)}
+                                                >
+                                                    <Trash2 className="h-4 w-4" />
+                                                </Button>
+                                            </TableCell>
                                         </TableRow>
                                     );
                                 })
@@ -279,7 +300,32 @@ export function EditableUserTable({ users, onSave, isLoading }: EditableUserTabl
                 </div>
             </div>
 
-            {/* Confirmation Modal */}
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={!!deleteTargetId} onOpenChange={(open) => { if (!open) setDeleteTargetId(null) }}>
+                <DialogContent className="max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Delete User</DialogTitle>
+                        <DialogDescription>
+                            Are you sure you want to disable{' '}
+                            <span className="font-semibold text-foreground">
+                                {deleteTarget ? `${deleteTarget.name} ${deleteTarget.last_name}` : ''}
+                            </span>
+                            ? This action will prevent them from logging in.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter className="mt-6">
+                        <Button variant="outline" onClick={() => setDeleteTargetId(null)}>
+                            Cancel
+                        </Button>
+                        <Button variant="destructive" onClick={handleConfirmDelete} className="gap-2">
+                            <Trash2 className="h-4 w-4" />
+                            Delete User
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Save Confirmation Modal */}
             <Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
                 <DialogContent className="max-w-md">
                     <DialogHeader>

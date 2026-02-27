@@ -58,15 +58,7 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 	}
 
 	return (
-		<div className="relative min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20 flex items-center justify-center p-4">
-			{isLoading && (
-				<div className="absolute inset-0 z-30 bg-background/80 backdrop-blur-[1px] flex items-center justify-center">
-					<div className="flex items-center gap-2 text-sm font-medium text-foreground">
-						<Loader2 className="h-4 w-4 animate-spin" />
-						<span>{t('login.redirecting')}</span>
-					</div>
-				</div>
-			)}
+		<div className="min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20 flex items-center justify-center p-4">
 			{/* Contenedor principal */}
 			<div className="w-full max-w-md space-y-8">
 				{/* Header con navegación y branding */}

@@ -29,9 +29,10 @@ describe('SearchRepository', () => {
             expect(result.transactions).toHaveLength(1)
         })
 
-        it('throws on error', async () => {
+        it('returns empty result on error', async () => {
             mockFetch.mockRejectedValue(new Error('Network'))
-            await expect(repo.search('test')).rejects.toThrow('Network')
+            const result = await repo.search('test')
+            expect(result).toEqual({ transactions: [], categories: [], accounts: [], budgets: [], loans: [], certificates: [] })
         })
     })
 })

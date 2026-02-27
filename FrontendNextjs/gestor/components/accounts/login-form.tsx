@@ -49,36 +49,20 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 
 	type LoginFormValues = z.infer<typeof loginSchema>
 
-	const resolveLoginError = (resultError?: string | null, status?: number) => {
-		if (resultError === 'CredentialsSignin' || status === 401) {
-			return t('invalidCredentials')
-		}
-		if (resultError === 'AccessDenied' || status === 403) {
-			return t('accessDenied')
-		}
-		if (status && status >= 500) {
-			return t('serverError')
-		}
-		if (resultError) {
-			return `${t('error')}: ${resultError}`
-		}
-		return t('error')
-	}
-
 	const form = useForm<LoginFormValues>({
 		resolver: zodResolver(loginSchema),
 		defaultValues: {
-			email: '',
-			password: '',
+			email: 'juan.perez@example.com',
+			password: 'password123',
 		},
 	})
 
 	const onSubmit = async (values: LoginFormValues) => {
-		let keepLoading = false
 		try {
 			setIsLoading(true)
 			setError(null)
 
+			console.log('🔐 Iniciando login...')
 			const result = await signIn('credentials', {
 				email: values.email,
 				password: values.password,
@@ -86,34 +70,25 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 			})
 
 			if (result?.error) {
-				setError(resolveLoginError(result.error, result.status))
+				setError(t('invalidCredentials'))
 				return
 			}
 
-			keepLoading = true
+			console.log('✅ Login exitoso')
 			router.push('/app')
 			router.refresh()
 		} catch (err) {
-			setError(err instanceof Error ? err.message : t('networkError'))
+			console.error('❌ Error en login:', err)
+			setError(err instanceof Error ? err.message : t('error'))
 		} finally {
-			if (!keepLoading) {
-				setIsLoading(false)
-			}
+			setIsLoading(false)
 		}
 	}
 
 
 
 	return (
-		<Card className="relative w-full max-w-md mx-auto shadow-lg border-border/50">
-			{isLoading && (
-				<div className="absolute inset-0 z-20 rounded-lg bg-background/80 backdrop-blur-[1px] flex items-center justify-center">
-					<div className="flex items-center gap-2 text-sm font-medium text-foreground">
-						<Loader2 className="h-4 w-4 animate-spin" />
-						<span>{t('redirecting')}</span>
-					</div>
-				</div>
-			)}
+		<Card className="w-full max-w-md mx-auto shadow-lg border-border/50">
 			<CardHeader className="space-y-1 text-center">
 				<div className="flex items-center justify-center mb-4">
 					<div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">

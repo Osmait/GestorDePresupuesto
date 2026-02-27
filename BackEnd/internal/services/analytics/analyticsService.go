@@ -61,7 +61,7 @@ func (s *AnalyticsService) GetCategoryExpenses(ctx context.Context, userID strin
 		return nil, fmt.Errorf("error getting category expenses: %w", err)
 	}
 
-	var categoryExpenses []*analytics.CategoryExpense
+	categoryExpenses := make([]*analytics.CategoryExpense, 0)
 
 	for _, categoryExpenseRepo := range categoryExpensesRepo {
 		categoryExpenses = append(categoryExpenses, &analytics.CategoryExpense{
@@ -91,7 +91,7 @@ func (s *AnalyticsService) GetMonthlySummary(ctx context.Context, userID string)
 		return nil, fmt.Errorf("error getting monthly summary: %w", err)
 	}
 
-	var monthlySummaries []*analytics.MonthlySummary
+	monthlySummaries := make([]*analytics.MonthlySummary, 0)
 
 	for _, monthlySummaryRepo := range monthlySummariesRepo {
 		monthlySummaries = append(monthlySummaries, &analytics.MonthlySummary{
@@ -163,7 +163,7 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		return nil, fmt.Errorf("error getting totals: %w", err)
 	}
 
-	var categoryExpenses []*analytics.CategoryExpense
+	categoryExpenses := make([]*analytics.CategoryExpense, 0)
 	for _, categoryExpenseRepo := range categoryExpensesRepo {
 		categoryExpenses = append(categoryExpenses, &analytics.CategoryExpense{
 			ID:               categoryExpenseRepo.CategoryID,
@@ -176,7 +176,7 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		})
 	}
 
-	var monthlySummaries []*analytics.MonthlySummary
+	monthlySummaries := make([]*analytics.MonthlySummary, 0)
 	for _, monthlySummaryRepo := range monthlySummariesRepo {
 		monthlySummaries = append(monthlySummaries, &analytics.MonthlySummary{
 			Month:    fmt.Sprintf("%d-%02d", monthlySummaryRepo.Year, monthlySummaryRepo.Month),

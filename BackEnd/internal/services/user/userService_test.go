@@ -68,6 +68,11 @@ func (m *MockUserRepostory) Update(ctx context.Context, u *user.User) error {
 	return args.Error(0)
 }
 
+func (m *MockUserRepostory) SoftDelete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func TestCreateUser(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	user1 := utils.GetNewRandomUser()

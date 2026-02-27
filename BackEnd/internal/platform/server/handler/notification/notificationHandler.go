@@ -1,12 +1,11 @@
 package notification
 
 import (
+	"log"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
-	"github.com/rs/zerolog/log"
 )
 
 type NotificationHandler struct {
@@ -24,10 +23,17 @@ func (h *NotificationHandler) Subscribe(ctx *gin.Context) {
 	// We just need to check authentication and pass the writer/req
 
 	// Authentication is handled by Middleware, so if we are here, we have a UserID
-	userIDStr, ok := getUserID(ctx, "NotificationHandler.Subscribe")
-	if !ok {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		// Log error but proceed? Or fail? The middleware should have handled it.
+		// If using query param for auth (EventSource limitation), we might need to manually check here if middleware failed.
+		// Assuming standard Bearer token via Polyfill on frontend.
+		log.Println("NotificationHandler: User ID not found in context")
+		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
+
+	userIDStr := userID.(string)
 
 	// Ensure the stream for this user exists
 	if !h.service.GetServer().StreamExists(userIDStr) {
@@ -60,10 +66,12 @@ func (h *NotificationHandler) Subscribe(ctx *gin.Context) {
 }
 
 func (h *NotificationHandler) SendTestNotification(ctx *gin.Context) {
-	userIDStr, ok := getUserID(ctx, "NotificationHandler.SendTestNotification")
-	if !ok {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
+	userIDStr := userID.(string)
 
 	message := `{"type": "test", "message": "This is a test notification 🚀"}`
 	h.service.SendToUser(userIDStr, message)
@@ -72,15 +80,17 @@ func (h *NotificationHandler) SendTestNotification(ctx *gin.Context) {
 }
 
 func (h *NotificationHandler) GetHistory(ctx *gin.Context) {
-	userIDStr, ok := getUserID(ctx, "NotificationHandler.GetHistory")
-	if !ok {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
+	userIDStr := userID.(string)
 
 	history, err := h.service.GetHistory(userIDStr)
 	if err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Str("operation", "GetHistory").Msg("failed to get notification history")
-		_ = ctx.Error(apperrors.NewInternalError("failed to load notification history", err).WithContext(ctx.Request.Context()).WithOperation("NotificationHandler.GetHistory"))
+		log.Printf("Error getting notification history: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}
 
@@ -88,20 +98,22 @@ func (h *NotificationHandler) GetHistory(ctx *gin.Context) {
 }
 
 func (h *NotificationHandler) MarkAsRead(ctx *gin.Context) {
-	userIDStr, ok := getUserID(ctx, "NotificationHandler.MarkAsRead")
-	if !ok {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
+	userIDStr := userID.(string)
 
 	notificationID := ctx.Param("id")
 	if notificationID == "" {
-		_ = ctx.Error(apperrors.NewValidationError("NOTIFICATION_ID_REQUIRED", "notification ID is required").WithContext(ctx.Request.Context()).WithOperation("NotificationHandler.MarkAsRead"))
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Notification ID is required"})
 		return
 	}
 
 	if err := h.service.MarkAsRead(notificationID, userIDStr); err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Str("notification_id", notificationID).Str("operation", "MarkAsRead").Msg("failed to mark notification as read")
-		_ = ctx.Error(apperrors.NewInternalError("failed to mark notification as read", err).WithContext(ctx.Request.Context()).WithOperation("NotificationHandler.MarkAsRead"))
+		log.Printf("Error marking notification as read: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}
 
@@ -109,14 +121,16 @@ func (h *NotificationHandler) MarkAsRead(ctx *gin.Context) {
 }
 
 func (h *NotificationHandler) MarkAllAsRead(ctx *gin.Context) {
-	userIDStr, ok := getUserID(ctx, "NotificationHandler.MarkAllAsRead")
-	if !ok {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
+	userIDStr := userID.(string)
 
 	if err := h.service.MarkAllAsRead(userIDStr); err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Str("operation", "MarkAllAsRead").Msg("failed to mark all notifications as read")
-		_ = ctx.Error(apperrors.NewInternalError("failed to mark all notifications as read", err).WithContext(ctx.Request.Context()).WithOperation("NotificationHandler.MarkAllAsRead"))
+		log.Printf("Error marking all notifications as read: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}
 
@@ -124,25 +138,18 @@ func (h *NotificationHandler) MarkAllAsRead(ctx *gin.Context) {
 }
 
 func (h *NotificationHandler) DeleteAll(ctx *gin.Context) {
-	userIDStr, ok := getUserID(ctx, "NotificationHandler.DeleteAll")
-	if !ok {
+	userID, exists := ctx.Get("X-User-Id")
+	if !exists {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "Unauthorized"})
 		return
 	}
+	userIDStr := userID.(string)
 
 	if err := h.service.DeleteAll(userIDStr); err != nil {
-		log.Error().Err(err).Str("user_id", userIDStr).Str("operation", "DeleteAll").Msg("failed to delete all notifications")
-		_ = ctx.Error(apperrors.NewInternalError("failed to delete notifications", err).WithContext(ctx.Request.Context()).WithOperation("NotificationHandler.DeleteAll"))
+		log.Printf("Error deleting all notifications: %v", err)
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
 	}
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "All notifications deleted"})
-}
-
-func getUserID(ctx *gin.Context, operation string) (string, bool) {
-	userID := ctx.GetString("X-User-Id")
-	if userID == "" {
-		_ = ctx.Error(apperrors.NewUnauthorizedError("unauthorized").WithContext(ctx.Request.Context()).WithOperation(operation))
-		return "", false
-	}
-	return userID, true
 }

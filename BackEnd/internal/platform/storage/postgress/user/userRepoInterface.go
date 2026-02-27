@@ -22,4 +22,6 @@ type UserRepositoryInterface interface {
 	FindAllFiltered(ctx context.Context, query string, limit int, offset int) ([]*domainUser.User, error)
 	// Update modifies an existing user in the database
 	Update(ctx context.Context, user *domainUser.User) error
+	// SoftDelete marks a user as deleted by setting deleted_at timestamp
+	SoftDelete(ctx context.Context, id string) error
 }

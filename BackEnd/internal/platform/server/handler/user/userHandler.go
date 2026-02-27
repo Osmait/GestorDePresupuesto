@@ -107,6 +107,25 @@ func UpdateUsers(userService *user.UserService) gin.HandlerFunc {
 	}
 }
 
+// SoftDeleteUser marks a user as deleted. Admins cannot delete their own account.
+func SoftDeleteUser(userService *user.UserService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		requesterID := c.GetString("X-User-Id")
+		if id == requesterID {
+			_ = c.Error(apperrors.NewValidationError("SELF_DELETE", "cannot delete your own account"))
+			return
+		}
+
+		if err := userService.SoftDeleteUser(c, id); err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		c.Status(http.StatusOK)
+	}
+}
+
 // CreateUserByAdmin allows administrators to create new users with custom roles.
 // This endpoint is protected and requires ADMIN role.
 func CreateUserByAdmin(userService *user.UserService) gin.HandlerFunc {

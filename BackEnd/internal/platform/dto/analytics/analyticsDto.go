@@ -13,7 +13,7 @@ type GetCategoryExpensesResponse struct {
 }
 
 func NewGetCategoryExpensesResponse(categoryExpenses []*analytics.CategoryExpense) []GetCategoryExpensesResponse {
-	var response []GetCategoryExpensesResponse
+	response := make([]GetCategoryExpensesResponse, 0)
 	for _, categoryExpense := range categoryExpenses {
 		response = append(response, GetCategoryExpensesResponse{
 			ID:               categoryExpense.ID,
@@ -35,7 +35,7 @@ type GetMonthlySummaryResponse struct {
 }
 
 func NewGetMonthlySummaryResponse(monthlySummaries []*analytics.MonthlySummary) []GetMonthlySummaryResponse {
-	var response []GetMonthlySummaryResponse
+	response := make([]GetMonthlySummaryResponse, 0)
 	for _, monthlySummary := range monthlySummaries {
 		response = append(response, GetMonthlySummaryResponse{
 			Month:    monthlySummary.Month,
@@ -63,7 +63,10 @@ type DashboardSummaryResponse struct {
 
 func NewDashboardSummaryResponse(summary *analytics.DashboardSummary) DashboardSummaryResponse {
 	if summary == nil {
-		return DashboardSummaryResponse{}
+		return DashboardSummaryResponse{
+			CategoryExpenses: make([]GetCategoryExpensesResponse, 0),
+			MonthlySummary:   make([]GetMonthlySummaryResponse, 0),
+		}
 	}
 
 	return DashboardSummaryResponse{

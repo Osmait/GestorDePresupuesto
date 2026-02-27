@@ -1,15 +1,14 @@
 package middleware
 
 import (
-	"context"
 	"fmt"
+	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
-	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
 
@@ -71,7 +70,9 @@ func AuthMiddleware(userService *user.UserService, config *config.Config) gin.Ha
 		// Extract Authorization header
 		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
 		if authHeader == "" {
-			_ = c.Error(apperrors.NewUnauthorizedError("authorization header is required").WithContext(c.Request.Context()).WithOperation("AuthMiddleware"))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "authorization header is required",
+			})
 			c.Abort()
 			return
 		}
@@ -79,7 +80,9 @@ func AuthMiddleware(userService *user.UserService, config *config.Config) gin.Ha
 		// Validate Authorization header format
 		tokenParts := strings.Split(authHeader, " ")
 		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			_ = c.Error(apperrors.NewUnauthorizedError("invalid authorization header format").WithContext(c.Request.Context()).WithOperation("AuthMiddleware"))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "invalid authorization header format",
+			})
 			c.Abort()
 			return
 		}
@@ -95,7 +98,9 @@ func AuthMiddleware(userService *user.UserService, config *config.Config) gin.Ha
 		})
 
 		if err != nil {
-			_ = c.Error(apperrors.NewUnauthorizedError("invalid or expired token").WithCause(err).WithContext(c.Request.Context()).WithOperation("AuthMiddleware"))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "invalid or expired token",
+			})
 			c.Abort()
 			return
 		}
@@ -103,7 +108,9 @@ func AuthMiddleware(userService *user.UserService, config *config.Config) gin.Ha
 		// Extract claims
 		claims, ok := token.Claims.(*AppClaims)
 		if !ok || !token.Valid {
-			_ = c.Error(apperrors.NewUnauthorizedError("invalid token claims").WithContext(c.Request.Context()).WithOperation("AuthMiddleware"))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "invalid token claims",
+			})
 			c.Abort()
 			return
 		}
@@ -111,13 +118,17 @@ func AuthMiddleware(userService *user.UserService, config *config.Config) gin.Ha
 		// Validate user exists and is active
 		user, err := userService.FindUserById(c, claims.UserId)
 		if err != nil {
-			_ = c.Error(apperrors.NewUnauthorizedError("user not found or inactive").WithCause(err).WithContext(c.Request.Context()).WithOperation("AuthMiddleware"))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "user not found or inactive",
+			})
 			c.Abort()
 			return
 		}
 
 		if user == nil {
-			_ = c.Error(apperrors.NewUnauthorizedError("user not found").WithContext(c.Request.Context()).WithOperation("AuthMiddleware"))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "user not found",
+			})
 			c.Abort()
 			return
 		}
@@ -125,8 +136,6 @@ func AuthMiddleware(userService *user.UserService, config *config.Config) gin.Ha
 		// Set user context for downstream handlers
 		c.Set("X-User-Id", claims.UserId)
 		c.Set("User", user)
-		ctxWithUser := context.WithValue(c.Request.Context(), apperrors.ContextKeyUserID, claims.UserId)
-		c.Request = c.Request.WithContext(ctxWithUser)
 		c.Next()
 	}
 }
@@ -136,7 +145,9 @@ func RequireAuth(userService *user.UserService, config *config.Config) gin.Handl
 	return func(c *gin.Context) {
 		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
 		if authHeader == "" {
-			_ = c.Error(apperrors.NewUnauthorizedError("authentication required").WithContext(c.Request.Context()).WithOperation("RequireAuth"))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "authentication required",
+			})
 			c.Abort()
 			return
 		}
@@ -166,20 +177,26 @@ func RequireRole(role string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userVal, exists := c.Get("User")
 		if !exists {
-			_ = c.Error(apperrors.NewUnauthorizedError("user context required").WithContext(c.Request.Context()).WithOperation("RequireRole"))
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"error": "user context required",
+			})
 			c.Abort()
 			return
 		}
 
 		userModel, ok := userVal.(*dto.UserResponse)
 		if !ok {
-			_ = c.Error(apperrors.NewInternalError("invalid user context", nil).WithContext(c.Request.Context()).WithOperation("RequireRole"))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "invalid user context",
+			})
 			c.Abort()
 			return
 		}
 
 		if userModel.Role != role {
-			_ = c.Error(apperrors.NewForbiddenError("insufficient permissions").WithContext(c.Request.Context()).WithOperation("RequireRole"))
+			c.JSON(http.StatusForbidden, gin.H{
+				"error": "insufficient permissions",
+			})
 			c.Abort()
 			return
 		}

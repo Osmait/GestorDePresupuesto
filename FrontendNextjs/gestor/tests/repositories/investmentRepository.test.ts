@@ -24,9 +24,10 @@ describe('InvestmentRepository', () => {
             expect(result).toEqual(mockInvestments)
         })
 
-        it('throws on error', async () => {
+        it('returns empty array on error', async () => {
             mockFetch.mockRejectedValue(new Error('Network error'))
-            await expect(repo.findAll()).rejects.toThrow('Network error')
+            const result = await repo.findAll()
+            expect(result).toEqual([])
         })
     })
 

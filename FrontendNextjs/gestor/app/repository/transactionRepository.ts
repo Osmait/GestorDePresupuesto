@@ -32,6 +32,7 @@ export class TransactionRepository extends BaseRepository {
   }
 
   async findAll(filters?: TransactionFilters): Promise<PaginatedTransactionResponse> {
+    try {
       const queryParams = new URLSearchParams();
 
       if (filters) {
@@ -45,6 +46,22 @@ export class TransactionRepository extends BaseRepository {
       const url = `/transaction${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
       const response = await this.get<PaginatedTransactionResponse>(url);
       return response;
+    } catch (error) {
+      console.error("Error fetching transactions:", error);
+      return {
+        data: [],
+        pagination: {
+          current_page: 1,
+          has_next_page: false,
+          has_prev_page: false,
+          next_page: 1,
+          per_page: 20,
+          prev_page: 1,
+          total_pages: 1,
+          total_records: 0
+        }
+      };
+    }
   }
 
   async findAllSimple(): Promise<Transaction[]> {
@@ -79,7 +96,8 @@ export class TransactionRepository extends BaseRepository {
 
       return allTransactions;
     } catch (error) {
-      throw error;
+      console.error("Error fetching simple transactions:", error);
+      return [];
     }
   }
 
@@ -102,7 +120,9 @@ export class TransactionRepository extends BaseRepository {
         created_at: created_at ? created_at.toISOString() : new Date().toISOString()
       };
 
-      await this.post("/transaction", body);
+      console.log("[TransactionRepository] Creating transaction with body:", JSON.stringify(body, null, 2));
+      const data = await this.post("/transaction", body);
+      console.log("[TransactionRepository] Transaction created:", data);
     } catch (error) {
       console.error("[TransactionRepository] Error creating transaction:", error);
       throw error;
@@ -145,6 +165,11 @@ export class TransactionRepository extends BaseRepository {
   }
 
   async findById(id: string): Promise<Transaction | null> {
+    try {
       return await this.get<Transaction>(`/transaction/${id}`);
+    } catch (error) {
+      console.error("Error fetching transaction by id:", error);
+      return null;
+    }
   }
 }

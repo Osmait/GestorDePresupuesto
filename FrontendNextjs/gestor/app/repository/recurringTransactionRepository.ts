@@ -3,23 +3,48 @@ import { RecurringTransaction, RecurringTransactionRequest } from "@/types/recur
 
 export class RecurringTransactionRepository extends BaseRepository {
     async findAll(): Promise<RecurringTransaction[]> {
-        const response = await this.get<RecurringTransaction[]>("/recurring-transactions");
-        return response;
+        try {
+            const response = await this.get<RecurringTransaction[]>("/recurring-transactions");
+            return response;
+        } catch (error) {
+            console.error("Error fetching recurring transactions:", error);
+            return [];
+        }
     }
 
     async create(data: RecurringTransactionRequest): Promise<void> {
-        await this.post("/recurring-transactions", data);
+        try {
+            await this.post("/recurring-transactions", data);
+        } catch (error) {
+            console.error("Error creating recurring transaction:", error);
+            throw error;
+        }
     }
 
     async update(id: string, data: RecurringTransactionRequest): Promise<void> {
-        await this.put(`/recurring-transactions/${id}`, data);
+        try {
+            await this.put(`/recurring-transactions/${id}`, data);
+        } catch (error) {
+            console.error("Error updating recurring transaction:", error);
+            throw error;
+        }
     }
 
     async delete(id: string): Promise<void> {
-        await this.deleteRequest(`/recurring-transactions/${id}`);
+        try {
+            await this.deleteRequest(`/recurring-transactions/${id}`);
+        } catch (error) {
+            console.error("Error deleting recurring transaction:", error);
+            throw error;
+        }
     }
 
     async process(): Promise<void> {
-        await this.post("/recurring-transactions/process", {});
+        try {
+            await this.post("/recurring-transactions/process", {});
+        } catch (error) {
+            console.error("Error processing recurring transactions:", error);
+            throw error;
+        }
     }
 }

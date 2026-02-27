@@ -65,7 +65,7 @@ func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.Bud
 		return nil, err
 	}
 
-	var budgetResponses []*dto.BudgetResponse
+	budgetResponses := make([]*dto.BudgetResponse, 0)
 	for _, budget := range budgets {
 		currentAmount := currentBudgets[budget.Id]
 		budgetResponse := dto.NewBudgetReponse(budget.Id, budget.CategoryId, budget.UserId, budget.Amount, currentAmount, budget.CreatedAt)

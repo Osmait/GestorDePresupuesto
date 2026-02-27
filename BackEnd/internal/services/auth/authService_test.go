@@ -63,6 +63,11 @@ func (m *MockUserRepostory) Update(ctx context.Context, u *user.User) error {
 	return args.Error(0)
 }
 
+func (m *MockUserRepostory) SoftDelete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
+	return args.Error(0)
+}
+
 func getNewUser() *user.User {
 	user1 := user.NewUser(faker.ID, faker.Name(), faker.LastName(), faker.Email(), faker.Password())
 	return user1

@@ -3,23 +3,48 @@ import { BaseRepository } from "@/lib/base-repository";
 
 export class CategoryRepository extends BaseRepository {
   async findAll(): Promise<Category[]> {
-    const categories = await this.get<Category[]>("/category");
-    return categories ?? [];
+    try {
+      const categories = await this.get<Category[]>("/category");
+      return categories ?? [];
+    } catch (error) {
+      console.error("Error fetching categories:", error);
+      return [];
+    }
   }
 
   async create(name: string, icon: string, color: string): Promise<void> {
-    await this.post("/category", { name, icon, color });
+    try {
+      await this.post("/category", { name, icon, color });
+    } catch (error) {
+      console.error("Error creating category:", error);
+      throw error;
+    }
   }
 
   async update(id: string, name: string, icon: string, color: string): Promise<void> {
-    await this.put(`/category/${id}`, { name, icon, color });
+    try {
+      await this.put(`/category/${id}`, { name, icon, color });
+    } catch (error) {
+      console.error("Error updating category:", error);
+      throw error;
+    }
   }
 
   async delete(id: string): Promise<void> {
-    await this.deleteRequest(`/category/${id}`);
+    try {
+      await this.deleteRequest(`/category/${id}`);
+    } catch (error) {
+      console.error("Error deleting category:", error);
+      throw error;
+    }
   }
 
-  async findById(id: string): Promise<Category> {
-    return this.get<Category>(`/category/${id}`);
+  async findById(id: string): Promise<Category | null> {
+    try {
+      return await this.get<Category>(`/category/${id}`);
+    } catch (error) {
+      console.error("Error fetching category by id:", error);
+      return null;
+    }
   }
 }
