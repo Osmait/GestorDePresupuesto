@@ -1,42 +1,31 @@
 package errorHandler
 
 import (
-	"context"
-	"errors"
+	"net/http"
+	"time"
 
 	"github.com/gin-gonic/gin"
-	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 )
 
 func ResponseByTypeOfErr(err error, ctx *gin.Context) {
-	if err == nil {
-		return
-	}
-
-	if _, ok := apperrors.AsAppError(err); ok {
-		_ = ctx.Error(err)
-		return
-	}
-
-	operation := ctx.Request.Method + " " + ctx.FullPath()
 	switch {
 	case errorhttp.IsErrNotDuplicate(err):
-		_ = ctx.Error(apperrors.NewConflictError("resource", err.Error()).WithCause(err).WithContext(ctx.Request.Context()).WithOperation(operation))
+		errorResponse := errorhttp.NewErrorApp(http.StatusConflict, ctx.Request.URL.Path, err.Error(), time.Now())
+		ctx.AbortWithStatusJSON(http.StatusConflict, errorResponse)
 		return
 	case errorhttp.IsErrNotBadRequest(err):
-		_ = ctx.Error(apperrors.NewValidationError("BAD_REQUEST", err.Error()).WithCause(err).WithContext(ctx.Request.Context()).WithOperation(operation))
+		errorResponse := errorhttp.NewErrorApp(http.StatusBadRequest, ctx.Request.URL.Path, err.Error(), time.Now())
+		ctx.AbortWithStatusJSON(http.StatusBadRequest, errorResponse)
 		return
 	case errorhttp.IsErrNotFound(err):
-		_ = ctx.Error(apperrors.NewNotFoundError("resource", err.Error()).WithCause(err).WithContext(ctx.Request.Context()).WithOperation(operation))
+		errorResponse := errorhttp.NewErrorApp(http.StatusNotFound, ctx.Request.URL.Path, err.Error(), time.Now())
+		ctx.AbortWithStatusJSON(http.StatusNotFound, errorResponse)
 		return
 
 	default:
-		wrapped := apperrors.NewInternalError("internal server error", err).WithContext(ctx.Request.Context()).WithOperation(operation)
-		if errors.Is(err, context.Canceled) {
-			wrapped = apperrors.NewInternalError("request cancelled", err).WithContext(ctx.Request.Context()).WithOperation(operation)
-		}
-		_ = ctx.Error(wrapped)
+		errorResponse := errorhttp.NewErrorApp(http.StatusInternalServerError, ctx.Request.URL.Path, err.Error(), time.Now())
+		ctx.AbortWithStatusJSON(http.StatusInternalServerError, errorResponse)
 		return
 
 	}

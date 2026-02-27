@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"bytes"
+	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -93,7 +94,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			return
 		}
 
-		ctx.JSON(http.StatusCreated, gin.H{"message": "Transaction created"})
+		ctx.JSON(http.StatusCreated, "Transaction created")
 	}
 }
 
@@ -301,17 +302,14 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 func DeleteTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		userId := ctx.GetString("X-User-Id")
-		if userId == "" {
-			_ = ctx.Error(apperrors.NewUnauthorizedError("authentication required").WithContext(ctx.Request.Context()).WithOperation("DeleteTransaction"))
-			return
-		}
+		userId := ctx.MustGet("X-User-Id").(string)
 		err := transactionService.DeleteTransaction(ctx, id, userId)
 		if err != nil {
-			_ = ctx.Error(err)
+			fmt.Println(err)
+			ctx.JSON(http.StatusInternalServerError, err.Error())
 			return
 		}
-		ctx.JSON(http.StatusOK, gin.H{"message": "Deleted"})
+		ctx.JSON(http.StatusOK, "Deleted")
 	}
 }
 
@@ -320,18 +318,10 @@ func UpdateTransaction(s *transaction.TransactionService) gin.HandlerFunc {
 		id := ctx.Param("id")
 		var transactionRequest dto.TransactionRequest
 		if err := ctx.ShouldBindJSON(&transactionRequest); err != nil {
-			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body: "+err.Error()).WithContext(ctx.Request.Context()).WithOperation("UpdateTransaction"))
+			ctx.JSON(http.StatusBadRequest, err.Error())
 			return
 		}
-		if err := transactionRequest.Validate(); err != nil {
-			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()).WithContext(ctx.Request.Context()).WithOperation("UpdateTransaction"))
-			return
-		}
-		userId := ctx.GetString("X-User-Id")
-		if userId == "" {
-			_ = ctx.Error(apperrors.NewUnauthorizedError("authentication required").WithContext(ctx.Request.Context()).WithOperation("UpdateTransaction"))
-			return
-		}
+		userId := ctx.MustGet("X-User-Id").(string)
 		transactionObj := domain.NewTransaction(id, transactionRequest.Name, transactionRequest.Description, transactionRequest.TypeTransation, transactionRequest.AccountId, transactionRequest.CategoryId, transactionRequest.Amount)
 		if !transactionRequest.CreatedAt.IsZero() {
 			transactionObj.CreatedAt = transactionRequest.CreatedAt
@@ -339,7 +329,7 @@ func UpdateTransaction(s *transaction.TransactionService) gin.HandlerFunc {
 		transactionObj.UserId = userId
 
 		if err := s.UpdateTransaction(ctx, id, transactionObj); err != nil {
-			_ = ctx.Error(err)
+			ctx.JSON(http.StatusInternalServerError, err.Error())
 			return
 		}
 		ctx.Status(http.StatusOK)

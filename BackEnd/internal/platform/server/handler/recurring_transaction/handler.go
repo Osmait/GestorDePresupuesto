@@ -6,7 +6,6 @@ import (
 	"github.com/gin-gonic/gin"
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/recurring_transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/recurring_transaction"
-	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	service "github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
 )
 
@@ -22,13 +21,9 @@ func NewRecurringTransactionHandler(service *service.RecurringTransactionService
 
 func (h *RecurringTransactionHandler) Create(ctx *gin.Context) {
 	userId := ctx.GetString("X-User-Id")
-	if userId == "" {
-		_ = ctx.Error(apperrors.NewUnauthorizedError("authentication required").WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.Create"))
-		return
-	}
 	var req dto.RecurringTransactionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		_ = ctx.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid recurring transaction payload: "+err.Error()).WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.Create"))
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -46,7 +41,7 @@ func (h *RecurringTransactionHandler) Create(ctx *gin.Context) {
 	)
 
 	if err := h.service.Create(ctx, rt); err != nil {
-		_ = ctx.Error(apperrors.NewInternalError("failed to create recurring transaction", err).WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.Create"))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -55,13 +50,9 @@ func (h *RecurringTransactionHandler) Create(ctx *gin.Context) {
 
 func (h *RecurringTransactionHandler) FindAll(ctx *gin.Context) {
 	userId := ctx.GetString("X-User-Id")
-	if userId == "" {
-		_ = ctx.Error(apperrors.NewUnauthorizedError("authentication required").WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.FindAll"))
-		return
-	}
 	results, err := h.service.FindAllByUser(ctx, userId)
 	if err != nil {
-		_ = ctx.Error(apperrors.NewInternalError("failed to load recurring transactions", err).WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.FindAll"))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -89,7 +80,7 @@ func (h *RecurringTransactionHandler) FindAll(ctx *gin.Context) {
 func (h *RecurringTransactionHandler) Delete(ctx *gin.Context) {
 	id := ctx.Param("id")
 	if err := h.service.Delete(ctx, id); err != nil {
-		_ = ctx.Error(apperrors.NewInternalError("failed to delete recurring transaction", err).WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.Delete"))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Deleted successfully"})
@@ -98,13 +89,9 @@ func (h *RecurringTransactionHandler) Delete(ctx *gin.Context) {
 func (h *RecurringTransactionHandler) Update(ctx *gin.Context) {
 	id := ctx.Param("id")
 	userId := ctx.GetString("X-User-Id")
-	if userId == "" {
-		_ = ctx.Error(apperrors.NewUnauthorizedError("authentication required").WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.Update"))
-		return
-	}
 	var req dto.RecurringTransactionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		_ = ctx.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid recurring transaction payload: "+err.Error()).WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.Update"))
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
@@ -122,7 +109,7 @@ func (h *RecurringTransactionHandler) Update(ctx *gin.Context) {
 	)
 
 	if err := h.service.Update(ctx, rt); err != nil {
-		_ = ctx.Error(apperrors.NewInternalError("failed to update recurring transaction", err).WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.Update"))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Updated successfully"})
@@ -130,7 +117,7 @@ func (h *RecurringTransactionHandler) Update(ctx *gin.Context) {
 
 func (h *RecurringTransactionHandler) Process(ctx *gin.Context) {
 	if err := h.service.ProcessDueTransactions(ctx); err != nil {
-		_ = ctx.Error(apperrors.NewInternalError("failed to process recurring transactions", err).WithContext(ctx.Request.Context()).WithOperation("RecurringTransactionHandler.Process"))
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 	ctx.JSON(http.StatusOK, gin.H{"message": "Processing triggered successfully"})
