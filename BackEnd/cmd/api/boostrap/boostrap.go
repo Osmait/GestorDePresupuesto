@@ -226,9 +226,6 @@ func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 	case config.DatabaseTypePostgres:
 		utils.RunDBMigration("file://cmd/api/db/migrations", cfg.GetPostgresUrl())
 		return nil
-	case config.DatabaseTypeSQLite:
-		utils.RunSQLiteMigration("cmd/api/db/migrations", cfg.GetSQLiteUrl())
-		return nil
 	default:
 		return fmt.Errorf("unsupported database type for migrations: %s", cfg.Database.Type)
 	}

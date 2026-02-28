@@ -216,7 +216,9 @@ func TestBudgetRepository_User_Isolation(t *testing.T) {
 	assert.Equal(t, 1, len(user2Budgets))
 	assert.Equal(t, 2000.0, user2Budgets[0].Amount)
 
-	// Cleanup
+	// Cleanup in FK order: budgets → categories → users
+	_, err = db.ExecContext(ctx, "DELETE FROM budgets WHERE user_id = $1 OR user_id = $2", user1.Id, user2.Id)
+	assert.NoError(t, err)
 	err = categoryRepository.Delete(ctx, category1.Id, user1.Id)
 	assert.NoError(t, err)
 	err = categoryRepository.Delete(ctx, category2.Id, user2.Id)

@@ -2,7 +2,6 @@ package postgress
 
 import (
 	"context"
-	"fmt"
 	"testing"
 	"time"
 
@@ -44,9 +43,8 @@ func TestTransactionRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	currentTime := time.Now()
-	// Use SQLite-compatible date format (YYYY-MM-DD)
-	date1 := fmt.Sprintf("%04d-%02d-%02d", currentTime.Year(), currentTime.Month(), currentTime.Day()-7)
-	date2 := fmt.Sprintf("%04d-%02d-%02d", currentTime.Year(), currentTime.Month(), currentTime.Day()+5)
+	date1 := currentTime.AddDate(0, 0, -7).Format("2006-01-02")
+	date2 := currentTime.AddDate(0, 0, 5).Format("2006-01-02")
 	transactionList, err := transactionRepo.FindAll(ctx, date1, date2, account.Id)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, transactionList)

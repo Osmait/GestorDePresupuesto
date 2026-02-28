@@ -134,6 +134,11 @@ func TestCertificateRepository_SaveAndFindPayments(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, allPayments, 2)
 
+	// Cleanup in FK order: certificate_payments → certificates → users
+	_, err = db.ExecContext(ctx, "DELETE FROM certificate_payments WHERE user_id = $1", user.Id)
+	assert.NoError(t, err)
+	_, err = db.ExecContext(ctx, "DELETE FROM certificates WHERE user_id = $1", user.Id)
+	assert.NoError(t, err)
 	err = userRepository.Delete(ctx, user.Id)
 	assert.NoError(t, err)
 }
