@@ -1,0 +1,17 @@
+{
+  "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
+  "packages": {
+    "BackEnd": {
+      "release-type": "go",
+      "package-name": "gestor-backend",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true
+    },
+    "FrontendNextjs/gestor": {
+      "release-type": "node",
+      "package-name": "gestor-frontend",
+      "changelog-path": "CHANGELOG.md",
+      "bump-minor-pre-major": true
+    }
+  }
+}
