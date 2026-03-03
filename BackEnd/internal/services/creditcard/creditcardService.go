@@ -17,6 +17,8 @@ import (
 
 type TransactionServiceInterface interface {
 	CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error
+	CreateTransactionWithID(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) (string, error)
+	DeleteTransaction(ctx context.Context, id string, userId string) error
 }
 
 type AccountRepositoryInterface interface {
@@ -250,7 +252,8 @@ func (s *CreditCardService) CreatePayment(ctx context.Context, cardId string, us
 	balance.CurrentBalance += req.Amount
 	balance.UpdatedAt = time.Now()
 	if err := s.cardRepo.UpdateBalance(ctx, balance); err != nil {
-		log.Error().Err(err).Msg("Failed to update balance after payment")
+		s.rollbackCardPayment(ctx, payment.Id, balance, req.Amount)
+		return nil, err
 	}
 
 	card, _ := s.cardRepo.FindCardById(ctx, cardId, userId)
@@ -262,18 +265,39 @@ func (s *CreditCardService) CreatePayment(ctx context.Context, cardId string, us
 	if req.Notes != "" {
 		transactionDesc += " - " + req.Notes
 	}
-	_ = s.transactionRepo.CreateTransaction(ctx, "Card Payment", transactionDesc, sourceAmount, "bill", req.FromAccountId, userId, "", "", fromCurrency, time.Now())
+	mainTransactionID, err := s.transactionRepo.CreateTransactionWithID(ctx, "Card Payment", transactionDesc, sourceAmount, "card_payment", req.FromAccountId, userId, "", "", fromCurrency, time.Now())
+	if err != nil {
+		s.rollbackCardPayment(ctx, payment.Id, balance, req.Amount)
+		return nil, err
+	}
 
 	if req.IncludesInterest && req.InterestAmount > 0 {
 		interestSourceAmount, convErr := convertPaymentAmount(req.InterestAmount, req.Currency, fromCurrency, req.ExchangeRate)
 		if convErr != nil {
 			interestSourceAmount = req.InterestAmount
 		}
-		_ = s.transactionRepo.CreateTransaction(ctx, "Interest Charge", "Interest paid to "+cardName, interestSourceAmount, "bill", req.FromAccountId, userId, "", "", fromCurrency, time.Now())
+		if _, err := s.transactionRepo.CreateTransactionWithID(ctx, "Interest Charge", "Interest paid to "+cardName, interestSourceAmount, "bill", req.FromAccountId, userId, "", "", fromCurrency, time.Now()); err != nil {
+			if delErr := s.transactionRepo.DeleteTransaction(ctx, mainTransactionID, userId); delErr != nil {
+				log.Error().Err(delErr).Str("transaction_id", mainTransactionID).Msg("Failed to rollback primary payment transaction")
+			}
+			s.rollbackCardPayment(ctx, payment.Id, balance, req.Amount)
+			return nil, err
+		}
 	}
 
 	log.Info().Str("card_id", cardId).Str("user_id", userId).Float64("amount", req.Amount).Msg("Card payment created")
 	return dto.NewPaymentResponse(payment), nil
+}
+
+func (s *CreditCardService) rollbackCardPayment(ctx context.Context, paymentID string, balance *creditcard.CardBalance, amount float64) {
+	balance.CurrentBalance -= amount
+	balance.UpdatedAt = time.Now()
+	if err := s.cardRepo.UpdateBalance(ctx, balance); err != nil {
+		log.Error().Err(err).Str("payment_id", paymentID).Msg("Failed to rollback card balance after payment error")
+	}
+	if err := s.cardRepo.DeletePayment(ctx, paymentID); err != nil {
+		log.Error().Err(err).Str("payment_id", paymentID).Msg("Failed to rollback saved card payment")
+	}
 }
 
 func convertPaymentAmount(cardAmount float64, cardCurrency string, sourceCurrency string, rate float64) (float64, error) {

@@ -20,6 +20,7 @@ import (
 
 const (
 	BILL                = "bill"
+	CARD_PAYMENT        = "card_payment"
 	LOAN_DISBURSEMENT   = "loan_disbursement"
 	LOAN_COLLECTION     = "loan_collection"
 	INVESTMENT_PURCHASE = "investment_purchase"
@@ -63,7 +64,7 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 		return "", err
 	}
 	id := uuid.String()
-	if typeTransaction == BILL || typeTransaction == LOAN_DISBURSEMENT || typeTransaction == INVESTMENT_PURCHASE || typeTransaction == INVESTMENT_FUNDING {
+	if typeTransaction == BILL || typeTransaction == CARD_PAYMENT || typeTransaction == LOAN_DISBURSEMENT || typeTransaction == INVESTMENT_PURCHASE || typeTransaction == INVESTMENT_FUNDING {
 		amount = amount * -1
 	}
 	if typeTransaction == LOAN_COLLECTION {
