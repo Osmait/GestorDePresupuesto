@@ -236,6 +236,21 @@ func (r *CreditCardRepository) SavePayment(ctx context.Context, payment *creditc
 	return err
 }
 
+func (r *CreditCardRepository) DeletePayment(ctx context.Context, id string) error {
+	result, err := r.db.ExecContext(ctx, `DELETE FROM card_payments WHERE id = $1`, id)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
+}
+
 func (r *CreditCardRepository) FindPaymentById(ctx context.Context, id string) (*creditcard.CardPayment, error) {
 	query := `SELECT id, card_id, from_account_id, currency, amount, COALESCE(source_currency, ''), COALESCE(source_amount, 0), COALESCE(exchange_rate, 1), includes_interest, interest_amount, payment_date, status, notes, created_at
 		FROM card_payments WHERE id = $1`

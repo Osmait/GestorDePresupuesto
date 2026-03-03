@@ -23,6 +23,7 @@ type CreditCardRepositoryInterface interface {
 	DeleteBalance(ctx context.Context, id string) error
 
 	SavePayment(ctx context.Context, payment *creditcard.CardPayment) error
+	DeletePayment(ctx context.Context, id string) error
 	FindPaymentById(ctx context.Context, id string) (*creditcard.CardPayment, error)
 	FindPaymentsByCard(ctx context.Context, cardId string) ([]*creditcard.CardPayment, error)
 	FindPaymentsByCardAndCurrency(ctx context.Context, cardId string, currency string) ([]*creditcard.CardPayment, error)

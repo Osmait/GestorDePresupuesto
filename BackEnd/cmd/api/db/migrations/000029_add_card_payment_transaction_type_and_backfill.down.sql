@@ -1,0 +1,1 @@
+-- PostgreSQL enum values cannot be safely removed in reversible down migrations.

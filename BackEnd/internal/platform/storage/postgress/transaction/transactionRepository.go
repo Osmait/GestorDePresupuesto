@@ -27,9 +27,46 @@ func (repo *TransactionRepository) Save(ctx context.Context, transaction *transa
 	if currency == "" {
 		currency = "DOP"
 	}
-	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id,currency,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, transaction.CategoryId, transaction.BudgetId, currency, transaction.CreatedAt)
+
+	categoryID := transaction.CategoryId
+	if categoryID == "" {
+		resolvedCategoryID, err := repo.resolveFallbackCategoryID(ctx, transaction.UserId)
+		if err != nil {
+			return err
+		}
+		categoryID = resolvedCategoryID
+	}
+
+	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id,currency,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, categoryID, transaction.BudgetId, currency, transaction.CreatedAt)
 
 	return err
+}
+
+func (repo *TransactionRepository) resolveFallbackCategoryID(ctx context.Context, userId string) (string, error) {
+	var categoryID string
+	err := repo.db.QueryRowContext(ctx, `SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, userId).Scan(&categoryID)
+	if err == nil {
+		return categoryID, nil
+	}
+	if err != sql.ErrNoRows {
+		return "", err
+	}
+
+	_, err = repo.db.ExecContext(ctx, `
+		INSERT INTO categorys (id, name, icon, color, created_at, user_id)
+		VALUES ('autocat_' || SUBSTRING(MD5($1) FROM 1 FOR 24), 'General', 'tag', '#64748b', NOW(), $1)
+		ON CONFLICT (id) DO NOTHING
+	`, userId)
+	if err != nil {
+		return "", err
+	}
+
+	err = repo.db.QueryRowContext(ctx, `SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, userId).Scan(&categoryID)
+	if err != nil {
+		return "", err
+	}
+
+	return categoryID, nil
 }
 
 func (repo *TransactionRepository) ResolveAndValidateCurrencyForAccount(ctx context.Context, userId string, accountId string, currency string) (string, error) {
