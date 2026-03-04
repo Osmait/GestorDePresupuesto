@@ -1,6 +1,7 @@
 "use client"
 
 import React from 'react'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { UserNav } from '@/components/auth/user-nav'
@@ -14,7 +15,6 @@ import {
 	Menu,
 	ChevronLeft,
 	ChevronRight,
-	Home,
 	Plus,
 	Mouse,
 	TrendingUp,
@@ -53,18 +53,30 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 		<div className={`flex items-center gap-3 p-4 border-b border-border/50 ${!isExpanded && 'justify-center'}`}>
 			{isExpanded && (
 				<div className="flex items-center gap-2">
-					<div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-						<Home className="h-4 w-4 text-primary-foreground" />
+					<div className="w-8 h-8 rounded-lg overflow-hidden border border-border/40 bg-background flex items-center justify-center">
+						<Image
+							src="/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png"
+							alt="SBFinance logo"
+							width={32}
+							height={32}
+							className="w-full h-full object-cover"
+						/>
 					</div>
 					<div>
-						<h2 className="text-lg font-semibold text-foreground">FinanceApp</h2>
+						<h2 className="text-lg font-semibold text-foreground">SBFinance</h2>
 						<p className="text-xs text-muted-foreground">Gestor Personal</p>
 					</div>
 				</div>
 			)}
 			{!isExpanded && (
-				<div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-					<Home className="h-4 w-4 text-primary-foreground" />
+				<div className="w-8 h-8 rounded-lg overflow-hidden border border-border/40 bg-background flex items-center justify-center">
+					<Image
+						src="/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png"
+						alt="SBFinance logo"
+						width={32}
+						height={32}
+						className="w-full h-full object-cover"
+					/>
 				</div>
 			)}
 		</div>
@@ -282,4 +294,3 @@ export function Sidebar({ children }: SidebarProps) {
 		</SidebarController>
 	)
 }
-

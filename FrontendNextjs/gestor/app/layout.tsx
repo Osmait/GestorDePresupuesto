@@ -20,12 +20,12 @@ const plusJakarta = Plus_Jakarta_Sans({
 })
 
 export const metadata: Metadata = {
-	title: 'FinanceApp - Gestor de Presupuesto Personal',
+	title: 'SBFinance',
 	description: 'La plataforma más completa para gestionar tus finanzas personales. Controla gastos, crea presupuestos inteligentes y alcanza tus metas financieras.',
 	keywords: ['finanzas personales', 'presupuesto', 'gastos', 'ahorro', 'inversiones', 'criptomonedas'],
-	authors: [{ name: 'FinanceApp Team' }],
-	creator: 'FinanceApp',
-	publisher: 'FinanceApp',
+	authors: [{ name: 'SBFinance Team' }],
+	creator: 'SBFinance',
+	publisher: 'SBFinance',
 	formatDetection: {
 		email: false,
 		address: false,
@@ -33,27 +33,30 @@ export const metadata: Metadata = {
 	},
 	openGraph: {
 		type: 'website',
-		siteName: 'FinanceApp',
-		title: 'FinanceApp - Gestor de Presupuesto Personal',
+		siteName: 'SBFinance',
+		title: 'SBFinance',
 		description: 'La plataforma más completa para gestionar tus finanzas personales',
 		images: [
 			{
 				url: '/og-image.jpg',
 				width: 1200,
 				height: 630,
-				alt: 'FinanceApp - Gestor de Presupuesto Personal',
+				alt: 'SBFinance - Gestor de Presupuesto Personal',
 			},
 		],
 	},
 	twitter: {
 		card: 'summary_large_image',
-		title: 'FinanceApp - Gestor de Presupuesto Personal',
+		title: 'SBFinance',
 		description: 'La plataforma más completa para gestionar tus finanzas personales',
 		images: ['/og-image.jpg'],
 	},
 	icons: {
-		icon: '/favicon.ico',
-		shortcut: '/favicon-16x16.png',
+		icon: [
+			{ url: '/favicon-32x32.png', sizes: '32x32', type: 'image/png' },
+			{ url: '/favicon-16x16.png', sizes: '16x16', type: 'image/png' },
+		],
+		shortcut: '/favicon-32x32.png',
 		apple: '/apple-touch-icon.png',
 	},
 	manifest: '/site.webmanifest',

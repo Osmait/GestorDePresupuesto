@@ -1,13 +1,14 @@
 'use client'
 
 import { useState } from 'react'
+import Image from 'next/image'
 import { LoginForm } from './login-form'
 import { RegisterForm } from './register-form'
 import { Card } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ModeToggle } from '@/components/common/ToggleMode'
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
-import { Home, LogIn, UserPlus, Play, Loader2 } from 'lucide-react'
+import { LogIn, UserPlus, Play, Loader2 } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AuthRepository } from '@/app/repository/authRepository'
@@ -66,12 +67,18 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 					{/* Logo y título de la aplicación */}
 					<div className="flex items-center justify-center">
 						<Link href="/" className="group flex items-center gap-3 hover:scale-105 transition-transform duration-200">
-							<div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-xl flex items-center justify-center shadow-lg">
-								<Home className="h-6 w-6 text-primary-foreground" />
+							<div className="w-12 h-12 rounded-xl overflow-hidden border border-border/40 bg-background shadow-lg flex items-center justify-center">
+								<Image
+									src="/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png"
+									alt="SBFinance logo"
+									width={48}
+									height={48}
+									className="w-full h-full object-cover"
+								/>
 							</div>
 							<div className="text-left">
 								<h1 className="text-2xl font-bold text-foreground">
-									FinanceApp
+									SBFinance
 								</h1>
 								<p className="text-sm text-muted-foreground">Gestor Personal</p>
 							</div>

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import '../../styles/globals.css'
 
 export const metadata: Metadata = {
-	title: 'Crear Cuenta - FinanceApp',
+	title: 'Crear Cuenta - SBFinance',
 	description: 'Crea tu cuenta de gestión financiera personal',
 }
 
