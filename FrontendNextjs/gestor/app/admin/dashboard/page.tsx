@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Users, Trash2, RefreshCw } from "lucide-react";
 import { EditableUserTable } from "./user-table";
 import { CreateUserModal } from "./create-user-modal";
+import { FeatureFlagsPanel } from "./feature-flags-panel";
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
@@ -81,6 +82,26 @@ export default function AdminDashboard() {
             setIsSaving(false);
         }
     };
+
+    const handleDelete = async (userId: string) => {
+        try {
+            const token = (session as any)?.accessToken
+            const response = await fetch(`${BASE_URL}/users/${userId}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${token}` },
+            })
+
+            if (!response.ok) {
+                const errorText = await response.text()
+                throw new Error(`Failed to delete user: ${response.status} - ${errorText}`)
+            }
+
+            toast.success('User disabled successfully')
+            fetchUsers()
+        } catch (error: any) {
+            toast.error(`Error deleting user: ${error.message}`)
+        }
+    }
 
     const handleCleanup = async () => {
         if (!confirm("Are you sure? This will delete ALL demo users immediately.")) return;
@@ -176,10 +197,13 @@ export default function AdminDashboard() {
                         <EditableUserTable
                             users={users}
                             onSave={handleSave}
+                            onDelete={handleDelete}
                             isLoading={isLoadingUsers}
                         />
                     </CardContent>
                 </Card>
+
+                <FeatureFlagsPanel users={users} token={(session as any)?.accessToken || ''} />
             </div>
         </div>
     );

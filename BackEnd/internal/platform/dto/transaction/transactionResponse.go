@@ -11,10 +11,11 @@ type TransactionResponse struct {
 	AccountId      string    `json:"account_id"`
 	CategoryId     string    `json:"category_id"`
 	BudgetId       string    `json:"budget_id"`
+	Currency       string    `json:"currency"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
-func NewTransactionResponse(Id, Name, Description, TypeTransation, AccountId, categoryId string, Amount float64, createdAt time.Time) *TransactionResponse {
+func NewTransactionResponse(Id, Name, Description, TypeTransation, AccountId, categoryId string, Amount float64, currency string, createdAt time.Time) *TransactionResponse {
 	return &TransactionResponse{
 		Id:             Id,
 		Name:           Name,
@@ -23,6 +24,7 @@ func NewTransactionResponse(Id, Name, Description, TypeTransation, AccountId, ca
 		TypeTransation: TypeTransation,
 		AccountId:      AccountId,
 		CategoryId:     categoryId,
+		Currency:       currency,
 		CreatedAt:      createdAt,
 	}
 }

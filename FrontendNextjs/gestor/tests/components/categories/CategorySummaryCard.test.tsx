@@ -25,14 +25,13 @@ describe('CategorySummaryCard', () => {
         { id: 'c3', name: 'Entertainment', icon: '🎬', color: '#0000FF', user_id: 'u1', created_at: '', updated_at: '' }
     ]
 
-    const mockTransactions = [
-        { id: 't1', category_id: 'c1', amount: 50 },
-        { id: 't2', category_id: 'c1', amount: 30 },
-        { id: 't3', category_id: 'c2', amount: 100 },
-    ] as any[]
+    const mockCategoryExpenses = [
+        { id: 'c1', label: 'Food', value: 80, color: '#FF0000', transaction_count: 2, dop_total: 80, usd_total: 0 },
+        { id: 'c2', label: 'Transport', value: 100, color: '#00FF00', transaction_count: 1, dop_total: 100, usd_total: 0 },
+    ]
 
     it('calculates totals correctly', () => {
-        render(<CategorySummaryCard categories={mockCategories} transactions={mockTransactions} />)
+        render(<CategorySummaryCard categories={mockCategories} categoryExpenses={mockCategoryExpenses} />)
 
         expect(screen.getByText('Summary')).toBeInTheDocument()
 

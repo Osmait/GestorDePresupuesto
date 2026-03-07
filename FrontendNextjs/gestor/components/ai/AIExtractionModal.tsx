@@ -21,14 +21,33 @@ import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useCreateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
-import { DocumentType, AIExtractResponse } from '@/types/ai'
+import { DocumentType, AIExtractResponse, AIPotentialDuplicate, AICategorySuggestion } from '@/types/ai'
 import { toast } from 'sonner'
 import { useTranslations } from 'next-intl'
+import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 
 interface AIExtractionModalProps {
 	open: boolean
 	onOpenChange: (open: boolean) => void
 	defaultAccountId?: string
+}
+
+function ensureUniqueCategoryName(baseName: string, existingNames: string[]): string {
+	const normalized = new Set(existingNames.map((name) => name.trim().toLowerCase()))
+	const cleanBase = baseName.trim() || 'Nueva categoría'
+
+	if (!normalized.has(cleanBase.toLowerCase())) {
+		return cleanBase
+	}
+
+	let candidate = `${cleanBase} (IA)`
+	let index = 2
+	while (normalized.has(candidate.toLowerCase())) {
+		candidate = `${cleanBase} (IA ${index})`
+		index++
+	}
+
+	return candidate
 }
 
 export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIExtractionModalProps) {
@@ -41,12 +60,19 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 	const [selectedIndices, setSelectedIndices] = useState<Set<number>>(new Set())
 	const [step, setStep] = useState<'upload' | 'preview' | 'saving'>('upload')
 	const [showQuickCategory, setShowQuickCategory] = useState(false)
+	const [potentialDuplicatesByTransactionId, setPotentialDuplicatesByTransactionId] = useState<
+		Record<string, AIPotentialDuplicate>
+	>({})
+	const [categorySuggestionsByTransactionId, setCategorySuggestionsByTransactionId] = useState<
+		Record<string, AICategorySuggestion>
+	>({})
 	const [pendingCategorySelection, setPendingCategorySelection] = useState<{
 		index: number
 	} | null>(null)
 
 	const { extract, isExtracting, extractData, reset } = useExtractFromFile()
-	const { data: categories = [] } = useGetCategories()
+	const { isEnabled } = useFeatureFlags()
+	const { data: categories = [], refetch: refetchCategories } = useGetCategories()
 	const { data: accounts = [] } = useGetAccounts()
 	const createTransaction = useCreateTransactionMutation()
 	const createCategoryMutation = useCreateCategoryMutation()
@@ -61,12 +87,49 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 			return
 		}
 
-		const result = await extract(files, accountId, documentType)
+		const selectedAccount = accounts.find((a) => a.id === accountId)
+
+		const result = await extract(files, accountId, documentType, selectedAccount?.currency || 'DOP')
 
 		if ('success' in result && result.success) {
 			const response = result as AIExtractResponse
-			setExtractedTransactions(response.data.transactions)
-			setSelectedIndices(new Set(response.data.transactions.map((_, i) => i)))
+			const normalizedTransactions = response.data.transactions.map((transaction) => ({
+				...transaction,
+				account_id: transaction.account_id || accountId,
+				currency: transaction.currency || selectedAccount?.currency || 'DOP',
+			}))
+			setExtractedTransactions(normalizedTransactions)
+
+			const duplicatesMap = (response.data.potential_duplicates || []).reduce(
+				(acc, duplicate) => {
+					acc[duplicate.extracted_transaction_id] = duplicate
+					return acc
+				},
+				{} as Record<string, AIPotentialDuplicate>
+			)
+			setPotentialDuplicatesByTransactionId(duplicatesMap)
+
+			const categorySuggestionsMap = isEnabled('ai_category_suggestions')
+				? (response.data.category_suggestions || []).reduce(
+						(acc, suggestion) => {
+							if (suggestion.transaction_id) {
+								acc[suggestion.transaction_id] = suggestion
+							}
+							return acc
+						},
+						{} as Record<string, AICategorySuggestion>
+				  )
+				: {}
+			setCategorySuggestionsByTransactionId(categorySuggestionsMap)
+
+			const initialSelection = new Set<number>()
+			normalizedTransactions.forEach((transaction, index) => {
+				const duplicateInfo = duplicatesMap[transaction.id]
+				if (duplicateInfo?.match_type !== 'duplicate') {
+					initialSelection.add(index)
+				}
+			})
+			setSelectedIndices(initialSelection)
 			setStep('preview')
 			toast.success(t('extractedCount', { count: response.data.count }))
 		} else {
@@ -125,21 +188,56 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		let saved = 0
 		let failed = 0
 
-		for (const txn of selectedTransactions) {
+		for (let index = 0; index < selectedTransactions.length; index++) {
+			const txn = selectedTransactions[index]
+			const resolvedAccountId = txn.account_id || accountId
+			if (!resolvedAccountId) {
+				failed++
+				console.error('[AIExtractionModal] Missing account_id for extracted transaction', {
+					index,
+					transaction: txn,
+				})
+				continue
+			}
 			try {
 				await createTransaction.mutateAsync({
 					name: txn.name,
 					description: txn.description || '',
 					amount: txn.amount,
 					type: txn.type_transation as TypeTransaction,
-					accountId: txn.account_id,
+					accountId: resolvedAccountId,
 					categoryId: txn.category_id || '',
 					budgetId: txn.budget_id,
+					currency: txn.currency || 'DOP',
 					createdAt: txn.created_at ? new Date(txn.created_at) : undefined,
 				})
 				saved++
-			} catch {
+			} catch (error) {
 				failed++
+				const err = error as Error & {
+					status?: number
+					code?: string
+					details?: unknown
+					requestId?: string
+				}
+				console.error('[AIExtractionModal] Failed to save extracted transaction', {
+					index,
+					requestId: err?.requestId,
+					status: err?.status,
+					code: err?.code,
+					message: err?.message,
+					details: err?.details,
+					transaction: {
+						name: txn.name,
+						type_transation: txn.type_transation,
+						amount: txn.amount,
+						currency: txn.currency,
+						account_id: txn.account_id,
+						category_id: txn.category_id,
+						budget_id: txn.budget_id,
+						created_at: txn.created_at,
+					},
+				})
 			}
 		}
 
@@ -159,6 +257,8 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		setSelectedIndices(new Set())
 		setStep('upload')
 		setShowQuickCategory(false)
+		setPotentialDuplicatesByTransactionId({})
+		setCategorySuggestionsByTransactionId({})
 		setPendingCategorySelection(null)
 		reset()
 		onOpenChange(false)
@@ -168,6 +268,68 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		setStep('upload')
 		setExtractedTransactions([])
 		setSelectedIndices(new Set())
+		setPotentialDuplicatesByTransactionId({})
+		setCategorySuggestionsByTransactionId({})
+	}
+
+	const handleApplyCategorySuggestion = (transactionId: string) => {
+		const suggestion = categorySuggestionsByTransactionId[transactionId]
+		if (!suggestion) {
+			return
+		}
+
+		setExtractedTransactions((prev) =>
+			prev.map((transaction) =>
+				transaction.id === transactionId
+					? {
+						...transaction,
+						category_id: suggestion.category_id,
+					}
+					: transaction
+			)
+		)
+
+		toast.success(t('appliedCategorySuggestion', { name: suggestion.category_name }))
+	}
+
+	const handleCreateCategoryFromSuggestion = async (transactionId: string, categoryName: string) => {
+		const normalizedName = ensureUniqueCategoryName(
+			categoryName,
+			categories.map((category) => category.name)
+		)
+		if (!normalizedName) {
+			return
+		}
+
+		try {
+			await createCategoryMutation.mutateAsync({
+				name: normalizedName,
+				icon: '📦',
+				color: '#22c55e',
+			})
+
+			const refreshed = await refetchCategories()
+			const createdCategory = (refreshed.data || []).find(
+				(category) => category.name.toLowerCase() === normalizedName.toLowerCase()
+			)
+
+			if (createdCategory) {
+				setExtractedTransactions((prev) =>
+					prev.map((transaction) =>
+						transaction.id === transactionId
+							? {
+								...transaction,
+								category_id: createdCategory.id,
+							}
+							: transaction
+					)
+				)
+			}
+
+			toast.success(t('categoryCreated', { name: normalizedName }))
+		} catch {
+			toast.error(t('failedToCreateCategory'))
+		}
 	}
 
 	return (
@@ -275,9 +437,13 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 							<TransactionPreview
 								transactions={extractedTransactions}
 								categories={categories}
+								potentialDuplicatesByTransactionId={potentialDuplicatesByTransactionId}
+								categorySuggestionsByTransactionId={categorySuggestionsByTransactionId}
 								onEdit={handleEdit}
 								onRemove={handleRemove}
 								onSelect={handleSelect}
+								onApplyCategorySuggestion={handleApplyCategorySuggestion}
+								onCreateCategoryFromSuggestion={handleCreateCategoryFromSuggestion}
 								selectedIndices={selectedIndices}
 								onCreateCategory={handleCreateCategoryRequest}
 							/>

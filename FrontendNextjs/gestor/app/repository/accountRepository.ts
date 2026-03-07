@@ -5,9 +5,9 @@ export class AccountRepository extends BaseRepository {
   async findAll(): Promise<Account[]> {
     try {
       const data = await this.get<any[]>("/account");
-      
+
       // Normalizar la respuesta para que sea un array de Account plano
-      const accounts = data.map((item: any) => ({
+      const accounts = (data || []).map((item: any) => ({
         ...item.account_info,
         current_balance: item.current_balance,
       }));

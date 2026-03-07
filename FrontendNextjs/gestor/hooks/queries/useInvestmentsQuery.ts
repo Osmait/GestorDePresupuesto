@@ -1,13 +1,14 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getInvestmentRepository } from '@/lib/repositoryConfig';
-import { CreateInvestmentDTO, InvestmentFilters, UpdateInvestmentDTO } from '@/types/investment';
+import { CreateInvestmentDTO, FundBrokerDTO, InvestmentFilters, UpdateInvestmentDTO } from '@/types/investment';
 
 export const INVESTMENT_KEYS = {
-    all: ['investments'] as const,
-    lists: () => [...INVESTMENT_KEYS.all, 'list'] as const,
-    list: (filters: InvestmentFilters) => [...INVESTMENT_KEYS.lists(), filters] as const,
-    details: () => [...INVESTMENT_KEYS.all, 'detail'] as const,
-    detail: (id: string) => [...INVESTMENT_KEYS.details(), id] as const,
+	all: ['investments'] as const,
+	lists: () => [...INVESTMENT_KEYS.all, 'list'] as const,
+	list: (filters: InvestmentFilters) => [...INVESTMENT_KEYS.lists(), filters] as const,
+	fundingBalances: () => [...INVESTMENT_KEYS.all, 'funding-balances'] as const,
+	details: () => [...INVESTMENT_KEYS.all, 'detail'] as const,
+	detail: (id: string) => [...INVESTMENT_KEYS.details(), id] as const,
 };
 
 export function useGetInvestments(filters?: InvestmentFilters) {
@@ -28,10 +29,36 @@ export function useCreateInvestmentMutation() {
             const repo = await getInvestmentRepository();
             return repo.create(data);
         },
-        onSuccess: () => {
-            queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.lists() });
-        },
-    });
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.lists() });
+			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.fundingBalances() });
+		},
+	});
+}
+
+export function useGetInvestmentFundingBalances() {
+	return useQuery({
+		queryKey: INVESTMENT_KEYS.fundingBalances(),
+		queryFn: async () => {
+			const repo = await getInvestmentRepository();
+			return repo.getFundingBalances();
+		},
+	});
+}
+
+export function useFundBrokerMutation() {
+	const queryClient = useQueryClient();
+
+	return useMutation({
+		mutationFn: async (data: FundBrokerDTO) => {
+			const repo = await getInvestmentRepository();
+			return repo.fundBroker(data);
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.fundingBalances() });
+			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.lists() });
+		},
+	});
 }
 
 export function useUpdateInvestmentMutation() {

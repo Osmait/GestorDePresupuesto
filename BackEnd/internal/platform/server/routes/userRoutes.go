@@ -15,4 +15,5 @@ func UserRoute(s *gin.Engine, userService *user.UserService) {
 	s.GET("/users", middleware.RequireRole("ADMIN"), handler.GetUsers(userService))
 	s.PUT("/users", middleware.RequireRole("ADMIN"), handler.UpdateUsers(userService))
 	s.POST("/users", middleware.RequireRole("ADMIN"), handler.CreateUserByAdmin(userService))
+	s.DELETE("/users/:id", middleware.RequireRole("ADMIN"), handler.SoftDeleteUser(userService))
 }

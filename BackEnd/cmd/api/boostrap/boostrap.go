@@ -26,7 +26,10 @@ import (
 	authRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/auth"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
+	creditcardRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/creditcard"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
+	loanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/loan"
 	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
@@ -41,7 +44,11 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
+	"github.com/osmait/gestorDePresupuesto/internal/services/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/services/creditcard"
+	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/services/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
@@ -133,6 +140,10 @@ func Run() error {
 		services.aiCache,
 		repositories.categoryRepository,
 		repositories.transactionRepository,
+		services.certificateService,
+		services.creditCardService,
+		services.loanService,
+		services.exchangeService,
 	)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -215,9 +226,6 @@ func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 	case config.DatabaseTypePostgres:
 		utils.RunDBMigration("file://cmd/api/db/migrations", cfg.GetPostgresUrl())
 		return nil
-	case config.DatabaseTypeSQLite:
-		utils.RunSQLiteMigration("cmd/api/db/migrations", cfg.GetSQLiteUrl())
-		return nil
 	default:
 		return fmt.Errorf("unsupported database type for migrations: %s", cfg.Database.Type)
 	}
@@ -235,6 +243,9 @@ type repositories struct {
 	recurringRepository    *recurringRepo.RecurringTransactionRepository
 	notificationRepository *notificationRepo.NotificationRepository
 	refreshTokenRepository authRepo.RefreshTokenRepositoryInterface
+	certificateRepository  certificateRepo.CertificateRepositoryInterface
+	creditCardRepository   creditcardRepo.CreditCardRepositoryInterface
+	loanRepository         loanRepo.LoanRepositoryInterface
 }
 
 // initializeRepositories creates all repository instances
@@ -250,6 +261,9 @@ func initializeRepositories(db *sql.DB) *repositories {
 		recurringRepository:    recurringRepo.NewRecurringTransactionRepository(db),
 		notificationRepository: notificationRepo.NewNotificationRepository(db),
 		refreshTokenRepository: authRepo.NewRefreshTokenRepository(db),
+		certificateRepository:  certificateRepo.NewCertificateRepository(db),
+		creditCardRepository:   creditcardRepo.NewCreditCardRepository(db),
+		loanRepository:         loanRepo.NewLoanRepository(db),
 	}
 }
 
@@ -269,6 +283,10 @@ type services struct {
 	notificationService *notification.NotificationService
 	aiService           *aiService.Service
 	aiCache             *aiService.AICacheService
+	certificateService  *certificate.CertificateService
+	creditCardService   *creditcard.CreditCardService
+	loanService         *loan.LoanService
+	exchangeService     *exchange.ExchangeRateService
 }
 
 // initializeServices creates all service instances
@@ -290,23 +308,42 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		aiCacheInvalidator = aiCacheSvc
 	}
 
-	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator)
+	exchangeService := exchange.NewExchangeRateService()
+
+	usdToDopRateFn := func(ctx context.Context) (float64, error) {
+		rateResp, err := exchangeService.GetUSDtoDOP(ctx)
+		if err != nil {
+			return 0, err
+		}
+		return rateResp.USDToDOP, nil
+	}
+
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator, usdToDopRateFn)
+
+	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService)
+
+	creditCardService := creditcard.NewCreditCardService(repos.creditCardRepository, repos.accountRepository, transactionService)
+	loanService := loan.NewLoanService(repos.loanRepository, transactionService, repos.accountRepository, repos.categoryRepository)
 
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),
 		transactionService:  transactionService,
 		userService:         user.NewUserService(repos.userRepository),
 		authService:         auth.NewAuthServiceWithRefreshTokens(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, repos.refreshTokenRepository, cfg),
-		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository),
+		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository, usdToDopRateFn),
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
-		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService),
-		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository),
+		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService, transactionService, repos.accountRepository, repos.categoryRepository),
+		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn),
 		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService),
-		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository),
+		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository, repos.loanRepository, repos.certificateRepository),
 		quoteService:        quoteService,
 		notificationService: notificationService,
 		aiService:           aiSvc,
 		aiCache:             aiCacheSvc,
+		certificateService:  certificateService,
+		creditCardService:   creditCardService,
+		loanService:         loanService,
+		exchangeService:     exchangeService,
 	}
 }
 

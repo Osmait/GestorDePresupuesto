@@ -1,6 +1,10 @@
 export enum TypeTransaction {
   BILL = "bill",
   INCOME = "income",
+  LOAN_DISBURSEMENT = "loan_disbursement",
+  LOAN_COLLECTION = "loan_collection",
+  INVESTMENT_PURCHASE = "investment_purchase",
+  INVESTMENT_FUNDING = "investment_funding",
 }
 
 export interface Transaction {
@@ -12,6 +16,7 @@ export interface Transaction {
   account_id: string;
   category_id: string;
   budget_id?: string;
+  currency?: string;
   created_at: string;
 }
 
@@ -29,6 +34,20 @@ export interface PaginationMeta {
 export interface PaginatedTransactionResponse {
   data: Transaction[];
   pagination: PaginationMeta;
+  summary?: TransactionSummary;
+}
+
+export interface TransactionSummary {
+  total_income: number;
+  total_expenses: number;
+  net_amount: number;
+  income_dop: number;
+  income_usd: number;
+  expenses_dop: number;
+  expenses_usd: number;
+  usd_to_dop_rate: number;
+  income_count: number;
+  expense_count: number;
 }
 
 export interface TransactionFilters {

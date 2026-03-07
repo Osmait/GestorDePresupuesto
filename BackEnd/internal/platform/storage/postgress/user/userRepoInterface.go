@@ -18,6 +18,10 @@ type UserRepositoryInterface interface {
 	Delete(ctx context.Context, id string) error
 	// FindAll returns all users in the system
 	FindAll(ctx context.Context) ([]*domainUser.User, error)
+	// FindAllFiltered returns users filtered by query with pagination
+	FindAllFiltered(ctx context.Context, query string, limit int, offset int) ([]*domainUser.User, error)
 	// Update modifies an existing user in the database
 	Update(ctx context.Context, user *domainUser.User) error
+	// SoftDelete marks a user as deleted by setting deleted_at timestamp
+	SoftDelete(ctx context.Context, id string) error
 }

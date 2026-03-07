@@ -7,7 +7,6 @@ interface AnalysisRadarChartProps {
     nivoTheme: any
     t: {
         expenses: string
-        income: string
     }
 }
 
@@ -15,7 +14,7 @@ const AnalysisRadarChart = ({ data, nivoTheme, t }: AnalysisRadarChartProps) => 
     return (
         <ResponsiveRadar 
             data={data} 
-            keys={[t.expenses, t.income]} 
+            keys={[t.expenses]} 
             indexBy='categoria' 
             maxValue='auto' 
             margin={{ top: 30, right: 30, bottom: 50, left: 60 }} 
@@ -24,20 +23,19 @@ const AnalysisRadarChart = ({ data, nivoTheme, t }: AnalysisRadarChartProps) => 
             borderColor={{ from: 'color' }} 
             gridLevels={5} 
             gridShape='circular' 
-            gridLabelOffset={36} 
+            gridLabelOffset={18} 
             enableDots={true} 
             dotSize={8} 
             dotColor={{ theme: 'background' }} 
             dotBorderWidth={2} 
             dotBorderColor={{ from: 'color' }} 
-            enableDotLabel={true} 
-            dotLabel='value' 
-            dotLabelYOffset={-12} 
-            colors={{ scheme: 'nivo' }} 
-            fillOpacity={0.25} 
+            enableDotLabel={false} 
+            colors={['#f97316']} 
+            fillOpacity={0.35} 
             blendMode='multiply' 
             animate={true} 
             isInteractive={true} 
+            valueFormat={value => new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP', maximumFractionDigits: 0 }).format(Number(value))}
             theme={nivoTheme} 
         />
     )

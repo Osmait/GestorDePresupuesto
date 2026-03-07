@@ -5,7 +5,7 @@ export class BudgetRepository extends BaseRepository {
   async findAll(): Promise<Budget[]> {
     try {
       const budgets = await this.get<Budget[]>("/budget");
-      return budgets;
+      return budgets ?? [];
     } catch (error) {
       console.error("Error fetching budgets:", error);
       return [];

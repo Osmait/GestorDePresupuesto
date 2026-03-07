@@ -76,15 +76,39 @@ export abstract class BaseRepository {
 
     if (!response.ok) {
       let errorMessage = `HTTP error! status: ${response.status} - ${response.statusText}`;
+      let errorCode: string | undefined;
+      let errorDetails: unknown;
+      const requestId = response.headers.get('X-Request-ID') || undefined;
       try {
         const errorData = await response.json();
-        if (errorData.error) {
-          errorMessage = errorData.error;
+        if (errorData?.error) {
+          if (typeof errorData.error === 'string') {
+            errorMessage = errorData.error;
+          } else {
+            errorMessage = errorData.error.message || errorMessage;
+            errorCode = errorData.error.code;
+            errorDetails = errorData.error.details;
+          }
+        } else if (typeof errorData?.err === 'string') {
+          errorMessage = errorData.err;
+        } else if (typeof errorData?.message === 'string') {
+          errorMessage = errorData.message;
         }
       } catch (e) {
         // ignore json parse error
       }
-      throw new Error(errorMessage);
+
+      const error = new Error(errorMessage) as Error & {
+        status?: number;
+        code?: string;
+        details?: unknown;
+        requestId?: string;
+      };
+      error.status = response.status;
+      error.code = errorCode;
+      error.details = errorDetails;
+      error.requestId = requestId;
+      throw error;
     }
 
     return response;
@@ -121,5 +145,16 @@ export abstract class BaseRepository {
     await this.authenticatedFetch(endpoint, {
       method: "DELETE",
     });
+  }
+
+  protected async patch<T>(endpoint: string, data?: any): Promise<T | void> {
+    const response = await this.authenticatedFetch(endpoint, {
+      method: "PATCH",
+      body: data ? JSON.stringify(data) : undefined,
+    });
+
+    if (response.headers.get("content-type")?.includes("application/json")) {
+      return response.json();
+    }
   }
 }

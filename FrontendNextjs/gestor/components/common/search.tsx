@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { useRouter } from "next/navigation"
-import { Loader2, CreditCard, ArrowUpDown, Tags, PiggyBank, Search as SearchIcon, X } from "lucide-react"
+import { Loader2, CreditCard, ArrowUpDown, Tags, PiggyBank, Search as SearchIcon, X, HandCoins, Building2 } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { useSearchQuery } from "@/hooks/queries/useSearchQuery"
 import { Badge } from "@/components/ui/badge"
@@ -24,7 +24,9 @@ function SearchResults({
     (data.transactions && data.transactions.length > 0) ||
     (data.categories && data.categories.length > 0) ||
     (data.accounts && data.accounts.length > 0) ||
-    (data.budgets && data.budgets.length > 0)
+    (data.budgets && data.budgets.length > 0) ||
+    (data.loans && data.loans.length > 0) ||
+    (data.certificates && data.certificates.length > 0)
   )
 
   if (isLoading) {
@@ -55,12 +57,17 @@ function SearchResults({
             <div
               key={tx.id}
               className="flex items-center justify-between gap-3 px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors"
-              onClick={() => onSelect('/app/transactions')}
+              onClick={() => onSelect(`/app/transactions?highlight=${tx.id}&open=details`)}
             >
               <span className="truncate min-w-0 flex-1">{tx.name || tx.description}</span>
               {tx.amount !== undefined && tx.amount !== null && (
-                <span className={cn("text-xs font-mono flex-shrink-0", tx.type_transation === "income" ? "text-green-500" : "text-red-500")}>
-                  {tx.type_transation === "income" ? "+" : "-"}${Math.abs(tx.amount).toLocaleString()}
+                <span
+                  className={cn(
+                    "text-xs font-mono flex-shrink-0",
+                    tx.type_transation === "income" || tx.type_transation === "loan_collection" ? "text-green-500" : "text-red-500"
+                  )}
+                >
+                  {(tx.type_transation === "income" || tx.type_transation === "loan_collection") ? "+" : "-"}${Math.abs(tx.amount).toLocaleString()}
                 </span>
               )}
             </div>
@@ -102,7 +109,7 @@ function SearchResults({
               <div
                 key={cat.id}
                 className="flex items-center px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors"
-                onClick={() => onSelect(`/app/transactions?category=${cat.id}`)}
+                onClick={() => onSelect(`/app/category?selected=${cat.id}`)}
               >
                 <span className="mr-2">{cat.icon}</span>
                 <span>{cat.name}</span>
@@ -124,10 +131,54 @@ function SearchResults({
               <div
                 key={bud.id}
                 className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors"
-                onClick={() => onSelect('/app/budget')}
+                onClick={() => onSelect(`/app/budget?selected=${bud.id}`)}
               >
                 <span>{bud.category_name || "Presupuesto"}</span>
                 <span className="font-mono text-xs">${bud.amount}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Loans */}
+      {data?.loans && data.loans.length > 0 && (
+        <>
+          {(data.transactions?.length > 0 || data.accounts?.length > 0 || data.categories?.length > 0 || data.budgets?.length > 0) && <div className="h-px bg-border my-1 mx-2" />}
+          <div className="px-2 py-1">
+            <h4 className="flex items-center text-xs font-semibold text-muted-foreground mb-1 px-2">
+              <HandCoins className="mr-2 h-3 w-3" /> Préstamos
+            </h4>
+            {data.loans.map((loan: any) => (
+              <div
+                key={loan.id || loan.Id}
+                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors"
+                onClick={() => onSelect(`/app/loans?selected=${loan.id || loan.Id}&open=details`)}
+              >
+                <span>{loan.borrower_name || loan.BorrowerName || 'Préstamo'}</span>
+                <span className="font-mono text-xs">${loan.pending_amount?.toLocaleString?.() ?? loan.PendingAmount?.toLocaleString?.() ?? loan.total_amount ?? loan.TotalAmount}</span>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* Certificates */}
+      {data?.certificates && data.certificates.length > 0 && (
+        <>
+          {(data.transactions?.length > 0 || data.accounts?.length > 0 || data.categories?.length > 0 || data.budgets?.length > 0 || data.loans?.length > 0) && <div className="h-px bg-border my-1 mx-2" />}
+          <div className="px-2 py-1">
+            <h4 className="flex items-center text-xs font-semibold text-muted-foreground mb-1 px-2">
+              <Building2 className="mr-2 h-3 w-3" /> Certificados
+            </h4>
+            {data.certificates.map((certificate: any) => (
+              <div
+                key={certificate.id}
+                className="flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors"
+                onClick={() => onSelect(`/app/certificates?selected=${certificate.id}&open=history`)}
+              >
+                <span>{certificate.bank || 'Certificado'}</span>
+                <span className="font-mono text-xs">${certificate.base_capital?.toLocaleString?.() ?? 0}</span>
               </div>
             ))}
           </div>

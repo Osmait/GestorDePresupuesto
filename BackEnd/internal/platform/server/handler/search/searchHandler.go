@@ -29,6 +29,8 @@ func (h *SearchHandler) Search(ctx *gin.Context) {
 			"categories":   []interface{}{},
 			"accounts":     []interface{}{},
 			"budgets":      []interface{}{},
+			"loans":        []interface{}{},
+			"certificates": []interface{}{},
 		})
 		return
 	}

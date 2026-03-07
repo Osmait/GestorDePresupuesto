@@ -19,13 +19,14 @@ func NewInvestmentHandler(service *investmentService.InvestmentService) *Investm
 
 func (h *InvestmentHandler) Create(ctx *gin.Context) {
 	var req struct {
-		ID            string                    `json:"id"`
-		Type          investment.InvestmentType `json:"type" binding:"required"`
-		Name          string                    `json:"name" binding:"required"`
-		Symbol        string                    `json:"symbol" binding:"required"`
-		Quantity      float64                   `json:"quantity" binding:"required"`
-		PurchasePrice float64                   `json:"purchase_price" binding:"required"`
-		CurrentPrice  float64                   `json:"current_price" binding:"required"`
+		ID                 string                    `json:"id"`
+		Type               investment.InvestmentType `json:"type" binding:"required"`
+		Name               string                    `json:"name" binding:"required"`
+		Symbol             string                    `json:"symbol" binding:"required"`
+		Quantity           float64                   `json:"quantity" binding:"required"`
+		PurchasePrice      float64                   `json:"purchase_price" binding:"required,gt=0"`
+		CurrentPrice       float64                   `json:"current_price" binding:"required,gt=0"`
+		SettlementCurrency string                    `json:"settlement_currency"`
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
@@ -43,12 +44,64 @@ func (h *InvestmentHandler) Create(ctx *gin.Context) {
 		req.ID = ksuid.New().String()
 	}
 
-	if err := h.service.Create(ctx, req.ID, userId, req.Type, req.Name, req.Symbol, req.Quantity, req.PurchasePrice, req.CurrentPrice); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.service.Create(ctx, req.ID, userId, req.Type, req.Name, req.Symbol, req.Quantity, req.PurchasePrice, req.CurrentPrice, req.SettlementCurrency); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	ctx.Status(http.StatusCreated)
+}
+
+func (h *InvestmentHandler) FundBroker(ctx *gin.Context) {
+	var req struct {
+		SourceAccountID string  `json:"source_account_id" binding:"required"`
+		SourceAmount    float64 `json:"source_amount" binding:"required,gt=0"`
+		TargetCurrency  string  `json:"target_currency"`
+		ExchangeRate    float64 `json:"exchange_rate"`
+		FeeAmount       float64 `json:"fee_amount"`
+		Notes           string  `json:"notes"`
+	}
+
+	if err := ctx.ShouldBindJSON(&req); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	userId := ctx.GetString("X-User-Id")
+	if userId == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	if err := h.service.FundBroker(ctx, userId, investmentService.FundingRequest{
+		SourceAccountID: req.SourceAccountID,
+		SourceAmount:    req.SourceAmount,
+		TargetCurrency:  req.TargetCurrency,
+		ExchangeRate:    req.ExchangeRate,
+		FeeAmount:       req.FeeAmount,
+		Notes:           req.Notes,
+	}); err != nil {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.Status(http.StatusCreated)
+}
+
+func (h *InvestmentHandler) GetFundingBalances(ctx *gin.Context) {
+	userId := ctx.GetString("X-User-Id")
+	if userId == "" {
+		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return
+	}
+
+	balances, err := h.service.GetFundingBalances(ctx, userId)
+	if err != nil {
+		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx.JSON(http.StatusOK, balances)
 }
 
 func (h *InvestmentHandler) FindAll(ctx *gin.Context) {

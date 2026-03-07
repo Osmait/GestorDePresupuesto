@@ -1,8 +1,11 @@
 package transaction
 
 import (
+	"bytes"
 	"fmt"
+	"io"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
@@ -31,15 +34,48 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 		userID := ctx.GetString("X-User-Id")
 
 		var transactionRequest dto.TransactionRequest
+		rawBody, readErr := io.ReadAll(ctx.Request.Body)
+		if readErr != nil {
+			log.Error().Err(readErr).Str("user_id", userID).Msg("Failed to read create transaction request body")
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Error fields required"))
+			return
+		}
+		ctx.Request.Body = io.NopCloser(bytes.NewBuffer(rawBody))
 
 		if err := ctx.BindJSON(&transactionRequest); err != nil {
+			log.Error().
+				Err(err).
+				Str("user_id", userID).
+				Str("method", ctx.Request.Method).
+				Str("path", ctx.Request.URL.Path).
+				Str("content_type", ctx.GetHeader("Content-Type")).
+				Int("content_length", len(rawBody)).
+				Str("body_snippet", sanitizeBodyForLog(string(rawBody), 1024)).
+				Msg("Invalid JSON while creating transaction")
 			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Error fields required"))
 			return
 		}
 		if err := transactionRequest.Validate(); err != nil {
+			log.Warn().
+				Err(err).
+				Str("user_id", userID).
+				Str("account_id", transactionRequest.AccountId).
+				Str("category_id", transactionRequest.CategoryId).
+				Str("currency", transactionRequest.Currency).
+				Float64("amount", transactionRequest.Amount).
+				Str("type_transation", transactionRequest.TypeTransation).
+				Msg("Transaction validation failed")
 			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
+
+		log.Debug().
+			Str("user_id", userID).
+			Str("account_id", transactionRequest.AccountId).
+			Str("currency", transactionRequest.Currency).
+			Float64("amount", transactionRequest.Amount).
+			Msg("Creating transaction")
+
 		err := transactionservice.CreateTransaction(
 			ctx,
 			transactionRequest.Name,
@@ -50,6 +86,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			userID,
 			transactionRequest.CategoryId,
 			transactionRequest.BudgetId,
+			transactionRequest.Currency,
 			transactionRequest.CreatedAt,
 		)
 		if err != nil {
@@ -59,6 +96,16 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 
 		ctx.JSON(http.StatusCreated, "Transaction created")
 	}
+}
+
+func sanitizeBodyForLog(body string, maxLen int) string {
+	body = strings.ReplaceAll(body, "\n", " ")
+	body = strings.ReplaceAll(body, "\r", " ")
+	body = strings.TrimSpace(body)
+	if len(body) <= maxLen {
+		return body
+	}
+	return body[:maxLen] + "...<truncated>"
 }
 
 // FindAllTransactionOfAllAccount godoc

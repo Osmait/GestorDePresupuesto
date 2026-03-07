@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/select'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
+import { AIPotentialDuplicate, AICategorySuggestion } from '@/types/ai'
 import { cn } from '@/lib/utils'
 import { format } from 'date-fns'
 import { useTranslations } from 'next-intl'
@@ -23,21 +24,47 @@ import { useTranslations } from 'next-intl'
 interface TransactionPreviewProps {
 	transactions: Transaction[]
 	categories: Category[]
+	potentialDuplicatesByTransactionId?: Record<string, AIPotentialDuplicate>
+	categorySuggestionsByTransactionId?: Record<string, AICategorySuggestion>
 	onEdit: (index: number, transaction: Transaction) => void
 	onRemove: (index: number) => void
 	onSelect: (index: number, selected: boolean) => void
 	selectedIndices: Set<number>
 	onCreateCategory?: () => void
+	onApplyCategorySuggestion?: (transactionId: string) => void
+	onCreateCategoryFromSuggestion?: (transactionId: string, categoryName: string) => void
+}
+
+function buildUniqueCategoryName(baseName: string, existingNames: string[]): string {
+	const normalizedExisting = new Set(existingNames.map((name) => name.trim().toLowerCase()))
+	const cleanBase = baseName.trim() || 'Nueva categoría'
+
+	if (!normalizedExisting.has(cleanBase.toLowerCase())) {
+		return cleanBase
+	}
+
+	let candidate = `${cleanBase} - IA`
+	let suffix = 2
+	while (normalizedExisting.has(candidate.toLowerCase())) {
+		candidate = `${cleanBase} - IA ${suffix}`
+		suffix++
+	}
+
+	return candidate
 }
 
 export function TransactionPreview({
 	transactions,
 	categories,
+	potentialDuplicatesByTransactionId,
+	categorySuggestionsByTransactionId,
 	onEdit,
 	onRemove,
 	onSelect,
 	selectedIndices,
 	onCreateCategory,
+	onApplyCategorySuggestion,
+	onCreateCategoryFromSuggestion,
 }: TransactionPreviewProps) {
 	const t = useTranslations('ai.preview')
 	const tCommon = useTranslations('ai.common')
@@ -88,8 +115,34 @@ export function TransactionPreview({
 		)
 	}
 
+	const duplicateEntries = Object.values(potentialDuplicatesByTransactionId || {})
+	const duplicateCount = duplicateEntries.filter((item) => item.match_type === 'duplicate').length
+	const similarCount = duplicateEntries.filter((item) => item.match_type === 'similar').length
+
 	return (
 		<div className="space-y-3">
+			{potentialDuplicatesByTransactionId && Object.keys(potentialDuplicatesByTransactionId).length > 0 && (
+				<div className="rounded-lg border border-orange-300/50 bg-orange-50/70 dark:bg-orange-950/20 p-3 text-sm">
+					<div className="flex items-center gap-2 text-orange-700 dark:text-orange-300 font-medium">
+						<AlertTriangle className="h-4 w-4" />
+						<span>{t('duplicateWarningTitle')}</span>
+					</div>
+					<p className="text-muted-foreground mt-1">{t('duplicateWarningDescription')}</p>
+					<div className="mt-2 flex flex-wrap gap-2 text-xs">
+						{duplicateCount > 0 && (
+							<span className="px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+								{t('possibleDuplicateCount', { count: duplicateCount })}
+							</span>
+						)}
+						{similarCount > 0 && (
+							<span className="px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+								{t('similarTransactionCount', { count: similarCount })}
+							</span>
+						)}
+					</div>
+				</div>
+			)}
+
 			<div className="flex items-center justify-between mb-4">
 				<span className="text-sm text-muted-foreground">
 					{t('selectedCount', { selected: selectedIndices.size, total: transactions.length })}
@@ -122,6 +175,16 @@ export function TransactionPreview({
 					const isSelected = selectedIndices.has(index)
 					const isIncome = transaction.type_transation === TypeTransaction.INCOME
 					const hasCategory = !!transaction.category_id
+					const duplicateInfo = potentialDuplicatesByTransactionId?.[transaction.id]
+					const categorySuggestion = categorySuggestionsByTransactionId?.[transaction.id]
+					const createSuggestedName = categorySuggestion
+						? buildUniqueCategoryName(
+							categorySuggestion.new_category_name || categorySuggestion.category_name,
+							categories.map((category) => category.name)
+						)
+						: ''
+					const isPossibleDuplicate = duplicateInfo?.match_type === 'duplicate'
+					const isSimilarTransaction = duplicateInfo?.match_type === 'similar'
 
 					return (
 						<motion.div
@@ -132,7 +195,9 @@ export function TransactionPreview({
 							className={cn(
 								'p-4 rounded-lg border transition-colors',
 								isSelected ? 'border-primary bg-primary/5' : 'border-border',
-								!hasCategory && 'border-yellow-500/50'
+								!hasCategory && 'border-yellow-500/50',
+								isPossibleDuplicate && 'border-red-400/70 bg-red-50/40 dark:bg-red-950/20',
+								isSimilarTransaction && 'border-orange-400/70 bg-orange-50/30 dark:bg-orange-950/20'
 							)}
 						>
 							{isEditing && editForm ? (
@@ -154,19 +219,36 @@ export function TransactionPreview({
 											<label className="text-xs text-muted-foreground mb-1 block">
 												{t('amount')}
 											</label>
-											<Input
-												type="number"
-												value={editForm.amount}
+										<Input
+											type="number"
+											value={editForm.amount}
 												onChange={(e) =>
 													setEditForm({
 														...editForm,
 														amount: parseFloat(e.target.value) || 0,
 													})
 												}
-												placeholder={t('amount')}
-											/>
-										</div>
+											placeholder={t('amount')}
+										/>
 									</div>
+									<div>
+										<label className="text-xs text-muted-foreground mb-1 block">Currency</label>
+										<Select
+											value={editForm.currency || 'DOP'}
+											onValueChange={(v) =>
+												setEditForm({ ...editForm, currency: v as 'DOP' | 'USD' })
+											}
+										>
+											<SelectTrigger>
+												<SelectValue placeholder="DOP" />
+											</SelectTrigger>
+											<SelectContent>
+												<SelectItem value="DOP">DOP</SelectItem>
+												<SelectItem value="USD">USD</SelectItem>
+											</SelectContent>
+										</Select>
+									</div>
+								</div>
 
 									<div>
 										<label className="text-xs text-muted-foreground mb-1 block">
@@ -255,9 +337,19 @@ export function TransactionPreview({
 											className="mt-1 h-4 w-4 rounded border-gray-300"
 										/>
 										<div>
-											<div className="flex items-center gap-2">
-												<span className="font-medium">{transaction.name}</span>
-												{!hasCategory && (
+										<div className="flex items-center gap-2">
+											<span className="font-medium">{transaction.name}</span>
+											{isPossibleDuplicate && (
+												<span className="text-[11px] px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300">
+													{t('possibleDuplicate')}
+												</span>
+											)}
+											{isSimilarTransaction && (
+												<span className="text-[11px] px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300">
+													{t('similarTransaction')}
+												</span>
+											)}
+											{!hasCategory && (
 													<span
 														className="text-yellow-500"
 														title={t('noCategoryMatched')}
@@ -265,9 +357,56 @@ export function TransactionPreview({
 														<AlertTriangle className="h-4 w-4" />
 													</span>
 												)}
+										</div>
+										{duplicateInfo && duplicateInfo.candidates.length > 0 && (
+											<p className="text-xs text-muted-foreground mt-1">
+												{t('matchedWith', {
+													name: duplicateInfo.candidates[0].name,
+													date: formatDate(duplicateInfo.candidates[0].created_at),
+												})}
+											</p>
+										)}
+										{categorySuggestion && (!hasCategory || transaction.category_id !== categorySuggestion.category_id) && (
+											<div className='mt-2 flex items-center gap-2 flex-wrap'>
+												<span
+													className={cn(
+														'text-[11px] px-2 py-0.5 rounded',
+														categorySuggestion.confidence === 'high'
+															? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+															: categorySuggestion.confidence === 'medium'
+																? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+																: 'bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300'
+													)}
+												>
+													{t('suggestedCategory', {
+														name: categorySuggestion.category_name,
+														confidence: t(`confidence.${categorySuggestion.confidence}`),
+													})}
+												</span>
+												<Button
+													variant='outline'
+													size='sm'
+													onClick={() => onApplyCategorySuggestion?.(transaction.id)}
+												>
+													{t('applySuggestion')}
+												</Button>
+												<Button
+													variant='secondary'
+													size='sm'
+													title={createSuggestedName}
+													onClick={() =>
+														onCreateCategoryFromSuggestion?.(
+															transaction.id,
+															createSuggestedName
+														)
+													}
+												>
+													{t('createSuggestedCategory')}
+												</Button>
 											</div>
-											<p className="text-sm text-muted-foreground">
-												{transaction.description}
+										)}
+										<p className="text-sm text-muted-foreground">
+											{transaction.description}
 											</p>
 											<div className="flex items-center gap-2 mt-1 flex-wrap">
 												<span className="text-lg">
@@ -302,7 +441,7 @@ export function TransactionPreview({
 												isIncome ? 'text-green-600' : 'text-red-600'
 											)}
 										>
-											{isIncome ? '+' : '-'}${transaction.amount.toFixed(2)}
+											{isIncome ? '+' : '-'}{transaction.currency || 'DOP'} {transaction.amount.toFixed(2)}
 										</span>
 										<Button
 											variant="ghost"

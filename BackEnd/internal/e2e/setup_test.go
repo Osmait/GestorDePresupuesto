@@ -10,6 +10,8 @@ import (
 	"log"
 	"net/http/httptest"
 	"os"
+	"path/filepath"
+	"runtime"
 	"testing"
 	"time"
 
@@ -163,10 +165,12 @@ func (suite *E2ETestSuite) SetupSuite() {
 	err = suite.db.Ping()
 	suite.Require().NoError(err)
 
-	// Setup database schema
-	log.Println("Setting up database schema...")
-	err = utils.SetupPostgreSQLSchema(suite.db)
-	suite.Require().NoError(err)
+	// Run database migrations
+	log.Println("Running database migrations...")
+	_, filename, _, _ := runtime.Caller(0)
+	migrationsDir, _ := filepath.Abs(filepath.Join(filepath.Dir(filename), "../../../cmd/api/db/migrations"))
+	connURL := suite.config.GetDatabaseUrl()
+	utils.RunDBMigration("file://"+filepath.ToSlash(migrationsDir), connURL)
 
 	// Setup test server
 	gin.SetMode(gin.TestMode)
@@ -198,11 +202,18 @@ func (suite *E2ETestSuite) setupServices() {
 
 	// Service layer
 	userService := userSvc.NewUserService(userRepository)
-	authService := authSvc.NewAuthService(userRepository, suite.config)
+	authService := authSvc.NewAuthService(
+		userRepository,
+		accountRepository,
+		categoryRepository,
+		budgetRepository,
+		transactionRepository,
+		suite.config,
+	)
 	accountService := accountSvc.NewAccountService(accountRepository)
-	categoryService := categorySvc.NewCategoryServices(categoryRepository)                // Fixed name
-	budgetService := budgetSvc.NewBudgetServices(budgetRepository, transactionRepository) // Fixed name and added second parameter
-	transactionService := transactionSvc.NewTransactionService(transactionRepository)
+	categoryService := categorySvc.NewCategoryServices(categoryRepository) // Fixed name
+	budgetService := budgetSvc.NewBudgetServices(budgetRepository, transactionRepository, nil)
+	transactionService := transactionSvc.NewTransactionService(transactionRepository, budgetRepository, nil, nil, nil, nil)
 
 	// Setup routes
 	suite.setupRoutes(userService, authService, accountService, categoryService, budgetService, transactionService)

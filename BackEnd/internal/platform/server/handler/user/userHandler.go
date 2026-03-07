@@ -2,6 +2,7 @@ package user
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
@@ -66,7 +67,21 @@ func CleanupDemoUsers(userService *user.UserService) gin.HandlerFunc {
 
 func GetUsers(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		users, err := userService.GetAllUsers(c)
+		query := c.Query("q")
+		limit := 20
+		offset := 0
+		if value := c.Query("limit"); value != "" {
+			if parsed, parseErr := strconv.Atoi(value); parseErr == nil {
+				limit = parsed
+			}
+		}
+		if value := c.Query("offset"); value != "" {
+			if parsed, parseErr := strconv.Atoi(value); parseErr == nil {
+				offset = parsed
+			}
+		}
+
+		users, err := userService.GetUsersFiltered(c, query, limit, offset)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -84,6 +99,25 @@ func UpdateUsers(userService *user.UserService) gin.HandlerFunc {
 		}
 
 		if err := userService.BatchUpdateUsers(c, users); err != nil {
+			_ = c.Error(err)
+			return
+		}
+
+		c.Status(http.StatusOK)
+	}
+}
+
+// SoftDeleteUser marks a user as deleted. Admins cannot delete their own account.
+func SoftDeleteUser(userService *user.UserService) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		id := c.Param("id")
+		requesterID := c.GetString("X-User-Id")
+		if id == requesterID {
+			_ = c.Error(apperrors.NewValidationError("SELF_DELETE", "cannot delete your own account"))
+			return
+		}
+
+		if err := userService.SoftDeleteUser(c, id); err != nil {
 			_ = c.Error(err)
 			return
 		}

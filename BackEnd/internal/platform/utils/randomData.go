@@ -2,11 +2,13 @@ package utils
 
 import (
 	"math/rand"
+	"time"
 
 	"github.com/go-faker/faker/v4"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
@@ -62,4 +64,57 @@ func GetNewRandomInvestment() *investment.Investment {
 		float64(prices[0]),
 		float64(currentPrices[0]),
 	)
+}
+
+func GetNewRandomCertificate(userId string) *certificate.Certificate {
+	capitals, _ := faker.RandomInt(1000, 1000000)
+	rates, _ := faker.RandomInt(1, 20)
+	taxRates, _ := faker.RandomInt(5, 15)
+	cutDays, _ := faker.RandomInt(1, 28)
+
+	interestTypes := []certificate.InterestType{certificate.InterestTypeSimple, certificate.InterestTypeCompound}
+
+	cert := certificate.NewCertificate(
+		faker.UUIDDigit(),
+		userId,
+		faker.Name(),
+		float64(capitals[0]),
+		interestTypes[rand.Intn(2)],
+		float64(rates[0]),
+		float64(taxRates[0]),
+		cutDays[0],
+	)
+
+	return cert
+}
+
+func GetNewRandomCertificatePayment(certificateId, userId string) *certificate.CertificatePayment {
+	capitals, _ := faker.RandomInt(1000, 1000000)
+	rates, _ := faker.RandomInt(1, 20)
+	taxRates, _ := faker.RandomInt(5, 15)
+	grossInterests, _ := faker.RandomInt(100, 10000)
+
+	gross := float64(grossInterests[0])
+	tax := gross * float64(taxRates[0]) / 100
+	net := gross - tax
+
+	now := time.Now()
+	periodStart := now.AddDate(0, -1, 0)
+
+	payment := certificate.NewCertificatePayment(
+		faker.UUIDDigit(),
+		certificateId,
+		userId,
+		now,
+		periodStart,
+		now,
+		gross,
+		tax,
+		net,
+		float64(rates[0]),
+		float64(taxRates[0]),
+		float64(capitals[0]),
+	)
+
+	return payment
 }

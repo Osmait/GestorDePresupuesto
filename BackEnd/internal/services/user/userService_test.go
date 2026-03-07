@@ -58,8 +58,18 @@ func (m *MockUserRepostory) FindAll(ctx context.Context) ([]*user.User, error) {
 	return args.Get(0).([]*user.User), args.Error(1)
 }
 
+func (m *MockUserRepostory) FindAllFiltered(ctx context.Context, query string, limit int, offset int) ([]*user.User, error) {
+	args := m.Called(ctx, query, limit, offset)
+	return args.Get(0).([]*user.User), args.Error(1)
+}
+
 func (m *MockUserRepostory) Update(ctx context.Context, u *user.User) error {
 	args := m.Called(ctx, u)
+	return args.Error(0)
+}
+
+func (m *MockUserRepostory) SoftDelete(ctx context.Context, id string) error {
+	args := m.Called(ctx, id)
 	return args.Error(0)
 }
 

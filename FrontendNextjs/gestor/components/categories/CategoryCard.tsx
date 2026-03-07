@@ -22,22 +22,25 @@ import {
     DialogDescription
 } from '@/components/ui/dialog'
 import { Category } from '@/types/category'
-import { Transaction } from '@/types/transaction'
-import { formatCurrency } from '@/lib/utils'
+import { CategoryExpense } from '@/types/analytics'
 
 export interface CategoryCardProps {
     category: Category
-    transactions: Transaction[]
+    stats?: CategoryExpense
     onDelete: () => Promise<void>
     onEdit: () => void
 }
 
-export function CategoryCard({ category, transactions, onDelete, onEdit }: CategoryCardProps) {
+export function CategoryCard({ category, stats, onDelete, onEdit }: CategoryCardProps) {
     const t = useTranslations('categories')
     const tForms = useTranslations('forms')
     const router = useRouter()
-    const categoryTransactions = transactions.filter(t => t.category_id === category.id)
-    const totalAmount = categoryTransactions.reduce((sum, transaction) => sum + transaction.amount, 0)
+    const categoryTransactionsCount = stats?.transaction_count || 0
+    const totalAmountDOP = stats?.value || 0
+    const totals = {
+        dop: stats?.dop_total || 0,
+        usd: stats?.usd_total || 0,
+    }
     const [showDeleteDialog, setShowDeleteDialog] = useState(false)
     const [isDeleting, setIsDeleting] = useState(false)
 
@@ -101,15 +104,17 @@ export function CategoryCard({ category, transactions, onDelete, onEdit }: Categ
                         <div>
                             <p className="font-semibold text-foreground text-lg">{category.name}</p>
                             <p className="text-sm text-muted-foreground">
-                                {categoryTransactions.length} {t('transactionsCount')}
+                                {categoryTransactionsCount} {t('transactionsCount')}
                             </p>
                         </div>
                     </div>
                     <div className="text-right">
                         <p className="font-bold text-xl text-foreground">
-                            {formatCurrency(totalAmount)}
+                            {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totalAmountDOP)}
                         </p>
-                        <p className="text-xs text-muted-foreground">Total</p>
+                        <p className="text-xs text-muted-foreground">Total (DOP)</p>
+                        <p className="text-[11px] text-muted-foreground">DOP: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totals.dop)}</p>
+                        <p className="text-[11px] text-muted-foreground">USD: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.usd)}</p>
                     </div>
                 </div>
 
@@ -122,7 +127,7 @@ export function CategoryCard({ category, transactions, onDelete, onEdit }: Categ
                         <span className="text-xs text-muted-foreground">Color</span>
                     </div>
                     <Badge variant="outline" className="bg-muted/30 dark:bg-muted/20">
-                        {categoryTransactions.length > 5 ? t('active') : categoryTransactions.length > 0 ? t('moderate') : t('inactive')}
+                        {categoryTransactionsCount > 5 ? t('active') : categoryTransactionsCount > 0 ? t('moderate') : t('inactive')}
                     </Badge>
                 </div>
             </CardContent>

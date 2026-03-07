@@ -6,12 +6,14 @@ import {
 	getTransactionRepository,
 	getCategoryRepository,
 	getBudgetRepository,
-	getAnalyticsRepository
+	getExchangeRateRepository,
+	getAnalyticsRepository,
 } from '@/lib/repositoryConfig'
 import { Account } from '@/types/account'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { Category } from '@/types/category'
 import { Budget } from '@/types/budget'
+import { DashboardSummary } from '@/types/analytics'
 import {
 	TrendingUp,
 	TrendingDown,
@@ -24,10 +26,12 @@ import {
 	ArrowUpRight,
 	ArrowDownRight,
 	Target,
+	PiggyBank,
 	LucideIcon
 } from 'lucide-react'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { DashboardCharts } from '@/components/transactions/DashboardCharts'
+import { PatrimonyTab } from '@/components/dashboard/PatrimonyTab'
 import { getTranslations, getLocale } from 'next-intl/server'
 
 interface StatCardProps {
@@ -84,7 +88,8 @@ function TransactionItem({ transaction, category, locale }: {
 	category?: Category
 	locale?: string
 }) {
-	const isIncome = transaction.type_transation === TypeTransaction.INCOME
+	const isIncome = transaction.type_transation === TypeTransaction.INCOME || transaction.type_transation === TypeTransaction.LOAN_COLLECTION
+	const transactionCurrency = transaction.currency || 'DOP'
 
 	return (
 		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors">
@@ -102,7 +107,7 @@ function TransactionItem({ transaction, category, locale }: {
 			</div>
 			<div className="text-right">
 				<p className={`font-bold ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-					{isIncome ? '+' : ''}${Math.abs(transaction.amount).toLocaleString()}
+					{isIncome ? '+' : ''}{transactionCurrency} {Math.abs(transaction.amount).toLocaleString()}
 				</p>
 				<p className="text-xs text-muted-foreground">{category?.name}</p>
 			</div>
@@ -111,14 +116,21 @@ function TransactionItem({ transaction, category, locale }: {
 }
 
 // Server Component para CategoryCard
-function CategoryCard({ category, transactions, t }: {
+function CategoryCard({
+	category,
+	transactionCount,
+	totalAmountDOP,
+	dopTotal,
+	usdTotal,
+	t,
+}: {
 	category: Category
-	transactions: Transaction[]
+	transactionCount: number
+	totalAmountDOP: number
+	dopTotal: number
+	usdTotal: number
 	t: any
 }) {
-	const categoryTransactions = Array.isArray(transactions) ? transactions.filter(t => t.category_id === category.id) : [];
-	const totalAmount = categoryTransactions.reduce((sum, t) => sum + t.amount, 0)
-
 	return (
 		<div className="flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors">
 			<div className="flex items-center gap-3">
@@ -130,11 +142,13 @@ function CategoryCard({ category, transactions, t }: {
 				</div>
 				<div>
 					<p className="font-medium text-foreground">{category.name}</p>
-					<p className="text-xs text-muted-foreground">{categoryTransactions.length} {t('transactionsCount')}</p>
+					<p className="text-xs text-muted-foreground">{transactionCount} {t('transactionsCount')}</p>
 				</div>
 			</div>
 			<div className="text-right">
-				<p className="font-bold text-foreground">${totalAmount.toLocaleString()}</p>
+				<p className="font-bold text-foreground">{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totalAmountDOP)}</p>
+				<p className="text-[11px] text-muted-foreground">DOP: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(dopTotal)}</p>
+				<p className="text-[11px] text-muted-foreground">USD: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdTotal)}</p>
 			</div>
 		</div>
 	)
@@ -255,18 +269,13 @@ function DashboardHeader({ user, t, locale }: { user: any, t: any, locale: strin
 }
 
 // Server Component para las estadísticas
-function StatsGrid({ accounts, transactions, t }: {
-	accounts: Account[]
-	transactions: Transaction[]
+function StatsGrid({ summary, t }: {
+	summary: DashboardSummary | null
 	t: any
 }) {
-	const totalBalance = (accounts ?? []).reduce((sum, acc) => sum + (acc.current_balance ?? acc.initial_balance ?? 0), 0)
-	const totalIncome = Array.isArray(transactions)
-		? transactions.filter(t => t.type_transation === TypeTransaction.INCOME).reduce((sum, t) => sum + t.amount, 0)
-		: 0;
-	const totalExpenses = Array.isArray(transactions)
-		? transactions.filter(t => t.type_transation === TypeTransaction.BILL).reduce((sum, t) => sum + Math.abs(t.amount), 0)
-		: 0;
+	const totalBalance = summary?.accounts_total || 0
+	const totalIncome = summary?.total_income || 0
+	const totalExpenses = summary?.total_expenses || 0
 
 	return (
 		<div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -300,6 +309,7 @@ export default async function DashboardPage() {
 	const transactionRepository = await getTransactionRepository()
 	const categoryRepository = await getCategoryRepository()
 	const budgetRepository = await getBudgetRepository()
+	const exchangeRateRepository = await getExchangeRateRepository()
 	const analyticsRepository = await getAnalyticsRepository()
 
 	// Get translations
@@ -318,19 +328,31 @@ export default async function DashboardPage() {
 
 	const user = session.user;
 
-	const [accounts, transactionResponse, categories, budgets, categorysData, getMonthlySummary] = await Promise.all([
+	const [accounts, transactionResponse, categories, budgets, exchangeRate, dashboardSummary] = await Promise.all([
 		accountRepository.findAll(),
 		transactionRepository.findAllSimple(),
 		categoryRepository.findAll(),
 		budgetRepository.findAll(),
-		analyticsRepository.getCategoryExpenses(),
-		analyticsRepository.getMonthlySummary()
+		exchangeRateRepository.getRate(),
+		analyticsRepository.getDashboardSummary(),
 	])
 
 	// Extract transactions from the response
 	const transactions = transactionResponse || []
 
 	const recentTransactions = Array.isArray(transactions) ? transactions.slice(0, 8) : []
+
+	// Get exchange rate (fallback to 60 if failed)
+	const usdToDop = dashboardSummary?.usd_to_dop_rate ?? exchangeRate?.usd_to_dop ?? 60
+
+	const accountsTotal = dashboardSummary?.accounts_total || 0
+	const investmentsTotalDOP = dashboardSummary?.investments_total || 0
+	const investmentsTotalUSD = usdToDop > 0 ? (investmentsTotalDOP / usdToDop) : 0
+	const certificatesTotal = dashboardSummary?.certificates_total || 0
+	const accountsCount = dashboardSummary?.accounts_count || 0
+	const investmentsCount = dashboardSummary?.investments_count || 0
+	const certificatesCount = dashboardSummary?.certificates_count || 0
+	const categoryExpensesById = new Map((dashboardSummary?.category_expenses || []).map((item) => [item.id, item]))
 
 
 
@@ -344,13 +366,13 @@ export default async function DashboardPage() {
 					<DashboardCharts
 						categories={categories}
 						transactions={Array.isArray(transactions) ? transactions : []}
-						categorysData={categorysData}
-						monthSummary={getMonthlySummary}
+						categorysData={dashboardSummary?.category_expenses || []}
+						monthSummary={dashboardSummary?.monthly_summary || []}
 
 					/>
 				</div>
 				<div id="stats-grid">
-					<StatsGrid accounts={accounts} transactions={transactions} t={t} />
+					<StatsGrid summary={dashboardSummary} t={t} />
 				</div>
 
 				<AnimatedTabs
@@ -397,15 +419,21 @@ export default async function DashboardPage() {
 											</CardHeader>
 											<CardContent>
 												<div className="space-y-4">
-													{Array.isArray(categories) ? categories.slice(0, 4).map((category) => (
-														<CategoryCard
-															key={category.id}
-															category={category}
-															transactions={transactions}
-															t={t}
-														/>
-													)) : []}
-												</div>
+										{Array.isArray(categories) ? categories.slice(0, 4).map((category) => {
+											const stats = categoryExpensesById.get(category.id)
+											return (
+													<CategoryCard
+														key={category.id}
+														category={category}
+														transactionCount={stats?.transaction_count || 0}
+														totalAmountDOP={stats?.value || 0}
+														dopTotal={stats?.dop_total || 0}
+														usdTotal={stats?.usd_total || 0}
+														t={t}
+													/>
+											)
+										}) : []}
+										</div>
 											</CardContent>
 										</Card>
 
@@ -528,6 +556,31 @@ export default async function DashboardPage() {
 										</div>
 									)}
 								</div>
+							)
+						},
+						{
+							value: 'patrimony',
+							label: t('patrimony'),
+							icon: <PiggyBank className="h-4 w-4" />,
+							content: (
+								<PatrimonyTab
+									accountsTotal={accountsTotal}
+									investmentsTotal={investmentsTotalDOP}
+									investmentsTotalUSD={investmentsTotalUSD}
+									certificatesTotal={certificatesTotal}
+									accountsCount={accountsCount}
+									investmentsCount={investmentsCount}
+									certificatesCount={certificatesCount}
+									exchangeRate={usdToDop}
+									labels={{
+										title: t('patrimony'),
+										accounts: t('accountsBalance'),
+										investments: t('investmentsValue'),
+										certificates: t('certificatesValue'),
+										total: t('totalPatrimony'),
+										activeItems: t('activeItems'),
+									}}
+								/>
 							)
 						}
 					]}

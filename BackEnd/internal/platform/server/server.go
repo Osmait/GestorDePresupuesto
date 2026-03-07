@@ -23,7 +23,11 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
+	"github.com/osmait/gestorDePresupuesto/internal/services/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/services/creditcard"
+	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/services/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
@@ -57,6 +61,10 @@ type Server struct {
 	aiCache             *aiService.AICacheService
 	categoryRepo        categoryRepo.CategoryRepoInterface
 	transactionRepo     transactionRepo.TransactionRepositoryInterface
+	certificateService  *certificate.CertificateService
+	creditCardService   *creditcard.CreditCardService
+	loanService         *loan.LoanService
+	exchangeService     *exchange.ExchangeRateService
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -84,6 +92,10 @@ func New(ctx context.Context,
 	aiCache *aiService.AICacheService,
 	catRepo categoryRepo.CategoryRepoInterface,
 	txnRepo transactionRepo.TransactionRepositoryInterface,
+	certificateSvc *certificate.CertificateService,
+	creditCardSvc *creditcard.CreditCardService,
+	loanSvc *loan.LoanService,
+	exchangeSvc *exchange.ExchangeRateService,
 ) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
@@ -104,6 +116,10 @@ func New(ctx context.Context,
 		aiCache:             aiCache,
 		categoryRepo:        catRepo,
 		transactionRepo:     txnRepo,
+		certificateService:  certificateSvc,
+		creditCardService:   creditCardSvc,
+		loanService:         loanSvc,
+		exchangeService:     exchangeSvc,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -128,6 +144,7 @@ func (s *Server) registerRoutes() {
 	// Health routes (before authentication)
 	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Server.Environment))
 	routes.QuoteRoutes(s.Engine, s.quoteService)
+	routes.ExchangeRoutes(s.Engine, s.exchangeService)
 
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
@@ -144,6 +161,7 @@ func (s *Server) registerRoutes() {
 	// Application routes
 	routes.AuhtRoutes(s.Engine, s.servicesAuth)
 	routes.UserRoute(s.Engine, s.servicesUser)
+	routes.FeatureFlagRoutes(s.Engine, s.db)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)
 	routes.TransactionRoutes(s.Engine, s.servicesTransaction)
 	routes.CategoryRoutes(s.Engine, s.servicesCategory)
@@ -151,8 +169,11 @@ func (s *Server) registerRoutes() {
 	routes.AnalyticsRoutes(s.Engine, s.analyticsService)
 	routes.RecurringTransactionRoutes(s.Engine, s.recurringService)
 	routes.SearchRoutes(s.Engine, s.searchService)
-	routes.InvestmentRoutes(s.Engine, s.investmentService)
-	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.aiCache)
+	routes.InvestmentRoutes(s.Engine, s.investmentService, s.db)
+	routes.CertificateRoutes(s.Engine, s.certificateService, s.db)
+	routes.CreditCardRoutes(s.Engine, s.creditCardService, s.db)
+	routes.LoanRoutes(s.Engine, s.loanService, s.db)
+	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache)
 }
 
 func (s *Server) Run(ctx context.Context) error {

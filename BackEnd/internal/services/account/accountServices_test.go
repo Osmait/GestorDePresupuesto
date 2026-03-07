@@ -34,6 +34,11 @@ func (m *MockAccountRepository) Balance(ctx context.Context, id string) (float64
 	return args.Get(0).(float64), args.Error(1)
 }
 
+func (m *MockAccountRepository) BalanceByCurrency(ctx context.Context, id string, currency string) (float64, error) {
+	args := m.Called(ctx, id, currency)
+	return args.Get(0).(float64), args.Error(1)
+}
+
 func (m *MockAccountRepository) Balances(ctx context.Context, userId string) (map[string]float64, error) {
 	args := m.Called(ctx, userId)
 	return args.Get(0).(map[string]float64), args.Error(1)
@@ -46,6 +51,11 @@ func (m *MockAccountRepository) Update(ctx context.Context, id string, name stri
 
 func (m *MockAccountRepository) FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error) {
 	args := m.Called(ctx, id, userId)
+	return args.Get(0).(*account.Account), args.Error(1)
+}
+
+func (m *MockAccountRepository) FindById(ctx context.Context, id string) (*account.Account, error) {
+	args := m.Called(ctx, id)
 	return args.Get(0).(*account.Account), args.Error(1)
 }
 

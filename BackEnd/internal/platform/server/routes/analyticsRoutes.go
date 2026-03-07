@@ -10,4 +10,5 @@ func AnalyticsRoutes(r *gin.Engine, analyticsService *analytics.AnalyticsService
 	analytics := r.Group("/analytics")
 	analytics.GET("/category-expenses", analyticsHandler.GetCategoryExpenses(analyticsService))
 	analytics.GET("/monthly-summary", analyticsHandler.GetMonthlySummary(analyticsService))
+	analytics.GET("/dashboard-summary", analyticsHandler.GetDashboardSummary(analyticsService))
 }

@@ -5,6 +5,8 @@ import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { BudgetsPageSkeleton } from './BudgetsPageSkeleton'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { Budget } from '@/types/budget'
 import { Transaction } from '@/types/transaction'
 import { PiggyBank, AlertTriangle, PlusCircle } from 'lucide-react'
@@ -17,6 +19,8 @@ import { BudgetSummaryCard } from './BudgetSummaryCard'
 
 export function BudgetList() {
     const t = useTranslations('budgets')
+    const router = useRouter()
+    const searchParams = useSearchParams()
     const { budgets, isLoading, error, deleteBudget, setEditingBudget, isModalOpen, setModalOpen } = useBudgetContext()
     const { data: categories = [] } = useGetCategories()
     const { data: transactions = [] } = useGetAllTransactions()
@@ -29,6 +33,25 @@ export function BudgetList() {
         setEditingBudget(budget)
         setModalOpen(true)
     }
+
+    const suggestedCategoryId = searchParams.get('category') || ''
+    const selectedBudgetId = searchParams.get('selected') || ''
+
+    useEffect(() => {
+        const shouldOpenCreate = searchParams.get('create') === '1'
+        if (!shouldOpenCreate) return
+
+        setEditingBudget(null)
+        setModalOpen(true)
+        router.replace('/app/budget', { scroll: false })
+    }, [router, searchParams, setEditingBudget, setModalOpen])
+
+    useEffect(() => {
+        if (!selectedBudgetId) return
+        const element = document.getElementById(`budget-card-${selectedBudgetId}`)
+        if (!element) return
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, [selectedBudgetId, budgets])
 
     if (isLoading) {
         return <BudgetsPageSkeleton />
@@ -62,7 +85,7 @@ export function BudgetList() {
                     <PlusCircle className="h-4 w-4 mr-2" />
                     {t('createFirstBudget')}
                 </Button>
-                <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} />
+                <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} initialCategoryId={suggestedCategoryId} />
             </div>
         )
     }
@@ -85,10 +108,12 @@ export function BudgetList() {
                         return (
                             <motion.div
                                 key={budget.id}
+                                id={`budget-card-${budget.id}`}
                                 initial={{ opacity: 0, y: 15 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, scale: 0.95 }}
                                 transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                                className={selectedBudgetId === budget.id ? 'rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : ''}
                             >
                                 <BudgetCard
                                     budget={budget}
@@ -104,7 +129,7 @@ export function BudgetList() {
             </div>
 
             {/* Context-controlled Modal for Edit/Create */}
-            <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} />
+            <BudgetFormModal open={isModalOpen} setOpen={setModalOpen} initialCategoryId={suggestedCategoryId} />
         </motion.div>
     )
 }

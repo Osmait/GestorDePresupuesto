@@ -15,6 +15,7 @@ AVAILABLE USER CATEGORIES:
 
 DOCUMENT TYPE: {{.DocumentType}}
 IS_BANK_STATEMENT: {{.IsStatement}}
+ACCOUNT_CURRENCY: {{if .AccountCurrency}}{{.AccountCurrency}}{{else}}DOP{{end}}
 
 TASK:
 Analyze the document(s) and extract transaction data with automatic category matching.
@@ -24,6 +25,11 @@ RULES:
 2. Use "income" for credits/deposits/refunds
 3. Use "bill" for debits/payments/purchases
 4. Set category_id to empty string "" if uncertain
+5. Detect currency and set it to only "DOP" or "USD"
+6. Currency hints:
+   - Use "USD" for symbols/text like "$" with US context, "US$", "USD", "dollars"
+   - Use "DOP" for symbols/text like "RD$", "DOP", "peso dominicano", local DR merchant amounts
+7. If currency is unclear, default to ACCOUNT_CURRENCY. If ACCOUNT_CURRENCY is missing, default to "DOP"
 
 {{if .IsStatement}}
 BANK STATEMENT EXTRACTION:
@@ -49,6 +55,7 @@ Return a JSON array. Each object must match this exact structure:
     "account_id": "{{.AccountID}}",
     "category_id": "matching-category-id-or-empty",
     "budget_id": "",
+    "currency": "DOP or USD",
     "user_id": "",
     "created_at": "YYYY-MM-DDTHH:MM:SSZ"
   }
@@ -59,6 +66,7 @@ CRITICAL:
 - No markdown code blocks
 - No explanatory text before or after
 - All amounts as positive numbers
+- Currency must be either "DOP" or "USD"
 - ISO 8601 format for dates
 - If document type is receipt or invoice, created_at should be the document date
 - If document type is statement, created_at should be the transaction date shown

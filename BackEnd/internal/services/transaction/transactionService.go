@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
@@ -18,11 +19,17 @@ import (
 )
 
 const (
-	BILL = "bill"
+	BILL                = "bill"
+	CARD_PAYMENT        = "card_payment"
+	LOAN_DISBURSEMENT   = "loan_disbursement"
+	LOAN_COLLECTION     = "loan_collection"
+	INVESTMENT_PURCHASE = "investment_purchase"
+	INVESTMENT_FUNDING  = "investment_funding"
 )
 
 type AICacheInvalidator interface {
 	InvalidateUserAnalysis(userID string)
+	InvalidateUserExtractions(userID string)
 }
 
 type TransactionService struct {
@@ -31,31 +38,47 @@ type TransactionService struct {
 	notificationService   *notification.NotificationService
 	cache                 cache.CacheRepository
 	aiCache               AICacheInvalidator
+	usdToDopRateFn        func(context.Context) (float64, error)
 }
 
-func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator) *TransactionService {
+func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator, usdToDopRateFn func(context.Context) (float64, error)) *TransactionService {
 	return &TransactionService{
 		transactionRepository: transactionRepository,
 		budgetRepository:      budgetReposiotry,
 		notificationService:   notificationService,
 		cache:                 cache,
 		aiCache:               aiCache,
+		usdToDopRateFn:        usdToDopRateFn,
 	}
 }
 
 // CreateTransaction records a new transaction, checks for budget thresholds, and triggers alerts if necessary.
-func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, createdAt time.Time) error {
+func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error {
+	_, err := s.CreateTransactionWithID(ctx, name, description, amount, typeTransaction, accountId, userId, categoryId, budgetId, currency, createdAt)
+	return err
+}
+
+func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) (string, error) {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
-		return err
+		return "", err
 	}
 	id := uuid.String()
-	if typeTransaction == BILL {
+	if typeTransaction == BILL || typeTransaction == CARD_PAYMENT || typeTransaction == LOAN_DISBURSEMENT || typeTransaction == INVESTMENT_PURCHASE || typeTransaction == INVESTMENT_FUNDING {
 		amount = amount * -1
+	}
+	if typeTransaction == LOAN_COLLECTION {
+		amount = math.Abs(amount)
+	}
+
+	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, userId, accountId, currency)
+	if err != nil {
+		return "", err
 	}
 
 	transaction := transaction.NewTransaction(id, name, description, typeTransaction, accountId, categoryId, amount)
 	transaction.UserId = userId
+	transaction.Currency = resolvedCurrency
 	if !createdAt.IsZero() {
 		transaction.CreatedAt = createdAt
 	} else {
@@ -71,12 +94,13 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 
 	err = s.transactionRepository.Save(ctx, transaction)
 	if err != nil {
-		return err
+		return "", err
 	}
 	s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", userId))
 
 	if s.aiCache != nil {
 		s.aiCache.InvalidateUserAnalysis(userId)
+		s.aiCache.InvalidateUserExtractions(userId)
 	}
 
 	// Check Budget Thresholds
@@ -88,7 +112,14 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 	if budget != nil && typeTransaction == BILL {
 		log.Debug().Str("budget_id", budget.Id).Msg("checking budget thresholds for transaction")
 		go func() {
-			currentSpent, err := s.transactionRepository.FindCurrentBudget(context.Background(), budget.Id)
+			usdToDop := 60.0
+			if s.usdToDopRateFn != nil {
+				if rate, rateErr := s.usdToDopRateFn(context.Background()); rateErr == nil && rate > 0 {
+					usdToDop = rate
+				}
+			}
+
+			currentSpent, err := s.transactionRepository.FindCurrentBudget(context.Background(), budget.Id, usdToDop)
 			if err != nil {
 				log.Error().Err(err).Msg("failed to get current budget details for alert")
 				return
@@ -97,12 +128,16 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 			// budget.Amount is positive, currentSpent is negative (bills). Make it positive for calculation.
 			spentPositive := currentSpent * -1
 			limit := budget.Amount
+			currentTransactionImpact := amount * -1
+			if resolvedCurrency == "USD" {
+				currentTransactionImpact = currentTransactionImpact * usdToDop
+			}
 
 			log.Debug().Float64("current_spent", spentPositive).Float64("limit", limit).Msg("budget status")
 
 			if limit > 0 {
 				percentage := spentPositive / limit
-				previousSpent := spentPositive - (amount * -1) // remove current transaction
+				previousSpent := spentPositive - currentTransactionImpact // remove current transaction with conversion if needed
 				previousPercentage := previousSpent / limit
 
 				log.Debug().Float64("percentage", percentage).Float64("previous_percentage", previousPercentage).Msg("budget percentages")
@@ -134,7 +169,7 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 		}()
 	}
 
-	return nil
+	return id, nil
 }
 
 // FindAll retrieves transactions based on date range and account ID.
@@ -153,6 +188,7 @@ func (s TransactionService) FindAll(ctx context.Context, date string, date2 stri
 			transaction.AccountId,
 			transaction.CategoryId,
 			transaction.Amount,
+			transaction.Currency,
 			transaction.CreatedAt)
 		transactionResponse.BudgetId = transaction.BudgetId
 		transactionResponseList = append(transactionResponseList, transactionResponse)
@@ -179,6 +215,7 @@ func (s TransactionService) FindAllOfAllAccounts(ctx context.Context, id string)
 			transaction.AccountId,
 			transaction.CategoryId,
 			transaction.Amount,
+			transaction.Currency,
 			transaction.CreatedAt)
 		transactionResponse.BudgetId = transaction.BudgetId
 		transactionResponseList = append(transactionResponseList, transactionResponse)
@@ -221,6 +258,13 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 
 	// Create paginated response
 	if includeSummary {
+		usdToDop := 60.0
+		if s.usdToDopRateFn != nil {
+			if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
+				usdToDop = rate
+			}
+		}
+
 		// Get all transactions for summary calculation (without pagination)
 		allTransactionsFilter := *filter
 		allTransactionsFilter.Limit = 0 // Remove pagination for summary
@@ -232,7 +276,7 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 		}
 
 		allTransactionResponses := s.convertToResponseList(allTransactions)
-		summary := dto.CalculateSummary(allTransactionResponses, totalCount)
+		summary := dto.CalculateSummary(allTransactionResponses, totalCount, usdToDop)
 
 		response := dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,
@@ -276,6 +320,13 @@ func (s TransactionService) FindAllWithFilters(
 
 	// Create paginated response
 	if includeSummary {
+		usdToDop := 60.0
+		if s.usdToDopRateFn != nil {
+			if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
+				usdToDop = rate
+			}
+		}
+
 		// Get all transactions for summary calculation (without pagination)
 		allTransactionsFilter := *filter
 		allTransactionsFilter.Limit = 0 // Remove pagination for summary
@@ -287,7 +338,7 @@ func (s TransactionService) FindAllWithFilters(
 		}
 
 		allTransactionResponses := s.convertToResponseList(allTransactions)
-		summary := dto.CalculateSummary(allTransactionResponses, totalCount)
+		summary := dto.CalculateSummary(allTransactionResponses, totalCount, usdToDop)
 
 		return dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,
@@ -316,6 +367,7 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 			transaction.AccountId,
 			transaction.CategoryId,
 			transaction.Amount,
+			transaction.Currency,
 			transaction.CreatedAt,
 		)
 		transactionResponse.BudgetId = transaction.BudgetId
@@ -330,6 +382,12 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 		transaction.Amount = transaction.Amount * -1
 	}
 
+	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, transaction.UserId, transaction.AccountId, transaction.Currency)
+	if err != nil {
+		return err
+	}
+	transaction.Currency = resolvedCurrency
+
 	budget, _ := s.budgetRepository.FindByCategory(ctx, transaction.CategoryId)
 	if budget != nil {
 		transaction.BudgetId = budget.Id
@@ -341,6 +399,7 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 
 	if s.aiCache != nil {
 		s.aiCache.InvalidateUserAnalysis(transaction.UserId)
+		s.aiCache.InvalidateUserExtractions(transaction.UserId)
 	}
 	return nil
 }
@@ -353,6 +412,7 @@ func (s TransactionService) DeleteTransaction(ctx context.Context, id string, us
 
 		if s.aiCache != nil {
 			s.aiCache.InvalidateUserAnalysis(userId)
+			s.aiCache.InvalidateUserExtractions(userId)
 		}
 	}
 	return err

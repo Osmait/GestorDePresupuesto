@@ -39,6 +39,30 @@ describe('TransactionRepository', () => {
             const result = await repo.findAllSimple()
             expect(result).toHaveLength(2)
         })
+
+        it('fetches all pages with backend max limit', async () => {
+            const page1 = {
+                data: [{ id: 't1' }, { id: 't2' }],
+                pagination: { has_next_page: true, next_page: 2 }
+            }
+            const page2 = {
+                data: [{ id: 't3' }],
+                pagination: { has_next_page: false, next_page: 2 }
+            }
+
+            mockFetch
+                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(page1) })
+                .mockResolvedValueOnce({ ok: true, json: () => Promise.resolve(page2) })
+
+            const result = await repo.findAllSimple()
+
+            expect(result).toHaveLength(3)
+            expect(result.map(t => t.id)).toEqual(['t1', 't2', 't3'])
+            expect(mockFetch).toHaveBeenCalledTimes(2)
+            expect(mockFetch.mock.calls[0][0]).toContain('page=1')
+            expect(mockFetch.mock.calls[0][0]).toContain('limit=100')
+            expect(mockFetch.mock.calls[1][0]).toContain('page=2')
+        })
     })
 
     describe('create', () => {

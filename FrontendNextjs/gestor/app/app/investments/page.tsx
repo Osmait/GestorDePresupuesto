@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from 'next/navigation'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Plus } from "lucide-react"
@@ -8,23 +9,48 @@ import { InvestmentType, Investment } from "@/types/investment"
 import { InvestmentList } from "@/components/investments/InvestmentList"
 import { InvestmentDashboard } from "@/components/investments/InvestmentDashboard"
 import { InvestmentFormModal } from "@/components/investments/InvestmentFormModal"
+import { InvestmentFundingModal } from '@/components/investments/InvestmentFundingModal'
+import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 
 export default function InvestmentsPage() {
     const [isModalOpen, setIsModalOpen] = useState(false)
+    const [isFundingModalOpen, setIsFundingModalOpen] = useState(false)
     const [investmentToEdit, setInvestmentToEdit] = useState<Investment | null>(null)
+    const router = useRouter()
+    const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
+    const isInvestmentsModuleEnabled = isEnabled('module_investments')
 
     const handleEdit = (investment: Investment) => {
         setInvestmentToEdit(investment)
         setIsModalOpen(true)
     }
 
+    if (isFeatureFlagsLoading) {
+        return <div className="container mx-auto py-10">Loading...</div>
+    }
+
+    if (!isInvestmentsModuleEnabled) {
+        return (
+            <div className="container mx-auto py-10 space-y-4">
+                <h1 className="text-2xl font-semibold tracking-tight">Investments</h1>
+                <p className="text-muted-foreground">This module is currently disabled for your account.</p>
+                <Button variant="outline" onClick={() => router.push('/app')}>Go to dashboard</Button>
+            </div>
+        )
+    }
+
     return (
         <div className="container mx-auto py-10 space-y-8">
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold tracking-tight">Investments</h1>
-                <Button onClick={() => setIsModalOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4" /> Add Investment
-                </Button>
+                <div className='flex items-center gap-2'>
+                    <Button variant='outline' onClick={() => setIsFundingModalOpen(true)}>
+                        Fund Broker
+                    </Button>
+                    <Button onClick={() => setIsModalOpen(true)}>
+                        <Plus className="mr-2 h-4 w-4" /> Add Investment
+                    </Button>
+                </div>
             </div>
 
             <InvestmentDashboard />
@@ -53,6 +79,13 @@ export default function InvestmentsPage() {
                     investmentToEdit={investmentToEdit}
                 />
             )}
+
+			{isFundingModalOpen && (
+				<InvestmentFundingModal
+					isOpen={isFundingModalOpen}
+					onClose={() => setIsFundingModalOpen(false)}
+				/>
+			)}
         </div>
     )
 }

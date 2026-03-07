@@ -4,7 +4,6 @@
 const USE_MOCKS = false // Cambiado a false para usar el backend real
 
 import { BudgetRepository } from '@/app/repository/budgetRepository'
-// Importar el repositorio real
 import { AuthRepository } from '@/app/repository/authRepository'
 import { AccountRepository } from '@/app/repository/accountRepository'
 import { TransactionRepository } from '@/app/repository/transactionRepository'
@@ -12,6 +11,10 @@ import { CategoryRepository } from '@/app/repository/categoryRepository'
 import { AnalyticsRepository } from '@/app/repository/analyticsRepository'
 import { SearchRepository } from '@/app/repository/searchRepository'
 import { InvestmentRepository } from '@/app/repository/investmentRepository'
+import { CertificateRepository } from '@/app/repository/certificateRepository'
+import { ExchangeRateRepository } from '@/app/repository/exchangeRateRepository'
+import { CreditCardRepository } from '@/app/repository/creditcardRepository'
+import { LoanRepository } from '@/app/repository/loanRepository'
 
 // Crear instancias únicas
 let accountRepositoryInstance: AccountRepository | null = null;
@@ -22,6 +25,10 @@ let transactionRepositoryInstance: TransactionRepository | null = null;
 let analyticsRepositoryInstance: AnalyticsRepository | null = null;
 let searchRepositoryInstance: SearchRepository | null = null;
 let investmentRepositoryInstance: InvestmentRepository | null = null;
+let certificateRepositoryInstance: CertificateRepository | null = null;
+let exchangeRateRepositoryInstance: ExchangeRateRepository | null = null;
+let creditCardRepositoryInstance: CreditCardRepository | null = null;
+let loanRepositoryInstance: LoanRepository | null = null;
 
 // Funciones para obtener repositorios (con singleton pattern)
 export const getAccountRepository = async () => {
@@ -80,6 +87,34 @@ export const getInvestmentRepository = async () => {
   return investmentRepositoryInstance;
 };
 
+export const getCertificateRepository = async () => {
+  if (!certificateRepositoryInstance) {
+    certificateRepositoryInstance = new CertificateRepository();
+  }
+  return certificateRepositoryInstance;
+};
+
+export const getExchangeRateRepository = async () => {
+  if (!exchangeRateRepositoryInstance) {
+    exchangeRateRepositoryInstance = new ExchangeRateRepository();
+  }
+  return exchangeRateRepositoryInstance;
+};
+
+export const getCreditCardRepository = async () => {
+  if (!creditCardRepositoryInstance) {
+    creditCardRepositoryInstance = new CreditCardRepository();
+  }
+  return creditCardRepositoryInstance;
+};
+
+export const getLoanRepository = async () => {
+  if (!loanRepositoryInstance) {
+    loanRepositoryInstance = new LoanRepository();
+  }
+  return loanRepositoryInstance;
+};
+
 // Exportar instancias directas para compatibilidad
 export const accountRepository = new AccountRepository();
 export const authRepository = new AuthRepository();
@@ -89,6 +124,10 @@ export const transactionRepository = new TransactionRepository();
 export const analyticsRepository = new AnalyticsRepository();
 export const searchRepository = new SearchRepository();
 export const investmentRepository = new InvestmentRepository();
+export const certificateRepository = new CertificateRepository();
+export const exchangeRateRepository = new ExchangeRateRepository();
+export const creditCardRepository = new CreditCardRepository();
+export const loanRepository = new LoanRepository();
 
 // Función para verificar si estamos en modo mock
 export const isMockMode = (): boolean => USE_MOCKS;
@@ -107,4 +146,8 @@ export type ICategoryRepository = CategoryRepository;
 export type ITransactionRepository = TransactionRepository;
 export type IAnalyticsRepository = AnalyticsRepository;
 export type ISearchRepository = SearchRepository;
-export type IInvestmentRepository = InvestmentRepository; 
+export type IInvestmentRepository = InvestmentRepository;
+export type ICertificateRepository = CertificateRepository;
+export type IExchangeRateRepository = ExchangeRateRepository;
+export type ICreditCardRepository = CreditCardRepository; 
+export type ILoanRepository = LoanRepository;

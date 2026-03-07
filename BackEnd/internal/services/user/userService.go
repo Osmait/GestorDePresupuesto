@@ -194,6 +194,42 @@ func (u *UserService) DeleteUser(ctx context.Context, id string) error {
 	})
 }
 
+// SoftDeleteUser marks a user as deleted without removing their data.
+func (u *UserService) SoftDeleteUser(ctx context.Context, id string) error {
+	return apperrors.SafeCall(ctx, "SoftDeleteUser", func() error {
+		if id == "" {
+			return apperrors.NewValidationError("INVALID_ID", "user ID is required").
+				WithContext(ctx).
+				WithOperation("SoftDeleteUser").
+				WithDetails(map[string]interface{}{
+					"field": "id",
+				})
+		}
+
+		foundUser, err := u.userRepository.FindUserById(ctx, id)
+		if err != nil {
+			if errorhttp.IsErrNotFound(err) {
+				return apperrors.NewNotFoundError("user", id).
+					WithContext(ctx).
+					WithOperation("SoftDeleteUser")
+			}
+			return apperrors.WrapDatabaseError(ctx, err, "FindUserById for soft delete")
+		}
+
+		if foundUser.Id == "" {
+			return apperrors.NewNotFoundError("user", id).
+				WithContext(ctx).
+				WithOperation("SoftDeleteUser")
+		}
+
+		if err := u.userRepository.SoftDelete(ctx, id); err != nil {
+			return apperrors.WrapDatabaseError(ctx, err, "SoftDelete user")
+		}
+
+		return nil
+	})
+}
+
 // UpdateUser modifies an existing user's information.
 func (u *UserService) UpdateUser(ctx context.Context, id string, userRequest *dto.UserRequest) error {
 	return apperrors.SafeCall(ctx, "UpdateUser", func() error {
@@ -332,6 +368,21 @@ func (u *UserService) GetAllUsers(ctx context.Context) ([]*dto.UserResponse, err
 		}
 
 		var response []*dto.UserResponse
+		for _, user := range users {
+			response = append(response, dto.NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.Role, user.CreatedAt))
+		}
+		return response, nil
+	})
+}
+
+func (u *UserService) GetUsersFiltered(ctx context.Context, query string, limit int, offset int) ([]*dto.UserResponse, error) {
+	return apperrors.SafeCallWithResult(ctx, "GetUsersFiltered", func() ([]*dto.UserResponse, error) {
+		users, err := u.userRepository.FindAllFiltered(ctx, query, limit, offset)
+		if err != nil {
+			return nil, apperrors.WrapDatabaseError(ctx, err, "FindAllFiltered users")
+		}
+
+		response := make([]*dto.UserResponse, 0, len(users))
 		for _, user := range users {
 			response = append(response, dto.NewUserResponse(user.Id, user.Name, user.LastName, user.Email, user.Role, user.CreatedAt))
 		}

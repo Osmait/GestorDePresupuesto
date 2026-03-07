@@ -1,14 +1,16 @@
 'use client'
 
 import { motion, AnimatePresence } from 'framer-motion'
-import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { useGetCategories, useDeleteCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
+import { useGetDashboardSummary } from '@/hooks/queries/useAnalyticsQuery'
 import { useCategoryContext } from '@/components/categories/CategoryContext'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Tag } from 'lucide-react'
 import { Category } from '@/types/category'
 import { CategoriesSkeleton } from '@/components/skeletons/categories-skeleton'
 import { useTranslations } from 'next-intl'
+import { useSearchParams } from 'next/navigation'
+import { useEffect } from 'react'
 import { CategoryCard } from './CategoryCard'
 import { CategorySummaryCard } from './CategorySummaryCard'
 
@@ -16,14 +18,17 @@ import { CategorySummaryCard } from './CategorySummaryCard'
 export function CategoryList() {
     const t = useTranslations('categories')
     const { data: categoriesData, isLoading: isLoadingCategories } = useGetCategories()
-    const { data: transactionsData, isLoading: isLoadingTransactions } = useGetAllTransactions()
+    const { data: dashboardSummary, isLoading: isLoadingDashboardSummary } = useGetDashboardSummary()
     const categories = categoriesData ?? []
-    const transactions = transactionsData ?? []
+    const categoryExpenses = dashboardSummary?.category_expenses ?? []
+    const categoryStatsById = new Map(categoryExpenses.map((item) => [item.id, item]))
     const { setEditingCategory, setModalOpen } = useCategoryContext()
+    const searchParams = useSearchParams()
+    const selectedCategoryId = searchParams.get('selected') || ''
 
     const deleteCategoryMutation = useDeleteCategoryMutation()
 
-    const isLoading = isLoadingCategories || isLoadingTransactions
+    const isLoading = isLoadingCategories || isLoadingDashboardSummary
 
     const handleDeleteCategory = async (categoryId: string) => {
         await deleteCategoryMutation.mutateAsync(categoryId)
@@ -33,6 +38,13 @@ export function CategoryList() {
         setEditingCategory(category)
         setModalOpen(true)
     }
+
+    useEffect(() => {
+        if (!selectedCategoryId) return
+        const element = document.getElementById(`category-card-${selectedCategoryId}`)
+        if (!element) return
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, [selectedCategoryId, categories])
 
     if (isLoading) {
         return <CategoriesSkeleton />
@@ -45,7 +57,7 @@ export function CategoryList() {
             transition={{ duration: 0.5 }}
         >
             <div className="mb-8">
-                <CategorySummaryCard categories={categories} transactions={transactions} />
+                <CategorySummaryCard categories={categories} categoryExpenses={categoryExpenses} />
             </div>
 
             <AnimatedTabs
@@ -61,14 +73,16 @@ export function CategoryList() {
                                     {categories.map((category) => (
                                         <motion.div
                                             key={category.id}
+                                            id={`category-card-${category.id}`}
                                             initial={{ opacity: 0, y: 15 }}
                                             animate={{ opacity: 1, y: 0 }}
                                             exit={{ opacity: 0, scale: 0.95 }}
                                             transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
+                                            className={selectedCategoryId === category.id ? 'rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : ''}
                                         >
                                             <CategoryCard
                                                 category={category}
-                                                transactions={transactions}
+                                                stats={categoryStatsById.get(category.id || '')}
                                                 onDelete={() => handleDeleteCategory(category.id!)}
                                                 onEdit={() => handleEditCategory(category)}
                                             />

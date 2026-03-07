@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Button } from '@/components/ui/button'
 import { CreditCard, TrendingUp, TrendingDown } from 'lucide-react'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import TransactionItem from '@/components/transactions/TransactionItem'
 import TransactionSummaryCard from '@/components/transactions/TransactionSummaryCard'
@@ -22,6 +23,7 @@ export default function TransactionsList() {
     const {
         transactions,
         pagination,
+        summary,
         isLoading: isLoadingTx,
         deleteTransaction,
         clearFilters,
@@ -29,13 +31,21 @@ export default function TransactionsList() {
     } = useTransactionContext()
 
     const { data: categories = [], isLoading: isLoadingCat } = useGetCategories()
-    const { isLoading: isLoadingAcc } = useGetAccounts()
+    const { data: accounts = [], isLoading: isLoadingAcc } = useGetAccounts()
     const searchParams = useSearchParams()
+    const highlightedTransactionId = searchParams.get('highlight') || ''
+    const shouldOpenDetails = searchParams.get('open') === 'details'
 
     const [currentFilter, setCurrentFilter] = useState('all')
+    const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
 
     const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME)
-    const expenseTransactions = transactions.filter(t => t.type_transation === TypeTransaction.BILL)
+    const expenseTransactions = transactions.filter((t) =>
+        t.type_transation === TypeTransaction.BILL ||
+        t.type_transation === TypeTransaction.LOAN_DISBURSEMENT ||
+        t.type_transation === TypeTransaction.INVESTMENT_PURCHASE ||
+        t.type_transation === TypeTransaction.INVESTMENT_FUNDING
+    )
 
     const getFilteredTransactions = () => {
         switch (currentFilter) {
@@ -51,18 +61,20 @@ export default function TransactionsList() {
                 {transactionList.map((transaction) => {
                     const category = categories.find(c => c.id === transaction.category_id)
                     return (
-                        <motion.li
-                            key={transaction.id}
-                            layout
+                            <motion.li
+                                key={transaction.id}
+                                id={`transaction-item-${transaction.id}`}
+                                layout
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
                             transition={{ duration: 0.3, ease: "easeInOut" }}
-                            className="list-none"
-                        >
+                                className={highlightedTransactionId === transaction.id ? 'list-none rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : 'list-none'}
+                            >
                             <TransactionItem
                                 transaction={transaction}
                                 category={category}
+                                onOpenDetails={(item) => setSelectedTransaction(item)}
                                 onTransactionDeleted={async () => {
                                     await deleteTransaction(transaction.id!)
                                     reloadCurrentView()
@@ -90,6 +102,21 @@ export default function TransactionsList() {
         { value: 'expense', label: t('expense'), icon: <TrendingDown className="h-4 w-4" />, content: <></> }
     ]
 
+    useEffect(() => {
+        if (!highlightedTransactionId) return
+        const element = document.getElementById(`transaction-item-${highlightedTransactionId}`)
+        if (!element) return
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, [highlightedTransactionId, transactions])
+
+    useEffect(() => {
+        if (!shouldOpenDetails || !highlightedTransactionId || selectedTransaction) return
+        const match = transactions.find((item) => item.id === highlightedTransactionId)
+        if (match) {
+            setSelectedTransaction(match)
+        }
+    }, [shouldOpenDetails, highlightedTransactionId, selectedTransaction, transactions])
+
     if (isLoadingTx || isLoadingCat || isLoadingAcc) {
         return <TransactionsPageSkeleton />
     }
@@ -101,7 +128,7 @@ export default function TransactionsList() {
             transition={{ duration: 0.5 }}
         >
             <div className="mb-8">
-                <TransactionSummaryCard transactions={transactions} />
+                <TransactionSummaryCard transactions={transactions} summary={summary} />
             </div>
 
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
@@ -133,7 +160,43 @@ export default function TransactionsList() {
 
                 {renderTransactionList(getFilteredTransactions())}
             </div>
+
+            <Dialog open={Boolean(selectedTransaction)} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{selectedTransaction?.name}</DialogTitle>
+                        <DialogDescription>{selectedTransaction?.description || t('description')}</DialogDescription>
+                    </DialogHeader>
+                    {selectedTransaction && (
+                        <div className="space-y-3 text-sm">
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <p className="text-xs text-muted-foreground">{t('amount')}</p>
+                                    <p className="font-semibold">{selectedTransaction.amount >= 0 ? '+' : '-'}${Math.abs(selectedTransaction.amount).toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">{t('type')}</p>
+                                    <p className="font-semibold">{selectedTransaction.type_transation}</p>
+                                </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <p className="text-xs text-muted-foreground">{t('account')}</p>
+                                    <p className="font-semibold">{accounts.find((acc) => acc.id === selectedTransaction.account_id)?.name || selectedTransaction.account_id}</p>
+                                </div>
+                                <div>
+                                    <p className="text-xs text-muted-foreground">{t('category')}</p>
+                                    <p className="font-semibold">{categories.find((cat) => cat.id === selectedTransaction.category_id)?.name || '-'}</p>
+                                </div>
+                            </div>
+                            <div>
+                                <p className="text-xs text-muted-foreground">{t('date')}</p>
+                                <p className="font-semibold">{new Date(selectedTransaction.created_at).toLocaleString()}</p>
+                            </div>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
         </motion.div>
     )
 }
-

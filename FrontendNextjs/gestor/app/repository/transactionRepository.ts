@@ -16,8 +16,9 @@ export class TransactionRepository extends BaseRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    currency?: string,
   ) {
-    return {
+    const body: Record<string, any> = {
       name,
       description,
       amount,
@@ -25,7 +26,9 @@ export class TransactionRepository extends BaseRepository {
       account_id,
       category_id,
       budget_id: budget_id || null,
+      currency: currency && currency.length === 3 ? currency : "DOP",
     };
+    return body;
   }
 
   async findAll(filters?: TransactionFilters): Promise<PaginatedTransactionResponse> {
@@ -63,8 +66,35 @@ export class TransactionRepository extends BaseRepository {
 
   async findAllSimple(): Promise<Transaction[]> {
     try {
-      const response = await this.findAll({ limit: 1000 }); // Get a large limit for simple cases
-      return response.data;
+      const allTransactions: Transaction[] = [];
+      const pageSize = 100;
+      let page = 1;
+      let hasNextPage = true;
+      let safetyCounter = 0;
+
+      while (hasNextPage && safetyCounter < 100) {
+        const response = await this.findAll({
+          page,
+          limit: pageSize,
+          sort_by: 'created_at',
+          sort_order: 'desc',
+        });
+
+        const pageData = response.data || [];
+        allTransactions.push(...pageData);
+
+        const pagination = response.pagination;
+        hasNextPage = Boolean(pagination?.has_next_page) && pageData.length > 0;
+
+        if (hasNextPage) {
+          const nextPage = pagination?.next_page;
+          page = (typeof nextPage === 'number' && nextPage > page) ? nextPage : page + 1;
+        }
+
+        safetyCounter += 1;
+      }
+
+      return allTransactions;
     } catch (error) {
       console.error("Error fetching simple transactions:", error);
       return [];
@@ -79,21 +109,22 @@ export class TransactionRepository extends BaseRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    currency?: string,
     created_at?: Date,
   ): Promise<void> {
     try {
       const body = {
         ...this.buildTransactionBody(
-          name, description, amount, typeTransaction, account_id, category_id, budget_id
+          name, description, amount, typeTransaction, account_id, category_id, budget_id, currency
         ),
         created_at: created_at ? created_at.toISOString() : new Date().toISOString()
       };
 
-      console.log("body", body);
+      console.log("[TransactionRepository] Creating transaction with body:", JSON.stringify(body, null, 2));
       const data = await this.post("/transaction", body);
-      console.log("transaction created", data);
+      console.log("[TransactionRepository] Transaction created:", data);
     } catch (error) {
-      console.error("Error creating transaction:", error);
+      console.error("[TransactionRepository] Error creating transaction:", error);
       throw error;
     }
   }
@@ -107,12 +138,13 @@ export class TransactionRepository extends BaseRepository {
     account_id: string,
     category_id: string,
     budget_id?: string,
+    currency?: string,
     created_at?: Date,
   ): Promise<void> {
     try {
       const body = {
         ...this.buildTransactionBody(
-          name, description, amount, typeTransaction, account_id, category_id, budget_id
+          name, description, amount, typeTransaction, account_id, category_id, budget_id, currency
         ),
         created_at: created_at ? created_at.toISOString() : undefined
       };

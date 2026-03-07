@@ -3,6 +3,7 @@ package postgress
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
@@ -147,8 +148,13 @@ func (u *UserRepository) Update(ctx context.Context, user *domainUser.User) erro
 	return err
 }
 
+func (u *UserRepository) SoftDelete(ctx context.Context, id string) error {
+	_, err := u.db.ExecContext(ctx, "UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL", id)
+	return err
+}
+
 func (u *UserRepository) FindUserById(ctx context.Context, id string) (*domainUser.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users WHERE id = $1", id)
+	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users WHERE id = $1 AND deleted_at IS NULL", id)
 	if err != nil {
 		return nil, err
 	}
@@ -202,7 +208,7 @@ func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*domainUs
 }
 
 func (u *UserRepository) FindUserByEmail(ctx context.Context, email string) (*domainUser.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE email = $1", email)
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE email = $1 AND deleted_at IS NULL", email)
 	if err != nil {
 		return nil, err
 	}
@@ -234,7 +240,7 @@ func (u *UserRepository) Delete(ctx context.Context, id string) error {
 }
 
 func (u *UserRepository) FindAll(ctx context.Context) ([]*domainUser.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users ORDER BY created_at DESC")
+	rows, err := u.db.QueryContext(ctx, "SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at FROM users WHERE deleted_at IS NULL ORDER BY created_at DESC")
 	if err != nil {
 		return nil, err
 	}
@@ -256,5 +262,61 @@ func (u *UserRepository) FindAll(ctx context.Context) ([]*domainUser.User, error
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
+	return users, nil
+}
+
+func (u *UserRepository) FindAllFiltered(ctx context.Context, query string, limit int, offset int) ([]*domainUser.User, error) {
+	if limit <= 0 {
+		limit = 20
+	}
+	if limit > 100 {
+		limit = 100
+	}
+	if offset < 0 {
+		offset = 0
+	}
+
+	baseQuery := `
+		SELECT id, name, last_name, email, password, confirmed, is_demo, COALESCE(ip_address, ''), role, created_at
+		FROM users
+		WHERE deleted_at IS NULL
+	`
+	extraClause := ""
+	args := make([]interface{}, 0)
+	argIndex := 1
+
+	query = strings.TrimSpace(query)
+	if query != "" {
+		extraClause = fmt.Sprintf(" AND (LOWER(name) LIKE LOWER($%d) OR LOWER(last_name) LIKE LOWER($%d) OR LOWER(email) LIKE LOWER($%d))", argIndex, argIndex, argIndex)
+		args = append(args, "%"+query+"%")
+		argIndex++
+	}
+
+	finalQuery := fmt.Sprintf("%s%s ORDER BY created_at DESC LIMIT $%d OFFSET $%d", baseQuery, extraClause, argIndex, argIndex+1)
+	args = append(args, limit, offset)
+
+	rows, err := u.db.QueryContext(ctx, finalQuery, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	users := make([]*domainUser.User, 0)
+	for rows.Next() {
+		var user domainUser.User
+		if err = rows.Scan(&user.Id, &user.Name, &user.LastName, &user.Email, &user.Password, &user.Confirmed, &user.IsDemo, &user.IpAddress, &user.Role, &user.CreatedAt); err != nil {
+			return nil, err
+		}
+		users = append(users, &user)
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
 	return users, nil
 }

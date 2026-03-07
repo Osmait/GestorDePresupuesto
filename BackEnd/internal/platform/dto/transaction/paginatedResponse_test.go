@@ -149,7 +149,7 @@ func TestCalculateSummary(t *testing.T) {
 	}
 
 	filteredCount := int64(10)
-	summary := CalculateSummary(transactions, filteredCount)
+	summary := CalculateSummary(transactions, filteredCount, 60)
 
 	// Test totals
 	assert.Equal(t, 2500.0, summary.TotalIncome)  // 2000 + 500
@@ -191,7 +191,7 @@ func TestCalculateSummary_EmptyTransactions(t *testing.T) {
 	transactions := []*TransactionResponse{}
 	filteredCount := int64(0)
 
-	summary := CalculateSummary(transactions, filteredCount)
+	summary := CalculateSummary(transactions, filteredCount, 60)
 
 	assert.Equal(t, 0.0, summary.TotalIncome)
 	assert.Equal(t, 0.0, summary.TotalExpenses)

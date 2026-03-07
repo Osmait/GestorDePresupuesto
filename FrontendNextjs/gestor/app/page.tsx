@@ -1,13 +1,13 @@
 'use client'
 
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { motion, useScroll, useTransform } from 'framer-motion'
 import {
 	ArrowRight,
-	BarChart3,
 	Github,
 	Linkedin,
 	ExternalLink,
@@ -93,11 +93,17 @@ function Navigation() {
 					<Link href="/" className="flex items-center gap-3 group">
 						<motion.div
 							whileHover={{ scale: 1.1, rotate: 5 }}
-							className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shadow-lg"
+							className="w-10 h-10 rounded-xl overflow-hidden border border-border/40 bg-background flex items-center justify-center shadow-lg"
 						>
-							<BarChart3 className="h-5 w-5 text-primary-foreground" />
+							<Image
+								src="/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png"
+								alt="SBFinance logo"
+								width={40}
+								height={40}
+								className="w-full h-full object-cover"
+							/>
 						</motion.div>
-						<span className="font-bold text-xl">FinanceApp</span>
+						<span className="font-bold text-xl">SBFinance</span>
 					</Link>
 
 					<div className="hidden md:flex items-center gap-8">

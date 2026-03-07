@@ -34,6 +34,12 @@ vi.mock('@/hooks/queries/useAccountsQuery', () => ({
 vi.mock('@/hooks/queries/useCategoriesQuery', () => ({
     useGetCategories: () => ({ data: [] })
 }))
+vi.mock('@/hooks/queries/useAnalyticsQuery', () => ({
+    useGetDashboardSummary: () => ({ data: { total_income: 0, total_expenses: 0, category_expenses: [] } })
+}))
+vi.mock('@/hooks/queries/useBudgetsQuery', () => ({
+    useGetBudgets: () => ({ data: [] })
+}))
 
 // Mock filters form
 vi.mock('@/components/analysis/AnalysisFilters', () => ({

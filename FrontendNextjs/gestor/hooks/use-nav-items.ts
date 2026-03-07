@@ -4,14 +4,18 @@ import { useTranslations } from 'next-intl'
 import {
     LayoutDashboard,
     CreditCard,
+    CreditCard as CreditCardIcon,
     ArrowUpDown,
     Tags,
     PiggyBank,
     BarChart,
     TrendingUp,
     Shield,
+	FileCheck,
+	HandCoins,
 } from 'lucide-react'
 import { useAdmin } from './useAdmin'
+import { useFeatureFlags } from './useFeatureFlags'
 
 /**
  * Interface representing a navigation item in the sidebar.
@@ -37,6 +41,7 @@ interface NavItem {
  */
 export function useNavItems() {
     const t = useTranslations('nav')
+    const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
 
     const navItems: NavItem[] = [
         {
@@ -69,13 +74,40 @@ export function useNavItems() {
             icon: PiggyBank,
             description: t('budgetsDesc')
         },
-        {
-            title: t('investments'),
-            href: '/app/investments',
-            icon: TrendingUp,
+        ...(isFeatureFlagsLoading || isEnabled('module_investments')
+            ? [{
+                title: t('investments'),
+                href: '/app/investments',
+                icon: TrendingUp,
+                badge: t('new'),
+                description: t('investmentsDesc')
+            }]
+            : []),
+        ...(isFeatureFlagsLoading || isEnabled('module_certificates')
+            ? [{
+                title: t('certificates'),
+                href: '/app/certificates',
+                icon: FileCheck,
+                description: t('certificatesDesc')
+            }]
+            : []),
+        ...(isFeatureFlagsLoading || isEnabled('module_loans')
+            ? [{
+                title: t('loans'),
+                href: '/app/loans',
+                icon: HandCoins,
+                description: t('loansDesc')
+            }]
+            : []),
+        ...(isFeatureFlagsLoading || isEnabled('module_credit_cards')
+            ? [{
+                title: t('creditCards'),
+                href: '/app/credit-cards',
+                icon: CreditCardIcon,
             badge: t('new'),
-            description: t('investmentsDesc')
-        },
+            description: t('creditCardsDesc')
+            }]
+            : []),
         {
             title: t('analytics'),
             href: '/app/analysis',
