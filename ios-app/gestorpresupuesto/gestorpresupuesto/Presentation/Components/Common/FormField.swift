@@ -17,6 +17,7 @@ enum FieldValidationState {
 }
 
 struct FormField: View {
+    var title: String?
     let icon: String
     let placeholder: String
     @Binding var text: String
@@ -25,7 +26,7 @@ struct FormField: View {
     var isSecure: Bool = false
     var validation: ((String) -> String?)?
     var showSuccessIndicator: Bool = true
-    
+
     @FocusState private var isFocused: Bool
     @State private var errorMessage: String?
     @State private var hasBeenEdited: Bool = false
@@ -51,6 +52,13 @@ struct FormField: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: .xs) {
+            if let title {
+                Text(title)
+                    .font(.app(.caption))
+                    .foregroundStyle(Color.app.textSecondary)
+                    .padding(.leading, 4)
+            }
+
             HStack(spacing: .sm) {
                 Image(systemName: icon)
                     .font(.system(size: 16))

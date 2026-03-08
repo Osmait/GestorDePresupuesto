@@ -2,7 +2,7 @@ import SwiftUI
 import Combine
 
 struct LoginView: View {
-    @StateObject private var viewModel = AuthViewModel()
+    @ObservedObject var viewModel: AuthViewModel
     @State private var email = ""
     @State private var password = ""
     @State private var showingRegister = false
@@ -312,5 +312,5 @@ struct RegisterView: View {
 }
 
 #Preview {
-    LoginView()
+    LoginView(viewModel: AuthViewModel())
 }

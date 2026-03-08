@@ -5,58 +5,53 @@ import Vision
 import VisionKit
 
 @MainActor
-class DocumentScannerViewModel: ObservableObject {
+class DocumentScannerViewModel: BaseViewModel {
     @Published var isScanning = false
     @Published var isProcessing = false
     @Published var scannedImages: [UIImage] = []
     @Published var extractedTransactions: [ExtractedTransaction] = []
     @Published var selectedAccountId = ""
     @Published var documentType: DocumentType = .receipt
-    
-    @Published var showErrorBanner = false
-    @Published var errorBannerMessage = ""
-    @Published var showToast = false
-    @Published var toastType: ToastType = .success
-    @Published var toastMessage = ""
-    
+
     private let aiRepository: AIRepository
     private let transactionRepository: TransactionRepository
-    
+
     init(
-        aiRepository: AIRepository = AIRepositoryImpl(),
-        transactionRepository: TransactionRepository = TransactionRepositoryImpl()
+        aiRepository: AIRepository? = nil,
+        transactionRepository: TransactionRepository? = nil
     ) {
-        self.aiRepository = aiRepository
-        self.transactionRepository = transactionRepository
+        let container = DependencyContainer.shared
+        self.aiRepository = aiRepository ?? container.resolve(AIRepository.self)
+        self.transactionRepository = transactionRepository ?? container.resolve(TransactionRepository.self)
     }
-    
+
     var canExtract: Bool {
         !scannedImages.isEmpty && !selectedAccountId.isEmpty
     }
-    
+
     func addScannedImage(_ image: UIImage) {
         scannedImages.append(image)
     }
-    
+
     func removeScannedImage(at index: Int) {
         if scannedImages.indices.contains(index) {
             scannedImages.remove(at: index)
         }
     }
-    
+
     func clearScannedImages() {
         scannedImages.removeAll()
         extractedTransactions.removeAll()
     }
-    
+
     func extractTransactions() async {
         guard canExtract else { return }
-        
+
         isProcessing = true
-        
+
         do {
             var files: [DocumentFile] = []
-            
+
             for (index, image) in scannedImages.enumerated() {
                 if let base64Data = image.jpegData(compressionQuality: 0.8)?.base64EncodedString() {
                     files.append(DocumentFile(
@@ -66,29 +61,29 @@ class DocumentScannerViewModel: ObservableObject {
                     ))
                 }
             }
-            
+
             let request = ExtractTransactionsRequest(
                 accountId: selectedAccountId,
                 documentType: documentType.rawValue,
                 language: "es",
                 files: files
             )
-            
+
             let response = try await aiRepository.extractTransactions(request: request)
             extractedTransactions = response.data.transactions
-            
+
             if extractedTransactions.isEmpty {
-                showToast(message: "No se encontraron transacciones", type: .warning)
+                showWarning("No se encontraron transacciones")
             } else {
-                showToast(message: "\(extractedTransactions.count) transacciones encontradas", type: .success)
+                showSuccess("\(extractedTransactions.count) transacciones encontradas")
             }
         } catch {
             showError(error.localizedDescription)
         }
-        
+
         isProcessing = false
     }
-    
+
     func saveTransaction(_ extracted: ExtractedTransaction, categoryId: String, accountId: String) async -> Bool {
         let request = CreateTransactionRequest(
             name: extracted.name,
@@ -98,29 +93,16 @@ class DocumentScannerViewModel: ObservableObject {
             accountId: accountId,
             categoryId: categoryId,
             budgetId: nil,
+            currency: nil,
             createdAt: extracted.createdAt ?? Date()
         )
-        
+
         do {
-            _ = try await transactionRepository.create(request)
+            try await transactionRepository.create(request)
             return true
         } catch {
             showError(error.localizedDescription)
             return false
         }
-    }
-    
-    private func showError(_ message: String) {
-        errorBannerMessage = message
-        showErrorBanner = true
-        
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.error)
-    }
-    
-    private func showToast(message: String, type: ToastType) {
-        toastType = type
-        toastMessage = message
-        showToast = true
     }
 }

@@ -34,12 +34,44 @@ extension Double {
     var currencyFormatted: String {
         let formatter = NumberFormatter()
         formatter.numberStyle = .currency
-        formatter.locale = Locale(identifier: "es_MX")
-        return formatter.string(from: self as NSNumber) ?? "$\(self)"
+        formatter.locale = Locale(identifier: "es_DO")
+        formatter.currencyCode = "DOP"
+        formatter.currencySymbol = "RD$"
+        return formatter.string(from: self as NSNumber) ?? "RD$\(self)"
     }
-    
+
+    func currencyFormatted(currency: String) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .currency
+        switch currency.uppercased() {
+        case "USD":
+            formatter.locale = Locale(identifier: "en_US")
+            formatter.currencyCode = "USD"
+            formatter.currencySymbol = "US$"
+        case "EUR":
+            formatter.locale = Locale(identifier: "es_ES")
+            formatter.currencyCode = "EUR"
+        default:
+            formatter.locale = Locale(identifier: "es_DO")
+            formatter.currencyCode = "DOP"
+            formatter.currencySymbol = "RD$"
+        }
+        return formatter.string(from: self as NSNumber) ?? "\(currency) \(self)"
+    }
+
     var percentageFormatted: String {
         "\(Int(self * 100))%"
+    }
+
+    var compactFormatted: String {
+        let absValue = abs(self)
+        let sign = self < 0 ? "-" : ""
+        if absValue >= 1_000_000 {
+            return "\(sign)\(String(format: "%.1fM", absValue / 1_000_000))"
+        } else if absValue >= 1_000 {
+            return "\(sign)\(String(format: "%.1fK", absValue / 1_000))"
+        }
+        return "\(sign)\(String(format: "%.0f", absValue))"
     }
 }
 

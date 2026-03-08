@@ -13,3 +13,4 @@ build/
 *.dSYM.zip
 Pods/
 .swiftpm/
+Local.xcconfig

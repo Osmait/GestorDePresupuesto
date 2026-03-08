@@ -81,7 +81,7 @@ struct Endpoint {
 }
 
 struct Endpoints {
-    static let baseURL = "http://127.0.0.1:8080"
+    static var baseURL: String { AppConfiguration.current.baseURL }
     
     // MARK: - Auth
     static func login() -> Endpoint {
@@ -227,5 +227,185 @@ struct Endpoints {
             items.append(URLQueryItem(name: "language", value: language))
         }
         return Endpoint(path: "/ai/analyze/spending", method: .POST, queryItems: items)
+    }
+
+    static func suggestCategory() -> Endpoint {
+        Endpoint(path: "/ai/suggest-category", method: .POST)
+    }
+
+    static func reconcilePreview() -> Endpoint {
+        Endpoint(path: "/ai/reconcile/preview", method: .POST)
+    }
+
+    static func reconcileApply(sessionId: String) -> Endpoint {
+        Endpoint(path: "/ai/reconcile/\(sessionId)/apply", method: .POST)
+    }
+
+    static func savingsGoals() -> Endpoint {
+        Endpoint(path: "/ai/goals", method: .GET)
+    }
+
+    static func createSavingsGoal() -> Endpoint {
+        Endpoint(path: "/ai/goals", method: .POST)
+    }
+
+    static func updateSavingsGoal(id: String) -> Endpoint {
+        Endpoint(path: "/ai/goals/\(id)", method: .PATCH)
+    }
+
+    static func deleteSavingsGoal(id: String) -> Endpoint {
+        Endpoint(path: "/ai/goals/\(id)", method: .DELETE)
+    }
+
+    static func savingsGoalProgress(id: String) -> Endpoint {
+        Endpoint(path: "/ai/goals/\(id)/progress", method: .GET)
+    }
+
+    static func savingsPlan() -> Endpoint {
+        Endpoint(path: "/ai/goals/savings-plan", method: .POST)
+    }
+
+    // MARK: - Feature Flags
+    static func features() -> Endpoint {
+        Endpoint(path: "/me/features", method: .GET)
+    }
+
+    // MARK: - Exchange Rate
+    static func exchangeRate() -> Endpoint {
+        Endpoint(path: "/exchange/rate", method: .GET)
+    }
+
+    // MARK: - Credit Cards
+    static func creditCards() -> Endpoint {
+        Endpoint(path: "/credit-cards", method: .GET)
+    }
+
+    static func creditCard(id: String) -> Endpoint {
+        Endpoint(path: "/credit-cards/\(id)", method: .GET)
+    }
+
+    static func createCreditCard() -> Endpoint {
+        Endpoint(path: "/credit-cards", method: .POST)
+    }
+
+    static func updateCreditCard(id: String) -> Endpoint {
+        Endpoint(path: "/credit-cards/\(id)", method: .PUT)
+    }
+
+    static func deleteCreditCard(id: String) -> Endpoint {
+        Endpoint(path: "/credit-cards/\(id)", method: .DELETE)
+    }
+
+    static func creditCardSummary() -> Endpoint {
+        Endpoint(path: "/credit-cards/summary", method: .GET)
+    }
+
+    static func updateCardBalance(cardId: String, balanceId: String) -> Endpoint {
+        Endpoint(path: "/credit-cards/\(cardId)/balances/\(balanceId)", method: .PUT)
+    }
+
+    static func creditCardPayments(cardId: String) -> Endpoint {
+        Endpoint(path: "/credit-cards/\(cardId)/payments", method: .GET)
+    }
+
+    static func createCreditCardPayment(cardId: String) -> Endpoint {
+        Endpoint(path: "/credit-cards/\(cardId)/payments", method: .POST)
+    }
+
+    // MARK: - Loans
+    static func loans() -> Endpoint {
+        Endpoint(path: "/loan", method: .GET)
+    }
+
+    static func loan(id: String) -> Endpoint {
+        Endpoint(path: "/loan/\(id)", method: .GET)
+    }
+
+    static func createLoan() -> Endpoint {
+        Endpoint(path: "/loan", method: .POST)
+    }
+
+    static func registerLoanPayment(id: String) -> Endpoint {
+        Endpoint(path: "/loan/\(id)/payments", method: .POST)
+    }
+
+    static func updateLoanStatus(id: String) -> Endpoint {
+        Endpoint(path: "/loan/\(id)/status", method: .PATCH)
+    }
+
+    static func loanSummary() -> Endpoint {
+        Endpoint(path: "/loan/summary", method: .GET)
+    }
+
+    // MARK: - Certificates
+    static func certificates() -> Endpoint {
+        Endpoint(path: "/certificate", method: .GET)
+    }
+
+    static func certificate(id: String) -> Endpoint {
+        Endpoint(path: "/certificate/\(id)", method: .GET)
+    }
+
+    static func createCertificate() -> Endpoint {
+        Endpoint(path: "/certificate", method: .POST)
+    }
+
+    static func updateCertificate(id: String) -> Endpoint {
+        Endpoint(path: "/certificate/\(id)", method: .PUT)
+    }
+
+    static func deleteCertificate(id: String) -> Endpoint {
+        Endpoint(path: "/certificate/\(id)", method: .DELETE)
+    }
+
+    static func simulateCertificate(id: String) -> Endpoint {
+        Endpoint(path: "/certificate/\(id)/simulate", method: .POST)
+    }
+
+    static func certificateSummary() -> Endpoint {
+        Endpoint(path: "/certificate/summary", method: .GET)
+    }
+
+    // MARK: - Investments
+    static func investments() -> Endpoint {
+        Endpoint(path: "/investments", method: .GET)
+    }
+
+    static func investment(id: String) -> Endpoint {
+        Endpoint(path: "/investments/\(id)", method: .GET)
+    }
+
+    static func createInvestment() -> Endpoint {
+        Endpoint(path: "/investments", method: .POST)
+    }
+
+    static func updateInvestment(id: String) -> Endpoint {
+        Endpoint(path: "/investments/\(id)", method: .PUT)
+    }
+
+    static func deleteInvestment(id: String) -> Endpoint {
+        Endpoint(path: "/investments/\(id)", method: .DELETE)
+    }
+
+    static func fundBroker() -> Endpoint {
+        Endpoint(path: "/investments/funding", method: .POST)
+    }
+
+    static func fundingBalances() -> Endpoint {
+        Endpoint(path: "/investments/funding/balances", method: .GET)
+    }
+
+    static func quote(symbol: String) -> Endpoint {
+        Endpoint(path: "/quotes/\(symbol)", method: .GET)
+    }
+
+    // MARK: - Dashboard Summary
+    static func dashboardSummary() -> Endpoint {
+        Endpoint(path: "/analytics/dashboard-summary", method: .GET)
+    }
+
+    // MARK: - Search
+    static func search(query: String) -> Endpoint {
+        Endpoint(path: "/search", method: .GET, queryItems: [URLQueryItem(name: "q", value: query)])
     }
 }

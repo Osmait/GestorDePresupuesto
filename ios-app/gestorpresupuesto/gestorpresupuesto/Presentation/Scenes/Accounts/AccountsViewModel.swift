@@ -1,45 +1,43 @@
 import Foundation
-import UIKit
 import Combine
 
 @MainActor
-class AccountsViewModel: ObservableObject {
+class AccountsViewModel: BaseViewModel {
     @Published var accounts: [AccountResponse] = []
-    @Published var isLoading = false
-    @Published var error: String?
-    
-    @Published var showErrorBanner = false
-    @Published var errorBannerMessage = ""
-    @Published var showToast = false
-    @Published var toastType: ToastType = .success
-    @Published var toastMessage = ""
-    
+
     private let accountRepository: AccountRepository
-    
-    init(accountRepository: AccountRepository = AccountRepositoryImpl()) {
-        self.accountRepository = accountRepository
+
+    init(accountRepository: AccountRepository? = nil) {
+        self.accountRepository = accountRepository ?? DependencyContainer.shared.resolve(AccountRepository.self)
     }
-    
+
     func loadAccounts() async {
         isLoading = true
         error = nil
-        
+
         do {
             accounts = try await accountRepository.getAll()
         } catch {
             showError(error.localizedDescription)
         }
-        
+
         isLoading = false
     }
-    
+
     func createAccount(request: CreateAccountRequest) async throws -> Account {
         let account = try await accountRepository.create(request)
         showSuccess("Cuenta creada")
         await loadAccounts()
         return account
     }
-    
+
+    func updateAccount(_ id: String, request: UpdateAccountRequest) async throws -> Account {
+        let account = try await accountRepository.update(id, request: request)
+        showSuccess("Cuenta actualizada")
+        await loadAccounts()
+        return account
+    }
+
     func deleteAccount(_ id: String) async {
         do {
             try await accountRepository.delete(id)
@@ -48,20 +46,5 @@ class AccountsViewModel: ObservableObject {
         } catch {
             showError(error.localizedDescription)
         }
-    }
-    
-    private func showError(_ message: String) {
-        error = message
-        errorBannerMessage = message
-        showErrorBanner = true
-        
-        let generator = UINotificationFeedbackGenerator()
-        generator.notificationOccurred(.error)
-    }
-    
-    private func showSuccess(_ message: String) {
-        toastType = .success
-        toastMessage = message
-        showToast = true
     }
 }

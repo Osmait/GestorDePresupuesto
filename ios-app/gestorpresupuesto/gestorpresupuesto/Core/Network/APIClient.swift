@@ -13,22 +13,33 @@ actor APIClient {
         self.tokenStorage = tokenStorage
         
         let jsonDecoder = JSONDecoder()
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoWithFrac = ISO8601DateFormatter()
+        isoWithFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        let isoNoFrac = ISO8601DateFormatter()
+        isoNoFrac.formatOptions = [.withInternetDateTime]
         jsonDecoder.dateDecodingStrategy = .custom { decoder in
             let container = try decoder.singleValueContainer()
             let dateString = try container.decode(String.self)
-            
-            if let date = formatter.date(from: dateString) {
+
+            if let date = isoWithFrac.date(from: dateString) {
                 return date
             }
-            
-            let fallbackFormatter = ISO8601DateFormatter()
-            fallbackFormatter.formatOptions = [.withInternetDateTime]
-            if let date = fallbackFormatter.date(from: dateString) {
+
+            if let date = isoNoFrac.date(from: dateString) {
                 return date
             }
-            
+
+            // Handle Go's nanosecond precision (>3 fractional digits)
+            // by truncating to milliseconds
+            let trimmed = dateString.replacingOccurrences(
+                of: #"(\.\d{3})\d+"#,
+                with: "$1",
+                options: .regularExpression
+            )
+            if trimmed != dateString, let date = isoWithFrac.date(from: trimmed) {
+                return date
+            }
+
             throw DecodingError.dataCorruptedError(in: container, debugDescription: "Cannot decode date: \(dateString)")
         }
         self.decoder = jsonDecoder
@@ -88,6 +99,11 @@ actor APIClient {
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {
+                let rawJSON = String(data: data, encoding: .utf8) ?? "<no data>"
+                print("🔴 DECODING ERROR for \(T.self)")
+                print("🔴 URL: \(request.url?.absoluteString ?? "?")")
+                print("🔴 Error: \(error)")
+                print("🔴 Raw JSON (first 2000 chars): \(String(rawJSON.prefix(2000)))")
                 throw APIError.decodingError(error)
             }
         case 401:
