@@ -23,8 +23,9 @@ const (
 	CARD_PAYMENT        = "card_payment"
 	LOAN_DISBURSEMENT   = "loan_disbursement"
 	LOAN_COLLECTION     = "loan_collection"
-	INVESTMENT_PURCHASE = "investment_purchase"
-	INVESTMENT_FUNDING  = "investment_funding"
+	INVESTMENT_PURCHASE         = "investment_purchase"
+	INVESTMENT_FUNDING          = "investment_funding"
+	LOAN_CANCELLATION_REFUND    = "loan_cancellation_refund"
 )
 
 type AICacheInvalidator interface {
@@ -67,7 +68,7 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 	if typeTransaction == BILL || typeTransaction == CARD_PAYMENT || typeTransaction == LOAN_DISBURSEMENT || typeTransaction == INVESTMENT_PURCHASE || typeTransaction == INVESTMENT_FUNDING {
 		amount = amount * -1
 	}
-	if typeTransaction == LOAN_COLLECTION {
+	if typeTransaction == LOAN_COLLECTION || typeTransaction == LOAN_CANCELLATION_REFUND {
 		amount = math.Abs(amount)
 	}
 

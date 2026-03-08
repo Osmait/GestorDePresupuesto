@@ -259,7 +259,14 @@
     "totalCollected": "Total cobrado",
     "totalInterestEarned": "Interés total ganado",
     "ofTotalInterest": "de {total}",
-    "activeLoans": "Préstamos activos"
+    "activeLoans": "Préstamos activos",
+    "cancelLoan": "Cancelar",
+    "cancelLoanTitle": "Cancelar Préstamo",
+    "cancelLoanConfirm": "¿Estás seguro de cancelar el préstamo a \"{name}\"? El capital restante será devuelto a la cuenta de origen.",
+    "loanCancelled": "Préstamo cancelado correctamente",
+    "cancelLoanError": "No se pudo cancelar el préstamo",
+    "cancelling": "Cancelando...",
+    "confirmCancel": "Confirmar cancelación"
   },
   "categories": {
     "title": "Gestión de Categorías",

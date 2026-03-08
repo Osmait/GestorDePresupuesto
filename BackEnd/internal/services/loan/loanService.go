@@ -297,6 +297,45 @@ func (s *LoanService) RegisterPayment(ctx context.Context, loanId string, userId
 	return &response, nil
 }
 
+func (s *LoanService) CancelLoan(ctx context.Context, loanId string, userId string) error {
+	entity, err := s.repository.FindById(ctx, loanId, userId)
+	if err != nil {
+		return errors.New("loan not found")
+	}
+
+	if entity.Status != loan.LoanStatusActive {
+		return errors.New("only active loans can be cancelled")
+	}
+
+	remainingPrincipal := round2(entity.PrincipalAmount - entity.PaidPrincipal)
+
+	if remainingPrincipal > 0 && s.transactionService != nil {
+		categoryId, catErr := s.ensureSystemCategory(ctx, userId, "Cancelacion de prestamo", "🔙", "#ef4444")
+		if catErr != nil {
+			return catErr
+		}
+
+		txErr := s.transactionService.CreateTransaction(
+			ctx,
+			"Loan cancellation refund - "+entity.BorrowerName,
+			"Refund of remaining principal due to loan cancellation",
+			remainingPrincipal,
+			"loan_cancellation_refund",
+			entity.SourceAccountId,
+			userId,
+			categoryId,
+			"",
+			entity.Currency,
+			time.Now(),
+		)
+		if txErr != nil {
+			return txErr
+		}
+	}
+
+	return s.repository.UpdateLoanStatus(ctx, loanId, userId, loan.LoanStatusCancelled)
+}
+
 func (s *LoanService) UpdateStatus(ctx context.Context, loanId string, userId string, status loan.LoanStatus) error {
 	return s.repository.UpdateLoanStatus(ctx, loanId, userId, status)
 }

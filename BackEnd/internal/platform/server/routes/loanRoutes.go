@@ -17,6 +17,7 @@ func LoanRoutes(s *gin.Engine, service *loanService.LoanService, db *sql.DB) {
 		group.GET("/summary", handler.GetLoanSummary(service))
 		group.GET("/:id", handler.FindLoanById(service))
 		group.POST("/:id/payments", handler.RegisterPayment(service))
+		group.POST("/:id/cancel", handler.CancelLoan(service))
 		group.PATCH("/:id/status", handler.UpdateLoanStatus(service))
 	}
 }

@@ -259,7 +259,14 @@
     "totalCollected": "Total collected",
     "totalInterestEarned": "Total interest earned",
     "ofTotalInterest": "of {total}",
-    "activeLoans": "Active loans"
+    "activeLoans": "Active loans",
+    "cancelLoan": "Cancel",
+    "cancelLoanTitle": "Cancel Loan",
+    "cancelLoanConfirm": "Are you sure you want to cancel the loan to \"{name}\"? The remaining principal will be refunded to the source account.",
+    "loanCancelled": "Loan cancelled successfully",
+    "cancelLoanError": "Could not cancel loan",
+    "cancelling": "Cancelling...",
+    "confirmCancel": "Confirm cancellation"
   },
   "categories": {
     "title": "Category Management",
