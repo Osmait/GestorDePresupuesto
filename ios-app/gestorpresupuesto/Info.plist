@@ -4,6 +4,10 @@
 <dict>
 	<key>API_BASE_URL</key>
 	<string>$(API_BASE_URL)</string>
+	<key>NSFaceIDUsageDescription</key>
+	<string>Se necesita Face ID para desbloquear la aplicación y proteger tus datos financieros.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Se necesita acceso a la cámara para escanear documentos y extraer transacciones.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

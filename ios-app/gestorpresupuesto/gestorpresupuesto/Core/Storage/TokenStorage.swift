@@ -94,6 +94,8 @@ class UserDefaultsStorage {
     private let userNameKey = "user_name"
     private let userEmailKey = "user_email"
     private let onboardingCompletedKey = "onboarding_completed"
+    private let biometricEnabledKey = "biometric_enabled"
+    private let biometricEnrollmentOfferedKey = "biometric_enrollment_offered"
     
     var userId: String? {
         get { defaults.string(forKey: userIdKey) }
@@ -114,10 +116,22 @@ class UserDefaultsStorage {
         get { defaults.bool(forKey: onboardingCompletedKey) }
         set { defaults.set(newValue, forKey: onboardingCompletedKey) }
     }
-    
+
+    var biometricEnabled: Bool {
+        get { defaults.bool(forKey: biometricEnabledKey) }
+        set { defaults.set(newValue, forKey: biometricEnabledKey) }
+    }
+
+    var biometricEnrollmentOffered: Bool {
+        get { defaults.bool(forKey: biometricEnrollmentOfferedKey) }
+        set { defaults.set(newValue, forKey: biometricEnrollmentOfferedKey) }
+    }
+
     func clearUserData() {
         userId = nil
         userName = nil
         userEmail = nil
+        biometricEnabled = false
+        biometricEnrollmentOffered = false
     }
 }
