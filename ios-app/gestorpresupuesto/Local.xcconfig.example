@@ -1,0 +1,5 @@
+// Copy this file to Local.xcconfig and set your backend URL
+// cp Local.xcconfig.example Local.xcconfig
+//
+// Note: use $() to escape // in URLs (xcconfig treats // as comments)
+API_BASE_URL = http:/$()/192.168.1.100:8080

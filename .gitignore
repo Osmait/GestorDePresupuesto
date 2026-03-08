@@ -2,3 +2,15 @@ postgres_data
 .env
 tmp
 node_modules
+
+# iOS/Xcode
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.ipa
+*.dSYM.zip
+Pods/
+.swiftpm/
+Local.xcconfig
