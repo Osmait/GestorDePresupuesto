@@ -18,6 +18,10 @@ export class LoanRepository extends BaseRepository {
 		return this.post<LoanPayment>(`/loan/${id}/payments`, data) as Promise<LoanPayment>
 	}
 
+	async cancelLoan(id: string): Promise<void> {
+		return this.post(`/loan/${id}/cancel`, {}) as Promise<void>
+	}
+
 	async updateStatus(id: string, status: Loan['status']): Promise<void> {
 		return this.patch(`/loan/${id}/status`, { status })
 	}

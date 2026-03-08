@@ -102,6 +102,20 @@ func UpdateLoanStatus(service *loanService.LoanService) gin.HandlerFunc {
 	}
 }
 
+func CancelLoan(service *loanService.LoanService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		id := ctx.Param("id")
+
+		if err := service.CancelLoan(ctx, id, userId); err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+
+		ctx.JSON(http.StatusOK, gin.H{"message": "Loan cancelled successfully"})
+	}
+}
+
 func GetLoanSummary(service *loanService.LoanService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")

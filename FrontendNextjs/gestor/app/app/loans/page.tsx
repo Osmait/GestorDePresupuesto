@@ -59,6 +59,8 @@ export default function LoansPage() {
 	const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null)
 	const [selectedLoanDetails, setSelectedLoanDetails] = useState<LoanDetails | null>(null)
 	const [saving, setSaving] = useState(false)
+	const [cancelDialogOpen, setCancelDialogOpen] = useState(false)
+	const [cancelling, setCancelling] = useState(false)
 	const [createForm, setCreateForm] = useState<CreateLoanDTO>(initialCreateForm)
 	const [paymentAmount, setPaymentAmount] = useState('')
 	const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
@@ -248,6 +250,26 @@ export default function LoansPage() {
 		}
 	}
 
+	const handleCancelLoan = async () => {
+		if (!selectedLoan) return
+		setCancelling(true)
+		try {
+			await loanRepository.cancelLoan(selectedLoan.id)
+			toast.success(t('loanCancelled'))
+			setCancelDialogOpen(false)
+			await Promise.all([
+				queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() }),
+				queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.simple() }),
+				queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.lists() }),
+			])
+			await loadData()
+		} catch (error: any) {
+			toast.error(error?.message || t('cancelLoanError'))
+		} finally {
+			setCancelling(false)
+		}
+	}
+
 	const formatMoney = (value: number, currency: string) => new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-DO', {
 		style: 'currency',
 		currency,
@@ -381,6 +403,17 @@ export default function LoansPage() {
 												>
 													{t('registerPayment')}
 												</Button>
+												<Button
+													variant='destructive'
+													size='sm'
+													disabled={loan.status !== 'active'}
+													onClick={() => {
+														setSelectedLoan(loan)
+														setCancelDialogOpen(true)
+													}}
+												>
+													{t('cancelLoan')}
+												</Button>
 											</div>
 										</TableCell>
 									</TableRow>
@@ -490,6 +523,25 @@ export default function LoansPage() {
 							<Button type='submit' disabled={saving}>{saving ? t('saving') : t('confirmPayment')}</Button>
 						</DialogFooter>
 					</form>
+				</DialogContent>
+			</Dialog>
+
+			<Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>{t('cancelLoanTitle')}</DialogTitle>
+						<DialogDescription>
+							{t('cancelLoanConfirm', { name: selectedLoan?.borrower_name ?? '' })}
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button variant='outline' onClick={() => setCancelDialogOpen(false)} disabled={cancelling}>
+							{t('cancel')}
+						</Button>
+						<Button variant='destructive' onClick={handleCancelLoan} disabled={cancelling}>
+							{cancelling ? t('cancelling') : t('confirmCancel')}
+						</Button>
+					</DialogFooter>
 				</DialogContent>
 			</Dialog>
 
