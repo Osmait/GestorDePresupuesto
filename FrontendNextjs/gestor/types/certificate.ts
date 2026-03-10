@@ -41,6 +41,7 @@ export interface CertificatePayment {
 	applied_capital: number
 	transaction_id?: string
 	created_at: string
+	updated_at?: string
 }
 
 export interface CertificateSummary {
@@ -79,6 +80,18 @@ export interface UpdateCertificateDTO {
 	reinvest_interest?: boolean
 	payout_account_id?: string
 	status?: CertificateStatus
+}
+
+export interface UpdateCertificatePaymentDTO {
+	payment_date?: string
+	period_start?: string
+	period_end?: string
+	gross_interest?: number
+	tax_withheld?: number
+	net_interest?: number
+	applied_rate?: number
+	applied_tax_rate?: number
+	applied_capital?: number
 }
 
 export interface SimulatePaymentDTO {

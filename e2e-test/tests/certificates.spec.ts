@@ -64,4 +64,56 @@ test.describe('Certificates @prod-write', () => {
 			return 'pending'
 		}, { timeout: 20000 }).toMatch(/removed|cancelled/)
 	})
+
+	test('edit a certificate payment', async ({ page }) => {
+		await gotoApp(page)
+
+		await page.locator('a[href="/app/certificates"]').first().click()
+		await page.waitForURL('**/app/certificates')
+
+		// Payments are generated lazily by the backend when listing certificates.
+		// A freshly created certificate won't have payments until its first cutDay
+		// passes, so we look for any existing certificate that already has payments.
+		const historyButtons = page.getByRole('button', { name: /History/i })
+		const count = await historyButtons.count()
+		test.skip(count === 0, 'No existing certificates found to test payment edit')
+
+		let foundPayments = false
+		const historyDialog = page.getByRole('dialog', { name: /Payment History/i })
+
+		for (let i = 0; i < count; i++) {
+			await historyButtons.nth(i).click()
+			await expect(historyDialog).toBeVisible()
+
+			const editBtn = historyDialog.getByRole('button', { name: /Edit payment/i }).first()
+			try {
+				await editBtn.waitFor({ state: 'visible', timeout: 3000 })
+				foundPayments = true
+				break
+			} catch {
+				await page.keyboard.press('Escape')
+				await expect(historyDialog).not.toBeVisible()
+			}
+		}
+
+		test.skip(!foundPayments, 'No certificates with existing payments found')
+
+		// Click edit on the first payment
+		const editButton = historyDialog.getByRole('button', { name: /Edit payment/i }).first()
+		await editButton.click()
+		const editDialog = page.getByRole('dialog', { name: /Edit Payment/i })
+		await expect(editDialog).toBeVisible()
+
+		// Change gross_interest
+		const grossInput = editDialog.locator('input#edit_gross_interest')
+		await grossInput.fill('999.99')
+
+		await editDialog.getByRole('button', { name: /Save/i }).click()
+		await expect(editDialog).not.toBeVisible({ timeout: 10000 })
+
+		// Verify the updated value appears in the table
+		await expect(historyDialog.getByText('DOP 999.99')).toBeVisible({ timeout: 10000 })
+
+		await page.keyboard.press('Escape')
+	})
 })

@@ -92,6 +92,19 @@ func (m *MockCertificateRepository) FindAllPayments(ctx context.Context, userId 
 	return args.Get(0).([]*certificate.CertificatePayment), args.Error(1)
 }
 
+func (m *MockCertificateRepository) FindPaymentById(ctx context.Context, paymentId string, userId string) (*certificate.CertificatePayment, error) {
+	args := m.Called(ctx, paymentId, userId)
+	if args.Get(0) == nil {
+		return nil, args.Error(1)
+	}
+	return args.Get(0).(*certificate.CertificatePayment), args.Error(1)
+}
+
+func (m *MockCertificateRepository) UpdatePayment(ctx context.Context, payment *certificate.CertificatePayment) error {
+	args := m.Called(ctx, payment)
+	return args.Error(0)
+}
+
 func (m *MockCertificateRepository) UpdatePaymentTransaction(ctx context.Context, paymentId string, transactionId string) error {
 	args := m.Called(ctx, paymentId, transactionId)
 	return args.Error(0)
