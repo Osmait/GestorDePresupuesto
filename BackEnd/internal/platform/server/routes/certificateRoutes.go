@@ -18,6 +18,7 @@ func CertificateRoutes(s *gin.Engine, certificateService *certificate.Certificat
 		certGroup.GET("/:id", handler.FindCertificateById(certificateService))
 		certGroup.PUT("/:id", handler.UpdateCertificate(certificateService))
 		certGroup.DELETE("/:id", handler.DeleteCertificate(certificateService))
+		certGroup.PUT("/payments/:paymentId", handler.UpdateCertificatePayment(certificateService))
 		certGroup.POST("/:id/simulate", handler.SimulateCertificate(certificateService))
 	}
 }

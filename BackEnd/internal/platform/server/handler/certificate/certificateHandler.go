@@ -112,6 +112,26 @@ func SimulateCertificate(certificateService *certificate.CertificateService) gin
 	}
 }
 
+func UpdateCertificatePayment(certificateService *certificate.CertificateService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		paymentId := ctx.Param("paymentId")
+
+		var req dto.UpdateCertificatePaymentRequest
+		if err := ctx.BindJSON(&req); err != nil {
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
+			return
+		}
+
+		err := certificateService.UpdatePayment(ctx, paymentId, &req, userId)
+		if err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+		ctx.JSON(http.StatusOK, gin.H{"message": "Payment updated successfully"})
+	}
+}
+
 func GetCertificateSummary(certificateService *certificate.CertificateService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")

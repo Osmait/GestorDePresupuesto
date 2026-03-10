@@ -18,6 +18,7 @@ type CertificatePayment struct {
 	PayoutAccountId *string
 	TransactionId   *string
 	CreatedAt       time.Time
+	UpdatedAt       *time.Time
 }
 
 func NewCertificatePayment(id, certificateId, userId string, paymentDate, periodStart, periodEnd time.Time, gross, tax, net, rate, taxRate, capital float64) *CertificatePayment {

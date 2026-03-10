@@ -5,6 +5,7 @@ import {
 	CertificateSummary,
 	CreateCertificateDTO,
 	UpdateCertificateDTO,
+	UpdateCertificatePaymentDTO,
 	SimulatePaymentDTO,
 	SimulationResult,
 } from '@/types/certificate'
@@ -28,6 +29,10 @@ export class CertificateRepository extends BaseRepository {
 
 	async delete(id: string): Promise<void> {
 		return this.deleteRequest(`/certificate/${id}`)
+	}
+
+	async updatePayment(paymentId: string, data: UpdateCertificatePaymentDTO): Promise<void> {
+		return this.put(`/certificate/payments/${paymentId}`, data)
 	}
 
 	async simulate(id: string, data: SimulatePaymentDTO): Promise<SimulationResult> {

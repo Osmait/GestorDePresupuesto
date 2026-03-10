@@ -62,6 +62,18 @@ type UpdateCertificateRequest struct {
 	Status              *certificate.CertificateStatus `json:"status" binding:"omitempty,oneof=active matured cancelled"`
 }
 
+type UpdateCertificatePaymentRequest struct {
+	PaymentDate    *string  `json:"payment_date"`
+	PeriodStart    *string  `json:"period_start"`
+	PeriodEnd      *string  `json:"period_end"`
+	GrossInterest  *float64 `json:"gross_interest" binding:"omitempty,gte=0"`
+	TaxWithheld    *float64 `json:"tax_withheld" binding:"omitempty,gte=0"`
+	NetInterest    *float64 `json:"net_interest" binding:"omitempty,gte=0"`
+	AppliedRate    *float64 `json:"applied_rate" binding:"omitempty,gt=0,lte=100"`
+	AppliedTaxRate *float64 `json:"applied_tax_rate" binding:"omitempty,gte=0,lte=100"`
+	AppliedCapital *float64 `json:"applied_capital" binding:"omitempty,gt=0"`
+}
+
 type SimulatePaymentRequest struct {
 	Capital *float64 `json:"capital" binding:"omitempty,gt=0"`
 	Rate    *float64 `json:"rate" binding:"omitempty,gt=0,lte=100"`

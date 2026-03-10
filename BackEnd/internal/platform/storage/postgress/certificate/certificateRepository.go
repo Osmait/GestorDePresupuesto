@@ -165,7 +165,7 @@ func (r *CertificateRepository) SavePayment(ctx context.Context, payment *certif
 
 func (r *CertificateRepository) FindPaymentsByCertificate(ctx context.Context, certificateId string) ([]*certificate.CertificatePayment, error) {
 	query := `SELECT id, certificate_id, user_id, payment_date, period_start, period_end, gross_interest, tax_withheld,
-		net_interest, applied_rate, applied_tax_rate, applied_capital, payout_account_id, transaction_id, created_at
+		net_interest, applied_rate, applied_tax_rate, applied_capital, payout_account_id, transaction_id, created_at, updated_at
 		FROM certificate_payments WHERE certificate_id = $1 ORDER BY payment_date DESC`
 	rows, err := r.db.QueryContext(ctx, query, certificateId)
 	if err != nil {
@@ -182,7 +182,7 @@ func (r *CertificateRepository) FindPaymentsByCertificate(ctx context.Context, c
 		p := &certificate.CertificatePayment{}
 		if err = rows.Scan(&p.Id, &p.CertificateId, &p.UserId, &p.PaymentDate, &p.PeriodStart, &p.PeriodEnd,
 			&p.GrossInterest, &p.TaxWithheld, &p.NetInterest, &p.AppliedRate, &p.AppliedTaxRate,
-			&p.AppliedCapital, &p.PayoutAccountId, &p.TransactionId, &p.CreatedAt); err == nil {
+			&p.AppliedCapital, &p.PayoutAccountId, &p.TransactionId, &p.CreatedAt, &p.UpdatedAt); err == nil {
 			payments = append(payments, p)
 		}
 	}
@@ -194,14 +194,14 @@ func (r *CertificateRepository) FindPaymentsByCertificate(ctx context.Context, c
 
 func (r *CertificateRepository) FindLastPayment(ctx context.Context, certificateId string) (*certificate.CertificatePayment, error) {
 	query := `SELECT id, certificate_id, user_id, payment_date, period_start, period_end, gross_interest, tax_withheld,
-		net_interest, applied_rate, applied_tax_rate, applied_capital, payout_account_id, transaction_id, created_at
+		net_interest, applied_rate, applied_tax_rate, applied_capital, payout_account_id, transaction_id, created_at, updated_at
 		FROM certificate_payments WHERE certificate_id = $1 ORDER BY payment_date DESC LIMIT 1`
 	row := r.db.QueryRowContext(ctx, query, certificateId)
 
 	p := &certificate.CertificatePayment{}
 	err := row.Scan(&p.Id, &p.CertificateId, &p.UserId, &p.PaymentDate, &p.PeriodStart, &p.PeriodEnd,
 		&p.GrossInterest, &p.TaxWithheld, &p.NetInterest, &p.AppliedRate, &p.AppliedTaxRate,
-		&p.AppliedCapital, &p.PayoutAccountId, &p.TransactionId, &p.CreatedAt)
+		&p.AppliedCapital, &p.PayoutAccountId, &p.TransactionId, &p.CreatedAt, &p.UpdatedAt)
 	if err != nil {
 		return nil, err
 	}
@@ -210,7 +210,7 @@ func (r *CertificateRepository) FindLastPayment(ctx context.Context, certificate
 
 func (r *CertificateRepository) FindAllPayments(ctx context.Context, userId string) ([]*certificate.CertificatePayment, error) {
 	query := `SELECT id, certificate_id, user_id, payment_date, period_start, period_end, gross_interest, tax_withheld,
-		net_interest, applied_rate, applied_tax_rate, applied_capital, payout_account_id, transaction_id, created_at
+		net_interest, applied_rate, applied_tax_rate, applied_capital, payout_account_id, transaction_id, created_at, updated_at
 		FROM certificate_payments WHERE user_id = $1 ORDER BY payment_date DESC`
 	rows, err := r.db.QueryContext(ctx, query, userId)
 	if err != nil {
@@ -227,7 +227,7 @@ func (r *CertificateRepository) FindAllPayments(ctx context.Context, userId stri
 		p := &certificate.CertificatePayment{}
 		if err = rows.Scan(&p.Id, &p.CertificateId, &p.UserId, &p.PaymentDate, &p.PeriodStart, &p.PeriodEnd,
 			&p.GrossInterest, &p.TaxWithheld, &p.NetInterest, &p.AppliedRate, &p.AppliedTaxRate,
-			&p.AppliedCapital, &p.PayoutAccountId, &p.TransactionId, &p.CreatedAt); err == nil {
+			&p.AppliedCapital, &p.PayoutAccountId, &p.TransactionId, &p.CreatedAt, &p.UpdatedAt); err == nil {
 			payments = append(payments, p)
 		}
 	}
@@ -235,6 +235,43 @@ func (r *CertificateRepository) FindAllPayments(ctx context.Context, userId stri
 		return nil, err
 	}
 	return payments, nil
+}
+
+func (r *CertificateRepository) FindPaymentById(ctx context.Context, paymentId string, userId string) (*certificate.CertificatePayment, error) {
+	query := `SELECT id, certificate_id, user_id, payment_date, period_start, period_end, gross_interest, tax_withheld,
+		net_interest, applied_rate, applied_tax_rate, applied_capital, payout_account_id, transaction_id, created_at, updated_at
+		FROM certificate_payments WHERE id = $1 AND user_id = $2`
+	row := r.db.QueryRowContext(ctx, query, paymentId, userId)
+
+	p := &certificate.CertificatePayment{}
+	err := row.Scan(&p.Id, &p.CertificateId, &p.UserId, &p.PaymentDate, &p.PeriodStart, &p.PeriodEnd,
+		&p.GrossInterest, &p.TaxWithheld, &p.NetInterest, &p.AppliedRate, &p.AppliedTaxRate,
+		&p.AppliedCapital, &p.PayoutAccountId, &p.TransactionId, &p.CreatedAt, &p.UpdatedAt)
+	if err != nil {
+		return nil, err
+	}
+	return p, nil
+}
+
+func (r *CertificateRepository) UpdatePayment(ctx context.Context, payment *certificate.CertificatePayment) error {
+	query := `UPDATE certificate_payments SET payment_date = $1, period_start = $2, period_end = $3,
+		gross_interest = $4, tax_withheld = $5, net_interest = $6, applied_rate = $7, applied_tax_rate = $8,
+		applied_capital = $9, updated_at = $10
+		WHERE id = $11 AND user_id = $12`
+	result, err := r.db.ExecContext(ctx, query, payment.PaymentDate, payment.PeriodStart, payment.PeriodEnd,
+		payment.GrossInterest, payment.TaxWithheld, payment.NetInterest, payment.AppliedRate, payment.AppliedTaxRate,
+		payment.AppliedCapital, payment.UpdatedAt, payment.Id, payment.UserId)
+	if err != nil {
+		return err
+	}
+	rowsAffected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rowsAffected == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (r *CertificateRepository) UpdatePaymentTransaction(ctx context.Context, paymentId string, transactionId string) error {

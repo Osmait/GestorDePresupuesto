@@ -216,6 +216,61 @@ func (s *CertificateService) UpdateCertificate(ctx context.Context, id string, r
 	return s.repository.Update(ctx, cert)
 }
 
+func (s *CertificateService) UpdatePayment(ctx context.Context, paymentId string, req *dto.UpdateCertificatePaymentRequest, userId string) error {
+	payment, err := s.repository.FindPaymentById(ctx, paymentId, userId)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return errors.New("payment not found")
+		}
+		return err
+	}
+
+	if req.PaymentDate != nil {
+		t, err := time.Parse("2006-01-02", *req.PaymentDate)
+		if err != nil {
+			return errors.New("invalid payment_date format, expected YYYY-MM-DD")
+		}
+		payment.PaymentDate = t
+	}
+	if req.PeriodStart != nil {
+		t, err := time.Parse("2006-01-02", *req.PeriodStart)
+		if err != nil {
+			return errors.New("invalid period_start format, expected YYYY-MM-DD")
+		}
+		payment.PeriodStart = t
+	}
+	if req.PeriodEnd != nil {
+		t, err := time.Parse("2006-01-02", *req.PeriodEnd)
+		if err != nil {
+			return errors.New("invalid period_end format, expected YYYY-MM-DD")
+		}
+		payment.PeriodEnd = t
+	}
+	if req.GrossInterest != nil {
+		payment.GrossInterest = *req.GrossInterest
+	}
+	if req.TaxWithheld != nil {
+		payment.TaxWithheld = *req.TaxWithheld
+	}
+	if req.NetInterest != nil {
+		payment.NetInterest = *req.NetInterest
+	}
+	if req.AppliedRate != nil {
+		payment.AppliedRate = *req.AppliedRate
+	}
+	if req.AppliedTaxRate != nil {
+		payment.AppliedTaxRate = *req.AppliedTaxRate
+	}
+	if req.AppliedCapital != nil {
+		payment.AppliedCapital = *req.AppliedCapital
+	}
+
+	now := time.Now()
+	payment.UpdatedAt = &now
+
+	return s.repository.UpdatePayment(ctx, payment)
+}
+
 func (s *CertificateService) DeleteCertificate(ctx context.Context, id string, userId string) error {
 	return s.repository.Delete(ctx, id, userId)
 }

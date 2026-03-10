@@ -19,5 +19,7 @@ type CertificateRepositoryInterface interface {
 	FindPaymentsByCertificate(ctx context.Context, certificateId string) ([]*certificate.CertificatePayment, error)
 	FindLastPayment(ctx context.Context, certificateId string) (*certificate.CertificatePayment, error)
 	FindAllPayments(ctx context.Context, userId string) ([]*certificate.CertificatePayment, error)
+	FindPaymentById(ctx context.Context, paymentId string, userId string) (*certificate.CertificatePayment, error)
+	UpdatePayment(ctx context.Context, payment *certificate.CertificatePayment) error
 	UpdatePaymentTransaction(ctx context.Context, paymentId string, transactionId string) error
 }

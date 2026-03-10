@@ -8,6 +8,7 @@ import {
 	CertificateSummary,
 	CreateCertificateDTO,
 	UpdateCertificateDTO,
+	UpdateCertificatePaymentDTO,
 	SimulatePaymentDTO,
 	SimulationResult,
 } from '@/types/certificate'
@@ -89,6 +90,19 @@ export function useDeleteCertificateMutation() {
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.summary() })
+		},
+	})
+}
+
+export function useUpdateCertificatePaymentMutation() {
+	const queryClient = useQueryClient()
+	return useMutation({
+		mutationFn: async ({ paymentId, data }: { paymentId: string; data: UpdateCertificatePaymentDTO }) => {
+			const repo = await getCertificateRepository()
+			return repo.updatePayment(paymentId, data)
+		},
+		onSuccess: () => {
+			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.all })
 		},
 	})
 }
