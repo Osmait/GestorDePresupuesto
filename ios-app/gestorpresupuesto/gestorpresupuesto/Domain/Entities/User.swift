@@ -9,7 +9,7 @@ struct User: Codable, Identifiable, Equatable {
     let isDemo: Bool?
     let confirmed: Bool?
     let createdAt: Date
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case name
@@ -20,7 +20,7 @@ struct User: Codable, Identifiable, Equatable {
         case confirmed
         case createdAt = "created_at"
     }
-    
+
     var fullName: String {
         "\(name) \(lastName)"
     }
@@ -29,7 +29,7 @@ struct User: Codable, Identifiable, Equatable {
 struct AuthTokens: Codable {
     let accessToken: String
     let refreshToken: String
-    
+
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
@@ -46,7 +46,7 @@ struct LoginResponse: Codable {
     let refreshToken: String
     let tokenType: String
     let expiresIn: Int
-    
+
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"
@@ -60,7 +60,7 @@ struct RegisterRequest: Codable {
     let lastName: String
     let email: String
     let password: String
-    
+
     enum CodingKeys: String, CodingKey {
         case name
         case lastName = "last_name"
@@ -71,7 +71,7 @@ struct RegisterRequest: Codable {
 
 struct RefreshTokenRequest: Codable {
     let refreshToken: String
-    
+
     enum CodingKeys: String, CodingKey {
         case refreshToken = "refresh_token"
     }
@@ -80,7 +80,7 @@ struct RefreshTokenRequest: Codable {
 struct RefreshTokenResponse: Codable {
     let accessToken: String
     let refreshToken: String
-    
+
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case refreshToken = "refresh_token"

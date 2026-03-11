@@ -28,6 +28,7 @@ struct Transaction: Codable, Identifiable, Equatable {
     let id: String
     let name: String
     let description: String?
+    // FIXME: amount: Double should be Decimal for monetary precision
     let amount: Double
     let typeTransaction: String
     let accountId: String
@@ -35,6 +36,7 @@ struct Transaction: Codable, Identifiable, Equatable {
     let budgetId: String?
     let currency: String?
     let userId: String?
+    // NOTE: Date vs String inconsistency is backend-dependent
     let createdAt: Date
 
     enum CodingKeys: String, CodingKey {
@@ -42,6 +44,7 @@ struct Transaction: Codable, Identifiable, Equatable {
         case name
         case description
         case amount
+        // NOTE: "type_transation" is a backend typo (missing 'c'). Must match API.
         case typeTransaction = "type_transation"
         case accountId = "account_id"
         case categoryId = "category_id"
@@ -50,11 +53,11 @@ struct Transaction: Codable, Identifiable, Equatable {
         case userId = "user_id"
         case createdAt = "created_at"
     }
-    
+
     var transactionType: TransactionType? {
         TransactionType(rawValue: typeTransaction)
     }
-    
+
     var isIncome: Bool {
         typeTransaction == "income"
     }
@@ -122,7 +125,7 @@ struct TransactionFilter: Codable {
     var amountMin: Double?
     var amountMax: Double?
     var search: String?
-    
+
     enum CodingKeys: String, CodingKey {
         case page
         case limit
@@ -140,7 +143,7 @@ struct TransactionFilter: Codable {
         case amountMax = "amount_max"
         case search
     }
-    
+
     func toQueryItems() -> [URLQueryItem] {
         var items: [URLQueryItem] = [
             URLQueryItem(name: "page", value: "\(page)"),
@@ -148,7 +151,7 @@ struct TransactionFilter: Codable {
             URLQueryItem(name: "sort_by", value: sortBy),
             URLQueryItem(name: "sort_order", value: sortOrder)
         ]
-        
+
         if let type = type { items.append(URLQueryItem(name: "type", value: type)) }
         if let categoryId = categoryId { items.append(URLQueryItem(name: "category_id", value: categoryId)) }
         if let categories = categories, !categories.isEmpty {
@@ -162,7 +165,7 @@ struct TransactionFilter: Codable {
         if let amountMin = amountMin { items.append(URLQueryItem(name: "amount_min", value: "\(amountMin)")) }
         if let amountMax = amountMax { items.append(URLQueryItem(name: "amount_max", value: "\(amountMax)")) }
         if let search = search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
-        
+
         return items
     }
 }
@@ -170,6 +173,11 @@ struct TransactionFilter: Codable {
 struct PaginatedTransactionResponse: Codable {
     let data: [Transaction]
     let pagination: PaginationMeta
+
+    init(data: [Transaction], pagination: PaginationMeta) {
+        self.data = data
+        self.pagination = pagination
+    }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -187,7 +195,7 @@ struct PaginationMeta: Codable {
     let hasPrevPage: Bool
     let nextPage: Int?
     let prevPage: Int?
-    
+
     enum CodingKeys: String, CodingKey {
         case currentPage = "current_page"
         case perPage = "per_page"

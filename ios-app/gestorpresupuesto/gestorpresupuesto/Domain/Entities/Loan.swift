@@ -75,10 +75,6 @@ struct Loan: Codable, Identifiable, Equatable {
         case updatedAt = "updated_at"
     }
 
-    static func == (lhs: Loan, rhs: Loan) -> Bool {
-        lhs.id == rhs.id
-    }
-
     var progressPercent: Double {
         guard totalAmount > 0 else { return 0 }
         return min((paidPrincipal + paidInterest) / totalAmount, 1.0)

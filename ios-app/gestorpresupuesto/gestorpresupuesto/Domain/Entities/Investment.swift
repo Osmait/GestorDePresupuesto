@@ -51,10 +51,6 @@ struct Investment: Codable, Identifiable, Equatable {
         case userId = "user_id"
     }
 
-    static func == (lhs: Investment, rhs: Investment) -> Bool {
-        lhs.id == rhs.id
-    }
-
     var totalCost: Double {
         quantity * purchasePrice
     }

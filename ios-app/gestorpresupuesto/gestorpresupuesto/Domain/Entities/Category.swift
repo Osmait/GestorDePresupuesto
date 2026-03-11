@@ -1,4 +1,4 @@
-import SwiftUI
+import Foundation
 
 struct Category: Codable, Identifiable, Equatable, Hashable {
     let id: String
@@ -7,7 +7,7 @@ struct Category: Codable, Identifiable, Equatable, Hashable {
     let color: String
     let userId: String?
     let createdAt: Date
-    
+
     enum CodingKeys: String, CodingKey {
         case id
         case name
@@ -15,10 +15,6 @@ struct Category: Codable, Identifiable, Equatable, Hashable {
         case color
         case userId = "user_id"
         case createdAt = "created_at"
-    }
-    
-    var colorValue: Color {
-        Color.fromHex(color) ?? .gray
     }
 }
 

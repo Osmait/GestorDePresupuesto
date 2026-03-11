@@ -15,6 +15,7 @@ protocol AccountRepository {
     func delete(_ id: String) async throws
 }
 
+// NOTE: Only TransactionRepository supports pagination
 protocol TransactionRepository {
     func getAll(filter: TransactionFilter?) async throws -> PaginatedTransactionResponse
     func getByAccount(_ accountId: String) async throws -> PaginatedTransactionResponse
@@ -50,6 +51,7 @@ protocol RecurringTransactionRepository {
     func delete(_ id: String) async throws
 }
 
+// TODO: AIRepository has 11 methods, 4 features — split into 4 protocols
 protocol AIRepository {
     func extractTransactions(request: ExtractTransactionsRequest) async throws -> ExtractTransactionsResponse
     func analyzeSpending(request: AnalyzeSpendingRequest) async throws -> SpendingAnalysisResponse
@@ -110,4 +112,12 @@ protocol ExchangeRateRepository {
 
 protocol SearchRepository {
     func search(query: String) async throws -> SearchResponse
+}
+
+protocol NotificationRepository {
+    func getHistory() async throws -> [AppNotification]
+    func markAsRead(_ id: String) async throws
+    func markAllAsRead() async throws
+    func deleteAll() async throws
+    func sendTest() async throws
 }

@@ -62,12 +62,9 @@ struct Certificate: Codable, Identifiable, Equatable {
         case projectedPayment = "projected_payment"
     }
 
-    static func == (lhs: Certificate, rhs: Certificate) -> Bool {
-        lhs.id == rhs.id
-    }
 }
 
-struct ProjectedPayment: Codable {
+struct ProjectedPayment: Codable, Equatable {
     let grossInterest: Double
     let taxWithheld: Double
     let netInterest: Double

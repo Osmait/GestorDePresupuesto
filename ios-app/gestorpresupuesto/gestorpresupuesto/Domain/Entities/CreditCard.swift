@@ -24,16 +24,12 @@ struct CreditCard: Codable, Identifiable, Equatable {
         case updatedAt = "updated_at"
     }
 
-    static func == (lhs: CreditCard, rhs: CreditCard) -> Bool {
-        lhs.id == rhs.id
-    }
-
     var totalDebt: Double {
         balances.reduce(0) { $0 + $1.currentBalance }
     }
 }
 
-struct CardBalance: Codable, Identifiable {
+struct CardBalance: Codable, Identifiable, Equatable {
     let id: String
     let currency: String
     let currentBalance: Double

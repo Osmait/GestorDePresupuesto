@@ -1,5 +1,5 @@
 import Foundation
-import SwiftUI
+// TODO: Split into AI+Extraction, AI+Spending, AI+Reconciliation, AI+SavingsGoals
 
 enum DocumentType: String, Codable, CaseIterable {
     case receipt = "receipt"
@@ -76,7 +76,7 @@ struct ExtractData: Codable {
 }
 
 struct ExtractedTransaction: Codable, Identifiable {
-    let id: String?
+    let extractedId: String?
     let name: String
     let description: String?
     let amount: Double
@@ -84,8 +84,12 @@ struct ExtractedTransaction: Codable, Identifiable {
     let categoryId: String?
     let createdAt: Date?
 
+    var id: String { extractedId ?? UUID().uuidString }
+
     enum CodingKeys: String, CodingKey {
-        case id, name, description, amount
+        case extractedId = "id"
+        case name, description, amount
+        // NOTE: "type_transation" is a backend typo (missing 'c'). Must match API.
         case typeTransaction = "type_transation"
         case categoryId = "category_id"
         case createdAt = "created_at"
@@ -170,25 +174,6 @@ struct Pattern: Codable, Identifiable {
     let type: String
     let description: String
     let severity: String
-
-    var severityColor: Color {
-        switch severity.lowercased() {
-        case "high", "alert": return .app.error
-        case "medium", "warning": return .app.warning
-        case "low", "info": return .app.success
-        default: return .app.textSecondary
-        }
-    }
-
-    var icon: String {
-        switch type.lowercased() {
-        case "subscription": return "arrow.clockwise"
-        case "impulse": return "bolt"
-        case "frequency": return "chart.line.uptrend.xyaxis"
-        case "seasonal": return "calendar"
-        default: return "lightbulb"
-        }
-    }
 }
 
 struct Recommendation: Codable, Identifiable {
@@ -201,24 +186,6 @@ struct Recommendation: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case title, description, priority
         case potentialSavings = "potential_savings"
-    }
-
-    var priorityColor: Color {
-        switch priority.lowercased() {
-        case "high": return .app.error
-        case "medium": return .app.warning
-        case "low": return .app.success
-        default: return .app.textSecondary
-        }
-    }
-
-    var priorityIcon: String {
-        switch priority.lowercased() {
-        case "high": return "exclamationmark.3"
-        case "medium": return "exclamationmark.2"
-        case "low": return "exclamationmark"
-        default: return "info.circle"
-        }
     }
 }
 
