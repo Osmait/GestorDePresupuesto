@@ -14,7 +14,7 @@ class AuthRepositoryImpl: AuthRepository {
         let body = LoginRequest(email: email, password: password)
 
         let response: LoginResponse = try await apiClient.request(
-            Endpoint(path: endpoint.path, method: endpoint.method, body: try? JSONEncoder().encode(body))
+            Endpoint(path: endpoint.path, method: endpoint.method, body: try JSONEncoder().encode(body))
         )
 
         try tokenStorage.saveTokens(
@@ -36,7 +36,7 @@ class AuthRepositoryImpl: AuthRepository {
         let body = RegisterRequest(name: name, lastName: lastName, email: email, password: password)
 
         let user: User = try await apiClient.request(
-            Endpoint(path: endpoint.path, method: endpoint.method, body: try? JSONEncoder().encode(body))
+            Endpoint(path: endpoint.path, method: endpoint.method, body: try JSONEncoder().encode(body))
         )
 
         return user
@@ -69,13 +69,13 @@ class AccountRepositoryImpl: AccountRepository {
 
     func create(_ request: CreateAccountRequest) async throws -> Account {
         try await apiClient.request(
-            Endpoint(path: "/account", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/account", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func update(_ id: String, request: UpdateAccountRequest) async throws -> Account {
         try await apiClient.request(
-            Endpoint(path: "/account/\(id)", method: .PUT, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/account/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -134,13 +134,13 @@ class CategoryRepositoryImpl: CategoryRepository {
 
     func create(_ request: CreateCategoryRequest) async throws -> Category {
         try await apiClient.request(
-            Endpoint(path: "/category", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/category", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func update(_ id: String, request: UpdateCategoryRequest) async throws -> Category {
         try await apiClient.request(
-            Endpoint(path: "/category/\(id)", method: .PUT, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/category/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -162,13 +162,13 @@ class BudgetRepositoryImpl: BudgetRepository {
 
     func create(_ request: CreateBudgetRequest) async throws -> Budget {
         try await apiClient.request(
-            Endpoint(path: "/budget", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/budget", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func update(_ id: String, request: UpdateBudgetRequest) async throws -> Budget {
         try await apiClient.request(
-            Endpoint(path: "/budget/\(id)", method: .PUT, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/budget/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -210,13 +210,13 @@ class RecurringTransactionRepositoryImpl: RecurringTransactionRepository {
 
     func create(_ request: CreateRecurringTransactionRequest) async throws -> RecurringTransaction {
         try await apiClient.request(
-            Endpoint(path: "/recurring-transactions", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/recurring-transactions", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func update(_ id: String, request: UpdateRecurringTransactionRequest) async throws -> RecurringTransaction {
         try await apiClient.request(
-            Endpoint(path: "/recurring-transactions/\(id)", method: .PUT, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/recurring-transactions/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -234,7 +234,7 @@ class AIRepositoryImpl: AIRepository {
 
     func extractTransactions(request: ExtractTransactionsRequest) async throws -> ExtractTransactionsResponse {
         try await apiClient.request(
-            Endpoint(path: "/ai/extract/transactions", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/ai/extract/transactions", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -253,19 +253,19 @@ class AIRepositoryImpl: AIRepository {
 
     func suggestCategory(request: AISuggestCategoryRequest) async throws -> AISuggestCategoryResponse {
         try await apiClient.request(
-            Endpoint(path: "/ai/suggest-category", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/ai/suggest-category", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func reconcilePreview(request: AIReconciliationPreviewRequest) async throws -> AIReconciliationPreviewResponse {
         try await apiClient.request(
-            Endpoint(path: "/ai/reconcile/preview", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/ai/reconcile/preview", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func reconcileApply(sessionId: String, request: AIReconciliationApplyRequest) async throws -> AIReconciliationApplyResponse {
         try await apiClient.request(
-            Endpoint(path: "/ai/reconcile/\(sessionId)/apply", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/ai/reconcile/\(sessionId)/apply", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -275,13 +275,13 @@ class AIRepositoryImpl: AIRepository {
 
     func createSavingsGoal(request: AICreateSavingsGoalRequest) async throws -> AISavingsGoalResponse {
         try await apiClient.request(
-            Endpoint(path: "/ai/goals", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/ai/goals", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func updateSavingsGoal(id: String, request: AIUpdateSavingsGoalRequest) async throws -> AISavingsGoalResponse {
         try await apiClient.request(
-            Endpoint(path: "/ai/goals/\(id)", method: .PATCH, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/ai/goals/\(id)", method: .PATCH, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -295,7 +295,7 @@ class AIRepositoryImpl: AIRepository {
 
     func generateSavingsPlan(request: AISavingsPlanRequest) async throws -> AISavingsPlanResponse {
         try await apiClient.request(
-            Endpoint(path: "/ai/goals/savings-plan", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/ai/goals/savings-plan", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 }
@@ -319,13 +319,13 @@ class CreditCardRepositoryImpl: CreditCardRepository {
 
     func create(_ request: CreateCreditCardRequest) async throws -> CreditCard {
         try await apiClient.request(
-            Endpoint(path: "/credit-cards", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/credit-cards", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func update(_ id: String, request: UpdateCreditCardRequest) async throws -> CreditCard {
         try await apiClient.request(
-            Endpoint(path: "/credit-cards/\(id)", method: .PUT, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/credit-cards/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -343,7 +343,7 @@ class CreditCardRepositoryImpl: CreditCardRepository {
 
     func createPayment(cardId: String, request: CreateCardPaymentRequest) async throws -> CardPayment {
         try await apiClient.request(
-            Endpoint(path: "/credit-cards/\(cardId)/payments", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/credit-cards/\(cardId)/payments", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 }
@@ -367,13 +367,13 @@ class LoanRepositoryImpl: LoanRepository {
 
     func create(_ request: CreateLoanRequest) async throws -> Loan {
         try await apiClient.request(
-            Endpoint(path: "/loan", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/loan", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func registerPayment(id: String, request: RegisterLoanPaymentRequest) async throws -> LoanPayment {
         try await apiClient.request(
-            Endpoint(path: "/loan/\(id)/payments", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/loan/\(id)/payments", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -401,13 +401,13 @@ class CertificateRepositoryImpl: CertificateRepository {
 
     func create(_ request: CreateCertificateRequest) async throws -> Certificate {
         try await apiClient.request(
-            Endpoint(path: "/certificate", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/certificate", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func update(_ id: String, request: UpdateCertificateRequest) async throws -> Certificate {
         try await apiClient.request(
-            Endpoint(path: "/certificate/\(id)", method: .PUT, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/certificate/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -417,7 +417,7 @@ class CertificateRepositoryImpl: CertificateRepository {
 
     func simulate(id: String, request: SimulatePaymentRequest) async throws -> SimulationResult {
         try await apiClient.request(
-            Endpoint(path: "/certificate/\(id)/simulate", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/certificate/\(id)/simulate", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -445,13 +445,13 @@ class InvestmentRepositoryImpl: InvestmentRepository {
 
     func create(_ request: CreateInvestmentRequest) async throws -> Investment {
         try await apiClient.request(
-            Endpoint(path: "/investments", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/investments", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
     func update(_ id: String, request: UpdateInvestmentRequest) async throws -> Investment {
         try await apiClient.request(
-            Endpoint(path: "/investments/\(id)", method: .PUT, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/investments/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -461,7 +461,7 @@ class InvestmentRepositoryImpl: InvestmentRepository {
 
     func fundBroker(_ request: FundBrokerRequest) async throws {
         try await apiClient.requestVoid(
-            Endpoint(path: "/investments/funding", method: .POST, body: try? JSONEncoder().encode(request))
+            Endpoint(path: "/investments/funding", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
@@ -499,5 +499,36 @@ class SearchRepositoryImpl: SearchRepository {
 
     func search(query: String) async throws -> SearchResponse {
         try await apiClient.request(Endpoints.search(query: query))
+    }
+}
+
+// MARK: - Notification Repository
+
+class NotificationRepositoryImpl: NotificationRepository {
+    private let apiClient: APIClient
+
+    init(apiClient: APIClient = .shared) {
+        self.apiClient = apiClient
+    }
+
+    func getHistory() async throws -> [AppNotification] {
+        let result: [AppNotification]? = try await apiClient.request(Endpoints.notificationHistory())
+        return result ?? []
+    }
+
+    func markAsRead(_ id: String) async throws {
+        try await apiClient.requestVoid(Endpoints.markNotificationRead(id: id))
+    }
+
+    func markAllAsRead() async throws {
+        try await apiClient.requestVoid(Endpoints.markAllNotificationsRead())
+    }
+
+    func deleteAll() async throws {
+        try await apiClient.requestVoid(Endpoints.deleteAllNotifications())
+    }
+
+    func sendTest() async throws {
+        try await apiClient.requestVoid(Endpoints.testNotification())
     }
 }
