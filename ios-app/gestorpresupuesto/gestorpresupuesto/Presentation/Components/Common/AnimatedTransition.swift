@@ -27,28 +27,18 @@ extension View {
 
 // MARK: - Animated Number Counter
 
-struct AnimatedNumberText: View {
-    let value: Double
+struct AnimatedNumberText: View, Animatable {
+    var animatableData: Double
+
     let format: (Double) -> String
-    @State private var displayedValue: Double = 0
 
     init(_ value: Double, format: @escaping (Double) -> String = { $0.currencyFormatted }) {
-        self.value = value
+        self.animatableData = value
         self.format = format
     }
 
     var body: some View {
-        Text(format(displayedValue))
-            .onAppear {
-                withAnimation(.easeOut(duration: 0.8)) {
-                    displayedValue = value
-                }
-            }
-            .onChange(of: value) { _, newValue in
-                withAnimation(.easeOut(duration: 0.5)) {
-                    displayedValue = newValue
-                }
-            }
+        Text(format(animatableData))
     }
 }
 

@@ -3,24 +3,25 @@ import SwiftUI
 struct ErrorBanner: View {
     let message: String
     let onDismiss: () -> Void
-    
+
     @State private var offset: CGFloat = -100
     @State private var opacity: Double = 0
-    
+    @State private var dismissTask: Task<Void, Never>?
+
     var body: some View {
         HStack(spacing: .sm) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 18, weight: .medium))
                 .foregroundStyle(.white)
-            
+
             Text(message)
                 .font(.app(.subheadline))
                 .fontWeight(.medium)
                 .foregroundStyle(.white)
                 .lineLimit(2)
-            
+
             Spacer()
-            
+
             Button {
                 dismissWithAnimation()
             } label: {
@@ -28,6 +29,7 @@ struct ErrorBanner: View {
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.8))
             }
+            .accessibilityLabel("Cerrar error")
         }
         .padding(Spacing.md)
         .background(
@@ -46,23 +48,31 @@ struct ErrorBanner: View {
                 offset = 0
                 opacity = 1
             }
-            
+
             let generator = UINotificationFeedbackGenerator()
             generator.notificationOccurred(.error)
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
+
+            dismissTask = Task {
+                try? await Task.sleep(nanoseconds: 5_000_000_000)
+                guard !Task.isCancelled else { return }
                 dismissWithAnimation()
             }
         }
+        .onDisappear {
+            dismissTask?.cancel()
+        }
     }
-    
+
     private func dismissWithAnimation() {
+        dismissTask?.cancel()
         withAnimation(.easeOut(duration: 0.3)) {
             offset = -100
             opacity = 0
         }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+
+        Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
             onDismiss()
         }
     }
@@ -71,7 +81,7 @@ struct ErrorBanner: View {
 struct ErrorBannerModifier: ViewModifier {
     @Binding var isPresented: Bool
     let message: String
-    
+
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .top) {
@@ -96,11 +106,11 @@ extension View {
 #Preview {
     ZStack {
         Color.app.background.ignoresSafeArea()
-        
+
         VStack {
             ErrorBanner(message: "Error de conexión. Verifica tu conexión a internet.") {}
                 .padding()
-            
+
             Spacer()
         }
     }

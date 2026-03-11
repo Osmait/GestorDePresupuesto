@@ -5,7 +5,7 @@ enum ToastType {
     case error
     case warning
     case info
-    
+
     var icon: String {
         switch self {
         case .success: return "checkmark.circle.fill"
@@ -14,7 +14,7 @@ enum ToastType {
         case .info: return "info.circle.fill"
         }
     }
-    
+
     var color: Color {
         switch self {
         case .success: return .app.success
@@ -23,7 +23,7 @@ enum ToastType {
         case .info: return .app.info
         }
     }
-    
+
     var backgroundColor: Color {
         switch self {
         case .success: return Color.app.success.opacity(0.15)
@@ -38,23 +38,24 @@ struct ToastView: View {
     let type: ToastType
     let message: String
     let onDismiss: () -> Void
-    
+
     @State private var offset: CGFloat = 100
     @State private var opacity: Double = 0
-    
+    @State private var dismissTask: Task<Void, Never>?
+
     var body: some View {
         HStack(spacing: .sm) {
             Image(systemName: type.icon)
                 .font(.system(size: 20, weight: .medium))
                 .foregroundStyle(type.color)
-            
+
             Text(message)
                 .font(.app(.subheadline))
                 .foregroundStyle(Color.app.textPrimary)
                 .lineLimit(2)
-            
+
             Spacer()
-            
+
             Button {
                 dismissWithAnimation()
             } label: {
@@ -62,6 +63,7 @@ struct ToastView: View {
                     .font(.caption)
                     .foregroundStyle(Color.app.textTertiary)
             }
+            .accessibilityLabel("Cerrar notificación")
         }
         .padding(Spacing.md)
         .background(
@@ -80,20 +82,28 @@ struct ToastView: View {
                 offset = 0
                 opacity = 1
             }
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+
+            dismissTask = Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                guard !Task.isCancelled else { return }
                 dismissWithAnimation()
             }
         }
+        .onDisappear {
+            dismissTask?.cancel()
+        }
     }
-    
+
     private func dismissWithAnimation() {
+        dismissTask?.cancel()
         withAnimation(.easeOut(duration: 0.3)) {
             offset = 100
             opacity = 0
         }
-        
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+
+        Task {
+            try? await Task.sleep(nanoseconds: 300_000_000)
+            guard !Task.isCancelled else { return }
             onDismiss()
         }
     }
@@ -103,7 +113,7 @@ struct ToastModifier: ViewModifier {
     @Binding var isPresented: Bool
     let type: ToastType
     let message: String
-    
+
     func body(content: Content) -> some View {
         content
             .overlay(alignment: .bottom) {
@@ -128,7 +138,7 @@ extension View {
 #Preview {
     ZStack {
         Color.app.background.ignoresSafeArea()
-        
+
         VStack(spacing: 20) {
             ToastView(type: .success, message: "Guardado exitosamente") {}
             ToastView(type: .error, message: "Error al guardar los datos") {}
