@@ -35,6 +35,7 @@ class InvestmentsViewModel: BaseViewModel {
 
     func loadInvestments() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -48,8 +49,6 @@ class InvestmentsViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func createInvestment(request: CreateInvestmentRequest) async throws -> Investment {

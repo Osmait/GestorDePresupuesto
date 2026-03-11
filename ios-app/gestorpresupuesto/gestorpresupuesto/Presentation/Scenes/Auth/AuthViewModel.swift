@@ -49,6 +49,7 @@ class AuthViewModel: BaseViewModel {
 
     func login(email: String, password: String) async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -62,38 +63,36 @@ class AuthViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func register(name: String, lastName: String, email: String, password: String) async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
-            let _ = try await authRepository.register(name: name, lastName: lastName, email: email, password: password)
+            _ = try await authRepository.register(name: name, lastName: lastName, email: email, password: password)
             await login(email: email, password: password)
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func logout() async {
         isLoading = true
+        defer { isLoading = false }
 
         do {
             try await authRepository.logout()
         } catch {
+            #if DEBUG
             print("Logout error: \(error)")
+            #endif
         }
 
-        await CacheManager.shared.invalidateAll()
         isAuthenticated = false
         requiresBiometricUnlock = false
         user = nil
-        isLoading = false
     }
 
     // MARK: - Biometric Auth
@@ -151,7 +150,9 @@ class AuthViewModel: BaseViewModel {
         do {
             user = try await authRepository.getProfile()
         } catch {
+            #if DEBUG
             print("Error fetching profile: \(error)")
+            #endif
         }
     }
 }

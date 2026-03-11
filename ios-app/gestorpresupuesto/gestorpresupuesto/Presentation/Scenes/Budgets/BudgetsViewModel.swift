@@ -13,6 +13,7 @@ class BudgetsViewModel: BaseViewModel {
 
     func loadBudgets() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -20,8 +21,6 @@ class BudgetsViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func createBudget(request: CreateBudgetRequest) async throws -> Budget {

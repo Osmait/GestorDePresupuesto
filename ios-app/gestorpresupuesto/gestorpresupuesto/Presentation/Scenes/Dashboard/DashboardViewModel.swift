@@ -1,6 +1,7 @@
 import Foundation
 import Combine
 
+// TODO: DashboardViewModel is a God Object — consider splitting by feature area
 @MainActor
 class DashboardViewModel: BaseViewModel {
     @Published var accounts: [AccountResponse] = []
@@ -39,6 +40,7 @@ class DashboardViewModel: BaseViewModel {
 
     func loadAll() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         // Try dashboard summary first, fall back to individual calls
@@ -54,8 +56,6 @@ class DashboardViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     private func loadDashboardSummary() async {

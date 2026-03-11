@@ -23,6 +23,7 @@ class CertificatesViewModel: BaseViewModel {
 
     func loadCertificates() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -36,8 +37,6 @@ class CertificatesViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func loadCertificateDetail(_ id: String) async {

@@ -1,6 +1,7 @@
 import SwiftUI
 import Combine
 
+// TODO: Extract generic CRUDViewModel<T> to eliminate ~300 duplicated lines across ViewModels
 @MainActor
 class BaseViewModel: ObservableObject {
     @Published var isLoading = false
@@ -34,5 +35,12 @@ class BaseViewModel: ObservableObject {
     func clearError() {
         error = nil
         showErrorBanner = false
+    }
+
+    // FIXME: error/errorBanner/toast state should be consolidated
+    func performLoading<T>(_ operation: () async throws -> T) async rethrows -> T {
+        isLoading = true
+        defer { isLoading = false }
+        return try await operation()
     }
 }

@@ -13,6 +13,7 @@ class CategoriesViewModel: BaseViewModel {
 
     func loadCategories() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -20,8 +21,6 @@ class CategoriesViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func createCategory(request: CreateCategoryRequest) async throws -> Category {

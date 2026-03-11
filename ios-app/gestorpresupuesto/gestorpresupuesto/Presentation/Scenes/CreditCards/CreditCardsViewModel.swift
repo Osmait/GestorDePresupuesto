@@ -22,6 +22,7 @@ class CreditCardsViewModel: BaseViewModel {
 
     func loadCreditCards() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -35,8 +36,6 @@ class CreditCardsViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func createCreditCard(request: CreateCreditCardRequest) async throws -> CreditCard {

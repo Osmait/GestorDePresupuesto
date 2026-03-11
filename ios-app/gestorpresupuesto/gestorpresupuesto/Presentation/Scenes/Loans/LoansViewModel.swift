@@ -22,6 +22,7 @@ class LoansViewModel: BaseViewModel {
 
     func loadLoans() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -35,8 +36,6 @@ class LoansViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func loadLoanDetails(_ id: String) async {

@@ -16,6 +16,7 @@ class AnalyticsViewModel: BaseViewModel {
 
     func loadAnalytics() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         let formatter = DateFormatter()
@@ -33,7 +34,5 @@ class AnalyticsViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 }

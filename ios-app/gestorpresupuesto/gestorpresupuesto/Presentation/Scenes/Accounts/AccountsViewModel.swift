@@ -13,6 +13,7 @@ class AccountsViewModel: BaseViewModel {
 
     func loadAccounts() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -20,8 +21,6 @@ class AccountsViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func createAccount(request: CreateAccountRequest) async throws -> Account {

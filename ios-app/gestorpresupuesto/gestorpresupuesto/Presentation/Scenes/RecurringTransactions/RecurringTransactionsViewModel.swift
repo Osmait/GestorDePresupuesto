@@ -13,6 +13,7 @@ class RecurringTransactionsViewModel: BaseViewModel {
 
     func loadRecurringTransactions() async {
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         do {
@@ -20,8 +21,6 @@ class RecurringTransactionsViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func createRecurringTransaction(request: CreateRecurringTransactionRequest) async throws -> RecurringTransaction {

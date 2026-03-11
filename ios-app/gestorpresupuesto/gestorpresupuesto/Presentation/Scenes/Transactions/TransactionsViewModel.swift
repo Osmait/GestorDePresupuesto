@@ -15,6 +15,7 @@ class TransactionsViewModel: BaseViewModel {
     @Published var amountMin: String = ""
     @Published var amountMax: String = ""
 
+    // TODO: accounts duplicated in 5 ViewModels — extract shared AccountsStore
     @Published var categories: [Category] = []
     @Published var accounts: [AccountResponse] = []
 
@@ -71,6 +72,7 @@ class TransactionsViewModel: BaseViewModel {
         guard !isLoading && hasMorePages else { return }
 
         isLoading = true
+        defer { isLoading = false }
         error = nil
 
         var filter = buildFilter()
@@ -84,8 +86,6 @@ class TransactionsViewModel: BaseViewModel {
         } catch {
             showError(error.localizedDescription)
         }
-
-        isLoading = false
     }
 
     func refresh() async {
