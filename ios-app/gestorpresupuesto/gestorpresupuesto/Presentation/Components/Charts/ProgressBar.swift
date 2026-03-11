@@ -6,7 +6,7 @@ struct GradientProgressBar: View {
     var showLabel: Bool = true
     var isCritical: Bool = false
     var isWarning: Bool = false
-    
+
     private var gradientColors: [Color] {
         if isCritical {
             return Color.app.gradientError
@@ -15,14 +15,14 @@ struct GradientProgressBar: View {
         }
         return Color.app.gradientSuccess
     }
-    
+
     var body: some View {
         VStack(spacing: .sm) {
             GeometryReader { geometry in
                 ZStack(alignment: .leading) {
                     RoundedRectangle(cornerRadius: height / 2)
                         .fill(Color.app.surfaceSecondary)
-                    
+
                     RoundedRectangle(cornerRadius: height / 2)
                         .fill(
                             LinearGradient(
@@ -36,15 +36,15 @@ struct GradientProgressBar: View {
                 }
             }
             .frame(height: height)
-            
+
             if showLabel {
                 HStack {
                     Text("\(Int(progress * 100))%")
                         .font(.caption2)
                         .foregroundStyle(Color.app.textSecondary)
-                    
+
                     Spacer()
-                    
+
                     if progress >= 1.0 {
                         Text("Excedido")
                             .font(.caption2)
@@ -57,6 +57,9 @@ struct GradientProgressBar: View {
                 }
             }
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Progreso")
+        .accessibilityValue("\(Int(progress * 100)) por ciento")
     }
 }
 
@@ -67,7 +70,7 @@ struct CircularProgressView: View {
     var showPercentage: Bool = true
     var isCritical: Bool = false
     var isWarning: Bool = false
-    
+
     private var gradientColors: [Color] {
         if isCritical {
             return Color.app.gradientError
@@ -76,12 +79,12 @@ struct CircularProgressView: View {
         }
         return Color.app.gradientSuccess
     }
-    
+
     var body: some View {
         ZStack {
             Circle()
                 .stroke(Color.app.surfaceSecondary, lineWidth: lineWidth)
-            
+
             Circle()
                 .trim(from: 0, to: min(progress, 1.0))
                 .stroke(
@@ -94,7 +97,7 @@ struct CircularProgressView: View {
                 )
                 .rotationEffect(.degrees(-90))
                 .animation(.spring(response: 0.6, dampingFraction: 0.7), value: progress)
-            
+
             if showPercentage {
                 VStack(spacing: 2) {
                     Text("\(Int(min(progress, 1.0) * 100))")
@@ -107,30 +110,33 @@ struct CircularProgressView: View {
             }
         }
         .frame(width: size, height: size)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("Progreso")
+        .accessibilityValue("\(Int(min(progress, 1.0) * 100)) por ciento")
     }
 }
 
 struct AnimatedBarChart: View {
     let data: [ChartData]
     var showLabels: Bool = true
-    
+
     @State private var animatedValues: [Double] = []
-    
+
     struct ChartData: Identifiable, Equatable {
         let id = UUID()
         let label: String
         let value: Double
         let color: Color
-        
+
         static func == (lhs: ChartData, rhs: ChartData) -> Bool {
             lhs.label == rhs.label && lhs.value == rhs.value
         }
     }
-    
+
     var maxValue: Double {
         data.map { abs($0.value) }.max() ?? 1
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .md) {
             ForEach(Array(data.enumerated()), id: \.element.id) { index, item in
@@ -142,12 +148,12 @@ struct AnimatedBarChart: View {
                             .frame(width: 80, alignment: .leading)
                             .lineLimit(1)
                     }
-                    
+
                     GeometryReader { geometry in
                         ZStack(alignment: .leading) {
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(Color.app.surfaceSecondary)
-                            
+
                             RoundedRectangle(cornerRadius: 4)
                                 .fill(
                                     LinearGradient(
@@ -156,13 +162,13 @@ struct AnimatedBarChart: View {
                                         endPoint: .trailing
                                     )
                                 )
-                                .frame(width: animatedValues.indices.contains(index) 
-                                    ? (abs(animatedValues[index]) / maxValue) * geometry.size.width 
+                                .frame(width: animatedValues.indices.contains(index)
+                                    ? (abs(animatedValues[index]) / maxValue) * geometry.size.width
                                     : 0)
                         }
                     }
                     .frame(height: 24)
-                    
+
                     Text(abs(item.value).currencyFormatted)
                         .font(.caption)
                         .foregroundStyle(Color.app.textPrimary)
@@ -177,10 +183,10 @@ struct AnimatedBarChart: View {
             animateBars()
         }
     }
-    
+
     private func animateBars() {
         animatedValues = Array(repeating: 0, count: data.count)
-        
+
         for (index, item) in data.enumerated() {
             DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.1) {
                 withAnimation(.spring(response: 0.5, dampingFraction: 0.7)) {
@@ -195,7 +201,7 @@ struct AnimatedBarChart: View {
 
 struct BudgetProgressCard: View {
     let budget: BudgetResponse
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.sm.rawValue) {
             HStack {
@@ -205,14 +211,14 @@ struct BudgetProgressCard: View {
                         .fontWeight(.medium)
                         .foregroundStyle(Color.app.textPrimary)
                         .lineLimit(1)
-                    
+
                     Text(budget.amount.currencyFormatted)
-                        .font(.system(size: 18, weight: .bold, design: .rounded))
+                        .font(.app(.headline))
                         .foregroundStyle(Color.app.textPrimary)
                 }
-                
+
                 Spacer()
-                
+
                 CircularProgressView(
                     progress: budget.progress,
                     lineWidth: 6,
@@ -222,7 +228,7 @@ struct BudgetProgressCard: View {
                     isWarning: budget.isWarning
                 )
             }
-            
+
             GradientProgressBar(
                 progress: budget.progress,
                 height: 6,
@@ -230,7 +236,7 @@ struct BudgetProgressCard: View {
                 isCritical: budget.isCritical,
                 isWarning: budget.isWarning
             )
-            
+
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Gastado")
@@ -241,9 +247,9 @@ struct BudgetProgressCard: View {
                         .fontWeight(.medium)
                         .foregroundStyle(Color.app.textSecondary)
                 }
-                
+
                 Spacer()
-                
+
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(budget.isOverBudget ? "Excedido" : "Disponible")
                         .font(.system(size: 10))
@@ -272,13 +278,13 @@ struct BudgetProgressCard: View {
 #Preview {
     ZStack {
         Color.app.background.ignoresSafeArea()
-        
+
         ScrollView {
             VStack(spacing: 24) {
                 GradientProgressBar(progress: 0.65, height: 12)
                 GradientProgressBar(progress: 0.85, height: 12, isWarning: true)
                 GradientProgressBar(progress: 1.1, height: 12, isCritical: true)
-                
+
                 HStack(spacing: 16) {
                     CircularProgressView(progress: 0.65, lineWidth: 8)
                     CircularProgressView(progress: 0.85, lineWidth: 8, isWarning: true)

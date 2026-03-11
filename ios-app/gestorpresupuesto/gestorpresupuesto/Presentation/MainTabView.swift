@@ -85,6 +85,8 @@ private let sidebarDisplayOrder: [SidebarItem] = [
 struct MainTabView: View {
     @StateObject private var authViewModel = AuthViewModel()
     @EnvironmentObject private var featureFlagManager: FeatureFlagManager
+    @EnvironmentObject private var notificationManager: NotificationManager
+    @EnvironmentObject private var networkMonitor: NetworkMonitor
     @AppStorage("isDarkMode") private var isDarkMode = false
     @State private var selectedItem: SidebarItem = .dashboard
     @State private var isSidebarOpen = false
@@ -100,7 +102,17 @@ struct MainTabView: View {
                 mainContent
                     .tint(Color.app.accent)
                     .task { await featureFlagManager.fetchFlags() }
+                    .task { notificationManager.start(networkMonitor: networkMonitor) }
                     .sheet(isPresented: $showSearch) { SearchView() }
+                    .sheet(isPresented: $notificationManager.showNotificationCenter) {
+                        NotificationCenterView()
+                            .environmentObject(notificationManager)
+                    }
+                    .notificationBanner(
+                        isPresented: $notificationManager.showBanner,
+                        event: notificationManager.bannerNotification,
+                        onTap: { notificationManager.showNotificationCenter = true }
+                    )
                     .biometricEnrollmentAlert(
                         isPresented: $authViewModel.showBiometricEnrollment,
                         biometricType: authViewModel.biometricType,
@@ -117,9 +129,15 @@ struct MainTabView: View {
 
     private var mainContent: some View {
         ZStack(alignment: .leading) {
-            // Content
-            detailView(for: selectedItem)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            // Content — keep all visible items alive to preserve scroll state
+            ZStack {
+                ForEach(visibleItems, id: \.self) { item in
+                    viewForItem(item)
+                        .opacity(selectedItem == item ? 1 : 0)
+                        .allowsHitTesting(selectedItem == item)
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
             // Dim overlay
             if isSidebarOpen {
@@ -160,6 +178,7 @@ struct MainTabView: View {
                 .background(.ultraThinMaterial, in: Circle())
                 .shadow(color: .black.opacity(0.12), radius: 4, y: 2)
         }
+        .accessibilityLabel("Menú de navegación")
         .padding(.leading, 16)
         .padding(.top, 6)
     }
@@ -248,6 +267,7 @@ struct MainTabView: View {
                 // Logout
                 Button {
                     closeSidebar()
+                    notificationManager.stop()
                     Task { await authViewModel.logout() }
                 } label: {
                     HStack(spacing: 12) {
@@ -310,6 +330,7 @@ struct MainTabView: View {
             )
         }
         .buttonStyle(.plain)
+        .accessibilityLabel(item.title)
     }
 
     // MARK: - Helpers
@@ -348,7 +369,7 @@ struct MainTabView: View {
     // MARK: - Detail View
 
     @ViewBuilder
-    private func detailView(for item: SidebarItem) -> some View {
+    private func viewForItem(_ item: SidebarItem) -> some View {
         switch item {
         case .dashboard:
             DashboardView()
@@ -389,4 +410,6 @@ struct MainTabView: View {
 #Preview {
     MainTabView()
         .environmentObject(FeatureFlagManager.shared)
+        .environmentObject(NotificationManager.shared)
+        .environmentObject(NetworkMonitor.shared)
 }
