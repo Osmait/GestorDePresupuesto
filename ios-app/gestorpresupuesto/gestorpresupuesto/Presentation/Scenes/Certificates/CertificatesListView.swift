@@ -3,6 +3,8 @@ import SwiftUI
 struct CertificatesListView: View {
     @StateObject private var viewModel = CertificatesViewModel()
     @State private var showAddCertificate = false
+    @State private var showDeleteConfirmation = false
+    @State private var certificateToDelete: Certificate?
 
     var body: some View {
         NavigationStack {
@@ -11,34 +13,46 @@ struct CertificatesListView: View {
 
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
-                        if let summary = viewModel.summary {
-                            HStack(spacing: Spacing.md.rawValue) {
-                                StatCard(
-                                    title: "Capital Total",
-                                    value: summary.totalCapital.currencyFormatted,
-                                    icon: "banknote.fill",
-                                    colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
-                                )
-                                StatCard(
-                                    title: "Interés Neto",
-                                    value: summary.totalNetInterest.currencyFormatted,
-                                    icon: "chart.line.uptrend.xyaxis",
-                                    colors: [Color.app.success, Color.app.success.opacity(0.7)]
-                                )
-                            }
-                        }
-
-                        if viewModel.certificates.isEmpty && !viewModel.isLoading {
-                            EmptyStateView(
-                                icon: "doc.plaintext",
-                                title: "Sin certificados",
-                                message: "Agrega tu primer certificado financiero"
-                            )
+                        if viewModel.certificates.isEmpty && viewModel.isLoading {
+                            CertificatesSkeleton()
                         } else {
-                            LazyVStack(spacing: Spacing.md.rawValue) {
-                                ForEach(viewModel.certificates) { cert in
-                                    NavigationLink(destination: CertificateDetailView(certificate: cert, viewModel: viewModel)) {
-                                        certificateRow(cert)
+                            if !viewModel.isLoading, let summary = viewModel.summary {
+                                VStack(spacing: Spacing.md.rawValue) {
+                                    StatCard(
+                                        title: "Capital Total",
+                                        value: summary.totalCapital.currencyFormatted,
+                                        icon: "banknote.fill",
+                                        colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
+                                    )
+                                    StatCard(
+                                        title: "Interés Neto",
+                                        value: summary.totalNetInterest.currencyFormatted,
+                                        icon: "chart.line.uptrend.xyaxis",
+                                        colors: [Color.app.success, Color.app.success.opacity(0.7)]
+                                    )
+                                }
+                            }
+
+                            if viewModel.certificates.isEmpty && !viewModel.isLoading {
+                                EmptyStateView(
+                                    icon: "doc.plaintext",
+                                    title: "Sin certificados",
+                                    message: "Agrega tu primer certificado financiero"
+                                )
+                            } else {
+                                LazyVStack(spacing: Spacing.md.rawValue) {
+                                    ForEach(viewModel.certificates) { cert in
+                                        NavigationLink(destination: CertificateDetailView(certificate: cert, viewModel: viewModel)) {
+                                            certificateRow(cert)
+                                        }
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                certificateToDelete = cert
+                                                showDeleteConfirmation = true
+                                            } label: {
+                                                Label("Eliminar", systemImage: "trash")
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -48,6 +62,7 @@ struct CertificatesListView: View {
                 }
             }
             .navigationTitle("Certificados")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showAddCertificate = true } label: {
@@ -62,6 +77,11 @@ struct CertificatesListView: View {
             .task { await viewModel.loadCertificates() }
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+            .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "certificado") {
+                if let cert = certificateToDelete {
+                    Task { await viewModel.deleteCertificate(cert.id) }
+                }
+            }
         }
     }
 

@@ -24,7 +24,7 @@ struct DashboardView: View {
                             Task { await viewModel.refresh() }
                         }
                     } else {
-                        VStack(spacing: .lg) {
+                        LazyVStack(spacing: .lg) {
                             BalanceStatCard(
                                 totalBalance: viewModel.totalBalance,
                                 income: viewModel.totalIncome,
@@ -93,6 +93,7 @@ struct DashboardView: View {
                 .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             }
             .navigationTitle("Dashboard")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showSearch = true } label: {
@@ -114,14 +115,14 @@ struct DashboardView: View {
 
 struct ExpensesByCategoryCard: View {
     let expenses: [CategoryExpense]
-    
+
     var body: some View {
         GlassCard(cornerRadius: .xl, padding: .lg) {
             VStack(alignment: .leading, spacing: .md) {
                 Text("Gastos por Categoría")
                     .font(.app(.headline))
                     .foregroundStyle(Color.app.textPrimary)
-                
+
                 Chart(expenses.prefix(5)) { expense in
                     BarMark(
                         x: .value("Monto", expense.totalAmount),
@@ -145,14 +146,14 @@ struct ExpensesByCategoryCard: View {
 
 struct BudgetsSection: View {
     let budgets: [BudgetResponse]
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .md) {
             Text("Presupuestos")
                 .font(.app(.headline))
                 .foregroundStyle(Color.app.textPrimary)
                 .padding(.horizontal)
-            
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: .md) {
                     ForEach(budgets.prefix(5)) { budget in
@@ -167,14 +168,14 @@ struct BudgetsSection: View {
 
 struct RecentTransactionsSection: View {
     let transactions: [Transaction]
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .md) {
             Text("Transacciones Recientes")
                 .font(.app(.headline))
                 .foregroundStyle(Color.app.textPrimary)
                 .padding(.horizontal)
-            
+
             VStack(spacing: .sm) {
                 ForEach(transactions.prefix(5)) { transaction in
                     TransactionRow(transaction: transaction)
@@ -187,36 +188,36 @@ struct RecentTransactionsSection: View {
 
 struct TransactionRow: View {
     let transaction: Transaction
-    
+
     var body: some View {
         GlassCard(cornerRadius: .lg, padding: .md) {
             HStack(spacing: .md) {
                 ZStack {
                     Circle()
-                        .fill(transaction.isIncome 
+                        .fill(transaction.isIncome
                             ? Color.app.success.opacity(0.15)
                             : Color.app.error.opacity(0.15))
                         .frame(width: 44, height: 44)
-                    
+
                     Image(systemName: transaction.isIncome ? "arrow.up" : "arrow.down")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(transaction.isIncome ? Color.app.success : Color.app.error)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(transaction.name)
                         .font(.app(.subheadline))
                         .fontWeight(.medium)
                         .foregroundStyle(Color.app.textPrimary)
                         .lineLimit(1)
-                    
+
                     Text(transaction.createdAt.shortFormatted)
                         .font(.caption)
                         .foregroundStyle(Color.app.textTertiary)
                 }
-                
+
                 Spacer()
-                
+
                 Text((transaction.isIncome ? "+" : "-") + abs(transaction.amount).currencyFormatted)
                     .font(.app(.subheadline))
                     .fontWeight(.semibold)

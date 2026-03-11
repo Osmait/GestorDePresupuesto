@@ -11,6 +11,7 @@ struct AddInvestmentView: View {
     @State private var purchasePrice = ""
     @State private var currentPrice = ""
     @State private var settlementCurrency = "USD"
+    @State private var shakeTrigger = false
 
     private var isValid: Bool {
         name.isNotBlank && symbol.isNotBlank &&
@@ -33,15 +34,27 @@ struct AddInvestmentView: View {
                             icon: "chart.line.uptrend.xyaxis"
                         )
 
-                        FormField(title: "Nombre", icon: "textformat", placeholder: "Ej: Apple Inc.", text: $name)
-                        FormField(title: "Símbolo", icon: "number", placeholder: "Ej: AAPL", text: $symbol)
+                        FormField(title: "Nombre", icon: "textformat", placeholder: "Ej: Apple Inc.", text: $name, validation: { $0.isEmpty ? "El nombre es requerido" : nil })
+                        FormField(title: "Símbolo", icon: "number", placeholder: "Ej: AAPL", text: $symbol, validation: { $0.isEmpty ? "El símbolo es requerido" : nil })
 
                         HStack(spacing: Spacing.md.rawValue) {
-                            FormField(title: "Cantidad", icon: "number.circle", placeholder: "0", text: $quantity, keyboardType: .decimalPad)
-                            FormField(title: "Precio Compra", icon: "dollarsign.circle", placeholder: "0.00", text: $purchasePrice, keyboardType: .decimalPad)
+                            FormField(title: "Cantidad", icon: "number.circle", placeholder: "0", text: $quantity, keyboardType: .decimalPad, validation: { value in
+                                if value.isEmpty { return "Requerido" }
+                                if Double(value) == nil { return "Número inválido" }
+                                return nil
+                            })
+                            FormField(title: "Precio Compra", icon: "dollarsign.circle", placeholder: "0.00", text: $purchasePrice, keyboardType: .decimalPad, validation: { value in
+                                if value.isEmpty { return "Requerido" }
+                                if Double(value) == nil { return "Número inválido" }
+                                return nil
+                            })
                         }
 
-                        FormField(title: "Precio Actual", icon: "chart.line.uptrend.xyaxis", placeholder: "0.00", text: $currentPrice, keyboardType: .decimalPad)
+                        FormField(title: "Precio Actual", icon: "chart.line.uptrend.xyaxis", placeholder: "0.00", text: $currentPrice, keyboardType: .decimalPad, validation: { value in
+                            if value.isEmpty { return "Requerido" }
+                            if Double(value) == nil { return "Número inválido" }
+                            return nil
+                        })
 
                         DropdownPicker(
                             title: "Moneda de liquidación",
@@ -53,6 +66,7 @@ struct AddInvestmentView: View {
                     }
                     .padding(Spacing.lg.rawValue)
                 }
+                .shake(trigger: shakeTrigger)
             }
             .navigationTitle("Nueva Inversión")
             .navigationBarTitleDisplayMode(.inline)
@@ -87,6 +101,10 @@ struct AddInvestmentView: View {
             _ = try await viewModel.createInvestment(request: request)
             dismiss()
         } catch {
+            shakeTrigger = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                shakeTrigger = true
+            }
             viewModel.showError(error.localizedDescription)
         }
     }

@@ -13,6 +13,7 @@ struct AddLoanView: View {
     @State private var termMonths = ""
     @State private var selectedAccountId = ""
     @State private var notes = ""
+    @State private var shakeTrigger = false
 
     private var isValid: Bool {
         borrowerName.isNotBlank &&
@@ -28,7 +29,7 @@ struct AddLoanView: View {
 
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
-                        FormField(title: "Nombre del prestatario", icon: "person", placeholder: "Nombre completo", text: $borrowerName)
+                        FormField(title: "Nombre del prestatario", icon: "person", placeholder: "Nombre completo", text: $borrowerName, validation: { $0.isEmpty ? "El nombre es requerido" : nil })
                         FormField(title: "Contacto", icon: "phone", placeholder: "Teléfono o email (opcional)", text: $borrowerContact)
 
                         CurrencyField(title: "Monto del préstamo", amount: $principalAmount, currency: $currency)
@@ -45,7 +46,11 @@ struct AddLoanView: View {
                             FormField(title: "Tasa anual (%)", icon: "percent", placeholder: "0.00", text: $annualRate, keyboardType: .decimalPad)
                         }
 
-                        FormField(title: "Plazo (meses)", icon: "calendar", placeholder: "12", text: $termMonths, keyboardType: .numberPad)
+                        FormField(title: "Plazo (meses)", icon: "calendar", placeholder: "12", text: $termMonths, keyboardType: .numberPad, validation: { value in
+                            if value.isEmpty { return "Requerido" }
+                            if Int(value) == nil { return "Número inválido" }
+                            return nil
+                        })
 
                         if !viewModel.accounts.isEmpty {
                             DropdownPicker(
@@ -63,6 +68,7 @@ struct AddLoanView: View {
                     }
                     .padding(Spacing.lg.rawValue)
                 }
+                .shake(trigger: shakeTrigger)
             }
             .navigationTitle("Nuevo Préstamo")
             .navigationBarTitleDisplayMode(.inline)
@@ -99,6 +105,10 @@ struct AddLoanView: View {
             _ = try await viewModel.createLoan(request: request)
             dismiss()
         } catch {
+            shakeTrigger = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                shakeTrigger = true
+            }
             viewModel.showError(error.localizedDescription)
         }
     }

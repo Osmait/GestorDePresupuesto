@@ -4,6 +4,8 @@ struct InvestmentsListView: View {
     @StateObject private var viewModel = InvestmentsViewModel()
     @State private var showAddInvestment = false
     @State private var showFundBroker = false
+    @State private var showDeleteConfirmation = false
+    @State private var investmentToDelete: Investment?
 
     var body: some View {
         NavigationStack {
@@ -12,71 +14,86 @@ struct InvestmentsListView: View {
 
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
-                        // Portfolio Summary
-                        HStack(spacing: Spacing.md.rawValue) {
-                            StatCard(
-                                title: "Valor Total",
-                                value: viewModel.totalPortfolioValue.currencyFormatted,
-                                icon: "chart.pie.fill",
-                                colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
-                            )
+                        if viewModel.investments.isEmpty && viewModel.isLoading {
+                            InvestmentsSkeleton()
+                        } else {
+                            // Portfolio Summary
+                            if !viewModel.investments.isEmpty {
+                                VStack(spacing: Spacing.md.rawValue) {
+                                    StatCard(
+                                        title: "Valor Total",
+                                        value: viewModel.totalPortfolioValue.currencyFormatted,
+                                        icon: "chart.pie.fill",
+                                        colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
+                                    )
 
-                            StatCard(
-                                title: "Ganancia/Pérdida",
-                                value: viewModel.totalGainLoss.currencyFormatted,
-                                icon: viewModel.totalGainLoss >= 0 ? "arrow.up.right" : "arrow.down.right",
-                                colors: viewModel.totalGainLoss >= 0
-                                    ? [Color.app.success, Color.app.success.opacity(0.7)]
-                                    : [Color.app.error, Color.app.error.opacity(0.7)]
-                            )
-                        }
+                                    StatCard(
+                                        title: "Ganancia/Pérdida",
+                                        value: viewModel.totalGainLoss.currencyFormatted,
+                                        icon: viewModel.totalGainLoss >= 0 ? "arrow.up.right" : "arrow.down.right",
+                                        colors: viewModel.totalGainLoss >= 0
+                                            ? [Color.app.success, Color.app.success.opacity(0.7)]
+                                            : [Color.app.error, Color.app.error.opacity(0.7)],
+                                        trend: viewModel.totalGainLoss >= 0 ? .up : .down
+                                    )
+                                }
+                            }
 
-                        // Funding Balances
-                        if !viewModel.fundingBalances.isEmpty {
-                            SurfaceCard {
-                                VStack(alignment: .leading, spacing: Spacing.sm.rawValue) {
-                                    Text("Saldos de fondeo")
-                                        .font(.app(.subheadline))
-                                        .fontWeight(.medium)
-                                    ForEach(viewModel.fundingBalances, id: \.currency) { balance in
-                                        HStack {
-                                            Text(balance.currency)
-                                                .font(.app(.caption))
-                                            Spacer()
-                                            Text(balance.available.currencyFormatted)
-                                                .font(.app(.subheadline))
-                                                .fontWeight(.semibold)
+                            // Funding Balances
+                            if !viewModel.fundingBalances.isEmpty {
+                                SurfaceCard {
+                                    VStack(alignment: .leading, spacing: Spacing.sm.rawValue) {
+                                        Text("Saldos de fondeo")
+                                            .font(.app(.subheadline))
+                                            .fontWeight(.medium)
+                                        ForEach(viewModel.fundingBalances, id: \.currency) { balance in
+                                            HStack {
+                                                Text(balance.currency)
+                                                    .font(.app(.caption))
+                                                Spacer()
+                                                Text(balance.available.currencyFormatted)
+                                                    .font(.app(.subheadline))
+                                                    .fontWeight(.semibold)
+                                            }
                                         }
                                     }
                                 }
                             }
-                        }
 
-                        // Type Filter
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: Spacing.sm.rawValue) {
-                                filterChip("Todos", isSelected: viewModel.selectedTypeFilter == nil) {
-                                    viewModel.selectedTypeFilter = nil
-                                }
-                                ForEach(InvestmentType.allCases, id: \.self) { type in
-                                    filterChip(type.displayName, isSelected: viewModel.selectedTypeFilter == type) {
-                                        viewModel.selectedTypeFilter = type
+                            // Type Filter
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: Spacing.sm.rawValue) {
+                                    filterChip("Todos", isSelected: viewModel.selectedTypeFilter == nil) {
+                                        viewModel.selectedTypeFilter = nil
+                                    }
+                                    ForEach(InvestmentType.allCases, id: \.self) { type in
+                                        filterChip(type.displayName, isSelected: viewModel.selectedTypeFilter == type) {
+                                            viewModel.selectedTypeFilter = type
+                                        }
                                     }
                                 }
                             }
-                        }
 
-                        if viewModel.filteredInvestments.isEmpty && !viewModel.isLoading {
-                            EmptyStateView(
-                                icon: "chart.line.uptrend.xyaxis",
-                                title: "Sin inversiones",
-                                message: "Agrega tu primera inversión"
-                            )
-                        } else {
-                            LazyVStack(spacing: Spacing.md.rawValue) {
-                                ForEach(viewModel.filteredInvestments) { investment in
-                                    NavigationLink(destination: InvestmentDetailView(investment: investment, viewModel: viewModel)) {
-                                        investmentRow(investment)
+                            if viewModel.filteredInvestments.isEmpty && !viewModel.isLoading {
+                                EmptyStateView(
+                                    icon: "chart.line.uptrend.xyaxis",
+                                    title: "Sin inversiones",
+                                    message: "Agrega tu primera inversión"
+                                )
+                            } else {
+                                LazyVStack(spacing: Spacing.md.rawValue) {
+                                    ForEach(viewModel.filteredInvestments) { investment in
+                                        NavigationLink(destination: InvestmentDetailView(investment: investment, viewModel: viewModel)) {
+                                            investmentRow(investment)
+                                        }
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                investmentToDelete = investment
+                                                showDeleteConfirmation = true
+                                            } label: {
+                                                Label("Eliminar", systemImage: "trash")
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -86,6 +103,7 @@ struct InvestmentsListView: View {
                 }
             }
             .navigationTitle("Inversiones")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
@@ -110,14 +128,19 @@ struct InvestmentsListView: View {
             .task { await viewModel.loadInvestments() }
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+            .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "inversión") {
+                if let investment = investmentToDelete {
+                    Task { await viewModel.deleteInvestment(investment.id) }
+                }
+            }
         }
     }
 
     private func filterChip(_ title: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        Button(action: {
+        Button {
             action()
             HapticManager.shared.selection()
-        }) {
+        } label: {
             Text(title)
                 .font(.app(.caption))
                 .fontWeight(isSelected ? .semibold : .regular)

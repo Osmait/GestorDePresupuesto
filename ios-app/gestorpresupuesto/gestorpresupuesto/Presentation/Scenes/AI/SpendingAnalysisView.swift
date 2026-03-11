@@ -21,6 +21,18 @@ struct SpendingAnalysisView: View {
                             Task { await viewModel.analyze() }
                         }
 
+                        if viewModel.isLoading {
+                            VStack(spacing: Spacing.md.rawValue) {
+                                ForEach(0..<3, id: \.self) { _ in CardSkeleton() }
+                            }
+                        } else if viewModel.insights == nil && !viewModel.isLoading {
+                            EmptyStateView(
+                                icon: "brain.head.profile",
+                                title: "Analiza tus gastos",
+                                message: "Selecciona un rango de fechas y presiona Analizar para obtener insights de IA sobre tus finanzas."
+                            )
+                        }
+
                         if let insights = viewModel.insights {
                             // Summary
                             SurfaceCard {
@@ -121,7 +133,9 @@ struct SpendingAnalysisView: View {
                 }
             }
             .navigationTitle("Análisis de Gastos")
+            .notificationToolbar()
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
+            .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
         }
     }
 }

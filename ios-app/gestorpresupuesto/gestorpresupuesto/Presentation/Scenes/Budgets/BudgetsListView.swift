@@ -3,12 +3,14 @@ import SwiftUI
 struct BudgetsListView: View {
     @StateObject private var viewModel = BudgetsViewModel()
     @State private var showingAddBudget = false
-    
+    @State private var showDeleteConfirmation = false
+    @State private var budgetToDelete: BudgetResponse?
+
     var body: some View {
         NavigationStack {
             ZStack {
             Color.app.background.ignoresSafeArea()
-            
+
             Group {
                 if viewModel.budgets.isEmpty && viewModel.isLoading {
                     VStack(spacing: .md) {
@@ -31,7 +33,8 @@ struct BudgetsListView: View {
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
-                                        Task { await viewModel.deleteBudget(budget.id) }
+                                        budgetToDelete = budget
+                                        showDeleteConfirmation = true
                                     } label: {
                                         Label("Eliminar", systemImage: "trash")
                                     }
@@ -47,6 +50,7 @@ struct BudgetsListView: View {
             }
         }
         .navigationTitle("Presupuestos")
+        .notificationToolbar()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 IconButton("plus") {
@@ -64,13 +68,18 @@ struct BudgetsListView: View {
         }
         .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
         .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+        .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "presupuesto") {
+            if let budget = budgetToDelete {
+                Task { await viewModel.deleteBudget(budget.id) }
+            }
+        }
         }
     }
 }
 
 struct BudgetRowView: View {
     let budget: BudgetResponse
-    
+
     var body: some View {
         GlassCard(cornerRadius: .lg, padding: .lg) {
             VStack(spacing: .md) {
@@ -79,26 +88,26 @@ struct BudgetRowView: View {
                         Text("Presupuesto")
                             .font(.caption)
                             .foregroundStyle(Color.app.textSecondary)
-                        
+
                         Text(budget.amount.currencyFormatted)
                             .font(.app(.title3))
                             .fontWeight(.bold)
                             .foregroundStyle(Color.app.textPrimary)
                     }
-                    
+
                     Spacer()
-                    
+
                     VStack(alignment: .trailing, spacing: 2) {
                         Text("Gastado")
                             .font(.caption)
                             .foregroundStyle(Color.app.textSecondary)
-                        
+
                         Text(budget.spent.currencyFormatted)
                             .font(.app(.headline))
                             .foregroundStyle(budget.isOverBudget ? Color.app.error : Color.app.textPrimary)
                     }
                 }
-                
+
                 GradientProgressBar(
                     progress: budget.progress,
                     height: 10,
@@ -106,14 +115,14 @@ struct BudgetRowView: View {
                     isCritical: budget.isCritical,
                     isWarning: budget.isWarning
                 )
-                
+
                 HStack {
                     Text("\(budget.percentageUsed)% usado")
                         .font(.caption)
                         .foregroundStyle(Color.app.textTertiary)
-                    
+
                     Spacer()
-                    
+
                     if budget.isOverBudget {
                         Text("Excedido por \(abs(budget.remaining).currencyFormatted)")
                             .font(.caption)
@@ -132,29 +141,29 @@ struct BudgetRowView: View {
 struct AddBudgetView: View {
     @ObservedObject var viewModel: BudgetsViewModel
     @Binding var isPresented: Bool
-    
+
     @State private var amount = ""
     @State private var selectedCategoryId = ""
     @State private var isLoading = false
-    @State private var shakeOffset: CGFloat = 0
-    
+    @State private var shakeTrigger = false
+
     @StateObject private var categoriesViewModel = CategoriesViewModel()
-    
+
     private var isValid: Bool {
         Double(amount) != nil && Double(amount)! > 0 && !selectedCategoryId.isEmpty
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.app.background.ignoresSafeArea()
-                
+
                 GlassCard(cornerRadius: .xl, padding: .lg) {
                     VStack(spacing: .md) {
                         Text("Nuevo Presupuesto")
                             .font(.app(.title3))
                             .foregroundStyle(Color.app.textPrimary)
-                        
+
                         VStack(spacing: .sm) {
                             FormField(
                                 icon: "dollarsign",
@@ -170,7 +179,7 @@ struct AddBudgetView: View {
                                     return nil
                                 }
                             )
-                            
+
                             if categoriesViewModel.categories.isEmpty && !categoriesViewModel.isLoading {
                                 HStack {
                                     Image(systemName: "exclamationmark.triangle")
@@ -208,12 +217,12 @@ struct AddBudgetView: View {
                                 }
                             }
                         }
-                        
+
                         HStack(spacing: .md) {
                             SecondaryButton("Cancelar") {
                                 isPresented = false
                             }
-                            
+
                             PrimaryButton(
                                 "Guardar",
                                 isLoading: isLoading
@@ -225,7 +234,7 @@ struct AddBudgetView: View {
                     }
                 }
                 .padding()
-                .offset(x: shakeOffset)
+                .shake(trigger: shakeTrigger)
                 .task {
                     await categoriesViewModel.loadCategories()
                 }
@@ -233,41 +242,27 @@ struct AddBudgetView: View {
             .navigationBarTitleDisplayMode(.inline)
         }
     }
-    
+
     private func saveBudget() async {
         guard let amountValue = Double(amount) else { return }
-        
+
         isLoading = true
-        
+
         let request = CreateBudgetRequest(
             categoryId: selectedCategoryId,
             amount: amountValue
         )
-        
+
         do {
             _ = try await viewModel.createBudget(request: request)
             isPresented = false
         } catch {
-            withAnimation(.default) {
-                shakeOffset = -10
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.default) {
-                    shakeOffset = 10
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                withAnimation(.default) {
-                    shakeOffset = -5
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.default) {
-                    shakeOffset = 0
-                }
+            shakeTrigger = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                shakeTrigger = true
             }
         }
-        
+
         isLoading = false
     }
 }

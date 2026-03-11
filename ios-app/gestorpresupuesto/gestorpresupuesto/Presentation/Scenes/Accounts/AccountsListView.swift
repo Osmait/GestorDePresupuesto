@@ -3,6 +3,8 @@ import SwiftUI
 struct AccountsListView: View {
     @StateObject private var viewModel = AccountsViewModel()
     @State private var showingAddAccount = false
+    @State private var showDeleteConfirmation = false
+    @State private var accountToDelete: AccountResponse?
 
     private var totalBalance: Double {
         viewModel.accounts.reduce(0) { $0 + $1.currentBalance }
@@ -40,7 +42,8 @@ struct AccountsListView: View {
                                         accountCard(account, index: index)
                                             .contextMenu {
                                                 Button(role: .destructive) {
-                                                    Task { await viewModel.deleteAccount(account.accountInfo.id) }
+                                                    accountToDelete = account
+                                                    showDeleteConfirmation = true
                                                 } label: {
                                                     Label("Eliminar", systemImage: "trash")
                                                 }
@@ -58,6 +61,7 @@ struct AccountsListView: View {
                 }
             }
             .navigationTitle("Cuentas")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingAddAccount = true } label: {
@@ -82,6 +86,11 @@ struct AccountsListView: View {
             }
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+            .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "cuenta") {
+                if let account = accountToDelete {
+                    Task { await viewModel.deleteAccount(account.accountInfo.id) }
+                }
+            }
         }
     }
 
@@ -184,7 +193,7 @@ struct AccountsListView: View {
             ("building.columns.fill", .indigo),
             ("banknote.fill", .teal),
             ("wallet.bifold.fill", .mint),
-            ("chart.bar.fill", .cyan),
+            ("chart.bar.fill", .cyan)
         ]
         return icons[index % icons.count]
     }

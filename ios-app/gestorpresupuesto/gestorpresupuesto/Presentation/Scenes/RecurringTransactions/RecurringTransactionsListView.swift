@@ -3,12 +3,14 @@ import SwiftUI
 struct RecurringTransactionsListView: View {
     @StateObject private var viewModel = RecurringTransactionsViewModel()
     @State private var showingAddRecurring = false
-    @Environment(\.dismiss) private var dismiss
-    
+    @State private var showDeleteConfirmation = false
+    @State private var transactionToDelete: RecurringTransaction?
+
     var body: some View {
+        NavigationStack {
         ZStack {
             Color.app.background.ignoresSafeArea()
-            
+
             Group {
                 if viewModel.recurringTransactions.isEmpty && viewModel.isLoading {
                     VStack(spacing: .md) {
@@ -30,7 +32,7 @@ struct RecurringTransactionsListView: View {
                                 totalIncome: viewModel.totalIncome,
                                 totalBills: viewModel.totalBills
                             )
-                            
+
                             if !viewModel.incomeTransactions.isEmpty {
                                 RecurringSection(
                                     title: "Ingresos recurrentes",
@@ -38,10 +40,11 @@ struct RecurringTransactionsListView: View {
                                     color: .app.success,
                                     transactions: viewModel.incomeTransactions
                                 ) { transaction in
-                                    Task { await viewModel.deleteRecurringTransaction(transaction.id) }
+                                    transactionToDelete = transaction
+                                    showDeleteConfirmation = true
                                 }
                             }
-                            
+
                             if !viewModel.billTransactions.isEmpty {
                                 RecurringSection(
                                     title: "Gastos recurrentes",
@@ -49,7 +52,8 @@ struct RecurringTransactionsListView: View {
                                     color: .app.error,
                                     transactions: viewModel.billTransactions
                                 ) { transaction in
-                                    Task { await viewModel.deleteRecurringTransaction(transaction.id) }
+                                    transactionToDelete = transaction
+                                    showDeleteConfirmation = true
                                 }
                             }
                         }
@@ -62,14 +66,8 @@ struct RecurringTransactionsListView: View {
             }
         }
         .navigationTitle("Recurrentes")
-        .navigationBarTitleDisplayMode(.inline)
+        .notificationToolbar()
         .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                Button("Cerrar") {
-                    dismiss()
-                }
-                .foregroundStyle(Color.app.textSecondary)
-            }
             ToolbarItem(placement: .primaryAction) {
                 IconButton("plus") {
                     showingAddRecurring = true
@@ -86,13 +84,19 @@ struct RecurringTransactionsListView: View {
         }
         .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
         .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+        .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "transacción recurrente") {
+            if let transaction = transactionToDelete {
+                Task { await viewModel.deleteRecurringTransaction(transaction.id) }
+            }
+        }
+        } // NavigationStack
     }
 }
 
 struct SummaryCardsSection: View {
     let totalIncome: Double
     let totalBills: Double
-    
+
     var body: some View {
         HStack(spacing: .md) {
             StatCard(
@@ -101,7 +105,7 @@ struct SummaryCardsSection: View {
                 icon: "arrow.down.circle.fill",
                 colors: Color.app.gradientSuccess
             )
-            
+
             StatCard(
                 title: "Gastos",
                 value: totalBills.currencyFormatted,
@@ -118,7 +122,7 @@ struct RecurringSection: View {
     let color: Color
     let transactions: [RecurringTransaction]
     let onDelete: (RecurringTransaction) -> Void
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .sm) {
             HStack(spacing: .sm) {
@@ -129,7 +133,7 @@ struct RecurringSection: View {
                     .foregroundStyle(Color.app.textPrimary)
             }
             .padding(.horizontal)
-            
+
             VStack(spacing: .sm) {
                 ForEach(transactions) { transaction in
                     RecurringTransactionRow(
@@ -147,7 +151,7 @@ struct RecurringTransactionRow: View {
     let transaction: RecurringTransaction
     let color: Color
     let onDelete: () -> Void
-    
+
     var body: some View {
         GlassCard(cornerRadius: .lg, padding: .md) {
             HStack(spacing: .md) {
@@ -155,31 +159,31 @@ struct RecurringTransactionRow: View {
                     Circle()
                         .fill(color.opacity(0.15))
                         .frame(width: 44, height: 44)
-                    
+
                     Image(systemName: transaction.isIncome ? "arrow.down" : "arrow.up")
                         .font(.system(size: 18, weight: .semibold))
                         .foregroundStyle(color)
                 }
-                
+
                 VStack(alignment: .leading, spacing: 2) {
                     Text(transaction.name)
                         .font(.app(.headline))
                         .foregroundStyle(Color.app.textPrimary)
-                    
+
                     if let days = transaction.daysUntilNextExecution {
                         Text("En \(days) días")
                             .font(.caption)
                             .foregroundStyle(Color.app.textSecondary)
                     }
                 }
-                
+
                 Spacer()
-                
+
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(transaction.amount.currencyFormatted)
                         .font(.app(.headline))
                         .foregroundStyle(color)
-                    
+
                     Text("Día \(transaction.dayOfMonth)")
                         .font(.caption2)
                         .foregroundStyle(Color.app.textTertiary)
@@ -197,7 +201,7 @@ struct RecurringTransactionRow: View {
 struct AddRecurringTransactionView: View {
     @ObservedObject var viewModel: RecurringTransactionsViewModel
     @Binding var isPresented: Bool
-    
+
     @State private var name = ""
     @State private var description = ""
     @State private var amount = ""
@@ -206,27 +210,27 @@ struct AddRecurringTransactionView: View {
     @State private var selectedCategoryId = ""
     @State private var dayOfMonth = 1
     @State private var isLoading = false
-    @State private var shakeOffset: CGFloat = 0
-    
+    @State private var shakeTrigger = false
+
     @StateObject private var accountsViewModel = AccountsViewModel()
     @StateObject private var categoriesViewModel = CategoriesViewModel()
-    
+
     private var isValid: Bool {
         !name.isEmpty && Double(amount) != nil && Double(amount)! > 0 && !selectedAccountId.isEmpty && !selectedCategoryId.isEmpty && dayOfMonth >= 1 && dayOfMonth <= 31
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.app.background.ignoresSafeArea()
-                
+
                 ScrollView {
                     GlassCard(cornerRadius: .xl, padding: .lg) {
                         VStack(spacing: .md) {
                             Text("Nueva Transacción Recurrente")
                                 .font(.app(.title3))
                                 .foregroundStyle(Color.app.textPrimary)
-                            
+
                             VStack(spacing: .sm) {
                                 FormField(
                                     icon: "tag",
@@ -236,13 +240,13 @@ struct AddRecurringTransactionView: View {
                                         value.isEmpty ? "El nombre es requerido" : nil
                                     }
                                 )
-                                
+
                                 FormField(
                                     icon: "text.alignleft",
                                     placeholder: "Descripción (opcional)",
                                     text: $description
                                 )
-                                
+
                                 FormField(
                                     icon: "dollarsign",
                                     placeholder: "Monto",
@@ -257,12 +261,12 @@ struct AddRecurringTransactionView: View {
                                         return nil
                                     }
                                 )
-                                
+
                                 VStack(alignment: .leading, spacing: .xs) {
                                     Text("Tipo")
                                         .font(.caption)
                                         .foregroundStyle(Color.app.textSecondary)
-                                    
+
                                     HStack(spacing: .sm) {
                                         TypeChip(
                                             title: "Gasto",
@@ -272,7 +276,7 @@ struct AddRecurringTransactionView: View {
                                         ) {
                                             selectedType = .bill
                                         }
-                                        
+
                                         TypeChip(
                                             title: "Ingreso",
                                             icon: "arrow.down.circle.fill",
@@ -283,25 +287,25 @@ struct AddRecurringTransactionView: View {
                                         }
                                     }
                                 }
-                                
+
                                 DayOfMonthPicker(dayOfMonth: $dayOfMonth)
-                                
+
                                 AccountPicker(
                                     accounts: accountsViewModel.accounts,
                                     selectedAccountId: $selectedAccountId
                                 )
-                                
+
                                 CategoryPicker(
                                     categories: categoriesViewModel.categories,
                                     selectedCategoryId: $selectedCategoryId
                                 )
                             }
-                            
+
                             HStack(spacing: .md) {
                                 SecondaryButton("Cancelar") {
                                     isPresented = false
                                 }
-                                
+
                                 PrimaryButton(
                                     "Guardar",
                                     isLoading: isLoading
@@ -313,7 +317,7 @@ struct AddRecurringTransactionView: View {
                         }
                     }
                     .padding()
-                    .offset(x: shakeOffset)
+                    .shake(trigger: shakeTrigger)
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
@@ -323,12 +327,12 @@ struct AddRecurringTransactionView: View {
             }
         }
     }
-    
+
     private func saveRecurringTransaction() async {
         guard let amountValue = Double(amount) else { return }
-        
+
         isLoading = true
-        
+
         let request = CreateRecurringTransactionRequest(
             name: name,
             description: description.isEmpty ? nil : description,
@@ -339,31 +343,17 @@ struct AddRecurringTransactionView: View {
             budgetId: nil,
             dayOfMonth: dayOfMonth
         )
-        
+
         do {
             _ = try await viewModel.createRecurringTransaction(request: request)
             isPresented = false
         } catch {
-            withAnimation(.default) {
-                shakeOffset = -10
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                withAnimation(.default) {
-                    shakeOffset = 10
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                withAnimation(.default) {
-                    shakeOffset = -5
-                }
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                withAnimation(.default) {
-                    shakeOffset = 0
-                }
+            shakeTrigger = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                shakeTrigger = true
             }
         }
-        
+
         isLoading = false
     }
 }
@@ -374,7 +364,7 @@ struct TypeChip: View {
     let isSelected: Bool
     let color: Color
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: .xs) {
@@ -399,13 +389,13 @@ struct TypeChip: View {
 
 struct DayOfMonthPicker: View {
     @Binding var dayOfMonth: Int
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .xs) {
             Text("Día del mes")
                 .font(.caption)
                 .foregroundStyle(Color.app.textSecondary)
-            
+
             HStack {
                 ForEach([1, 5, 10, 15, 20, 25, 28], id: \.self) { day in
                     Button {
@@ -422,12 +412,12 @@ struct DayOfMonthPicker: View {
                     .buttonStyle(PlainButtonStyle())
                 }
             }
-            
+
             HStack(spacing: .sm) {
                 Text("Otro día:")
                     .font(.caption)
                     .foregroundStyle(Color.app.textSecondary)
-                
+
                 TextField("1-31", value: $dayOfMonth, formatter: NumberFormatter())
                     .font(.app(.body))
                     .keyboardType(.numberPad)
@@ -444,13 +434,13 @@ struct DayOfMonthPicker: View {
 struct AccountPicker: View {
     let accounts: [AccountResponse]
     @Binding var selectedAccountId: String
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .xs) {
             Text("Cuenta")
                 .font(.caption)
                 .foregroundStyle(Color.app.textSecondary)
-            
+
             if accounts.isEmpty {
                 HStack {
                     Image(systemName: "exclamationmark.triangle")
@@ -494,13 +484,13 @@ struct AccountPicker: View {
 struct CategoryPicker: View {
     let categories: [Category]
     @Binding var selectedCategoryId: String
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .xs) {
             Text("Categoría")
                 .font(.caption)
                 .foregroundStyle(Color.app.textSecondary)
-            
+
             if categories.isEmpty {
                 HStack {
                     Image(systemName: "exclamationmark.triangle")

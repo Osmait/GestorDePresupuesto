@@ -4,6 +4,8 @@ struct CategoriesListView: View {
     @StateObject private var viewModel = CategoriesViewModel()
     @State private var showingAddCategory = false
     @State private var editingCategory: Category?
+    @State private var showDeleteConfirmation = false
+    @State private var categoryToDelete: Category?
 
     var body: some View {
         NavigationStack {
@@ -50,7 +52,8 @@ struct CategoriesListView: View {
                                                     Label("Editar", systemImage: "pencil")
                                                 }
                                                 Button(role: .destructive) {
-                                                    Task { await viewModel.deleteCategory(category.id) }
+                                                    categoryToDelete = category
+                                                    showDeleteConfirmation = true
                                                 } label: {
                                                     Label("Eliminar", systemImage: "trash")
                                                 }
@@ -68,6 +71,7 @@ struct CategoriesListView: View {
                 }
             }
             .navigationTitle("Categorías")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showingAddCategory = true } label: {
@@ -95,6 +99,11 @@ struct CategoriesListView: View {
             }
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+            .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "categoría") {
+                if let category = categoryToDelete {
+                    Task { await viewModel.deleteCategory(category.id) }
+                }
+            }
         }
     }
 

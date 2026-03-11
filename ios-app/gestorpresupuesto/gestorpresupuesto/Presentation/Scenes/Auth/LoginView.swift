@@ -6,31 +6,31 @@ struct LoginView: View {
     @State private var email = ""
     @State private var password = ""
     @State private var showingRegister = false
-    
+
     @State private var animationPhase: AnimationPhase = .initial
     @State private var shakeTrigger = false
-    
+
     enum AnimationPhase {
         case initial, logoAppearing, titleAppearing, cardAppearing, complete
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.app.background.ignoresSafeArea()
-                
+
                 VStack(spacing: 0) {
                     Spacer()
-                    
+
                     VStack(spacing: .lg) {
                         logoView
                         titleView
                     }
                     .padding(.bottom, .xxl)
-                    
+
                     cardView
                         .padding(.horizontal, .xl)
-                    
+
                     Spacer()
                     Spacer()
                 }
@@ -45,7 +45,7 @@ struct LoginView: View {
             }
         }
     }
-    
+
     private var logoView: some View {
         ZStack {
             Circle()
@@ -58,7 +58,7 @@ struct LoginView: View {
                 )
                 .frame(width: 80, height: 80)
                 .shadow(color: Color.app.accent.opacity(0.3), radius: 20, x: 0, y: 10)
-            
+
             Image(systemName: "wallet.fill")
                 .font(.system(size: 36))
                 .foregroundStyle(.white)
@@ -67,13 +67,13 @@ struct LoginView: View {
         .opacity(animationPhase == .initial ? 0 : 1)
         .animation(.spring(response: 0.6, dampingFraction: 0.7), value: animationPhase)
     }
-    
+
     private var titleView: some View {
         VStack(spacing: .xs) {
             Text("Gestor de Presupuesto")
                 .font(.app(.title))
                 .foregroundStyle(Color.app.textPrimary)
-            
+
             Text("Controla tus finanzas personales")
                 .font(.app(.subheadline))
                 .foregroundStyle(Color.app.textSecondary)
@@ -82,7 +82,7 @@ struct LoginView: View {
         .offset(y: animationPhase == .initial || animationPhase == .logoAppearing ? -20 : 0)
         .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: animationPhase)
     }
-    
+
     private var cardView: some View {
         GlassCard(cornerRadius: .xl, padding: .xl) {
             VStack(spacing: .lg) {
@@ -95,7 +95,7 @@ struct LoginView: View {
                         autocapitalization: .never,
                         validation: { $0.emailError }
                     )
-                    
+
                     FormField(
                         icon: "lock",
                         placeholder: "Contraseña",
@@ -104,7 +104,7 @@ struct LoginView: View {
                         showSuccessIndicator: false
                     )
                 }
-                
+
                 PrimaryButton(
                     "Iniciar Sesión",
                     icon: "arrow.right",
@@ -112,14 +112,14 @@ struct LoginView: View {
                 ) {
                     Task {
                         await viewModel.login(email: email, password: password)
-                        
+
                         if viewModel.error != nil {
                             triggerShake()
                         }
                     }
                 }
                 .disabled(email.isEmpty || password.isEmpty)
-                
+
                 Button {
                     showingRegister = true
                 } label: {
@@ -136,25 +136,25 @@ struct LoginView: View {
         .offset(y: animationPhase == .initial || animationPhase == .logoAppearing || animationPhase == .titleAppearing ? 50 : 0)
         .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animationPhase)
     }
-    
+
     private func startEntranceAnimation() {
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
             animationPhase = .logoAppearing
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             animationPhase = .titleAppearing
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             animationPhase = .cardAppearing
         }
-        
+
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.8) {
             animationPhase = .complete
         }
     }
-    
+
     private func triggerShake() {
         shakeTrigger = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
@@ -166,18 +166,18 @@ struct LoginView: View {
 struct RegisterView: View {
     @ObservedObject var viewModel: AuthViewModel
     @Binding var isPresented: Bool
-    
+
     @State private var name = ""
     @State private var lastName = ""
     @State private var email = ""
     @State private var password = ""
     @State private var confirmPassword = ""
     @State private var shakeTrigger = false
-    
+
     private var passwordsMatch: Bool {
         password == confirmPassword
     }
-    
+
     private var isValidForm: Bool {
         name.isValidName &&
         lastName.isValidName &&
@@ -185,19 +185,19 @@ struct RegisterView: View {
         password.isValidPassword &&
         passwordsMatch
     }
-    
+
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.app.background.ignoresSafeArea()
-                
+
                 ScrollView {
                     GlassCard(cornerRadius: .xl, padding: .lg) {
                         VStack(spacing: .lg) {
                             Text("Crear Cuenta")
                                 .font(.app(.title3))
                                 .foregroundStyle(Color.app.textPrimary)
-                            
+
                             VStack(spacing: .md) {
                                 FormField(
                                     icon: "person",
@@ -205,14 +205,14 @@ struct RegisterView: View {
                                     text: $name,
                                     validation: { $0.nameError }
                                 )
-                                
+
                                 FormField(
                                     icon: "person",
                                     placeholder: "Apellido",
                                     text: $lastName,
                                     validation: { $0.nameError }
                                 )
-                                
+
                                 FormField(
                                     icon: "envelope",
                                     placeholder: "Email",
@@ -221,7 +221,7 @@ struct RegisterView: View {
                                     autocapitalization: .never,
                                     validation: { $0.emailError }
                                 )
-                                
+
                                 VStack(spacing: .xs) {
                                     FormField(
                                         icon: "lock",
@@ -230,7 +230,7 @@ struct RegisterView: View {
                                         isSecure: true,
                                         showSuccessIndicator: false
                                     )
-                                    
+
                                     if !password.isEmpty {
                                         PasswordStrengthIndicator(
                                             strength: password.passwordStrength,
@@ -238,7 +238,7 @@ struct RegisterView: View {
                                         )
                                     }
                                 }
-                                
+
                                 VStack(spacing: .xs) {
                                     FormField(
                                         icon: "lock",
@@ -251,7 +251,7 @@ struct RegisterView: View {
                                             return nil
                                         }
                                     )
-                                    
+
                                     if !confirmPassword.isEmpty && passwordsMatch {
                                         HStack(spacing: .xs) {
                                             Image(systemName: "checkmark.circle.fill")
@@ -264,12 +264,12 @@ struct RegisterView: View {
                                     }
                                 }
                             }
-                            
+
                             HStack(spacing: .md) {
                                 SecondaryButton("Cancelar") {
                                     isPresented = false
                                 }
-                                
+
                                 PrimaryButton(
                                     "Registrar",
                                     isLoading: viewModel.isLoading
@@ -302,7 +302,7 @@ struct RegisterView: View {
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
         }
     }
-    
+
     private func triggerShake() {
         shakeTrigger = false
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {

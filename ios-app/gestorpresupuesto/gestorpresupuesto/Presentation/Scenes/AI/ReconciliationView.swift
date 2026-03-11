@@ -24,6 +24,18 @@ struct ReconciliationView: View {
                             }
                         }
 
+                        if viewModel.isLoading {
+                            VStack(spacing: Spacing.md.rawValue) {
+                                ForEach(0..<3, id: \.self) { _ in CardSkeleton() }
+                            }
+                        } else if viewModel.previewData == nil && !viewModel.isLoading {
+                            EmptyStateView(
+                                icon: "doc.text.magnifyingglass",
+                                title: "Sin conciliación",
+                                message: "Sube un estado de cuenta bancario para comenzar la conciliación automática."
+                            )
+                        }
+
                         if let preview = viewModel.previewData {
                             VStack(alignment: .leading, spacing: Spacing.md.rawValue) {
                                 Text("Resultados: \(preview.extractedCount) transacciones")
@@ -56,6 +68,7 @@ struct ReconciliationView: View {
                 }
             }
             .navigationTitle("Conciliación")
+            .notificationToolbar()
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
         }

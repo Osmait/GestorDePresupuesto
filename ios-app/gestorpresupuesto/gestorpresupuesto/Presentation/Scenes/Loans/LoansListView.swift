@@ -11,49 +11,50 @@ struct LoansListView: View {
 
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
-                        if let summary = viewModel.summary {
-                            HStack(spacing: Spacing.md.rawValue) {
-                                StatCard(
-                                    title: "Activos",
-                                    value: "\(summary.activeLoans)",
-                                    icon: "doc.text.fill",
-                                    colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
-                                )
-                                StatCard(
-                                    title: "Pendiente",
-                                    value: summary.totalPending.currencyFormatted,
-                                    icon: "hourglass",
-                                    colors: [Color.app.warning, Color.app.warning.opacity(0.7)]
-                                )
-                            }
-
-                            HStack(spacing: Spacing.md.rawValue) {
-                                StatCard(
-                                    title: "Cobrado",
-                                    value: summary.totalCollected.currencyFormatted,
-                                    icon: "checkmark.circle.fill",
-                                    colors: [Color.app.success, Color.app.success.opacity(0.7)]
-                                )
-                                StatCard(
-                                    title: "Intereses",
-                                    value: summary.totalInterestEarned.currencyFormatted,
-                                    icon: "percent",
-                                    colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
-                                )
-                            }
-                        }
-
-                        if viewModel.loans.isEmpty && !viewModel.isLoading {
-                            EmptyStateView(
-                                icon: "doc.text",
-                                title: "Sin préstamos",
-                                message: "Registra tu primer préstamo"
-                            )
+                        if viewModel.loans.isEmpty && viewModel.isLoading {
+                            LoansSkeleton()
                         } else {
-                            LazyVStack(spacing: Spacing.md.rawValue) {
-                                ForEach(viewModel.loans) { loan in
-                                    NavigationLink(destination: LoanDetailView(loan: loan, viewModel: viewModel)) {
-                                        loanRow(loan)
+                            if !viewModel.isLoading, let summary = viewModel.summary {
+                                VStack(spacing: Spacing.md.rawValue) {
+                                    StatCard(
+                                        title: "Activos",
+                                        value: "\(summary.activeLoans)",
+                                        icon: "doc.text.fill",
+                                        colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
+                                    )
+                                    StatCard(
+                                        title: "Pendiente",
+                                        value: summary.totalPending.currencyFormatted,
+                                        icon: "hourglass",
+                                        colors: [Color.app.warning, Color.app.warning.opacity(0.7)]
+                                    )
+                                    StatCard(
+                                        title: "Cobrado",
+                                        value: summary.totalCollected.currencyFormatted,
+                                        icon: "checkmark.circle.fill",
+                                        colors: [Color.app.success, Color.app.success.opacity(0.7)]
+                                    )
+                                    StatCard(
+                                        title: "Intereses",
+                                        value: summary.totalInterestEarned.currencyFormatted,
+                                        icon: "percent",
+                                        colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
+                                    )
+                                }
+                            }
+
+                            if viewModel.loans.isEmpty && !viewModel.isLoading {
+                                EmptyStateView(
+                                    icon: "doc.text",
+                                    title: "Sin préstamos",
+                                    message: "Registra tu primer préstamo"
+                                )
+                            } else {
+                                LazyVStack(spacing: Spacing.md.rawValue) {
+                                    ForEach(viewModel.loans) { loan in
+                                        NavigationLink(destination: LoanDetailView(loan: loan, viewModel: viewModel)) {
+                                            loanRow(loan)
+                                        }
                                     }
                                 }
                             }
@@ -63,6 +64,7 @@ struct LoansListView: View {
                 }
             }
             .navigationTitle("Préstamos")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showAddLoan = true } label: {

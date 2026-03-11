@@ -5,6 +5,8 @@ struct TransactionsListView: View {
     @State private var showingAddTransaction = false
     @State private var showingFilters = false
     @State private var showingDocumentScanner = false
+    @State private var showDeleteConfirmation = false
+    @State private var transactionToDelete: Transaction?
 
     var body: some View {
         NavigationStack {
@@ -53,7 +55,8 @@ struct TransactionsListView: View {
                                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
-                                            Task { await viewModel.deleteTransaction(transaction.id) }
+                                            transactionToDelete = transaction
+                                            showDeleteConfirmation = true
                                         } label: {
                                             Label("Eliminar", systemImage: "trash")
                                         }
@@ -76,6 +79,7 @@ struct TransactionsListView: View {
                 }
             }
             .navigationTitle("Transacciones")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     HStack(spacing: Spacing.sm.rawValue) {
@@ -123,6 +127,11 @@ struct TransactionsListView: View {
             .refreshable { await viewModel.refresh() }
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+            .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "transacción") {
+                if let transaction = transactionToDelete {
+                    Task { await viewModel.deleteTransaction(transaction.id) }
+                }
+            }
         }
     }
 
@@ -201,7 +210,7 @@ struct TransactionsListView: View {
 struct FilterBar: View {
     @ObservedObject var viewModel: TransactionsViewModel
     @Binding var showingFilters: Bool
-    
+
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: .sm) {
@@ -212,7 +221,7 @@ struct FilterBar: View {
                 ) {
                     showingFilters = true
                 }
-                
+
                 if viewModel.selectedType != .all {
                     FilterChip(
                         title: viewModel.selectedType.rawValue,
@@ -224,7 +233,7 @@ struct FilterBar: View {
                         Task { await viewModel.applyFilters() }
                     }
                 }
-                
+
                 if let categoryId = viewModel.selectedCategoryId,
                    let category = viewModel.categories.first(where: { $0.id == categoryId }) {
                     FilterChip(
@@ -238,7 +247,7 @@ struct FilterBar: View {
                         Task { await viewModel.applyFilters() }
                     }
                 }
-                
+
                 if let accountId = viewModel.selectedAccountId,
                    let account = viewModel.accounts.first(where: { $0.accountInfo.id == accountId }) {
                     FilterChip(
@@ -250,7 +259,7 @@ struct FilterBar: View {
                         Task { await viewModel.applyFilters() }
                     }
                 }
-                
+
                 if !viewModel.searchText.isEmpty {
                     FilterChip(
                         title: "\"\(viewModel.searchText)\"",
@@ -271,12 +280,12 @@ struct FilterBar: View {
 
 struct FilterChip: View {
     let title: String
-    var icon: String? = nil
-    var emoji: String? = nil
+    var icon: String?
+    var emoji: String?
     let isActive: Bool
     var color: Color = .app.accent
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: .xs) {
@@ -287,12 +296,12 @@ struct FilterChip: View {
                     Image(systemName: icon)
                         .font(.caption)
                 }
-                
+
                 Text(title)
                     .font(.caption)
                     .fontWeight(.medium)
                     .lineLimit(1)
-                
+
                 if isActive {
                     Image(systemName: "xmark")
                         .font(.caption2)

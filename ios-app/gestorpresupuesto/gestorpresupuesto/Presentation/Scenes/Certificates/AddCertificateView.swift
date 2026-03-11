@@ -13,6 +13,7 @@ struct AddCertificateView: View {
     @State private var cutDay = "15"
     @State private var reinvestInterest = false
     @State private var selectedPayoutAccountId = ""
+    @State private var shakeTrigger = false
 
     private var isValid: Bool {
         bank.isNotBlank && Double(baseCapital) != nil &&
@@ -27,7 +28,7 @@ struct AddCertificateView: View {
 
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
-                        FormField(title: "Banco", icon: "building.2", placeholder: "Nombre del banco", text: $bank)
+                        FormField(title: "Banco", icon: "building.2", placeholder: "Nombre del banco", text: $bank, validation: { $0.isEmpty ? "El banco es requerido" : nil })
                         CurrencyField(title: "Capital base", amount: $baseCapital, currency: $currency)
 
                         DropdownPicker(
@@ -39,8 +40,16 @@ struct AddCertificateView: View {
                         )
 
                         HStack(spacing: Spacing.md.rawValue) {
-                            FormField(title: "Tasa de interés (%)", icon: "percent", placeholder: "0.00", text: $interestRate, keyboardType: .decimalPad)
-                            FormField(title: "Tasa impositiva (%)", icon: "dollarsign.circle", placeholder: "0.00", text: $taxRate, keyboardType: .decimalPad)
+                            FormField(title: "Tasa de interés (%)", icon: "percent", placeholder: "0.00", text: $interestRate, keyboardType: .decimalPad, validation: { value in
+                                if value.isEmpty { return "Requerido" }
+                                if Double(value) == nil { return "Número inválido" }
+                                return nil
+                            })
+                            FormField(title: "Tasa impositiva (%)", icon: "dollarsign.circle", placeholder: "0.00", text: $taxRate, keyboardType: .decimalPad, validation: { value in
+                                if value.isEmpty { return "Requerido" }
+                                if Double(value) == nil { return "Número inválido" }
+                                return nil
+                            })
                         }
 
                         FormField(title: "Día de corte", icon: "calendar", placeholder: "15", text: $cutDay, keyboardType: .numberPad)
@@ -70,6 +79,7 @@ struct AddCertificateView: View {
                     }
                     .padding(Spacing.lg.rawValue)
                 }
+                .shake(trigger: shakeTrigger)
             }
             .navigationTitle("Nuevo Certificado")
             .navigationBarTitleDisplayMode(.inline)
@@ -108,6 +118,10 @@ struct AddCertificateView: View {
             _ = try await viewModel.createCertificate(request: request)
             dismiss()
         } catch {
+            shakeTrigger = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                shakeTrigger = true
+            }
             viewModel.showError(error.localizedDescription)
         }
     }

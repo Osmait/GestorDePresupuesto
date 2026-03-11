@@ -12,6 +12,7 @@ struct AddCreditCardView: View {
     @State private var balanceCurrency = "DOP"
     @State private var creditLimit = ""
     @State private var initialDebt = ""
+    @State private var shakeTrigger = false
 
     private var isValid: Bool {
         name.isNotBlank && bank.isNotBlank &&
@@ -26,9 +27,12 @@ struct AddCreditCardView: View {
 
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
-                        FormField(title: "Nombre", icon: "creditcard", placeholder: "Ej: Visa Gold", text: $name)
-                        FormField(title: "Banco", icon: "building.2", placeholder: "Nombre del banco", text: $bank)
-                        FormField(title: "Últimos 4 dígitos", icon: "number", placeholder: "1234", text: $lastFourDigits, keyboardType: .numberPad)
+                        FormField(title: "Nombre", icon: "creditcard", placeholder: "Ej: Visa Gold", text: $name, validation: { $0.isEmpty ? "El nombre es requerido" : nil })
+                        FormField(title: "Banco", icon: "building.2", placeholder: "Nombre del banco", text: $bank, validation: { $0.isEmpty ? "El banco es requerido" : nil })
+                        FormField(title: "Últimos 4 dígitos", icon: "number", placeholder: "1234", text: $lastFourDigits, keyboardType: .numberPad, validation: { value in
+                            if !value.isEmpty && value.count != 4 { return "Debe tener 4 dígitos" }
+                            return nil
+                        })
 
                         HStack(spacing: Spacing.md.rawValue) {
                             FormField(title: "Día de corte", icon: "calendar", placeholder: "15", text: $cutDay, keyboardType: .numberPad)
@@ -46,6 +50,7 @@ struct AddCreditCardView: View {
                     }
                     .padding(Spacing.lg.rawValue)
                 }
+                .shake(trigger: shakeTrigger)
             }
             .navigationTitle("Nueva Tarjeta")
             .navigationBarTitleDisplayMode(.inline)
@@ -85,6 +90,10 @@ struct AddCreditCardView: View {
             _ = try await viewModel.createCreditCard(request: request)
             dismiss()
         } catch {
+            shakeTrigger = false
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                shakeTrigger = true
+            }
             viewModel.showError(error.localizedDescription)
         }
     }

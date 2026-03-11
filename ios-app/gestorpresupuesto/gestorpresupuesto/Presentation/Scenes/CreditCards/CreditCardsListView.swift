@@ -3,6 +3,8 @@ import SwiftUI
 struct CreditCardsListView: View {
     @StateObject private var viewModel = CreditCardsViewModel()
     @State private var showAddCard = false
+    @State private var showDeleteConfirmation = false
+    @State private var cardToDelete: CreditCard?
 
     var body: some View {
         NavigationStack {
@@ -11,21 +13,33 @@ struct CreditCardsListView: View {
 
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
-                        if let summary = viewModel.summary {
-                            summarySection(summary)
-                        }
-
-                        if viewModel.creditCards.isEmpty && !viewModel.isLoading {
-                            EmptyStateView(
-                                icon: "creditcard",
-                                title: "Sin tarjetas",
-                                message: "Agrega tu primera tarjeta de crédito"
-                            )
+                        if viewModel.creditCards.isEmpty && viewModel.isLoading {
+                            CreditCardsSkeleton()
                         } else {
-                            LazyVStack(spacing: Spacing.md.rawValue) {
-                                ForEach(viewModel.creditCards) { card in
-                                    NavigationLink(destination: CreditCardDetailView(card: card, viewModel: viewModel)) {
-                                        creditCardRow(card)
+                            if !viewModel.isLoading, let summary = viewModel.summary {
+                                summarySection(summary)
+                            }
+
+                            if viewModel.creditCards.isEmpty && !viewModel.isLoading {
+                                EmptyStateView(
+                                    icon: "creditcard",
+                                    title: "Sin tarjetas",
+                                    message: "Agrega tu primera tarjeta de crédito"
+                                )
+                            } else {
+                                LazyVStack(spacing: Spacing.md.rawValue) {
+                                    ForEach(viewModel.creditCards) { card in
+                                        NavigationLink(destination: CreditCardDetailView(card: card, viewModel: viewModel)) {
+                                            creditCardRow(card)
+                                        }
+                                        .contextMenu {
+                                            Button(role: .destructive) {
+                                                cardToDelete = card
+                                                showDeleteConfirmation = true
+                                            } label: {
+                                                Label("Eliminar", systemImage: "trash")
+                                            }
+                                        }
                                     }
                                 }
                             }
@@ -35,6 +49,7 @@ struct CreditCardsListView: View {
                 }
             }
             .navigationTitle("Tarjetas de Crédito")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showAddCard = true } label: {
@@ -49,12 +64,17 @@ struct CreditCardsListView: View {
             .task { await viewModel.loadCreditCards() }
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+            .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "tarjeta de crédito") {
+                if let card = cardToDelete {
+                    Task { await viewModel.deleteCreditCard(card.id) }
+                }
+            }
         }
     }
 
     private func summarySection(_ summary: CreditCardSummary) -> some View {
         VStack(spacing: Spacing.sm.rawValue) {
-            HStack(spacing: Spacing.md.rawValue) {
+            VStack(spacing: Spacing.md.rawValue) {
                 StatCard(
                     title: "Tarjetas",
                     value: "\(summary.totalCards)",

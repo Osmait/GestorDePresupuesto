@@ -4,6 +4,8 @@ import SwiftUI
 struct SavingsGoalsView: View {
     @StateObject private var viewModel = SavingsGoalsViewModel()
     @State private var showAddGoal = false
+    @State private var showDeleteConfirmation = false
+    @State private var goalToDelete: AISavingsGoal?
 
     var body: some View {
         NavigationStack {
@@ -12,7 +14,9 @@ struct SavingsGoalsView: View {
 
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
-                        if viewModel.goals.isEmpty && !viewModel.isLoading {
+                        if viewModel.goals.isEmpty && viewModel.isLoading {
+                            ListSkeleton(count: 3)
+                        } else if viewModel.goals.isEmpty && !viewModel.isLoading {
                             EmptyStateView(
                                 icon: "target",
                                 title: "Sin metas de ahorro",
@@ -59,15 +63,16 @@ struct SavingsGoalsView: View {
                                         }
 
                                         if let targetDate = goal.targetDate {
-                                            Text("Fecha meta: \(targetDate)")
+                                            Text("Fecha meta: \(Self.formatDate(targetDate))")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
                                         }
                                     }
                                 }
-                                .swipeActions(edge: .trailing) {
+                                .contextMenu {
                                     Button(role: .destructive) {
-                                        Task { await viewModel.deleteGoal(goal.id) }
+                                        goalToDelete = goal
+                                        showDeleteConfirmation = true
                                     } label: {
                                         Label("Eliminar", systemImage: "trash")
                                     }
@@ -79,6 +84,7 @@ struct SavingsGoalsView: View {
                 }
             }
             .navigationTitle("Metas de Ahorro")
+            .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
                     Button { showAddGoal = true } label: {
@@ -93,7 +99,30 @@ struct SavingsGoalsView: View {
             .task { await viewModel.loadGoals() }
             .errorBanner(isPresented: $viewModel.showErrorBanner, message: viewModel.errorBannerMessage)
             .toast(isPresented: $viewModel.showToast, type: viewModel.toastType, message: viewModel.toastMessage)
+            .deleteConfirmation(isPresented: $showDeleteConfirmation, itemName: "meta de ahorro") {
+                if let goal = goalToDelete {
+                    Task { await viewModel.deleteGoal(goal.id) }
+                }
+            }
         }
+    }
+
+    private static let inputFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static let outputFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es")
+        f.dateStyle = .medium
+        return f
+    }()
+
+    private static func formatDate(_ dateString: String) -> String {
+        guard let date = inputFormatter.date(from: dateString) else { return dateString }
+        return outputFormatter.string(from: date)
     }
 }
 
