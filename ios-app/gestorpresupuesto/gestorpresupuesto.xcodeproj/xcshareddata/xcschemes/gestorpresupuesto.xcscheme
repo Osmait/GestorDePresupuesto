@@ -78,7 +78,7 @@
          <EnvironmentVariable
             key = "API_BASE_URL"
             value = "https://gestordepresupuesto.onrender.com"
-            isEnabled = "YES">
+            isEnabled = "NO">
          </EnvironmentVariable>
       </EnvironmentVariables>
    </LaunchAction>

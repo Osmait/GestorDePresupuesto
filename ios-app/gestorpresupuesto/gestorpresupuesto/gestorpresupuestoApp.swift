@@ -5,6 +5,7 @@ struct gestorpresupuestoApp: App {
     @AppStorage("isDarkMode") private var isDarkMode = false
     @StateObject private var networkMonitor = NetworkMonitor.shared
     @StateObject private var featureFlagManager = FeatureFlagManager.shared
+    @StateObject private var notificationManager = NotificationManager.shared
 
     init() {
         DependencyContainer.shared.registerDefaults()
@@ -16,6 +17,8 @@ struct gestorpresupuestoApp: App {
                 .preferredColorScheme(isDarkMode ? .dark : .light)
                 .environmentObject(networkMonitor)
                 .environmentObject(featureFlagManager)
+                .environmentObject(notificationManager)
+                .onAppear { notificationManager.requestNotificationPermission() }
         }
     }
 }
