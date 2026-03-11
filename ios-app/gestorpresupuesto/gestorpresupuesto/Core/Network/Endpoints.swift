@@ -8,7 +8,7 @@ enum APIError: Error, LocalizedError {
     case unauthorized
     case networkError(Error)
     case unknown
-    
+
     var errorDescription: String? {
         switch self {
         case .invalidURL:
@@ -30,11 +30,11 @@ enum APIError: Error, LocalizedError {
 }
 
 enum HTTPMethod: String {
-    case GET = "GET"
-    case POST = "POST"
-    case PUT = "PUT"
-    case DELETE = "DELETE"
-    case PATCH = "PATCH"
+    case GET
+    case POST
+    case PUT
+    case DELETE
+    case PATCH
 }
 
 struct Endpoint {
@@ -43,7 +43,7 @@ struct Endpoint {
     let headers: [String: String]?
     let queryItems: [URLQueryItem]?
     let body: Data?
-    
+
     init(
         path: String,
         method: HTTPMethod = .GET,
@@ -57,129 +57,133 @@ struct Endpoint {
         self.queryItems = queryItems
         self.body = body
     }
-    
+
     func asURLRequest(baseURL: String) -> URLRequest? {
         guard var urlComponents = URLComponents(string: baseURL + path) else { return nil }
-        
+
         if let queryItems = queryItems, !queryItems.isEmpty {
             urlComponents.queryItems = queryItems
         }
-        
+
         guard let url = urlComponents.url else { return nil }
-        
+
         var request = URLRequest(url: url)
         request.httpMethod = method.rawValue
         request.httpBody = body
         request.addValue("application/json", forHTTPHeaderField: "Content-Type")
-        
+
         headers?.forEach { key, value in
             request.addValue(value, forHTTPHeaderField: key)
         }
-        
+
         return request
     }
 }
 
 struct Endpoints {
     static var baseURL: String { AppConfiguration.current.baseURL }
-    
+
+    private static func encode(_ id: String) -> String {
+        id.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? id
+    }
+
     // MARK: - Auth
     static func login() -> Endpoint {
         Endpoint(path: "/auth/login", method: .POST)
     }
-    
+
     static func register() -> Endpoint {
         Endpoint(path: "/user", method: .POST)
     }
-    
+
     static func refreshToken() -> Endpoint {
         Endpoint(path: "/auth/refresh", method: .POST)
     }
-    
+
     static func logout() -> Endpoint {
         Endpoint(path: "/auth/logout", method: .POST)
     }
-    
+
     static func profile() -> Endpoint {
         Endpoint(path: "/profile", method: .GET)
     }
-    
+
     // MARK: - Accounts
     static func accounts() -> Endpoint {
         Endpoint(path: "/account", method: .GET)
     }
-    
+
     static func createAccount() -> Endpoint {
         Endpoint(path: "/account", method: .POST)
     }
-    
+
     static func account(id: String) -> Endpoint {
-        Endpoint(path: "/account/\(id)", method: .GET)
+        Endpoint(path: "/account/\(encode(id))", method: .GET)
     }
-    
+
     static func updateAccount(id: String) -> Endpoint {
-        Endpoint(path: "/account/\(id)", method: .PUT)
+        Endpoint(path: "/account/\(encode(id))", method: .PUT)
     }
-    
+
     static func deleteAccount(id: String) -> Endpoint {
-        Endpoint(path: "/account/\(id)", method: .DELETE)
+        Endpoint(path: "/account/\(encode(id))", method: .DELETE)
     }
-    
+
     // MARK: - Transactions
     static func transactions(filter: TransactionFilter? = nil) -> Endpoint {
         Endpoint(path: "/transaction", method: .GET, queryItems: filter?.toQueryItems())
     }
-    
+
     static func createTransaction() -> Endpoint {
         Endpoint(path: "/transaction", method: .POST)
     }
-    
+
     static func transactionsByAccount(id: String) -> Endpoint {
-        Endpoint(path: "/transaction/\(id)", method: .GET)
+        Endpoint(path: "/transaction/\(encode(id))", method: .GET)
     }
-    
+
     static func updateTransaction(id: String) -> Endpoint {
-        Endpoint(path: "/transaction/\(id)", method: .PUT)
+        Endpoint(path: "/transaction/\(encode(id))", method: .PUT)
     }
-    
+
     static func deleteTransaction(id: String) -> Endpoint {
-        Endpoint(path: "/transaction/\(id)", method: .DELETE)
+        Endpoint(path: "/transaction/\(encode(id))", method: .DELETE)
     }
-    
+
     // MARK: - Categories
     static func categories() -> Endpoint {
         Endpoint(path: "/category", method: .GET)
     }
-    
+
     static func createCategory() -> Endpoint {
         Endpoint(path: "/category", method: .POST)
     }
-    
+
     static func updateCategory(id: String) -> Endpoint {
-        Endpoint(path: "/category/\(id)", method: .PUT)
+        Endpoint(path: "/category/\(encode(id))", method: .PUT)
     }
-    
+
     static func deleteCategory(id: String) -> Endpoint {
-        Endpoint(path: "/category/\(id)", method: .DELETE)
+        Endpoint(path: "/category/\(encode(id))", method: .DELETE)
     }
-    
+
     // MARK: - Budgets
     static func budgets() -> Endpoint {
         Endpoint(path: "/budget", method: .GET)
     }
-    
+
     static func createBudget() -> Endpoint {
         Endpoint(path: "/budget", method: .POST)
     }
-    
+
     static func updateBudget(id: String) -> Endpoint {
-        Endpoint(path: "/budget/\(id)", method: .PUT)
+        Endpoint(path: "/budget/\(encode(id))", method: .PUT)
     }
-    
+
     static func deleteBudget(id: String) -> Endpoint {
-        Endpoint(path: "/budget/\(id)", method: .DELETE)
+        Endpoint(path: "/budget/\(encode(id))", method: .DELETE)
     }
-    
+
     // MARK: - Analytics
     static func categoryExpenses(dateFrom: String? = nil, dateTo: String? = nil) -> Endpoint {
         var items: [URLQueryItem] = []
@@ -191,33 +195,33 @@ struct Endpoints {
         }
         return Endpoint(path: "/analytics/category-expenses", method: .GET, queryItems: items.isEmpty ? nil : items)
     }
-    
+
     static func monthlySummary() -> Endpoint {
         Endpoint(path: "/analytics/monthly-summary", method: .GET)
     }
-    
+
     // MARK: - Recurring Transactions
     static func recurringTransactions() -> Endpoint {
         Endpoint(path: "/recurring-transactions", method: .GET)
     }
-    
+
     static func createRecurringTransaction() -> Endpoint {
         Endpoint(path: "/recurring-transactions", method: .POST)
     }
-    
+
     static func updateRecurringTransaction(id: String) -> Endpoint {
-        Endpoint(path: "/recurring-transactions/\(id)", method: .PUT)
+        Endpoint(path: "/recurring-transactions/\(encode(id))", method: .PUT)
     }
-    
+
     static func deleteRecurringTransaction(id: String) -> Endpoint {
-        Endpoint(path: "/recurring-transactions/\(id)", method: .DELETE)
+        Endpoint(path: "/recurring-transactions/\(encode(id))", method: .DELETE)
     }
-    
+
     // MARK: - AI
     static func extractTransactions() -> Endpoint {
         Endpoint(path: "/ai/extract/transactions", method: .POST)
     }
-    
+
     static func analyzeSpending(dateFrom: String, dateTo: String, language: String? = nil) -> Endpoint {
         var items: [URLQueryItem] = [
             URLQueryItem(name: "date_from", value: dateFrom),
@@ -238,7 +242,7 @@ struct Endpoints {
     }
 
     static func reconcileApply(sessionId: String) -> Endpoint {
-        Endpoint(path: "/ai/reconcile/\(sessionId)/apply", method: .POST)
+        Endpoint(path: "/ai/reconcile/\(encode(sessionId))/apply", method: .POST)
     }
 
     static func savingsGoals() -> Endpoint {
@@ -250,11 +254,11 @@ struct Endpoints {
     }
 
     static func updateSavingsGoal(id: String) -> Endpoint {
-        Endpoint(path: "/ai/goals/\(id)", method: .PATCH)
+        Endpoint(path: "/ai/goals/\(encode(id))", method: .PATCH)
     }
 
     static func deleteSavingsGoal(id: String) -> Endpoint {
-        Endpoint(path: "/ai/goals/\(id)", method: .DELETE)
+        Endpoint(path: "/ai/goals/\(encode(id))", method: .DELETE)
     }
 
     static func savingsGoalProgress(id: String) -> Endpoint {
@@ -281,7 +285,7 @@ struct Endpoints {
     }
 
     static func creditCard(id: String) -> Endpoint {
-        Endpoint(path: "/credit-cards/\(id)", method: .GET)
+        Endpoint(path: "/credit-cards/\(encode(id))", method: .GET)
     }
 
     static func createCreditCard() -> Endpoint {
@@ -289,11 +293,11 @@ struct Endpoints {
     }
 
     static func updateCreditCard(id: String) -> Endpoint {
-        Endpoint(path: "/credit-cards/\(id)", method: .PUT)
+        Endpoint(path: "/credit-cards/\(encode(id))", method: .PUT)
     }
 
     static func deleteCreditCard(id: String) -> Endpoint {
-        Endpoint(path: "/credit-cards/\(id)", method: .DELETE)
+        Endpoint(path: "/credit-cards/\(encode(id))", method: .DELETE)
     }
 
     static func creditCardSummary() -> Endpoint {
@@ -301,15 +305,15 @@ struct Endpoints {
     }
 
     static func updateCardBalance(cardId: String, balanceId: String) -> Endpoint {
-        Endpoint(path: "/credit-cards/\(cardId)/balances/\(balanceId)", method: .PUT)
+        Endpoint(path: "/credit-cards/\(encode(cardId))/balances/\(encode(balanceId))", method: .PUT)
     }
 
     static func creditCardPayments(cardId: String) -> Endpoint {
-        Endpoint(path: "/credit-cards/\(cardId)/payments", method: .GET)
+        Endpoint(path: "/credit-cards/\(encode(cardId))/payments", method: .GET)
     }
 
     static func createCreditCardPayment(cardId: String) -> Endpoint {
-        Endpoint(path: "/credit-cards/\(cardId)/payments", method: .POST)
+        Endpoint(path: "/credit-cards/\(encode(cardId))/payments", method: .POST)
     }
 
     // MARK: - Loans
@@ -318,7 +322,7 @@ struct Endpoints {
     }
 
     static func loan(id: String) -> Endpoint {
-        Endpoint(path: "/loan/\(id)", method: .GET)
+        Endpoint(path: "/loan/\(encode(id))", method: .GET)
     }
 
     static func createLoan() -> Endpoint {
@@ -343,7 +347,7 @@ struct Endpoints {
     }
 
     static func certificate(id: String) -> Endpoint {
-        Endpoint(path: "/certificate/\(id)", method: .GET)
+        Endpoint(path: "/certificate/\(encode(id))", method: .GET)
     }
 
     static func createCertificate() -> Endpoint {
@@ -351,11 +355,11 @@ struct Endpoints {
     }
 
     static func updateCertificate(id: String) -> Endpoint {
-        Endpoint(path: "/certificate/\(id)", method: .PUT)
+        Endpoint(path: "/certificate/\(encode(id))", method: .PUT)
     }
 
     static func deleteCertificate(id: String) -> Endpoint {
-        Endpoint(path: "/certificate/\(id)", method: .DELETE)
+        Endpoint(path: "/certificate/\(encode(id))", method: .DELETE)
     }
 
     static func simulateCertificate(id: String) -> Endpoint {
@@ -372,7 +376,7 @@ struct Endpoints {
     }
 
     static func investment(id: String) -> Endpoint {
-        Endpoint(path: "/investments/\(id)", method: .GET)
+        Endpoint(path: "/investments/\(encode(id))", method: .GET)
     }
 
     static func createInvestment() -> Endpoint {
@@ -380,11 +384,11 @@ struct Endpoints {
     }
 
     static func updateInvestment(id: String) -> Endpoint {
-        Endpoint(path: "/investments/\(id)", method: .PUT)
+        Endpoint(path: "/investments/\(encode(id))", method: .PUT)
     }
 
     static func deleteInvestment(id: String) -> Endpoint {
-        Endpoint(path: "/investments/\(id)", method: .DELETE)
+        Endpoint(path: "/investments/\(encode(id))", method: .DELETE)
     }
 
     static func fundBroker() -> Endpoint {
@@ -396,7 +400,7 @@ struct Endpoints {
     }
 
     static func quote(symbol: String) -> Endpoint {
-        Endpoint(path: "/quotes/\(symbol)", method: .GET)
+        Endpoint(path: "/quotes/\(encode(symbol))", method: .GET)
     }
 
     // MARK: - Dashboard Summary
@@ -404,8 +408,55 @@ struct Endpoints {
         Endpoint(path: "/analytics/dashboard-summary", method: .GET)
     }
 
+    // MARK: - Notifications
+    static func notificationHistory() -> Endpoint {
+        Endpoint(path: "/notifications/history", method: .GET)
+    }
+
+    static func markNotificationRead(id: String) -> Endpoint {
+        Endpoint(path: "/notifications/\(encode(id))/read", method: .PATCH)
+    }
+
+    static func markAllNotificationsRead() -> Endpoint {
+        Endpoint(path: "/notifications/read-all", method: .PATCH)
+    }
+
+    static func deleteAllNotifications() -> Endpoint {
+        Endpoint(path: "/notifications", method: .DELETE)
+    }
+
+    static func testNotification() -> Endpoint {
+        Endpoint(path: "/notifications/test", method: .POST)
+    }
+
     // MARK: - Search
     static func search(query: String) -> Endpoint {
         Endpoint(path: "/search", method: .GET, queryItems: [URLQueryItem(name: "q", value: query)])
+    }
+}
+
+// MARK: - APIError Equatable
+
+extension APIError: Equatable {
+    static func == (lhs: APIError, rhs: APIError) -> Bool {
+        switch (lhs, rhs) {
+        case (.invalidURL, .invalidURL): return true
+        case (.noData, .noData): return true
+        case (.decodingError, .decodingError): return true
+        case (.serverError(let lCode, let lMsg), .serverError(let rCode, let rMsg)):
+            return lCode == rCode && lMsg == rMsg
+        case (.unauthorized, .unauthorized): return true
+        case (.networkError, .networkError): return true
+        case (.unknown, .unknown): return true
+        default: return false
+        }
+    }
+}
+
+// MARK: - Endpoint Body Helper
+
+extension Endpoint {
+    func withBody(_ body: Data) -> Endpoint {
+        Endpoint(path: path, method: method, headers: headers, queryItems: queryItems, body: body)
     }
 }

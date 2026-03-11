@@ -2,16 +2,16 @@ import Foundation
 
 actor APIClient {
     static let shared = APIClient()
-    
+
     private let session: URLSession
     private let tokenStorage: TokenStorage
     private let decoder: JSONDecoder
-    private var isRefreshing = false
-    
+    private var refreshTask: Task<String?, Error>?
+
     init(session: URLSession = .shared, tokenStorage: TokenStorage = KeychainTokenStorage()) {
         self.session = session
         self.tokenStorage = tokenStorage
-        
+
         let jsonDecoder = JSONDecoder()
         let isoWithFrac = ISO8601DateFormatter()
         isoWithFrac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
@@ -44,10 +44,10 @@ actor APIClient {
         }
         self.decoder = jsonDecoder
     }
-    
+
     func request<T: Decodable>(_ endpoint: Endpoint) async throws -> T {
         var request = try buildRequest(endpoint)
-        
+
         do {
             return try await performRequest(request)
         } catch APIError.unauthorized {
@@ -59,10 +59,10 @@ actor APIClient {
             }
         }
     }
-    
+
     func requestVoid(_ endpoint: Endpoint) async throws {
         var request = try buildRequest(endpoint)
-        
+
         do {
             try await performVoidRequest(request)
         } catch APIError.unauthorized {
@@ -74,36 +74,38 @@ actor APIClient {
             }
         }
     }
-    
+
     private func buildRequest(_ endpoint: Endpoint) throws -> URLRequest {
         guard var request = endpoint.asURLRequest(baseURL: Endpoints.baseURL) else {
             throw APIError.invalidURL
         }
-        
+
         if let accessToken = tokenStorage.getAccessToken() {
             request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         }
-        
+
         return request
     }
-    
+
     private func performRequest<T: Decodable>(_ request: URLRequest) async throws -> T {
         let (data, response) = try await session.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.unknown
         }
-        
+
         switch httpResponse.statusCode {
         case 200...299:
             do {
                 return try decoder.decode(T.self, from: data)
             } catch {
+                #if DEBUG
                 let rawJSON = String(data: data, encoding: .utf8) ?? "<no data>"
                 print("🔴 DECODING ERROR for \(T.self)")
                 print("🔴 URL: \(request.url?.absoluteString ?? "?")")
                 print("🔴 Error: \(error)")
                 print("🔴 Raw JSON (first 2000 chars): \(String(rawJSON.prefix(2000)))")
+                #endif
                 throw APIError.decodingError(error)
             }
         case 401:
@@ -117,14 +119,14 @@ actor APIClient {
             throw APIError.unknown
         }
     }
-    
+
     private func performVoidRequest(_ request: URLRequest) async throws {
         let (_, response) = try await session.data(for: request)
-        
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.unknown
         }
-        
+
         switch httpResponse.statusCode {
         case 200...299:
             return
@@ -138,40 +140,46 @@ actor APIClient {
             throw APIError.unknown
         }
     }
-    
+
     private func refreshToken() async throws -> String? {
-        if isRefreshing {
-            return nil
+        if let existing = refreshTask {
+            return try await existing.value
         }
-        
-        isRefreshing = true
-        defer { isRefreshing = false }
-        
-        guard let refreshToken = tokenStorage.getRefreshToken() else {
-            return nil
+
+        let task = Task<String?, Error> {
+            defer { self.refreshTask = nil }
+
+            guard let refreshToken = self.tokenStorage.getRefreshToken() else {
+                return nil
+            }
+
+            guard var request = Endpoints.refreshToken().asURLRequest(baseURL: Endpoints.baseURL) else {
+                throw APIError.invalidURL
+            }
+            let body = RefreshTokenRequest(refreshToken: refreshToken)
+            request.httpBody = try JSONEncoder().encode(body)
+
+            let (data, response) = try await self.session.data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  httpResponse.statusCode == 200 else {
+                await self.tokenStorage.clearTokens()
+                return nil
+            }
+
+            let tokenResponse = try self.decoder.decode(RefreshTokenResponse.self, from: data)
+            try await self.tokenStorage.saveTokens(accessToken: tokenResponse.accessToken, refreshToken: tokenResponse.refreshToken)
+
+            return tokenResponse.accessToken
         }
-        
-        var request = Endpoints.refreshToken().asURLRequest(baseURL: Endpoints.baseURL)!
-        let body = RefreshTokenRequest(refreshToken: refreshToken)
-        request.httpBody = try? JSONEncoder().encode(body)
-        
-        let (data, response) = try await session.data(for: request)
-        
-        guard let httpResponse = response as? HTTPURLResponse,
-              httpResponse.statusCode == 200 else {
-            tokenStorage.clearTokens()
-            return nil
-        }
-        
-        let tokenResponse = try decoder.decode(RefreshTokenResponse.self, from: data)
-        try tokenStorage.saveTokens(accessToken: tokenResponse.accessToken, refreshToken: tokenResponse.refreshToken)
-        
-        return tokenResponse.accessToken
+
+        refreshTask = task
+        return try await task.value
     }
-    
-    func logout() {
-        tokenStorage.clearTokens()
-        UserDefaultsStorage.shared.clearUserData()
+
+    func logout() async {
+        await tokenStorage.clearTokens()
+        await UserDefaultsStorage.shared.clearUserData()
     }
 }
 
