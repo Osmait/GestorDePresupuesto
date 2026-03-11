@@ -1,5 +1,6 @@
 import SwiftUI
 
+// TODO: Extract GenericListView<Item, Row, Form> for duplicated list patterns
 enum Spacing: CGFloat {
     case xxs = 2
     case xs = 4
@@ -37,11 +38,11 @@ extension CGFloat {
     static var xl: CGFloat { Spacing.xl.rawValue }
     static var xxl: CGFloat { Spacing.xxl.rawValue }
     static var xxxl: CGFloat { Spacing.xxxl.rawValue }
-    
+
     static func spacing(_ spacing: Spacing) -> CGFloat {
         spacing.rawValue
     }
-    
+
     static func radius(_ radius: Radius) -> CGFloat {
         radius.rawValue
     }
@@ -59,15 +60,15 @@ extension View {
     func padding(_ spacing: Spacing) -> some View {
         self.padding(spacing.rawValue)
     }
-    
+
     func padding(_ edges: Edge.Set, _ spacing: Spacing) -> some View {
         self.padding(edges, spacing.rawValue)
     }
-    
+
     func cornerRadius(_ radius: Radius) -> some View {
         self.cornerRadius(radius.rawValue)
     }
-    
+
     func glassBackground(cornerRadius: Radius = .lg, opacity: Double = 0.8) -> some View {
         self
             .background(
@@ -80,17 +81,17 @@ extension View {
                     .stroke(Color.app.border, lineWidth: 0.5)
             )
     }
-    
+
     func cardShadow(elevation: Elevation = .md) -> some View {
         self.shadow(color: Color.black.opacity(0.08), radius: elevation.rawValue, x: 0, y: elevation.rawValue / 2)
     }
-    
+
     func gradientOverlay(colors: [Color], startPoint: UnitPoint = .topLeading, endPoint: UnitPoint = .bottomTrailing) -> some View {
         self.overlay(
             LinearGradient(colors: colors, startPoint: startPoint, endPoint: endPoint)
         )
     }
-    
+
     func gradientBackground(colors: [Color], cornerRadius: Radius = .lg) -> some View {
         self.background(
             LinearGradient(colors: colors, startPoint: .topLeading, endPoint: .bottomTrailing)

@@ -13,7 +13,7 @@ enum AppFont {
     case footnote
     case caption
     case caption2
-    
+
     var font: Font {
         switch self {
         case .largeTitle: return .system(size: 34, weight: .bold, design: .rounded)
@@ -29,7 +29,7 @@ enum AppFont {
         case .caption2: return .system(size: 11, weight: .regular, design: .rounded)
         }
     }
-    
+
     var uiFont: UIFont {
         switch self {
         case .largeTitle: return .systemFont(ofSize: 34, weight: .bold)

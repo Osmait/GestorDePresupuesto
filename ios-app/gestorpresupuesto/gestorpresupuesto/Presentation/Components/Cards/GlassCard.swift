@@ -5,7 +5,7 @@ struct GlassCard<Content: View>: View {
     var cornerRadius: Radius = .lg
     var padding: Spacing = .lg
     var hasBorder: Bool = true
-    
+
     init(
         cornerRadius: Radius = .lg,
         padding: Spacing = .lg,
@@ -17,7 +17,7 @@ struct GlassCard<Content: View>: View {
         self.hasBorder = hasBorder
         self.content = content()
     }
-    
+
     var body: some View {
         content
             .padding(padding)
@@ -41,7 +41,7 @@ struct GradientCard<Content: View>: View {
     let content: Content
     var cornerRadius: Radius = .lg
     var padding: Spacing = .lg
-    
+
     init(
         colors: [Color],
         cornerRadius: Radius = .lg,
@@ -53,7 +53,7 @@ struct GradientCard<Content: View>: View {
         self.padding = padding
         self.content = content()
     }
-    
+
     var body: some View {
         content
             .padding(padding)
@@ -75,7 +75,7 @@ struct SurfaceCard<Content: View>: View {
     let content: Content
     var cornerRadius: Radius = .lg
     var padding: Spacing = .lg
-    
+
     init(
         cornerRadius: Radius = .lg,
         padding: Spacing = .lg,
@@ -85,7 +85,7 @@ struct SurfaceCard<Content: View>: View {
         self.padding = padding
         self.content = content()
     }
-    
+
     var body: some View {
         content
             .padding(padding)
@@ -102,18 +102,18 @@ struct SurfaceCard<Content: View>: View {
 #Preview {
     ZStack {
         Color.app.background.ignoresSafeArea()
-        
+
         VStack(spacing: 20) {
             GlassCard {
                 Text("Glass Card")
                     .foregroundStyle(Color.app.textPrimary)
             }
-            
+
             GradientCard(colors: Color.app.gradientPrimary) {
                 Text("Gradient Card")
                     .foregroundStyle(.white)
             }
-            
+
             SurfaceCard {
                 Text("Surface Card")
                     .foregroundStyle(Color.app.textPrimary)

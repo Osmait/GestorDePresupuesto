@@ -5,7 +5,7 @@ enum FieldValidationState {
     case focused
     case valid
     case invalid
-    
+
     var borderColor: Color {
         switch self {
         case .normal: return Color.app.border
@@ -30,7 +30,7 @@ struct FormField: View {
     @FocusState private var isFocused: Bool
     @State private var errorMessage: String?
     @State private var hasBeenEdited: Bool = false
-    
+
     private var validationState: FieldValidationState {
         if isFocused {
             if let error = errorMessage, hasBeenEdited {
@@ -38,18 +38,18 @@ struct FormField: View {
             }
             return .focused
         }
-        
+
         if let error = errorMessage, hasBeenEdited {
             return .invalid
         }
-        
+
         if showSuccessIndicator, hasBeenEdited, errorMessage == nil, !text.isEmpty {
             return .valid
         }
-        
+
         return .normal
     }
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .xs) {
             if let title {
@@ -64,7 +64,7 @@ struct FormField: View {
                     .font(.system(size: 16))
                     .foregroundStyle(validationState == .focused ? Color.app.accent : Color.app.textTertiary)
                     .frame(width: 20)
-                
+
                 if isSecure {
                     SecureField(placeholder, text: $text)
                         .font(.app(.body))
@@ -77,14 +77,14 @@ struct FormField: View {
                         .focused($isFocused)
                         .textInputAutocapitalization(autocapitalization)
                 }
-                
+
                 if validationState == .valid {
                     Image(systemName: "checkmark.circle.fill")
                         .font(.system(size: 16))
                         .foregroundStyle(Color.app.success)
                         .transition(.scale.combined(with: .opacity))
                 }
-                
+
                 if validationState == .invalid {
                     Image(systemName: "exclamationmark.circle.fill")
                         .font(.system(size: 16))
@@ -100,7 +100,7 @@ struct FormField: View {
                     .stroke(validationState.borderColor, lineWidth: isFocused ? 2 : 1)
             )
             .animation(.easeInOut(duration: 0.2), value: validationState)
-            
+
             if let error = errorMessage, hasBeenEdited {
                 HStack(spacing: .xs) {
                     Image(systemName: "exclamationmark.circle")
@@ -124,7 +124,7 @@ struct FormField: View {
             }
         }
     }
-    
+
     private func validate(_ value: String) {
         if let validation = validation {
             errorMessage = validation(value)
@@ -135,7 +135,7 @@ struct FormField: View {
 #Preview {
     ZStack {
         Color.app.background.ignoresSafeArea()
-        
+
         VStack(spacing: 24) {
             FormField(
                 icon: "envelope",
@@ -147,7 +147,7 @@ struct FormField: View {
                     value.isEmpty ? "El email es requerido" : nil
                 }
             )
-            
+
             FormField(
                 icon: "lock",
                 placeholder: "Contraseña",

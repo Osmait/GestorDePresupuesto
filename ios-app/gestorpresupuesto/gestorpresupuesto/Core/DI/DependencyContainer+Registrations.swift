@@ -1,5 +1,6 @@
 import Foundation
 
+// NOTE: VMs resolve via DependencyContainer.shared for @StateObject compatibility
 extension DependencyContainer {
     func registerDefaults() {
         register(AuthRepository.self) { AuthRepositoryImpl() }
@@ -16,5 +17,6 @@ extension DependencyContainer {
         register(InvestmentRepository.self) { InvestmentRepositoryImpl() }
         register(ExchangeRateRepository.self) { ExchangeRateRepositoryImpl() }
         register(SearchRepository.self) { SearchRepositoryImpl() }
+        register(NotificationRepository.self) { NotificationRepositoryImpl() }
     }
 }

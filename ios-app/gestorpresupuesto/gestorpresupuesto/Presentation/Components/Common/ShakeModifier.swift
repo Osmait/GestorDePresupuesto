@@ -4,13 +4,13 @@ struct ShakeModifier: ViewModifier {
     let trigger: Bool
     let amount: CGFloat
     let shakesCount: Int
-    
+
     init(trigger: Bool, amount: CGFloat = 10, shakesCount: Int = 3) {
         self.trigger = trigger
         self.amount = amount
         self.shakesCount = shakesCount
     }
-    
+
     func body(content: Content) -> some View {
         content
             .offset(x: trigger ? amount : 0)
@@ -32,7 +32,7 @@ extension View {
 #Preview {
     struct ShakePreview: View {
         @State private var shake = false
-        
+
         var body: some View {
             VStack(spacing: 40) {
                 Text("Shake Demo")
@@ -41,7 +41,7 @@ extension View {
                     .background(Color.app.surfaceSecondary)
                     .cornerRadius(.md)
                     .shake(trigger: shake)
-                
+
                 Button("Shake!") {
                     shake = false
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
@@ -52,6 +52,6 @@ extension View {
             }
         }
     }
-    
+
     return ShakePreview()
 }

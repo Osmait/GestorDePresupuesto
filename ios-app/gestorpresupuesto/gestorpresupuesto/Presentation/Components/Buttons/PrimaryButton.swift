@@ -5,7 +5,7 @@ struct PrimaryButton: View {
     let icon: String?
     let isLoading: Bool
     let action: () -> Void
-    
+
     init(
         _ title: String,
         icon: String? = nil,
@@ -17,7 +17,7 @@ struct PrimaryButton: View {
         self.isLoading = isLoading
         self.action = action
     }
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: .sm) {
@@ -53,7 +53,7 @@ struct SecondaryButton: View {
     let title: String
     let icon: String?
     let action: () -> Void
-    
+
     init(
         _ title: String,
         icon: String? = nil,
@@ -63,7 +63,7 @@ struct SecondaryButton: View {
         self.icon = icon
         self.action = action
     }
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: .sm) {
@@ -92,7 +92,7 @@ struct IconButton: View {
     let color: Color
     let size: CGFloat
     let action: () -> Void
-    
+
     init(
         _ icon: String,
         color: Color = .app.accent,
@@ -104,14 +104,14 @@ struct IconButton: View {
         self.size = size
         self.action = action
     }
-    
+
     var body: some View {
         Button(action: action) {
             ZStack {
                 Circle()
                     .fill(color.opacity(0.15))
                     .frame(width: size, height: size)
-                
+
                 Image(systemName: icon)
                     .font(.system(size: size * 0.45, weight: .medium))
                     .foregroundStyle(color)
@@ -124,7 +124,7 @@ struct IconButton: View {
 struct FAB: View {
     let icon: String
     let action: () -> Void
-    
+
     var body: some View {
         Button(action: action) {
             ZStack {
@@ -136,7 +136,7 @@ struct FAB: View {
                 .frame(width: 56, height: 56)
                 .clipShape(Circle())
                 .shadow(color: Color.app.accent.opacity(0.4), radius: 8, x: 0, y: 4)
-                
+
                 Image(systemName: icon)
                     .font(.title2)
                     .fontWeight(.semibold)
@@ -158,18 +158,18 @@ struct ScaleButtonStyle: ButtonStyle {
 #Preview {
     ZStack {
         Color.app.background.ignoresSafeArea()
-        
+
         VStack(spacing: 20) {
             PrimaryButton("Iniciar Sesión", icon: "arrow.right") {}
-            
+
             SecondaryButton("Crear Cuenta", icon: "person.badge.plus") {}
-            
+
             HStack(spacing: 16) {
                 IconButton("plus") {}
                 IconButton("heart.fill", color: .app.error) {}
                 IconButton("star.fill", color: .app.warning) {}
             }
-            
+
             FAB(icon: "plus") {}
         }
         .padding()

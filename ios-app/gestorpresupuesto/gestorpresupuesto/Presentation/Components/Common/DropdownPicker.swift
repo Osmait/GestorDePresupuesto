@@ -5,7 +5,7 @@ struct DropdownPicker<T: Hashable>: View {
     @Binding var selection: T
     let options: [T]
     let labelForOption: (T) -> String
-    var icon: String? = nil
+    var icon: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.xs.rawValue) {

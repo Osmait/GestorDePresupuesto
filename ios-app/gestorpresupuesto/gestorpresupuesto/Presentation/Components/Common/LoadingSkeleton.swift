@@ -3,9 +3,9 @@ import SwiftUI
 struct LoadingSkeleton: View {
     var height: CGFloat = 20
     var cornerRadius: Radius = .sm
-    
+
     @State private var isAnimating = false
-    
+
     var body: some View {
         Rectangle()
             .fill(Color.app.surfaceSecondary)
@@ -45,16 +45,16 @@ struct CardSkeleton: View {
                 HStack {
                     LoadingSkeleton(height: 40, cornerRadius: .full)
                         .frame(width: 40)
-                    
+
                     VStack(alignment: .leading, spacing: .sm) {
                         LoadingSkeleton(height: 14)
                             .frame(width: 120)
                         LoadingSkeleton(height: 12)
                             .frame(width: 80)
                     }
-                    
+
                     Spacer()
-                    
+
                     LoadingSkeleton(height: 24, cornerRadius: .sm)
                         .frame(width: 60)
                 }
@@ -76,12 +76,12 @@ struct DashboardSkeleton: View {
                         .frame(width: 200)
                 }
             }
-            
+
             HStack(spacing: .md) {
                 CardSkeleton()
                 CardSkeleton()
             }
-            
+
             VStack(alignment: .leading, spacing: .md) {
                 LoadingSkeleton(height: 20)
                     .frame(width: 150)
@@ -100,30 +100,30 @@ struct EmptyStateView: View {
     let message: String
     var actionTitle: String?
     var action: (() -> Void)?
-    
+
     var body: some View {
         VStack(spacing: .lg) {
             ZStack {
                 Circle()
                     .fill(Color.app.accent.opacity(0.1))
                     .frame(width: 100, height: 100)
-                
+
                 Image(systemName: icon)
                     .font(.system(size: 40))
                     .foregroundStyle(Color.app.accent)
             }
-            
+
             VStack(spacing: .sm) {
                 Text(title)
                     .font(.app(.headline))
                     .foregroundStyle(Color.app.textPrimary)
-                
+
                 Text(message)
                     .font(.app(.subheadline))
                     .foregroundStyle(Color.app.textSecondary)
                     .multilineTextAlignment(.center)
             }
-            
+
             if let actionTitle = actionTitle, let action = action {
                 PrimaryButton(actionTitle, icon: "plus", action: action)
                     .padding(.horizontal, .xxl)
@@ -136,23 +136,23 @@ struct EmptyStateView: View {
 #Preview {
     ZStack {
         Color.app.background.ignoresSafeArea()
-        
+
         ScrollView {
             VStack(spacing: 24) {
                 Text("Loading Skeleton")
                     .font(.headline)
-                
+
                 LoadingSkeleton(height: 20)
                 LoadingSkeleton(height: 40, cornerRadius: .md)
-                
+
                 Text("Card Skeleton")
                     .font(.headline)
-                
+
                 CardSkeleton()
-                
+
                 Text("Empty State")
                     .font(.headline)
-                
+
                 EmptyStateView(
                     icon: "tray",
                     title: "Sin transacciones",

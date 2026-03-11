@@ -4,7 +4,7 @@ enum PasswordStrength {
     case weak
     case medium
     case strong
-    
+
     var color: Color {
         switch self {
         case .weak: return .app.error
@@ -12,7 +12,7 @@ enum PasswordStrength {
         case .strong: return .app.success
         }
     }
-    
+
     var label: String {
         switch self {
         case .weak: return "Débil"
@@ -20,7 +20,7 @@ enum PasswordStrength {
         case .strong: return "Fuerte"
         }
     }
-    
+
     var segmentCount: Int {
         switch self {
         case .weak: return 1
@@ -33,9 +33,9 @@ enum PasswordStrength {
 struct PasswordStrengthIndicator: View {
     let strength: PasswordStrength
     let isVisible: Bool
-    
+
     @State private var animatedSegments: Int = 0
-    
+
     var body: some View {
         VStack(alignment: .leading, spacing: .xs) {
             HStack(spacing: .xs) {
@@ -46,7 +46,7 @@ struct PasswordStrengthIndicator: View {
                         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: animatedSegments)
                 }
             }
-            
+
             if isVisible {
                 Text(strength.label)
                     .font(.caption2)
@@ -68,7 +68,7 @@ struct PasswordStrengthIndicator: View {
 #Preview {
     ZStack {
         Color.app.background.ignoresSafeArea()
-        
+
         VStack(spacing: 24) {
             PasswordStrengthIndicator(strength: .weak, isVisible: true)
             PasswordStrengthIndicator(strength: .medium, isVisible: true)
