@@ -84,7 +84,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
   };
   return (
     <Card
-      className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20 cursor-pointer"
+      className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-colors duration-300 border-border/50 dark:border-border/20 cursor-pointer"
       onClick={() => onOpenDetails?.(transaction)}
     >
       <CardContent className="p-6">
@@ -155,7 +155,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
                     }
                   }}>
                     <Edit className="h-4 w-4" />
-                    Editar transacción
+                    {t('edit')}
                   </DropdownMenuItem>
                 ) : null}
                 <DropdownMenuItem
@@ -166,7 +166,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
                   }}
                 >
                   <Trash2 className="h-4 w-4" />
-                  Eliminar transacción
+                  {t('delete')}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -177,10 +177,9 @@ export default function TransactionItem({ transaction, category, onTransactionDe
       <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Eliminar Transacción</DialogTitle>
+            <DialogTitle>{t('deleteTitle')}</DialogTitle>
             <DialogDescription>
-              This action cannot be undone. This will permanently delete the transaction
-              &quot;{transaction.description || transaction.name}&quot; and remove your data from our servers.
+              {t('deleteDescription', { name: transaction.description || transaction.name })}
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>
@@ -189,14 +188,14 @@ export default function TransactionItem({ transaction, category, onTransactionDe
               onClick={() => setShowDeleteDialog(false)}
               disabled={isDeleting}
             >
-              Cancelar
+              {t('cancel')}
             </Button>
             <Button
               variant="destructive"
               onClick={handleDeleteTransaction}
               disabled={isDeleting}
             >
-              {isDeleting ? 'Eliminando...' : 'Eliminar'}
+              {isDeleting ? t('deleting') : t('delete')}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -8,7 +8,3 @@ export interface ConvertResponse {
 	dop: number
 	rate: number
 }
-
-export function formatExchangeRate(rate: number): string {
-	return rate.toFixed(2)
-}

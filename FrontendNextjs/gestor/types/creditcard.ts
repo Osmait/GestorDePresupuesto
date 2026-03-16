@@ -100,10 +100,3 @@ export function getUtilizationColor(percent: number): string {
 	if (percent < 80) return 'text-orange-500'
 	return 'text-red-500'
 }
-
-export function getUtilizationBgColor(percent: number): string {
-	if (percent < 30) return 'bg-green-500'
-	if (percent < 60) return 'bg-yellow-500'
-	if (percent < 80) return 'bg-orange-500'
-	return 'bg-red-500'
-}

@@ -67,7 +67,7 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
 
   return (
     <Card
-      className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20 cursor-pointer"
+      className="hover:bg-accent/40 dark:hover:bg-accent/40 transition-colors duration-300 border-border/50 dark:border-border/20 cursor-pointer"
       onClick={handleCardClick}
     >
       <CardContent className="p-6">
@@ -88,8 +88,8 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <MoreHorizontal className="h-4 w-4" />
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0" aria-label={t('edit')}>
+                <MoreHorizontal className="h-4 w-4" aria-hidden="true" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">

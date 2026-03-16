@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, ReactNode } from 'react'
+import { useState, useRef, useEffect, useCallback, ReactNode } from 'react'
+import { useSearchParams, useRouter, usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 interface TabItem {
@@ -18,6 +19,8 @@ interface AnimatedTabsProps {
 	orientation?: 'horizontal' | 'vertical'
 	onValueChange?: (_value: string) => void
 	noContent?: boolean
+	/** URL query param name to sync tab state. Defaults to "tab". Set to false to disable URL sync. */
+	urlParam?: string | false
 }
 
 export function AnimatedTabs({
@@ -26,9 +29,28 @@ export function AnimatedTabs({
 	className,
 	orientation = 'horizontal',
 	onValueChange,
-	noContent = false
+	noContent = false,
+	urlParam = 'tab'
 }: AnimatedTabsProps) {
-	const [activeTab, setActiveTab] = useState(defaultValue)
+	const searchParams = useSearchParams()
+	const router = useRouter()
+	const pathname = usePathname()
+
+	const urlTab = urlParam ? searchParams.get(urlParam) : null
+	const validUrlTab = urlTab && tabs.some(t => t.value === urlTab) ? urlTab : null
+	const [activeTab, setActiveTab] = useState(validUrlTab || defaultValue)
+
+	const updateUrl = useCallback((value: string) => {
+		if (!urlParam) return
+		const params = new URLSearchParams(searchParams.toString())
+		if (value === defaultValue) {
+			params.delete(urlParam)
+		} else {
+			params.set(urlParam, value)
+		}
+		const query = params.toString()
+		router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+	}, [urlParam, searchParams, defaultValue, router, pathname])
 	const tabsRef = useRef<HTMLDivElement>(null)
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 	const [indicatorStyle, setIndicatorStyle] = useState({
@@ -83,6 +105,7 @@ export function AnimatedTabs({
 	const handleTabClick = (value: string) => {
 		if (tabs.find(tab => tab.value === value)?.disabled) return
 		setActiveTab(value)
+		updateUrl(value)
 		if (onValueChange) {
 			onValueChange(value)
 		}
@@ -95,6 +118,8 @@ export function AnimatedTabs({
 			{/* Tabs List */}
 			<div
 				ref={tabsRef}
+				role="tablist"
+				aria-orientation={orientation}
 				className={cn(
 					'relative inline-flex h-10 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground backdrop-blur-sm border border-border/50 w-full sm:w-auto',
 					orientation === 'horizontal' && 'flex-row',
@@ -106,7 +131,7 @@ export function AnimatedTabs({
 					<>
 						{/* Linea inferior del indicador */}
 						<div
-							className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-all duration-300 ease-out pointer-events-none z-10"
+							className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-[left,width,opacity] duration-300 ease-out pointer-events-none z-10"
 							style={{
 								left: `${indicatorStyle.left}px`,
 								width: `${indicatorStyle.width}px`,
@@ -116,7 +141,7 @@ export function AnimatedTabs({
 
 						{/* Fondo del indicador */}
 						<div
-							className="absolute top-1 bottom-1 bg-primary/10 rounded-md transition-all duration-300 ease-out pointer-events-none z-0"
+							className="absolute top-1 bottom-1 bg-primary/10 rounded-md transition-[left,width,opacity] duration-300 ease-out pointer-events-none z-0"
 							style={{
 								left: `${indicatorStyle.left}px`,
 								width: `${indicatorStyle.width}px`,
@@ -130,7 +155,7 @@ export function AnimatedTabs({
 				{orientation === 'vertical' && (
 					<>
 						<div
-							className="absolute left-0 w-0.5 bg-primary rounded-full transition-all duration-300 ease-out pointer-events-none z-10"
+							className="absolute left-0 w-0.5 bg-primary rounded-full transition-[top,height,opacity] duration-300 ease-out pointer-events-none z-10"
 							style={{
 								top: `${indicatorStyle.top}px`,
 								height: `${indicatorStyle.height}px`,
@@ -139,7 +164,7 @@ export function AnimatedTabs({
 						/>
 
 						<div
-							className="absolute left-1 right-1 bg-primary/10 rounded-md transition-all duration-300 ease-out pointer-events-none z-0"
+							className="absolute left-1 right-1 bg-primary/10 rounded-md transition-[top,height,opacity] duration-300 ease-out pointer-events-none z-0"
 							style={{
 								top: `${indicatorStyle.top}px`,
 								height: `${indicatorStyle.height}px`,
@@ -160,6 +185,10 @@ export function AnimatedTabs({
 							ref={(el) => {
 								tabRefs.current[index] = el
 							}}
+							role="tab"
+							aria-selected={isActive}
+							aria-controls={`tabpanel-${tab.value}`}
+							id={`tab-${tab.value}`}
 							onClick={() => handleTabClick(tab.value)}
 							disabled={isDisabled}
 							className={cn(
@@ -202,7 +231,12 @@ export function AnimatedTabs({
 
 			{/* Tab Content */}
 			{!noContent && (
-				<div className="min-h-[200px] transition-all duration-300 ease-in-out">
+				<div
+					role="tabpanel"
+					id={`tabpanel-${activeTab}`}
+					aria-labelledby={`tab-${activeTab}`}
+					className="min-h-[200px] transition-opacity duration-300 ease-in-out"
+				>
 					{activeTabContent}
 				</div>
 			)}

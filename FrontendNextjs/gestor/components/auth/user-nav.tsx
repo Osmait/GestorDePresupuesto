@@ -13,7 +13,7 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { LogOut, User, Settings, Globe } from "lucide-react"
 import { ModeToggle } from "@/components/common/ToggleMode"
-import { useLocale } from "next-intl"
+import { useLocale, useTranslations } from "next-intl"
 import { useState } from "react"
 import { SettingsModal } from "@/components/settings/SettingsModal"
 
@@ -26,6 +26,7 @@ import { SettingsModal } from "@/components/settings/SettingsModal"
 export function UserNav() {
   const { data: session, status } = useSession()
   const locale = useLocale()
+  const t = useTranslations('nav')
   const [showSettings, setShowSettings] = useState(false)
 
   if (status === "loading") {
@@ -77,15 +78,15 @@ export function UserNav() {
           <DropdownMenuSeparator />
           <div className="px-2 py-1.5">
             <div className="flex items-center justify-between">
-              <span className="text-sm">Tema</span>
+              <span className="text-sm">{t('theme')}</span>
               <ModeToggle />
             </div>
           </div>
           <div className="px-2 py-1.5">
             <div className="flex items-center justify-between">
               <span className="text-sm flex items-center gap-2">
-                <Globe className="h-4 w-4" />
-                Idioma
+                <Globe className="h-4 w-4" aria-hidden="true" />
+                {t('language')}
               </span>
               <div className="flex gap-1">
                 <Button
@@ -110,16 +111,16 @@ export function UserNav() {
           <DropdownMenuSeparator />
           <DropdownMenuItem>
             <User className="mr-2 h-4 w-4" />
-            <span>Perfil</span>
+            <span>{t('profile')}</span>
           </DropdownMenuItem>
           <DropdownMenuItem onClick={() => setShowSettings(true)}>
             <Settings className="mr-2 h-4 w-4" />
-            <span>Configuración</span>
+            <span>{t('configuration')}</span>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut}>
             <LogOut className="mr-2 h-4 w-4" />
-            <span>Cerrar sesión</span>
+            <span>{t('logout')}</span>
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>

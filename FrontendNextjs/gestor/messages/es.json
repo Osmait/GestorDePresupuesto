@@ -74,7 +74,11 @@
     "search": "Buscar...",
     "profile": "Perfil",
     "logout": "Cerrar sesión",
-    "collapse": "Contraer"
+    "collapse": "Contraer",
+    "theme": "Tema",
+    "language": "Idioma",
+    "configuration": "Configuración",
+    "menu": "Menú"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -203,7 +207,13 @@
     "page": "Página",
     "loanPrincipalCollection": "Cobro capital",
     "loanInterestIncome": "Interés préstamo",
-    "deleteConfirm": "¿Estás seguro de eliminar esta transacción?"
+    "deleteConfirm": "¿Estás seguro de eliminar esta transacción?",
+    "edit": "Editar transacción",
+    "delete": "Eliminar transacción",
+    "deleteTitle": "Eliminar Transacción",
+    "deleteDescription": "Esta acción no se puede deshacer. Se eliminará permanentemente la transacción \"{name}\" y sus datos.",
+    "deleting": "Eliminando…",
+    "cancel": "Cancelar"
   },
   "loans": {
     "title": "Préstamos",

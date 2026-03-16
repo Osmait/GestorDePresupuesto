@@ -24,16 +24,6 @@ import {
   SpendingAnalysisResponse,
 } from '@/types/ai'
 
-export const AI_KEYS = {
-  extract: ['ai', 'extract'] as const,
-  reconcilePreview: ['ai', 'reconcile-preview'] as const,
-  reconcileApply: ['ai', 'reconcile-apply'] as const,
-  analyze: ['ai', 'analyze'] as const,
-	savingsPlan: ['ai', 'savings-plan'] as const,
-	savingsGoals: ['ai', 'savings-goals'] as const,
-	savingsGoalProgress: ['ai', 'savings-goal-progress'] as const,
-	suggestCategory: ['ai', 'suggest-category'] as const,
-}
 
 export function useExtractTransactionsMutation() {
   return useMutation<AIExtractResponse | AIError, Error, AIExtractRequest>({

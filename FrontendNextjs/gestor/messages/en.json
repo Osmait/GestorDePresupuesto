@@ -74,7 +74,11 @@
     "search": "Search...",
     "profile": "Profile",
     "logout": "Log out",
-    "collapse": "Collapse"
+    "collapse": "Collapse",
+    "theme": "Theme",
+    "language": "Language",
+    "configuration": "Settings",
+    "menu": "Menu"
   },
   "dashboard": {
     "title": "Dashboard",
@@ -203,7 +207,13 @@
     "page": "Page",
     "loanPrincipalCollection": "Principal collection",
     "loanInterestIncome": "Loan interest",
-    "deleteConfirm": "Are you sure you want to delete this transaction?"
+    "deleteConfirm": "Are you sure you want to delete this transaction?",
+    "edit": "Edit transaction",
+    "delete": "Delete transaction",
+    "deleteTitle": "Delete Transaction",
+    "deleteDescription": "This action cannot be undone. The transaction \"{name}\" will be permanently deleted.",
+    "deleting": "Deleting…",
+    "cancel": "Cancel"
   },
   "loans": {
     "title": "Loans",

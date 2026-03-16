@@ -128,7 +128,7 @@ function SidebarFooter({
 					variant="ghost"
 					size="sm"
 					onClick={toggleCollapsed}
-					className={`w-full transition-all duration-300 ${!isExpanded && 'px-2'} group`}
+					className={`w-full transition-colors duration-300 ${!isExpanded && 'px-2'} group`}
 				>
 					{isExpanded ? (
 						<>
@@ -164,8 +164,9 @@ function MainHeader({ isExpanded, toggleMobile }: {
 						size="sm"
 						onClick={toggleMobile}
 						className="lg:hidden flex-shrink-0"
+						aria-label={t('dashboard')}
 					>
-						<Menu className="h-4 w-4" />
+						<Menu className="h-4 w-4" aria-hidden="true" />
 					</Button>
 
 					{isExpanded && (
@@ -183,8 +184,8 @@ function MainHeader({ isExpanded, toggleMobile }: {
 						<NotificationCenter />
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button variant="ghost" size="sm">
-									<Plus className="h-4 w-4" />
+								<Button variant="ghost" size="sm" aria-label={t('quickActions')}>
+									<Plus className="h-4 w-4" aria-hidden="true" />
 								</Button>
 							</DropdownMenuTrigger>
 							<DropdownMenuContent align="end" className="w-56">
@@ -225,6 +226,7 @@ function MainHeader({ isExpanded, toggleMobile }: {
 export function Sidebar({ children }: SidebarProps) {
 	usePathname() // Used for route-based styling in child components
 	const { navItems, bottomNavItems } = useNavItems()
+	const t = useTranslations('nav')
 
 	// Estado local para settings eliminada al moverla al UserNav
 	const handleItemClick = (_item: NavItem, _e: React.MouseEvent) => {
@@ -246,9 +248,11 @@ export function Sidebar({ children }: SidebarProps) {
 				<div className="flex h-screen bg-background">
 					{/* Mobile Overlay */}
 					{isMobileOpen && (
-						<div
-							className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden"
+						<button
+							type="button"
+							className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden cursor-default"
 							onClick={toggleMobile}
+							aria-label={t('collapse')}
 						/>
 					)}
 
