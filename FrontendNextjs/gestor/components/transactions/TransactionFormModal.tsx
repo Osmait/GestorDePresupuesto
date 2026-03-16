@@ -56,7 +56,6 @@ type TransactionFormModalProps = {
   ) => Promise<void>;
   isLoading: boolean;
   error: string | null;
-  formRef: React.MutableRefObject<{ reset: () => void } | null>;
 };
 
 function ensureUniqueCategoryName(baseName: string, existingNames: string[]): string {
@@ -98,7 +97,7 @@ const CURRENCIES = [
   { code: 'EUR', name: 'Euro', symbol: '€' },
 ];
 
-export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error }: Omit<TransactionFormModalProps, 'formRef'>) {
+export default function TransactionFormModal({ open, setOpen, createTransaction, isLoading, error }: TransactionFormModalProps) {
   const t = useTranslations('forms');
   const tTx = useTranslations('transactions');
   const locale = useLocale();

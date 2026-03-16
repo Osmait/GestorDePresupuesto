@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
@@ -69,6 +69,15 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 	const [error, setError] = useState<string | null>(null)
 	const [success, setSuccess] = useState(false)
 	const router = useRouter()
+	const autoLoginTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+	useEffect(() => {
+		return () => {
+			if (autoLoginTimerRef.current) {
+				clearTimeout(autoLoginTimerRef.current)
+			}
+		}
+	}, [])
 
 	const form = useForm<RegisterFormValues>({
 		resolver: zodResolver(registerSchema),
@@ -112,15 +121,12 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 			setSuccess(true)
 
 			// Auto-login después del registro
-			setTimeout(async () => {
+			autoLoginTimerRef.current = setTimeout(async () => {
 				try {
-					const user = await authRepository.login(values.email, values.password)
-					console.log('✅ Auto-login exitoso:', user)
+					await authRepository.login(values.email, values.password)
 					router.push('/app')
 					router.refresh()
-				} catch (err) {
-					console.error('❌ Error en auto-login:', err)
-					// Si falla el auto-login, redirigir al login manual
+				} catch {
 					router.push('/login')
 				}
 			}, 1500)

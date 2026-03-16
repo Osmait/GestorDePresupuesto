@@ -16,6 +16,7 @@ interface AccountAnalyticsProps {
 }
 
 const COLORS = ['#10b981', '#ef4444'] // Green for Income, Red for Expense
+const TOP_CATEGORIES_COUNT = 5
 
 export function AccountAnalytics({ transactions, categories, currentBalance }: AccountAnalyticsProps) {
     const t = useTranslations('analysis')
@@ -50,7 +51,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                     value,
                     color: cat?.color || '#94a3b8' // fallback color
                 }
-            }).sort((a, b) => b.value - a.value).slice(0, 5) // Top 5
+            }).sort((a, b) => b.value - a.value).slice(0, TOP_CATEGORIES_COUNT)
         }
 
         // Balance History Logic
@@ -100,7 +101,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
         const topExpenses = Object.entries(expenseByNameMap)
             .map(([name, value]) => ({ name, value, color: '#ef4444' }))
             .sort((a, b) => b.value - a.value)
-            .slice(0, 5)
+            .slice(0, TOP_CATEGORIES_COUNT)
 
         return {
             income,
@@ -117,7 +118,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
         { name: t('expenses'), value: stats.expense }
     ].filter(d => d.value > 0)
 
-    const CustomTooltip = ({ active, payload, label }: any) => {
+    const CustomTooltip = ({ active, payload, label }: { active?: boolean; payload?: Array<{ name: string; value: number; payload: { name: string } }>; label?: string }) => {
         if (active && payload && payload.length) {
             return (
                 <div className="bg-popover border border-border p-2 rounded shadow-md text-sm">
@@ -291,7 +292,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
                             <Tooltip
                                 contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
                                 labelStyle={{ fontWeight: 'bold', color: '#374151' }}
-                                formatter={(value: any) => [`$${Number(value).toLocaleString()}`, t('balance')]}
+                                formatter={(value) => [`$${Number(value).toLocaleString()}`, t('balance')]}
                             />
                             <Area
                                 type="monotone"
