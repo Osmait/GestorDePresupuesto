@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
 import { Loader2, ArrowRightLeft } from 'lucide-react'
 import {
 	Dialog,
@@ -10,7 +13,6 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
 	Select,
 	SelectContent,
@@ -19,6 +21,14 @@ import {
 	SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from '@/components/ui/form'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useFundBrokerMutation, useGetInvestmentFundingBalances } from '@/hooks/queries/useInvestmentsQuery'
 
@@ -29,69 +39,77 @@ interface InvestmentFundingModalProps {
 
 const SUPPORTED_CURRENCIES = ['USD', 'DOP']
 
+const fundingSchema = z.object({
+	sourceAccountID: z.string().min(1, 'Select a source account'),
+	sourceAmount: z.coerce.number().positive('Source amount must be greater than 0'),
+	targetCurrency: z.string().min(1),
+	exchangeRate: z.coerce.number().min(0),
+	feeAmount: z.coerce.number().min(0),
+	notes: z.string().optional().default(''),
+})
+
+type FundingFormValues = z.infer<typeof fundingSchema>
+
 export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingModalProps) {
 	const { data: accounts = [] } = useGetAccounts()
 	const { data: balances = [] } = useGetInvestmentFundingBalances()
 	const fundMutation = useFundBrokerMutation()
-	const [sourceAccountID, setSourceAccountID] = useState('')
-	const [sourceAmount, setSourceAmount] = useState(0)
-	const [targetCurrency, setTargetCurrency] = useState('USD')
-	const [exchangeRate, setExchangeRate] = useState(0)
-	const [feeAmount, setFeeAmount] = useState(0)
-	const [notes, setNotes] = useState('')
 	const [error, setError] = useState<string | null>(null)
 
-	useEffect(() => {
-		if (!sourceAccountID && accounts.length > 0) {
-			setSourceAccountID(accounts[0].id)
-		}
-	}, [accounts, sourceAccountID])
+	const form = useForm<FundingFormValues>({
+		resolver: zodResolver(fundingSchema),
+		defaultValues: {
+			sourceAccountID: '',
+			sourceAmount: 0,
+			targetCurrency: 'USD',
+			exchangeRate: 0,
+			feeAmount: 0,
+			notes: '',
+		},
+	})
+
+	const watchedValues = form.watch()
 
 	useEffect(() => {
-		if (isOpen) {
-			setError(null)
+		if (!watchedValues.sourceAccountID && accounts.length > 0) {
+			form.setValue('sourceAccountID', accounts[0].id)
 		}
+	}, [accounts, watchedValues.sourceAccountID, form])
+
+	useEffect(() => {
+		if (isOpen) setError(null)
 	}, [isOpen])
 
-	const selectedAccount = useMemo(() => accounts.find((account) => account.id === sourceAccountID), [accounts, sourceAccountID])
+	const selectedAccount = useMemo(() => accounts.find((account) => account.id === watchedValues.sourceAccountID), [accounts, watchedValues.sourceAccountID])
 	const sourceCurrency = selectedAccount?.currency || 'DOP'
-	const requiresExchangeRate = sourceCurrency !== targetCurrency
+	const requiresExchangeRate = sourceCurrency !== watchedValues.targetCurrency
 	const estimatedTargetAmount = useMemo(() => {
-		if (sourceAmount <= 0) return 0
-		if (!requiresExchangeRate) return sourceAmount
-		if (exchangeRate <= 0) return 0
-		return sourceAmount / exchangeRate
-	}, [sourceAmount, requiresExchangeRate, exchangeRate])
+		if (watchedValues.sourceAmount <= 0) return 0
+		if (!requiresExchangeRate) return watchedValues.sourceAmount
+		if (watchedValues.exchangeRate <= 0) return 0
+		return watchedValues.sourceAmount / watchedValues.exchangeRate
+	}, [watchedValues.sourceAmount, requiresExchangeRate, watchedValues.exchangeRate])
 
-	const handleSubmit = async (event: React.FormEvent) => {
-		event.preventDefault()
+	const onSubmit = async (values: FundingFormValues) => {
 		setError(null)
 
-		if (!sourceAccountID) {
-			setError('Select a source account')
-			return
-		}
-		if (sourceAmount <= 0) {
-			setError('Source amount must be greater than 0')
-			return
-		}
-		if (requiresExchangeRate && exchangeRate <= 0) {
+		if (requiresExchangeRate && values.exchangeRate <= 0) {
 			setError('Exchange rate is required when currencies differ')
 			return
 		}
 
 		try {
 			await fundMutation.mutateAsync({
-				source_account_id: sourceAccountID,
-				source_amount: sourceAmount,
-				target_currency: targetCurrency,
-				exchange_rate: requiresExchangeRate ? exchangeRate : undefined,
-				fee_amount: feeAmount > 0 ? feeAmount : undefined,
-				notes,
+				source_account_id: values.sourceAccountID,
+				source_amount: values.sourceAmount,
+				target_currency: values.targetCurrency,
+				exchange_rate: requiresExchangeRate ? values.exchangeRate : undefined,
+				fee_amount: values.feeAmount > 0 ? values.feeAmount : undefined,
+				notes: values.notes,
 			})
 			onClose()
-		} catch (submitError: any) {
-			setError(submitError?.message || 'Failed to fund broker balance')
+		} catch (submitError: unknown) {
+			setError(submitError instanceof Error ? submitError.message : 'Failed to fund broker balance')
 		}
 	}
 
@@ -119,98 +137,130 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 					</Alert>
 				)}
 
-				<form onSubmit={handleSubmit} className='space-y-4'>
-					<div className='space-y-1.5'>
-						<Label htmlFor='source_account'>Source account</Label>
-						<Select value={sourceAccountID} onValueChange={setSourceAccountID}>
-							<SelectTrigger>
-								<SelectValue placeholder='Select account' />
-							</SelectTrigger>
-							<SelectContent>
-								{accounts.map((account) => (
-									<SelectItem key={account.id} value={account.id}>
-										{account.name} ({account.currency || 'DOP'})
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className='grid gap-3 md:grid-cols-2'>
-						<div className='space-y-1.5'>
-							<Label htmlFor='source_amount'>Amount from account ({sourceCurrency})</Label>
-							<Input
-								id='source_amount'
-								type='number'
-								step='any'
-								value={sourceAmount}
-								onChange={(event) => setSourceAmount(parseFloat(event.target.value || '0'))}
-								required
-							/>
-						</div>
-						<div className='space-y-1.5'>
-							<Label htmlFor='target_currency'>Target wallet currency</Label>
-							<Select value={targetCurrency} onValueChange={setTargetCurrency}>
-								<SelectTrigger>
-									<SelectValue />
-								</SelectTrigger>
-								<SelectContent>
-									{SUPPORTED_CURRENCIES.map((currency) => (
-										<SelectItem key={currency} value={currency}>{currency}</SelectItem>
-									))}
-								</SelectContent>
-							</Select>
-						</div>
-						<div className='space-y-1.5'>
-							<Label htmlFor='exchange_rate'>Exchange rate ({sourceCurrency} per {targetCurrency})</Label>
-							<Input
-								id='exchange_rate'
-								type='number'
-								step='any'
-								value={exchangeRate}
-								onChange={(event) => setExchangeRate(parseFloat(event.target.value || '0'))}
-								disabled={!requiresExchangeRate}
-								required={requiresExchangeRate}
-							/>
-						</div>
-						<div className='space-y-1.5'>
-							<Label htmlFor='fee_amount'>Bank/FX fees ({sourceCurrency})</Label>
-							<Input
-								id='fee_amount'
-								type='number'
-								step='any'
-								value={feeAmount}
-								onChange={(event) => setFeeAmount(parseFloat(event.target.value || '0'))}
-							/>
-						</div>
-					</div>
-
-					<div className='rounded-md border p-3 text-sm text-muted-foreground'>
-						<p className='font-medium text-foreground'>Estimated credit</p>
-						<div className='mt-1 flex items-center gap-2'>
-							<span>{sourceAmount.toFixed(2)} {sourceCurrency}</span>
-							<ArrowRightLeft className='h-4 w-4' />
-							<span>{estimatedTargetAmount.toFixed(2)} {targetCurrency}</span>
-						</div>
-					</div>
-
-					<div className='space-y-1.5'>
-						<Label htmlFor='notes'>Notes (optional)</Label>
-						<Input
-							id='notes'
-							value={notes}
-							onChange={(event) => setNotes(event.target.value)}
-							placeholder='Transfer to broker account'
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+						<FormField
+							control={form.control}
+							name='sourceAccountID'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Source account</FormLabel>
+									<Select value={field.value} onValueChange={field.onChange}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue placeholder='Select account' />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{accounts.map((account) => (
+												<SelectItem key={account.id} value={account.id}>
+													{account.name} ({account.currency || 'DOP'})
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
 
-					<DialogFooter>
-						<Button type='submit' disabled={fundMutation.isPending}>
-							{fundMutation.isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-							Fund broker
-						</Button>
-					</DialogFooter>
-				</form>
+						<div className='grid gap-3 md:grid-cols-2'>
+							<FormField
+								control={form.control}
+								name='sourceAmount'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Amount from account ({sourceCurrency})</FormLabel>
+										<FormControl>
+											<Input type='number' step='any' {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name='targetCurrency'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Target wallet currency</FormLabel>
+										<Select value={field.value} onValueChange={field.onChange}>
+											<FormControl>
+												<SelectTrigger>
+													<SelectValue />
+												</SelectTrigger>
+											</FormControl>
+											<SelectContent>
+												{SUPPORTED_CURRENCIES.map((currency) => (
+													<SelectItem key={currency} value={currency}>{currency}</SelectItem>
+												))}
+											</SelectContent>
+										</Select>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name='exchangeRate'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Exchange rate ({sourceCurrency} per {watchedValues.targetCurrency})</FormLabel>
+										<FormControl>
+											<Input type='number' step='any' {...field} disabled={!requiresExchangeRate} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name='feeAmount'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Bank/FX fees ({sourceCurrency})</FormLabel>
+										<FormControl>
+											<Input type='number' step='any' {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</div>
+
+						<div className='rounded-md border p-3 text-sm text-muted-foreground'>
+							<p className='font-medium text-foreground'>Estimated credit</p>
+							<div className='mt-1 flex items-center gap-2'>
+								<span>{watchedValues.sourceAmount.toFixed(2)} {sourceCurrency}</span>
+								<ArrowRightLeft className='h-4 w-4' />
+								<span>{estimatedTargetAmount.toFixed(2)} {watchedValues.targetCurrency}</span>
+							</div>
+						</div>
+
+						<FormField
+							control={form.control}
+							name='notes'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Notes (optional)</FormLabel>
+									<FormControl>
+										<Input {...field} placeholder='Transfer to broker account' />
+									</FormControl>
+								</FormItem>
+							)}
+						/>
+
+						<DialogFooter>
+							<Button type='submit' disabled={fundMutation.isPending}>
+								{fundMutation.isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+								Fund broker
+							</Button>
+						</DialogFooter>
+					</form>
+				</Form>
 			</DialogContent>
 		</Dialog>
 	)

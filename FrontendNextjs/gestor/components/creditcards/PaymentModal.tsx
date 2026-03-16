@@ -1,6 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
 import { CreditCard, CreatePaymentDTO } from '@/types/creditcard'
 import { Account } from '@/types/account'
 import {
@@ -13,6 +16,14 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { accountRepository } from '@/lib/repositoryConfig'
@@ -25,26 +36,47 @@ interface PaymentModalProps {
 	card: CreditCard | null
 }
 
+const paymentSchema = z.object({
+	fromAccountId: z.string().min(1, 'Select an account'),
+	currency: z.string().min(1),
+	amount: z.coerce.number().positive('Amount must be greater than 0'),
+	exchangeRate: z.string().optional().default(''),
+	includesInterest: z.boolean().default(false),
+	interestAmount: z.coerce.number().min(0).default(0),
+	notes: z.string().optional().default(''),
+})
+
+type PaymentFormValues = z.infer<typeof paymentSchema>
+
 export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProps) {
 	const [loading, setLoading] = useState(false)
 	const [accounts, setAccounts] = useState<Account[]>([])
-	const [fromAccountId, setFromAccountId] = useState('')
-	const [currency, setCurrency] = useState(card?.balances[0]?.currency || 'DOP')
-	const [amount, setAmount] = useState('')
-	const [includesInterest, setIncludesInterest] = useState(false)
-	const [interestAmount, setInterestAmount] = useState('')
-	const [notes, setNotes] = useState('')
-	const [exchangeRate, setExchangeRate] = useState('')
 	const { data: rateData } = useExchangeRateQuery()
+
+	const form = useForm<PaymentFormValues>({
+		resolver: zodResolver(paymentSchema),
+		defaultValues: {
+			fromAccountId: '',
+			currency: card?.balances[0]?.currency || 'DOP',
+			amount: 0,
+			exchangeRate: '',
+			includesInterest: false,
+			interestAmount: 0,
+			notes: '',
+		},
+	})
+
+	const watchedValues = form.watch()
 
 	useEffect(() => {
 		if (open) {
 			loadAccounts()
 			if (card?.balances[0]) {
-				setCurrency(card.balances[0].currency)
-				setAmount(Math.abs(card.balances[0].current_balance).toString())
+				form.setValue('currency', card.balances[0].currency)
+				form.setValue('amount', Math.abs(card.balances[0].current_balance))
 			}
 		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [open, card])
 
 	const loadAccounts = async () => {
@@ -56,31 +88,55 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 		}
 	}
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault()
+	const selectedBalance = card?.balances.find((b) => b.currency === watchedValues.currency)
+	const currentDebt = selectedBalance ? Math.max(0, -selectedBalance.current_balance) : 0
+	const selectedAccount = accounts.find((a) => a.id === watchedValues.fromAccountId)
+	const sourceCurrency = selectedAccount?.currency || 'DOP'
+	const needsExchangeRate = sourceCurrency !== watchedValues.currency
+	const recommendedRate = needsExchangeRate && watchedValues.currency === 'USD' && sourceCurrency === 'DOP' ? rateData?.usd_to_dop : undefined
+
+	useEffect(() => {
+		if (!needsExchangeRate) {
+			form.setValue('exchangeRate', '')
+			return
+		}
+		if (recommendedRate && !watchedValues.exchangeRate) {
+			form.setValue('exchangeRate', recommendedRate.toFixed(4))
+		}
+	// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [needsExchangeRate, recommendedRate])
+
+	const parsedRate = parseFloat(watchedValues.exchangeRate || '0')
+	const exchangeRateValid = !needsExchangeRate || (Number.isFinite(parsedRate) && parsedRate > 0)
+	const debitPreview = (() => {
+		const paymentAmount = watchedValues.amount
+		if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) return 0
+		if (!needsExchangeRate) return paymentAmount
+		if (!exchangeRateValid) return 0
+		if (watchedValues.currency === 'USD' && sourceCurrency === 'DOP') return paymentAmount * parsedRate
+		if (watchedValues.currency === 'DOP' && sourceCurrency === 'USD') return paymentAmount / parsedRate
+		return 0
+	})()
+
+	const handleFormSubmit = async (values: PaymentFormValues) => {
 		if (!card) return
-		const paymentAmount = parseFloat(amount)
-		if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) {
-			return
-		}
-		if (paymentAmount > currentDebt) {
-			return
-		}
-		const parsedRate = parseFloat(exchangeRate)
+		if (values.amount > currentDebt && currentDebt > 0) return
+
+		const parsedExchangeRate = parseFloat(values.exchangeRate || '0')
 
 		setLoading(true)
 		try {
 			await onSubmit({
-				from_account_id: fromAccountId,
-				currency,
-				amount: paymentAmount,
-				exchange_rate: needsExchangeRate ? parsedRate : undefined,
-				includes_interest: includesInterest,
-				interest_amount: includesInterest ? parseFloat(interestAmount) || 0 : 0,
-				notes: notes || undefined,
+				from_account_id: values.fromAccountId,
+				currency: values.currency,
+				amount: values.amount,
+				exchange_rate: needsExchangeRate ? parsedExchangeRate : undefined,
+				includes_interest: values.includesInterest,
+				interest_amount: values.includesInterest ? values.interestAmount : 0,
+				notes: values.notes || undefined,
 			})
 			onClose()
-			resetForm()
+			form.reset()
 		} catch (error) {
 			console.error('Error making payment:', error)
 		} finally {
@@ -88,171 +144,173 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 		}
 	}
 
-	const resetForm = () => {
-		setFromAccountId('')
-		setAmount('')
-		setIncludesInterest(false)
-		setInterestAmount('')
-		setNotes('')
-		setExchangeRate('')
-	}
-
-	const selectedBalance = card?.balances.find((b) => b.currency === currency)
-	const currentDebt = selectedBalance ? Math.max(0, -selectedBalance.current_balance) : 0
-	const selectedAccount = accounts.find((a) => a.id === fromAccountId)
-	const sourceCurrency = selectedAccount?.currency || 'DOP'
-	const needsExchangeRate = sourceCurrency !== currency
-	const recommendedRate = needsExchangeRate && currency === 'USD' && sourceCurrency === 'DOP' ? rateData?.usd_to_dop : undefined
-
-	useEffect(() => {
-		if (!needsExchangeRate) {
-			setExchangeRate('')
-			return
-		}
-		if (recommendedRate && !exchangeRate) {
-			setExchangeRate(recommendedRate.toFixed(4))
-		}
-	}, [needsExchangeRate, recommendedRate, exchangeRate])
-
-	const parsedRate = parseFloat(exchangeRate)
-	const exchangeRateValid = !needsExchangeRate || (Number.isFinite(parsedRate) && parsedRate > 0)
-	const debitPreview = (() => {
-		const paymentAmount = parseFloat(amount)
-		if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) return 0
-		if (!needsExchangeRate) return paymentAmount
-		if (!exchangeRateValid) return 0
-		if (currency === 'USD' && sourceCurrency === 'DOP') return paymentAmount * parsedRate
-		if (currency === 'DOP' && sourceCurrency === 'USD') return paymentAmount / parsedRate
-		return 0
-	})()
-
 	return (
 		<Dialog open={open} onOpenChange={onClose}>
 			<DialogContent className="max-w-md">
 				<DialogHeader>
 					<DialogTitle>Pay Credit Card</DialogTitle>
 				</DialogHeader>
-				<form onSubmit={handleSubmit} className="space-y-4">
-					<div className="space-y-2">
-						<Label>Pay From Account</Label>
-						<Select value={fromAccountId} onValueChange={setFromAccountId} required>
-							<SelectTrigger>
-								<SelectValue placeholder="Select account" />
-							</SelectTrigger>
-							<SelectContent>
-								{accounts.map((account) => (
-									<SelectItem key={account.id} value={account.id}>
-										{account.name} ({account.bank}) - {account.currency || 'DOP'}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="space-y-2">
-						<Label>Currency</Label>
-						<Select value={currency} onValueChange={setCurrency}>
-							<SelectTrigger>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								{card?.balances.map((b) => (
-									<SelectItem key={b.currency} value={b.currency}>
-										{b.currency} (Debt: {Math.max(0, -b.current_balance).toLocaleString()})
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className="space-y-2">
-						<Label htmlFor="amount">Amount to Pay</Label>
-						<Input
-							id="amount"
-							type="number"
-							step="0.01"
-							max={currentDebt > 0 ? currentDebt : undefined}
-							value={amount}
-							onChange={(e) => setAmount(e.target.value)}
-							placeholder={currentDebt.toString()}
-							required
-						/>
-						<p className="text-xs text-muted-foreground">
-							Current debt: {currentDebt.toLocaleString()} {currency}
-						</p>
-						{parseFloat(amount) > currentDebt && currentDebt > 0 ? (
-							<p className="text-xs text-destructive">
-								Payment amount cannot exceed current debt.
-							</p>
-						) : null}
-					</div>
-
-					{needsExchangeRate && (
-						<div className="space-y-2 rounded-md border p-3">
-							<Label htmlFor="exchangeRate">Exchange Rate ({currency} to {sourceCurrency})</Label>
-							<Input
-								id="exchangeRate"
-								type="number"
-								step="0.0001"
-								value={exchangeRate}
-								onChange={(e) => setExchangeRate(e.target.value)}
-								placeholder={recommendedRate ? recommendedRate.toFixed(4) : 'Enter rate'}
-								required
-							/>
-							{recommendedRate ? (
-								<p className="text-xs text-muted-foreground">
-									Recommended rate from API: {recommendedRate.toFixed(4)}
-								</p>
-							) : (
-								<p className="text-xs text-muted-foreground">
-									Could not fetch recommended rate. Enter custom rate.
-								</p>
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+						<FormField
+							control={form.control}
+							name="fromAccountId"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Pay From Account</FormLabel>
+									<Select value={field.value} onValueChange={field.onChange}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue placeholder="Select account" />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{accounts.map((account) => (
+												<SelectItem key={account.id} value={account.id}>
+													{account.name} ({account.bank}) - {account.currency || 'DOP'}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<FormMessage />
+								</FormItem>
 							)}
-							<p className="text-xs text-muted-foreground">
-								Estimated debit from account: {debitPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })} {sourceCurrency}
-							</p>
-						</div>
-					)}
+						/>
 
-					<div className="space-y-2">
-						<div className="flex items-center justify-between">
-							<Label htmlFor="interest">Includes Interest</Label>
-							<Switch
-								id="interest"
-								checked={includesInterest}
-								onCheckedChange={setIncludesInterest}
-							/>
-						</div>
-						{includesInterest && (
-							<Input
-								type="number"
-								step="0.01"
-								value={interestAmount}
-								onChange={(e) => setInterestAmount(e.target.value)}
-								placeholder="Interest amount"
+						<FormField
+							control={form.control}
+							name="currency"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Currency</FormLabel>
+									<Select value={field.value} onValueChange={field.onChange}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{card?.balances.map((b) => (
+												<SelectItem key={b.currency} value={b.currency}>
+													{b.currency} (Debt: {Math.max(0, -b.current_balance).toLocaleString()})
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+
+						<FormField
+							control={form.control}
+							name="amount"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Amount to Pay</FormLabel>
+									<FormControl>
+										<Input
+											type="number"
+											step="0.01"
+											max={currentDebt > 0 ? currentDebt : undefined}
+											placeholder={currentDebt.toString()}
+											{...field}
+										/>
+									</FormControl>
+									<p className="text-xs text-muted-foreground">
+										Current debt: {currentDebt.toLocaleString()} {watchedValues.currency}
+									</p>
+									{watchedValues.amount > currentDebt && currentDebt > 0 ? (
+										<p className="text-xs text-destructive">
+											Payment amount cannot exceed current debt.
+										</p>
+									) : null}
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+
+						{needsExchangeRate && (
+							<FormField
+								control={form.control}
+								name="exchangeRate"
+								render={({ field }) => (
+									<FormItem className="rounded-md border p-3">
+										<FormLabel>Exchange Rate ({watchedValues.currency} to {sourceCurrency})</FormLabel>
+										<FormControl>
+											<Input
+												type="number"
+												step="0.0001"
+												placeholder={recommendedRate ? recommendedRate.toFixed(4) : 'Enter rate'}
+												{...field}
+											/>
+										</FormControl>
+										{recommendedRate ? (
+											<p className="text-xs text-muted-foreground">
+												Recommended rate from API: {recommendedRate.toFixed(4)}
+											</p>
+										) : (
+											<p className="text-xs text-muted-foreground">
+												Could not fetch recommended rate. Enter custom rate.
+											</p>
+										)}
+										<p className="text-xs text-muted-foreground">
+											Estimated debit from account: {debitPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })} {sourceCurrency}
+										</p>
+										<FormMessage />
+									</FormItem>
+								)}
 							/>
 						)}
-					</div>
 
-					<div className="space-y-2">
-						<Label htmlFor="notes">Notes (Optional)</Label>
-						<Input
-							id="notes"
-							value={notes}
-							onChange={(e) => setNotes(e.target.value)}
-							placeholder="Payment notes"
+						<div className="space-y-2">
+							<div className="flex items-center justify-between">
+								<Label htmlFor="interest">Includes Interest</Label>
+								<Switch
+									id="interest"
+									checked={watchedValues.includesInterest}
+									onCheckedChange={(checked) => form.setValue('includesInterest', checked)}
+								/>
+							</div>
+							{watchedValues.includesInterest && (
+								<FormField
+									control={form.control}
+									name="interestAmount"
+									render={({ field }) => (
+										<FormItem>
+											<FormControl>
+												<Input type="number" step="0.01" placeholder="Interest amount" {...field} />
+											</FormControl>
+											<FormMessage />
+										</FormItem>
+									)}
+								/>
+							)}
+						</div>
+
+						<FormField
+							control={form.control}
+							name="notes"
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Notes (Optional)</FormLabel>
+									<FormControl>
+										<Input {...field} placeholder="Payment notes" />
+									</FormControl>
+								</FormItem>
+							)}
 						/>
-					</div>
 
-					<DialogFooter>
-						<Button type="button" variant="outline" onClick={onClose}>
-							Cancel
-						</Button>
-						<Button type="submit" disabled={loading || !fromAccountId || !exchangeRateValid || parseFloat(amount) > currentDebt}>
-							{loading ? 'Processing...' : 'Make Payment'}
-						</Button>
-					</DialogFooter>
-				</form>
+						<DialogFooter>
+							<Button type="button" variant="outline" onClick={onClose}>
+								Cancel
+							</Button>
+							<Button type="submit" disabled={loading || !watchedValues.fromAccountId || !exchangeRateValid || (watchedValues.amount > currentDebt && currentDebt > 0)}>
+								{loading ? 'Processing…' : 'Make Payment'}
+							</Button>
+						</DialogFooter>
+					</form>
+				</Form>
 			</DialogContent>
 		</Dialog>
 	)

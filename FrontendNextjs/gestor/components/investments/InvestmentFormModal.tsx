@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
 import { Loader2, AlertCircle, Search } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
@@ -10,7 +13,6 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
 	Select,
 	SelectContent,
@@ -19,9 +21,17 @@ import {
 	SelectValue,
 } from '@/components/ui/select'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import {
+	Form,
+	FormControl,
+	FormField,
+	FormItem,
+	FormLabel,
+	FormMessage,
+} from '@/components/ui/form'
 import { useCreateInvestmentMutation, useGetInvestmentFundingBalances, useUpdateInvestmentMutation } from '@/hooks/queries/useInvestmentsQuery'
 import { investmentRepository } from '@/lib/repositoryConfig'
-import { CreateInvestmentDTO, Investment, InvestmentType } from '@/types/investment'
+import { Investment, InvestmentType } from '@/types/investment'
 
 interface InvestmentFormModalProps {
 	isOpen: boolean
@@ -29,7 +39,19 @@ interface InvestmentFormModalProps {
 	investmentToEdit?: Investment | null
 }
 
-const initialData: CreateInvestmentDTO = {
+const investmentSchema = z.object({
+	name: z.string().min(1, 'Name is required'),
+	symbol: z.string().min(1, 'Symbol is required').transform(v => v.toUpperCase()),
+	type: z.nativeEnum(InvestmentType),
+	quantity: z.coerce.number().min(0, 'Must be >= 0'),
+	purchase_price: z.coerce.number().min(0, 'Must be >= 0'),
+	current_price: z.coerce.number().min(0, 'Must be >= 0'),
+	settlement_currency: z.string().min(1).transform(v => v.toUpperCase()),
+})
+
+type InvestmentFormValues = z.infer<typeof investmentSchema>
+
+const defaultValues: InvestmentFormValues = {
 	name: '',
 	symbol: '',
 	type: InvestmentType.STOCK,
@@ -40,17 +62,21 @@ const initialData: CreateInvestmentDTO = {
 }
 
 export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: InvestmentFormModalProps) {
-	const [formData, setFormData] = useState<CreateInvestmentDTO>(initialData)
 	const [error, setError] = useState<string | null>(null)
 	const [fetchLoading, setFetchLoading] = useState(false)
 	const createMutation = useCreateInvestmentMutation()
 	const updateMutation = useUpdateInvestmentMutation()
 	const { data: balances = [] } = useGetInvestmentFundingBalances()
 
+	const form = useForm<InvestmentFormValues>({
+		resolver: zodResolver(investmentSchema),
+		defaultValues,
+	})
+
 	useEffect(() => {
 		setError(null)
 		if (investmentToEdit) {
-			setFormData({
+			form.reset({
 				name: investmentToEdit.name,
 				symbol: investmentToEdit.symbol,
 				type: investmentToEdit.type,
@@ -61,28 +87,33 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 			})
 			return
 		}
-		setFormData(initialData)
-	}, [investmentToEdit, isOpen])
+		form.reset(defaultValues)
+	}, [investmentToEdit, isOpen, form])
 
-	const settlementCurrency = (formData.settlement_currency || 'USD').toUpperCase()
-	const requiredAmount = Math.max(formData.quantity, 0) * Math.max(formData.purchase_price, 0)
+	const watchedValues = form.watch()
+	const settlementCurrency = (watchedValues.settlement_currency || 'USD').toUpperCase()
+	const requiredAmount = Math.max(watchedValues.quantity, 0) * Math.max(watchedValues.purchase_price, 0)
 	const availableBalance = useMemo(() => {
 		const match = balances.find((balance) => balance.currency === settlementCurrency)
 		return match?.available || 0
 	}, [balances, settlementCurrency])
 
 	const handleFetchPrice = async () => {
-		if (!formData.symbol) return
+		const symbol = form.getValues('symbol')
+		if (!symbol) return
 		setFetchLoading(true)
 		try {
-			const quote = await investmentRepository.getQuote(formData.symbol)
+			const quote = await investmentRepository.getQuote(symbol)
 			if (quote) {
-				setFormData((prev) => ({
-					...prev,
-					current_price: quote.regular_market_price,
-					name: (!prev.name || prev.name === '') && quote.name ? quote.name : prev.name,
-					purchase_price: prev.purchase_price === 0 ? quote.regular_market_price : prev.purchase_price,
-				}))
+				const currentName = form.getValues('name')
+				const currentPurchasePrice = form.getValues('purchase_price')
+				form.setValue('current_price', quote.regular_market_price)
+				if ((!currentName || currentName === '') && quote.name) {
+					form.setValue('name', quote.name)
+				}
+				if (currentPurchasePrice === 0) {
+					form.setValue('purchase_price', quote.regular_market_price)
+				}
 				setError(null)
 				return
 			}
@@ -94,8 +125,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 		}
 	}
 
-	const handleSubmit = async (e: React.FormEvent) => {
-		e.preventDefault()
+	const onSubmit = async (values: InvestmentFormValues) => {
 		setError(null)
 
 		if (!investmentToEdit && requiredAmount > availableBalance) {
@@ -105,16 +135,13 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 
 		try {
 			if (investmentToEdit) {
-				await updateMutation.mutateAsync({
-					id: investmentToEdit.id,
-					...formData,
-				})
+				await updateMutation.mutateAsync({ id: investmentToEdit.id, ...values })
 			} else {
-				await createMutation.mutateAsync(formData)
+				await createMutation.mutateAsync(values)
 			}
 			onClose()
-		} catch (submitError: any) {
-			const errorMessage = submitError?.message || 'Failed to save investment. Please try again.'
+		} catch (submitError: unknown) {
+			const errorMessage = submitError instanceof Error ? submitError.message : 'Failed to save investment. Please try again.'
 			setError(errorMessage)
 		}
 	}
@@ -140,108 +167,146 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 					</Alert>
 				)}
 
-				<form onSubmit={handleSubmit} className='space-y-4'>
-					<div className='rounded-md border p-3 text-sm'>
-						<p className='font-medium'>Broker balance</p>
-						<p className='text-muted-foreground'>
-							{settlementCurrency}: {availableBalance.toFixed(2)}
-						</p>
-						<p className='text-muted-foreground'>
-							Required for this purchase: {requiredAmount.toFixed(2)}
-						</p>
-					</div>
+				<Form {...form}>
+					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+						<div className='rounded-md border p-3 text-sm'>
+							<p className='font-medium'>Broker balance</p>
+							<p className='text-muted-foreground'>
+								{settlementCurrency}: {availableBalance.toFixed(2)}
+							</p>
+							<p className='text-muted-foreground'>
+								Required for this purchase: {requiredAmount.toFixed(2)}
+							</p>
+						</div>
 
-					<div className='space-y-1.5'>
-						<Label htmlFor='name'>Name</Label>
-						<Input
-							id='name'
-							value={formData.name}
-							onChange={(event) => setFormData({ ...formData, name: event.target.value })}
-							required
+						<FormField
+							control={form.control}
+							name='name'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>Name</FormLabel>
+									<FormControl>
+										<Input {...field} />
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
 						/>
-					</div>
 
-					<div className='space-y-1.5'>
-						<Label htmlFor='symbol'>Symbol</Label>
-						<div className='flex gap-2'>
-							<Input
-								id='symbol'
-								value={formData.symbol}
-								onChange={(event) => setFormData({ ...formData, symbol: event.target.value.toUpperCase() })}
-								placeholder='e.g. AAPL, BTC-USD'
-								required
+						<div className='space-y-1.5'>
+							<FormField
+								control={form.control}
+								name='symbol'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Symbol</FormLabel>
+										<FormControl>
+											<div className='flex gap-2'>
+												<Input
+													{...field}
+													onChange={(e) => field.onChange(e.target.value.toUpperCase())}
+													placeholder='e.g. AAPL, BTC-USD'
+												/>
+												<Button type='button' size='icon' variant='outline' onClick={handleFetchPrice} disabled={fetchLoading || !watchedValues.symbol}>
+													{fetchLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : <Search className='h-4 w-4' />}
+												</Button>
+											</div>
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
 							/>
-							<Button type='button' size='icon' variant='outline' onClick={handleFetchPrice} disabled={fetchLoading || !formData.symbol}>
-								{fetchLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : <Search className='h-4 w-4' />}
+						</div>
+
+						<div className='grid gap-3 md:grid-cols-2'>
+							<FormField
+								control={form.control}
+								name='type'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Type</FormLabel>
+										<Select value={field.value} onValueChange={field.onChange}>
+											<FormControl>
+												<SelectTrigger>
+													<SelectValue placeholder='Select type' />
+												</SelectTrigger>
+											</FormControl>
+											<SelectContent>
+												<SelectItem value={InvestmentType.STOCK}>Stock</SelectItem>
+												<SelectItem value={InvestmentType.CRYPTO}>Crypto</SelectItem>
+												<SelectItem value={InvestmentType.FIXED_INCOME}>Fixed income</SelectItem>
+											</SelectContent>
+										</Select>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name='settlement_currency'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Purchase currency</FormLabel>
+										<FormControl>
+											<Input {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} maxLength={10} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name='quantity'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Quantity</FormLabel>
+										<FormControl>
+											<Input type='number' step='any' {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name='purchase_price'
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>Purchase price</FormLabel>
+										<FormControl>
+											<Input type='number' step='any' {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+
+							<FormField
+								control={form.control}
+								name='current_price'
+								render={({ field }) => (
+									<FormItem className='md:col-span-2'>
+										<FormLabel>Current price</FormLabel>
+										<FormControl>
+											<Input type='number' step='any' {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						</div>
+
+						<DialogFooter>
+							<Button type='submit' disabled={isLoading}>
+								{isLoading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
+								{investmentToEdit ? 'Update' : 'Create'}
 							</Button>
-						</div>
-					</div>
-
-					<div className='grid gap-3 md:grid-cols-2'>
-						<div className='space-y-1.5'>
-							<Label htmlFor='type'>Type</Label>
-							<Select value={formData.type} onValueChange={(value) => setFormData({ ...formData, type: value as InvestmentType })}>
-								<SelectTrigger>
-									<SelectValue placeholder='Select type' />
-								</SelectTrigger>
-								<SelectContent>
-									<SelectItem value={InvestmentType.STOCK}>Stock</SelectItem>
-									<SelectItem value={InvestmentType.CRYPTO}>Crypto</SelectItem>
-									<SelectItem value={InvestmentType.FIXED_INCOME}>Fixed income</SelectItem>
-								</SelectContent>
-							</Select>
-						</div>
-						<div className='space-y-1.5'>
-							<Label htmlFor='settlement_currency'>Purchase currency</Label>
-							<Input
-								id='settlement_currency'
-								value={settlementCurrency}
-								onChange={(event) => setFormData({ ...formData, settlement_currency: event.target.value.toUpperCase() })}
-								maxLength={10}
-							/>
-						</div>
-						<div className='space-y-1.5'>
-							<Label htmlFor='quantity'>Quantity</Label>
-							<Input
-								id='quantity'
-								type='number'
-								step='any'
-								value={formData.quantity}
-								onChange={(event) => setFormData({ ...formData, quantity: parseFloat(event.target.value || '0') })}
-								required
-							/>
-						</div>
-						<div className='space-y-1.5'>
-							<Label htmlFor='purchase_price'>Purchase price</Label>
-							<Input
-								id='purchase_price'
-								type='number'
-								step='any'
-								value={formData.purchase_price}
-								onChange={(event) => setFormData({ ...formData, purchase_price: parseFloat(event.target.value || '0') })}
-								required
-							/>
-						</div>
-						<div className='space-y-1.5 md:col-span-2'>
-							<Label htmlFor='current_price'>Current price</Label>
-							<Input
-								id='current_price'
-								type='number'
-								step='any'
-								value={formData.current_price}
-								onChange={(event) => setFormData({ ...formData, current_price: parseFloat(event.target.value || '0') })}
-								required
-							/>
-						</div>
-					</div>
-
-					<DialogFooter>
-						<Button type='submit' disabled={isLoading}>
-							{isLoading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-							{investmentToEdit ? 'Update' : 'Create'}
-						</Button>
-					</DialogFooter>
-				</form>
+						</DialogFooter>
+					</form>
+				</Form>
 			</DialogContent>
 		</Dialog>
 	)

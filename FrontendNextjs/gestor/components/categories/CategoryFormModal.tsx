@@ -1,6 +1,9 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useEffect } from 'react'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import * as z from 'zod'
 import {
     Dialog,
     DialogContent,
@@ -11,7 +14,14 @@ import {
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import {
+    Form,
+    FormControl,
+    FormField,
+    FormItem,
+    FormLabel,
+    FormMessage,
+} from '@/components/ui/form'
 import { useCategoryContext } from '@/components/categories/CategoryContext'
 import { useTranslations } from 'next-intl'
 
@@ -69,47 +79,57 @@ const COLORS = [
     { name: 'zinc', value: '#71717A' },
 ]
 
+const categorySchema = z.object({
+    name: z.string().min(1, 'Required'),
+    icon: z.string().min(1),
+    color: z.string().min(1),
+})
+
+type CategoryFormValues = z.infer<typeof categorySchema>
+
 export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryFormModalProps) {
     const t = useTranslations('forms')
     const tCat = useTranslations('categories')
     const { editingCategory, updateCategory } = useCategoryContext()
-    const [name, setName] = useState('')
-    const [icon, setIcon] = useState('🏷️')
-    const [color, setColor] = useState('#3B82F6')
-    const [isSubmitting, setIsSubmitting] = useState(false)
 
     const isEditing = !!editingCategory
 
+    const form = useForm<CategoryFormValues>({
+        resolver: zodResolver(categorySchema),
+        defaultValues: {
+            name: '',
+            icon: '🏷️',
+            color: '#3B82F6',
+        },
+    })
+
     useEffect(() => {
         if (editingCategory) {
-            setName(editingCategory.name)
-            setIcon(editingCategory.icon)
-            setColor(editingCategory.color)
+            form.reset({
+                name: editingCategory.name,
+                icon: editingCategory.icon,
+                color: editingCategory.color,
+            })
         } else {
-            setName('')
-            setIcon('🏷️')
-            setColor('#3B82F6')
+            form.reset({ name: '', icon: '🏷️', color: '#3B82F6' })
         }
-    }, [editingCategory])
+    }, [editingCategory, form])
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault()
-        if (!name) return
-
-        setIsSubmitting(true)
+    const onSubmit = async (values: CategoryFormValues) => {
         try {
             if (isEditing && editingCategory) {
-                await updateCategory(editingCategory.id, name, icon, color)
+                await updateCategory(editingCategory.id, values.name, values.icon, values.color)
             } else {
-                await onCreateCategory(name, icon, color)
+                await onCreateCategory(values.name, values.icon, values.color)
             }
             setOpen(false)
         } catch (error) {
             console.error('Error saving category:', error)
-        } finally {
-            setIsSubmitting(false)
         }
     }
+
+    const selectedIcon = form.watch('icon')
+    const selectedColor = form.watch('color')
 
     return (
         <Dialog open={open} onOpenChange={setOpen}>
@@ -120,66 +140,87 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
                         {isEditing ? tCat('editDescription') : tCat('addDescription')}
                     </DialogDescription>
                 </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4 py-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="name">{t('name')}</Label>
-                        <Input
-                            id="name"
-                            placeholder={t('namePlaceholder')}
-                            value={name}
-                            onChange={(e) => setName(e.target.value)}
-                            required
+                <Form {...form}>
+                    <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 py-4">
+                        <FormField
+                            control={form.control}
+                            name="name"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('name')}</FormLabel>
+                                    <FormControl>
+                                        <Input placeholder={t('namePlaceholder')} {...field} />
+                                    </FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )}
                         />
-                    </div>
 
-                    <div className="space-y-2">
-                        <Label>{t('icon')}</Label>
-                        <div className="grid grid-cols-5 gap-2 p-2 border rounded-md max-h-[150px] overflow-y-auto">
-                            {EMOJIS.map((item) => (
-                                <button
-                                    key={item.labelKey}
-                                    type="button"
-                                    className={`text-2xl h-10 w-10 flex items-center justify-center rounded-md hover:bg-muted transition-colors ${icon === item.icon ? 'bg-muted ring-2 ring-primary' : ''}`}
-                                    onClick={() => setIcon(item.icon)}
-                                >
-                                    {item.icon}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                        <FormField
+                            control={form.control}
+                            name="icon"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('icon')}</FormLabel>
+                                    <FormControl>
+                                        <div className="grid grid-cols-5 gap-2 p-2 border rounded-md max-h-[150px] overflow-y-auto">
+                                            {EMOJIS.map((item) => (
+                                                <button
+                                                    key={item.labelKey}
+                                                    type="button"
+                                                    className={`text-2xl h-10 w-10 flex items-center justify-center rounded-md hover:bg-muted transition-colors ${selectedIcon === item.icon ? 'bg-muted ring-2 ring-primary' : ''}`}
+                                                    onClick={() => field.onChange(item.icon)}
+                                                >
+                                                    {item.icon}
+                                                </button>
+                                            ))}
+                                        </div>
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
 
-                    <div className="space-y-2">
-                        <Label>{t('color')}</Label>
-                        <div className="flex flex-wrap gap-2 p-2 border rounded-md">
-                            {COLORS.map((c) => (
-                                <button
-                                    key={c.name}
-                                    type="button"
-                                    className={`w-6 h-6 rounded-full border border-gray-200 transition-transform hover:scale-110 ${color === c.value ? 'ring-2 ring-offset-2 ring-black dark:ring-white scale-110' : ''}`}
-                                    style={{ backgroundColor: c.value }}
-                                    onClick={() => setColor(c.value)}
-                                />
-                            ))}
-                            <div
-                                className="relative w-6 h-6 rounded-full overflow-hidden border border-gray-200 transition-transform hover:scale-110"
-                                style={{ background: 'conic-gradient(from 0deg, red, orange, yellow, green, blue, indigo, violet, red)' }}
-                            >
-                                <Input
-                                    type="color"
-                                    value={color}
-                                    onChange={(e) => setColor(e.target.value)}
-                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 border-0 cursor-pointer opacity-0"
-                                />
-                            </div>
-                        </div>
-                    </div>
-                </form>
+                        <FormField
+                            control={form.control}
+                            name="color"
+                            render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>{t('color')}</FormLabel>
+                                    <FormControl>
+                                        <div className="flex flex-wrap gap-2 p-2 border rounded-md">
+                                            {COLORS.map((c) => (
+                                                <button
+                                                    key={c.name}
+                                                    type="button"
+                                                    className={`w-6 h-6 rounded-full border border-gray-200 transition-transform hover:scale-110 ${selectedColor === c.value ? 'ring-2 ring-offset-2 ring-black dark:ring-white scale-110' : ''}`}
+                                                    style={{ backgroundColor: c.value }}
+                                                    onClick={() => field.onChange(c.value)}
+                                                />
+                                            ))}
+                                            <div
+                                                className="relative w-6 h-6 rounded-full overflow-hidden border border-gray-200 transition-transform hover:scale-110"
+                                                style={{ background: 'conic-gradient(from 0deg, red, orange, yellow, green, blue, indigo, violet, red)' }}
+                                            >
+                                                <Input
+                                                    type="color"
+                                                    value={selectedColor}
+                                                    onChange={(e) => field.onChange(e.target.value)}
+                                                    className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[150%] h-[150%] p-0 border-0 cursor-pointer opacity-0"
+                                                />
+                                            </div>
+                                        </div>
+                                    </FormControl>
+                                </FormItem>
+                            )}
+                        />
+                    </form>
+                </Form>
                 <DialogFooter>
-                    <Button variant="outline" onClick={() => setOpen(false)} disabled={isSubmitting}>
+                    <Button variant="outline" onClick={() => setOpen(false)} disabled={form.formState.isSubmitting}>
                         {t('cancel')}
                     </Button>
-                    <Button onClick={handleSubmit} disabled={isSubmitting || !name}>
-                        {isSubmitting ? t('saving') : (isEditing ? t('saveChanges') : t('createCategory'))}
+                    <Button onClick={form.handleSubmit(onSubmit)} disabled={form.formState.isSubmitting || !form.formState.isValid}>
+                        {form.formState.isSubmitting ? t('saving') : (isEditing ? t('saveChanges') : t('createCategory'))}
                     </Button>
                 </DialogFooter>
             </DialogContent>
