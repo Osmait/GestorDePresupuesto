@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	accountDomain "github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
 	certificateDomain "github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
@@ -190,11 +191,14 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 	if s.accountRepository != nil {
 		accounts, accErr := s.accountRepository.FindAll(ctx, userID)
 		if accErr == nil {
-			accountsCount = len(accounts)
 			balances, balErr := s.accountRepository.Balances(ctx, userID)
 			if balErr == nil {
-				for _, account := range accounts {
-					accountsTotal += balances[account.Id] + account.InitialBalance
+				for _, acc := range accounts {
+					if acc.Type == accountDomain.AccountTypeCreditCard {
+						continue
+					}
+					accountsCount++
+					accountsTotal += balances[acc.Id] + acc.InitialBalance
 				}
 			}
 		}
