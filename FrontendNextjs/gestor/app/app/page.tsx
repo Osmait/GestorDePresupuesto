@@ -107,7 +107,7 @@ function TransactionItem({ transaction, category, locale }: {
 			</div>
 			<div className="text-right">
 				<p className={`font-bold ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-					{isIncome ? '+' : ''}{transactionCurrency} {Math.abs(transaction.amount).toLocaleString()}
+					{isIncome ? '+' : ''}{transactionCurrency} {transaction.amount.toLocaleString()}
 				</p>
 				<p className="text-xs text-muted-foreground">{category?.name}</p>
 			</div>
@@ -195,8 +195,7 @@ function BudgetCard({ budget, category, t }: {
 	category?: Category
 	t: any
 }) {
-	// Convert negative current_amount to positive for display
-	const spentAmount = Math.abs(budget.current_amount)
+	const spentAmount = budget.current_amount
 	const percentage = (spentAmount / budget.amount) * 100
 	const isOverBudget = spentAmount > budget.amount
 
@@ -450,7 +449,7 @@ export default async function DashboardPage() {
 														<>
 															{budgets.slice(0, 3).map((budget) => {
 																const category = Array.isArray(categories) ? categories.find(c => c.id === budget.category_id) : undefined;
-																const spentAmount = Math.abs(budget.current_amount);
+																const spentAmount = budget.current_amount;
 																const percentage = (spentAmount / budget.amount) * 100;
 
 																return (

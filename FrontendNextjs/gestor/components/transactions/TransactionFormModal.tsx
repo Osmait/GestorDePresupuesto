@@ -190,7 +190,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction,
       form.reset({
         name: editingTransaction.name,
         description: editingTransaction.description,
-        amount: Math.abs(editingTransaction.amount),
+        amount: editingTransaction.amount,
         type_transaction: editingTransaction.type_transation === 'income' ? TypeTransaction.INCOME : TypeTransaction.BILL,
         account_id: editingTransaction.account_id,
         category_id: editingTransaction.category_id,

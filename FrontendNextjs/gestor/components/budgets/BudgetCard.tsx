@@ -47,7 +47,7 @@ export function BudgetCard({ budget, category, transactions, onDelete, onEdit }:
     const t = useTranslations('budgets')
     const tForms = useTranslations('forms')
     const router = useRouter()
-    const spentAmount = Math.abs(budget.current_amount)
+    const spentAmount = budget.current_amount
     const progressPercentage = (spentAmount / budget.amount) * 100
     const remaining = budget.amount - spentAmount
     const isOverBudget = spentAmount > budget.amount

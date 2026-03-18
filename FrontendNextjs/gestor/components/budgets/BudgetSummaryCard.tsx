@@ -16,9 +16,9 @@ import { Transaction } from '@/types/transaction'
 export function BudgetSummaryCard({ budgets, transactions: _transactions }: { budgets: Budget[], transactions: Transaction[] }) {
     const t = useTranslations('budgets')
     const totalBudget = budgets?.reduce((sum, budget) => sum + budget.amount, 0) || 0
-    const totalSpent = budgets?.reduce((sum, budget) => sum + Math.abs(budget.current_amount), 0) || 0
+    const totalSpent = budgets?.reduce((sum, budget) => sum + budget.current_amount, 0) || 0
     const totalRemaining = totalBudget - totalSpent
-    const overBudgetCount = budgets?.filter(budget => Math.abs(budget.current_amount) > budget.amount).length || 0
+    const overBudgetCount = budgets?.filter(budget => budget.current_amount > budget.amount).length || 0
 
     return (
         <Card className="border-border/50 dark:border-border/20">

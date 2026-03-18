@@ -127,7 +127,7 @@ export default function TransactionItem({ transaction, category, onTransactionDe
           <div className="flex items-center gap-4">
             <div className="text-right">
               <p className={`font-bold text-xl ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                <span aria-hidden="true">{isIncome ? '+' : '-'}</span>${Math.abs(transaction.amount).toLocaleString()}
+                <span aria-hidden="true">{isIncome ? '+' : '-'}</span>${transaction.amount.toLocaleString()}
               </p>
               <p className="text-xs text-muted-foreground">USD</p>
             </div>

@@ -29,7 +29,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
         const expenseMap: Record<string, number> = {}
 
         transactions.forEach(t => {
-            const amount = Math.abs(t.amount)
+            const amount = t.amount
             if (t.type_transation === 'income') {
                 income += amount
                 if (t.category_id) {
@@ -74,10 +74,11 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
             // To go back in time:
             // If transaction was Income (+), we SUBTRACT it to get previous balance.
             // If transaction was Expense (-), we ADD it (using abs amount) to get previous balance.
-            if (t.amount >= 0) {
-                balanceTracker -= t.amount
+            const INCOME_TYPES = ['income', 'loan_collection', 'loan_cancellation_refund']
+            if (INCOME_TYPES.includes(t.type_transation)) {
+                balanceTracker -= t.amount   // going back in time: undo income = subtract
             } else {
-                balanceTracker += Math.abs(t.amount)
+                balanceTracker += t.amount   // going back in time: undo expense = add back
             }
 
             historyPoints.push({
@@ -94,7 +95,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
         const expenseByNameMap: Record<string, number> = {}
         transactions.forEach(t => {
             if (t.type_transation === 'bill') {
-                expenseByNameMap[t.name] = (expenseByNameMap[t.name] || 0) + Math.abs(t.amount)
+                expenseByNameMap[t.name] = (expenseByNameMap[t.name] || 0) + t.amount
             }
         })
 
