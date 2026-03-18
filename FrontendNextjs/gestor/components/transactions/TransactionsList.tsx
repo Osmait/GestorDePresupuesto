@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -39,38 +39,47 @@ export default function TransactionsList() {
     const [currentFilter, setCurrentFilter] = useState('all')
     const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
 
-    const incomeTransactions = transactions.filter(t => t.type_transation === TypeTransaction.INCOME)
-    const expenseTransactions = transactions.filter((t) =>
-        t.type_transation === TypeTransaction.BILL ||
-        t.type_transation === TypeTransaction.LOAN_DISBURSEMENT ||
-        t.type_transation === TypeTransaction.INVESTMENT_PURCHASE ||
-        t.type_transation === TypeTransaction.INVESTMENT_FUNDING
+    const incomeTransactions = useMemo(
+        () => transactions.filter(t => t.type_transation === TypeTransaction.INCOME),
+        [transactions]
+    )
+    const expenseTransactions = useMemo(
+        () => transactions.filter((t) =>
+            t.type_transation === TypeTransaction.BILL ||
+            t.type_transation === TypeTransaction.LOAN_DISBURSEMENT ||
+            t.type_transation === TypeTransaction.INVESTMENT_PURCHASE ||
+            t.type_transation === TypeTransaction.INVESTMENT_FUNDING
+        ),
+        [transactions]
     )
 
-    const getFilteredTransactions = () => {
+    const filteredTransactions = useMemo(() => {
         switch (currentFilter) {
             case 'income': return incomeTransactions
             case 'expense': return expenseTransactions
             default: return transactions
         }
-    }
+    }, [currentFilter, transactions, incomeTransactions, expenseTransactions])
 
     const renderTransactionList = (transactionList: Transaction[]) => (
         <ul className="space-y-4 min-h-[50vh]">
-            <AnimatePresence mode="popLayout" initial={false}>
+            {/* AnimatePresence mode="sync" is cheaper than "popLayout":
+                "popLayout" measures every sibling's layout on each change (O(n)),
+                while "sync" only animates the entering/exiting element.
+                The `layout` prop is intentionally omitted for the same reason. */}
+            <AnimatePresence mode="sync" initial={false}>
                 {transactionList.map((transaction) => {
                     const category = categories.find(c => c.id === transaction.category_id)
                     return (
-                            <motion.li
-                                key={transaction.id}
-                                id={`transaction-item-${transaction.id}`}
-                                layout
+                        <motion.li
+                            key={transaction.id}
+                            id={`transaction-item-${transaction.id}`}
                             initial={{ opacity: 0, scale: 0.95 }}
                             animate={{ opacity: 1, scale: 1 }}
                             exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ duration: 0.3, ease: "easeInOut" }}
-                                className={highlightedTransactionId === transaction.id ? 'list-none rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : 'list-none'}
-                            >
+                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            className={highlightedTransactionId === transaction.id ? 'list-none rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : 'list-none'}
+                        >
                             <TransactionItem
                                 transaction={transaction}
                                 category={category}
@@ -158,7 +167,7 @@ export default function TransactionsList() {
                     noContent={true}
                 />
 
-                {renderTransactionList(getFilteredTransactions())}
+                {renderTransactionList(filteredTransactions)}
             </div>
 
             <Dialog open={Boolean(selectedTransaction)} onOpenChange={(open) => !open && setSelectedTransaction(null)}>

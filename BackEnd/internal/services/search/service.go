@@ -61,26 +61,6 @@ func (s *SearchService) Search(ctx context.Context, userId string, query string)
 		return response, nil
 	}
 
-	// 1. Search Transactions
-	go func() {
-		// Use existing filter logic
-		filter := dto.NewTransactionFilter()
-		filter.Search = query
-		// We want all matches, maybe limit? Default limit is usually set in DTO, let's say 50.
-		// filter.Limit = 50
-
-		txs, err := s.transactionRepo.FindAllOfAllAccountsWithFilters(ctx, userId, filter)
-		if err != nil {
-			log.Error().Err(err).Msg("error searching transactions")
-		} else {
-			response.Transactions = txs
-		}
-	}()
-
-	// Since we are using pointers to response fields inside goroutines without mutex, this is unsafe if concurrent.
-	// Let's run sequentially for safety and simplicity first, or use channels/waitgroup correctly.
-	// Sequential is fast enough for <100ms DB queries.
-
 	// 1. Transactions
 	filter := dto.NewTransactionFilter()
 	filter.Search = query

@@ -9,10 +9,19 @@ import (
 )
 
 // RLSMiddleware pins every authenticated request to a single *sql.Tx,
-// sets app.current_user_id via set_config(), and stores the *sql.Tx in
-// Gin context under "db_tx" for repositories to use via txhelper.FromContext.
+// sets two transaction-scoped PostgreSQL settings via set_config(), and
+// stores the *sql.Tx in Gin context under "db_tx" for repositories to
+// use via txhelper.FromContext.
+//
+// Settings applied per request:
+//   - app.current_user_id  — the authenticated user's ID
+//   - app.is_admin         — "true" for ADMIN role, "false" otherwise
+//
+// RLS policies check current_setting('app.is_admin', true) = 'true' for
+// admin bypass instead of the fragile '__admin__' sentinel pattern.
 //
 // Must be registered AFTER AuthMiddleware.
+// Must NOT wrap long-lived SSE endpoints (register those before this middleware).
 func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("X-User-Id")
@@ -21,11 +30,10 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
-		// Admin users bypass row-level filters via sentinel value.
-		rlsUserID := userID
+		isAdmin := "false"
 		if userVal, exists := c.Get("User"); exists {
 			if userModel, ok := userVal.(*dto.UserResponse); ok && userModel.Role == "ADMIN" {
-				rlsUserID = "__admin__"
+				isAdmin = "true"
 			}
 		}
 
@@ -37,9 +45,14 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 		}
 
 		// set_config(name, value, is_local=true) is the parameterized equivalent of
-		// SET LOCAL — PostgreSQL does not support $1 placeholders in SET commands.
-		if _, err := tx.ExecContext(c.Request.Context(),
-			"SELECT set_config('app.current_user_id', $1, true)", rlsUserID); err != nil {
+		// SET LOCAL. PostgreSQL does not support $1 placeholders in SET commands.
+		// is_local=true makes both settings transaction-scoped so they are
+		// automatically cleared when the connection returns to the pool.
+		_, err = tx.ExecContext(c.Request.Context(),
+			"SELECT set_config('app.current_user_id', $1, true),"+
+				"       set_config('app.is_admin', $2, true)",
+			userID, isAdmin)
+		if err != nil {
 			_ = tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not set rls context"})
 			c.Abort()
