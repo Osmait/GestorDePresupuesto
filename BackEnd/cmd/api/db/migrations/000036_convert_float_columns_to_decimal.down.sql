@@ -1,0 +1,38 @@
+-- Revert DECIMAL columns back to DOUBLE PRECISION (float8).
+-- Data is preserved; the cast is lossless in this direction.
+
+ALTER TABLE account
+    ALTER COLUMN balance TYPE DOUBLE PRECISION USING balance::DOUBLE PRECISION;
+
+ALTER TABLE transactions
+    ALTER COLUMN amount TYPE DOUBLE PRECISION USING amount::DOUBLE PRECISION;
+
+ALTER TABLE budgets
+    ALTER COLUMN amount TYPE DOUBLE PRECISION USING amount::DOUBLE PRECISION;
+
+ALTER TABLE investments
+    ALTER COLUMN quantity       TYPE DOUBLE PRECISION USING quantity::DOUBLE PRECISION,
+    ALTER COLUMN purchase_price TYPE DOUBLE PRECISION USING purchase_price::DOUBLE PRECISION,
+    ALTER COLUMN current_price  TYPE DOUBLE PRECISION USING current_price::DOUBLE PRECISION,
+    ALTER COLUMN source_amount  TYPE DOUBLE PRECISION USING source_amount::DOUBLE PRECISION,
+    ALTER COLUMN source_amount  SET DEFAULT 0,
+    ALTER COLUMN exchange_rate  TYPE DOUBLE PRECISION USING exchange_rate::DOUBLE PRECISION;
+
+ALTER TABLE investment_funding_balances
+    ALTER COLUMN available_amount TYPE DOUBLE PRECISION USING available_amount::DOUBLE PRECISION,
+    ALTER COLUMN available_amount SET DEFAULT 0;
+
+ALTER TABLE investment_funding_movements
+    ALTER COLUMN amount         TYPE DOUBLE PRECISION USING amount::DOUBLE PRECISION,
+    ALTER COLUMN counter_amount TYPE DOUBLE PRECISION USING counter_amount::DOUBLE PRECISION,
+    ALTER COLUMN exchange_rate  TYPE DOUBLE PRECISION USING exchange_rate::DOUBLE PRECISION;
+
+ALTER TABLE savings_goals
+    ALTER COLUMN target_amount TYPE DOUBLE PRECISION USING target_amount::DOUBLE PRECISION,
+    ALTER COLUMN current_saved TYPE DOUBLE PRECISION USING current_saved::DOUBLE PRECISION,
+    ALTER COLUMN current_saved SET DEFAULT 0;
+
+ALTER TABLE cryptos
+    ALTER COLUMN price         TYPE DOUBLE PRECISION USING price::DOUBLE PRECISION,
+    ALTER COLUMN current_price TYPE DOUBLE PRECISION USING current_price::DOUBLE PRECISION,
+    ALTER COLUMN quantity      TYPE DOUBLE PRECISION USING quantity::DOUBLE PRECISION;
