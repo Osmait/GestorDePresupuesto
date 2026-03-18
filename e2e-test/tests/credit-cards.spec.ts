@@ -28,11 +28,11 @@ test.describe('Credit Cards @prod-write', () => {
 		const formModal = page.getByRole('dialog', { name: /Add Credit Card|Edit Credit Card/i })
 		await expect(formModal).toBeVisible()
 
-		await formModal.locator('#name').fill(cardName)
-		await formModal.locator('#bank').fill('E2E Bank')
-		await formModal.locator('#lastFourDigits').fill(lastFour)
-		await formModal.locator('#cutDay').fill('20')
-		await formModal.locator('#dueDay').fill('10')
+		await formModal.locator('input[name="name"]').fill(cardName)
+		await formModal.locator('input[name="bank"]').fill('E2E Bank')
+		await formModal.locator('input[name="lastFourDigits"]').fill(lastFour)
+		await formModal.locator('input[name="cutDay"]').fill('20')
+		await formModal.locator('input[name="dueDay"]').fill('10')
 		await formModal.locator('label:has-text("Credit Limit")').first().locator('..').locator('input').first().fill('10000')
 		await formModal.locator('label:has-text("Initial Debt")').first().locator('..').locator('input').first().fill('1500')
 
@@ -48,7 +48,7 @@ test.describe('Credit Cards @prod-write', () => {
 
 		await paymentModal.locator('button[role="combobox"]').first().click()
 		await page.getByRole('option', { name: new RegExp(accountName) }).first().click()
-		await paymentModal.locator('#amount').fill('100')
+		await paymentModal.locator('input[name="amount"]').fill('100')
 
 		await paymentModal.getByRole('button', { name: /Make Payment/i }).click()
 		await expect(paymentModal).not.toBeVisible({ timeout: 20000 })
@@ -69,7 +69,7 @@ test.describe('Credit Cards @prod-write', () => {
 		const editModal = page.getByRole('dialog', { name: /Edit Credit Card/i })
 		await expect(editModal).toBeVisible()
 		const updatedCardName = `${cardName}-UPD`
-		await editModal.locator('#name').fill(updatedCardName)
+		await editModal.locator('input[name="name"]').fill(updatedCardName)
 		await editModal.getByRole('button', { name: /Update/i }).click()
 
 		if (await editModal.isVisible()) {

@@ -4,18 +4,9 @@ import { defineConfig, devices } from '@playwright/test';
 const targetURL = process.env.E2E_TARGET_URL;
 const isCI = !!process.env.CI;
 
-// If target URL is provided, we don't need to spin up local servers
+// The backend is managed by global-setup (testcontainers + go run).
+// Only the frontend dev server is started here via webServer.
 const webServerConfig = targetURL ? undefined : [
-  {
-    // Use direct go run to ensure the process exits correctly on SIGTERM. 
-    // 'make backend' uses 'air' which might swallow signals.
-    command: 'cd ../BackEnd && go run main.go',
-    url: 'http://127.0.0.1:8080',
-    reuseExistingServer: !isCI,
-    timeout: 120 * 1000,
-    stdout: 'pipe' as 'pipe', // Explicit cast to satisfy union type
-    stderr: 'pipe' as 'pipe',
-  },
   {
     command: 'cd ../FrontendNextjs/gestor && npm run dev',
     url: 'http://localhost:3000',
@@ -27,6 +18,7 @@ const webServerConfig = targetURL ? undefined : [
 ];
 
 export default defineConfig({
+  globalSetup: require.resolve('./global-setup'),
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: isCI,

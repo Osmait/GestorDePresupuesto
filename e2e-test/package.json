@@ -15,7 +15,9 @@
   "type": "commonjs",
   "devDependencies": {
     "@playwright/test": "^1.57.0",
+    "@testcontainers/postgresql": "^10.x",
     "@types/node": "^25.0.3",
+    "testcontainers": "^10.x",
     "typescript": "^5.9.3"
   }
 }

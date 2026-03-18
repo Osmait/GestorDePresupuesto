@@ -160,4 +160,4 @@ dev-scripts/
 .claude/ 
 
 build-errors.log
-tmp/** */
+tmp/** */bin/

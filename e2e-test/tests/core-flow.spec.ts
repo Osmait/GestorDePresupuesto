@@ -62,7 +62,7 @@ test('Core Flow: Login (Demo), Create Account, Category, Transaction @prod-write
 
   // Fill Category Form
   const categoryName = `TestCat ${Date.now()}`;
-  await categoryModal.locator('input[id="name"]').fill(categoryName); // Using input[id="name"] to be safe of strict variations
+  await categoryModal.locator('input[name="name"]').fill(categoryName);
 
   // Select an icon (first one)
   await categoryModal.locator('button.text-2xl').first().click();
