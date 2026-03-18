@@ -56,10 +56,10 @@ func (repo *TransactionRepository) resolveFallbackCategoryID(ctx context.Context
 			ON CONFLICT (id) DO NOTHING
 			RETURNING id
 		)
-		SELECT id FROM ins
-		UNION ALL
-		SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1
-		LIMIT 1
+		SELECT COALESCE(
+			(SELECT id FROM ins LIMIT 1),
+			(SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1)
+		)
 	`, userId).Scan(&categoryID)
 	return categoryID, err
 }
@@ -471,12 +471,12 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 
 	// LIMIT and OFFSET for pagination (only if limit > 0)
 	if filter.Limit > 0 {
-		queryBuilder.WriteString(fmt.Sprintf(" LIMIT $%d", argIndex))
+		fmt.Fprintf(&queryBuilder, " LIMIT $%d", argIndex)
 		args = append(args, filter.Limit)
 		argIndex++
 
 		if filter.Offset > 0 {
-			queryBuilder.WriteString(fmt.Sprintf(" OFFSET $%d", argIndex))
+			fmt.Fprintf(&queryBuilder, " OFFSET $%d", argIndex)
 			args = append(args, filter.Offset)
 		}
 	}

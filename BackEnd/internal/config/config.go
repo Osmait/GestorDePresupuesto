@@ -216,15 +216,13 @@ type Config struct {
 
 // LoadConfig loads configuration from environment variables with comprehensive validation
 func LoadConfig() (*Config, error) {
-	// Load .env file if it exists (ignore error in production)
+	// Load .env file if it exists (ignore error if file not present).
+	// godotenv.Load — unlike Overload — does NOT override env vars that are
+	// already set in the process environment. This allows callers (CI, E2E
+	// test runners, Docker) to inject values via process env and have them
+	// take precedence over any local .env file.
 	if !isProduction() {
-		// Use Overload to FORCE overriding shell variables (like localhost)
-		err := godotenv.Overload()
-		pwd, _ := os.Getwd()
-		fmt.Printf("DEBUG: Current PWD: %s\n", pwd)
-		fmt.Printf("DEBUG: Loading .env result: %v\n", err)
-		fmt.Printf("DEBUG: Loaded DB_HOST: %s\n", getEnvString("DB_HOST", "not_set"))
-		fmt.Printf("DEBUG: Loaded DB_SSL_MODE: %s\n", getEnvString("DB_SSL_MODE", "not_set"))
+		_ = godotenv.Load()
 	}
 
 	config := &Config{
@@ -868,23 +866,37 @@ func getEnvStringMap(key string, defaultValue map[string]string) map[string]stri
 	return defaultValue
 }
 
-// getJWTSecret returns JWT secret with environment-specific handling
+// devJWTSecret is a stable fallback used ONLY in local development and test
+// environments. It is intentionally public knowledge — never use in staging/prod.
+const devJWTSecret = "dev-only-jwt-secret-do-not-use-outside-local-environment-32c"
+
+// getJWTSecret returns the JWT signing secret.
+//
+// Rules:
+//   - If JWT_SECRET env var is set, use it always (any environment).
+//   - If ENV is "development" or "test" and the var is missing, fall back to
+//     the well-known dev constant and log a loud warning.  Using a stable
+//     constant (not a random value) means the server can restart without
+//     invalidating existing tokens during local development.
+//   - Any other environment (staging, production, CI, …) panics on startup
+//     so the misconfiguration is caught before serving real traffic.
 func getJWTSecret() string {
 	if secret := os.Getenv("JWT_SECRET"); secret != "" {
 		return secret
 	}
 
-	if isProduction() {
-		panic("JWT_SECRET environment variable is required in production")
+	env := os.Getenv("ENV")
+	if env == "development" || env == "test" {
+		fmt.Fprintf(os.Stderr,
+			"\n⚠️  WARNING: JWT_SECRET is not set. Using the insecure development "+
+				"fallback secret. Set JWT_SECRET in your environment before deploying.\n\n")
+		return devJWTSecret
 	}
 
-	// Generate a random secret for non-production environments
-	if secret := generateSecureSecret(); secret != "" {
-		return secret
-	}
-
-	// Fallback to development secret
-	return "development-secret-key-change-in-production-please-use-env-var"
+	// Staging, production, or any unrecognised environment: fail fast.
+	panic(fmt.Sprintf(
+		"JWT_SECRET environment variable is required (ENV=%q). "+
+			"Set it to a random string of at least 32 characters.", env))
 }
 
 // generateSecureSecret generates a cryptographically secure secret
