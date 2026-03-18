@@ -44,30 +44,24 @@ func (repo *TransactionRepository) Save(ctx context.Context, transaction *transa
 }
 
 func (repo *TransactionRepository) resolveFallbackCategoryID(ctx context.Context, userId string) (string, error) {
+	// Single query: insert a 'General' fallback only when the user has no categories,
+	// then return whichever category exists (new or pre-existing).
+	// The fallback id is deterministic (MD5 of userId), so no second SELECT is needed.
 	var categoryID string
-	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, `SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, userId).Scan(&categoryID)
-	if err == nil {
-		return categoryID, nil
-	}
-	if err != sql.ErrNoRows {
-		return "", err
-	}
-
-	_, err = txhelper.FromContext(ctx, repo.db).ExecContext(ctx, `
-		INSERT INTO categorys (id, name, icon, color, created_at, user_id)
-		VALUES ('autocat_' || SUBSTRING(MD5($1) FROM 1 FOR 24), 'General', 'tag', '#64748b', NOW(), $1)
-		ON CONFLICT (id) DO NOTHING
-	`, userId)
-	if err != nil {
-		return "", err
-	}
-
-	err = txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, `SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, userId).Scan(&categoryID)
-	if err != nil {
-		return "", err
-	}
-
-	return categoryID, nil
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, `
+		WITH ins AS (
+			INSERT INTO categorys (id, name, icon, color, created_at, user_id)
+			SELECT 'autocat_' || SUBSTRING(MD5($1) FROM 1 FOR 24), 'General', 'tag', '#64748b', NOW(), $1
+			WHERE NOT EXISTS (SELECT 1 FROM categorys WHERE user_id = $1)
+			ON CONFLICT (id) DO NOTHING
+			RETURNING id
+		)
+		SELECT id FROM ins
+		UNION ALL
+		SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1
+		LIMIT 1
+	`, userId).Scan(&categoryID)
+	return categoryID, err
 }
 
 func (repo *TransactionRepository) ResolveAndValidateCurrencyForAccount(ctx context.Context, userId string, accountId string, currency string) (string, error) {
