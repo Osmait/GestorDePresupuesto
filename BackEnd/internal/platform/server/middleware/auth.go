@@ -12,41 +12,34 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
 
-// NO_AUTH_NEEDED defines routes that don't require authentication
-var NO_AUTH_NEEDED = []string{
-	"login",
-	"login",
-	"health",
-	"ping",
-	"metrics",
+// publicRoutes is the authoritative set of paths that bypass authentication.
+// IMPORTANT: use EXACT path matches only.
+// Substring matching (strings.Contains) is a security risk — a route like
+// "/account/login-history" would accidentally bypass auth if "login" were
+// matched as a substring.
+var publicRoutes = map[string]bool{
+	"/login":        true, // legacy single-token login
+	"/auth/login":   true,
+	"/auth/refresh": true,
+	"/auth/logout":  true,
+	"/auth/demo":    true,
+	"/health":       true,
+	"/ping":         true,
+	"/metrics":      true,
 }
 
-// shouldCheckToken determines if a route requires token validation
+// shouldCheckToken reports whether the given route path requires a valid JWT.
 func shouldCheckToken(route string) bool {
-	// 1. Check strict substring matches from list
-	for _, p := range NO_AUTH_NEEDED {
-		if strings.Contains(route, p) {
-			return false
-		}
-	}
-
-	// 2. Special case for /user routes (Registration, GetById)
-	// Must allow "/user" and "/user/xxx" BUT NOT "/users/demos"
-	if route == "/user" || strings.HasPrefix(route, "/user/") {
+	// Exact match against the public routes set.
+	if publicRoutes[route] {
 		return false
 	}
 
-	// 3. Auth routes that don't require authentication
-	authNoAuthRoutes := []string{
-		"/auth/login",
-		"/auth/refresh",
-		"/auth/logout",
-		"/auth/demo",
-	}
-	for _, r := range authNoAuthRoutes {
-		if route == r {
-			return false
-		}
+	// /user  (registration) and /user/:id (lookup by ID) are public.
+	// We guard against over-broad matches: only the exact path or a
+	// single path segment beneath it is allowed without auth.
+	if route == "/user" || strings.HasPrefix(route, "/user/") {
+		return false
 	}
 
 	return true

@@ -149,12 +149,21 @@ func (s *Server) registerRoutes() {
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
 
-	// RLS middleware: pins each authenticated request to a transaction with SET LOCAL app.current_user_id
-	s.Engine.Use(middleware.RLSMiddleware(s.db))
-
-	// Notification Route (SSE)
+	// SSE subscribe endpoint is registered HERE — after AuthMiddleware but BEFORE
+	// RLSMiddleware. Rationale: the SSE handler is a long-lived connection that
+	// never completes (it streams events until the client disconnects). If it were
+	// wrapped by RLSMiddleware, the middleware would open a *sql.Tx that is never
+	// committed/rolled back for the duration of the connection, exhausting the
+	// connection pool under concurrent users. The subscribe handler does not query
+	// the database itself, so it does not need an RLS transaction.
 	notificationH := notificationHandler.NewNotificationHandler(s.notificationService)
 	s.Engine.GET("/notifications", notificationH.Subscribe)
+
+	// RLS middleware: pins each DB-touching authenticated request to a transaction
+	// with set_config('app.current_user_id', userID, true).
+	s.Engine.Use(middleware.RLSMiddleware(s.db))
+
+	// Notification management endpoints — these DO query the DB and need RLS.
 	s.Engine.POST("/notifications/test", notificationH.SendTestNotification)
 	s.Engine.GET("/notifications/history", notificationH.GetHistory)
 	s.Engine.PATCH("/notifications/:id/read", notificationH.MarkAsRead)
