@@ -19,7 +19,7 @@ type AnalyticsRepository struct {
 
 func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *float64, maxAmount *float64) ([]*analytics.CategoryExpenseRepository, error) {
 	if usdToDop <= 0 {
-		usdToDop = 60
+		usdToDop = 1
 	}
 
 	query := `
@@ -89,7 +89,7 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 
 func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID string, usdToDop float64) ([]*analytics.CategoryExpenseRepository, error) {
 	if usdToDop <= 0 {
-		usdToDop = 60
+		usdToDop = 1
 	}
 
 	query := `

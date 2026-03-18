@@ -6,6 +6,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/rs/zerolog/log"
+
 	accountDomain "github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
 	certificateDomain "github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
@@ -50,11 +52,15 @@ type DashboardFilters struct {
 }
 
 func (s *AnalyticsService) GetCategoryExpenses(ctx context.Context, userID string) ([]*analytics.CategoryExpense, error) {
-	usdToDop := 60.0
+	usdToDop := 1.0 // fallback: no conversion if rate unavailable
 	if s.usdToDopRateFn != nil {
 		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
 			usdToDop = rate
+		} else {
+			log.Warn().Msg("exchange rate unavailable, USD amounts will not be converted")
 		}
+	} else {
+		log.Warn().Msg("exchange rate function not configured, USD amounts will not be converted")
 	}
 
 	categoryExpensesRepo, err := s.repo.GetCategoryExpenses(ctx, userID, usdToDop)
@@ -80,11 +86,15 @@ func (s *AnalyticsService) GetCategoryExpenses(ctx context.Context, userID strin
 }
 
 func (s *AnalyticsService) GetMonthlySummary(ctx context.Context, userID string) ([]*analytics.MonthlySummary, error) {
-	usdToDop := 60.0
+	usdToDop := 1.0 // fallback: no conversion if rate unavailable
 	if s.usdToDopRateFn != nil {
 		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
 			usdToDop = rate
+		} else {
+			log.Warn().Msg("exchange rate unavailable, USD amounts will not be converted")
 		}
+	} else {
+		log.Warn().Msg("exchange rate function not configured, USD amounts will not be converted")
 	}
 
 	monthlySummariesRepo, err := s.repo.GetMonthlySummary(ctx, userID, usdToDop)
@@ -109,11 +119,15 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 	dateFrom, dateTo := normalizeDashboardDateRange(filters.DateFrom, filters.DateTo)
 	transactionType := normalizeTransactionType(filters.TransactionType)
 
-	usdToDop := 60.0
+	usdToDop := 1.0 // fallback: no conversion if rate unavailable
 	if s.usdToDopRateFn != nil {
 		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
 			usdToDop = rate
+		} else {
+			log.Warn().Msg("exchange rate unavailable, USD amounts will not be converted")
 		}
+	} else {
+		log.Warn().Msg("exchange rate function not configured, USD amounts will not be converted")
 	}
 
 	categoryExpensesRepo, err := s.repo.GetCategoryExpensesInRange(

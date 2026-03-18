@@ -181,7 +181,7 @@ func (u *UserRepository) FindUserById(ctx context.Context, id string) (*domainUs
 }
 
 func (u *UserRepository) FindUserByIp(ctx context.Context, ip string) (*domainUser.User, error) {
-	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE ip_address = $1", ip)
+	rows, err := u.db.QueryContext(ctx, "SELECT id ,name ,last_name, email ,password, confirmed, is_demo, COALESCE(ip_address, ''), role from users WHERE ip_address = $1 AND deleted_at IS NULL", ip)
 	if err != nil {
 		return nil, err
 	}
