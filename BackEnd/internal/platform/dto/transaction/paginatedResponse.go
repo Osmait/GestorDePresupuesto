@@ -130,7 +130,7 @@ func CalculateSummary(transactions []*TransactionResponse, filteredCount int64, 
 	categoryCounts := make(map[string]int)
 
 	for _, transaction := range transactions {
-		amountAbs := math.Abs(transaction.Amount)
+		amountAbs := transaction.Amount
 		currency := transaction.Currency
 		if currency == "" {
 			currency = "DOP"

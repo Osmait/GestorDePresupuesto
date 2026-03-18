@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"math"
 	"net/http"
 	"strings"
 	"time"
@@ -239,7 +238,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 				currency = "DOP"
 			}
 
-			amount := math.Abs(tx.Amount)
+			amount := tx.Amount
 			createdID, createErr := h.transactionService.CreateTransactionWithID(
 				c.Request.Context(),
 				tx.Name,

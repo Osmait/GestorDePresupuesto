@@ -76,7 +76,13 @@ func (repo *AccountRepository) Delete(ctx context.Context, id string, userId str
 }
 
 func (repo *AccountRepository) Balance(ctx context.Context, id string) (float64, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT   sum(amount)  as TOTAL  FROM  transactions   WHERE account_id = $1 ", id)
+	rows, err := repo.db.QueryContext(ctx, `SELECT COALESCE(SUM(CASE
+    WHEN type_transation IN ('income','loan_collection','loan_cancellation_refund')
+    THEN amount
+    ELSE -amount
+END), 0) AS TOTAL
+FROM transactions
+WHERE account_id = $1`, id)
 	if err != nil {
 		return 0, err
 	}
@@ -101,7 +107,11 @@ func (repo *AccountRepository) Balance(ctx context.Context, id string) (float64,
 }
 
 func (repo *AccountRepository) BalanceByCurrency(ctx context.Context, id string, currency string) (float64, error) {
-	query := "SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE account_id = $1 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))"
+	query := `SELECT COALESCE(SUM(CASE
+    WHEN type_transation IN ('income','loan_collection','loan_cancellation_refund')
+    THEN amount
+    ELSE -amount
+END), 0) FROM transactions WHERE account_id = $1 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))`
 	row := repo.db.QueryRowContext(ctx, query, id, currency)
 
 	var total float64
@@ -113,7 +123,11 @@ func (repo *AccountRepository) BalanceByCurrency(ctx context.Context, id string,
 }
 
 func (repo *AccountRepository) Balances(ctx context.Context, userId string) (map[string]float64, error) {
-	rows, err := repo.db.QueryContext(ctx, "SELECT account_id, sum(amount) as TOTAL FROM transactions WHERE user_id = $1 GROUP BY account_id", userId)
+	rows, err := repo.db.QueryContext(ctx, `SELECT account_id, COALESCE(SUM(CASE
+    WHEN type_transation IN ('income','loan_collection','loan_cancellation_refund')
+    THEN amount
+    ELSE -amount
+END), 0) AS TOTAL FROM transactions WHERE user_id = $1 GROUP BY account_id`, userId)
 	if err != nil {
 		return nil, err
 	}

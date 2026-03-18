@@ -137,7 +137,7 @@ func (h *Handler) suggestCategoryForTransaction(
 	}
 
 	stats := make(map[string]*categoryStat)
-	targetAmount := math.Abs(txn.Amount)
+	targetAmount := txn.Amount
 
 	for _, existing := range history {
 		if existing == nil || existing.CategoryId == "" || existing.TypeTransation != txn.TypeTransation {
@@ -148,7 +148,7 @@ func (h *Handler) suggestCategoryForTransaction(
 		}
 
 		nameSim := nameSimilarityScore(txn.Name+" "+txn.Description, existing.Name+" "+existing.Description)
-		amountDiff := math.Abs(targetAmount - math.Abs(existing.Amount))
+		amountDiff := math.Abs(targetAmount - existing.Amount)
 
 		entryScore := 0.0
 		if nameSim >= 0.65 {

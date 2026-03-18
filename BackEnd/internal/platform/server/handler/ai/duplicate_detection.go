@@ -64,7 +64,7 @@ func (h *Handler) detectPotentialDuplicates(
 			matches = append(matches, dto.DuplicateCandidate{
 				ID:             existingTxn.Id,
 				Name:           existingTxn.Name,
-				Amount:         math.Abs(existingTxn.Amount),
+				Amount:         existingTxn.Amount,
 				TypeTransation: existingTxn.TypeTransation,
 				AccountID:      existingTxn.AccountId,
 				Currency:       normalizeCurrency(existingTxn.Currency),
@@ -119,8 +119,8 @@ func compareTransactionsForDuplicate(extracted *transaction.Transaction, existin
 		return "", 0
 	}
 
-	extractedAmount := math.Abs(extracted.Amount)
-	existingAmount := math.Abs(existing.Amount)
+	extractedAmount := extracted.Amount
+	existingAmount := existing.Amount
 	amountDiff := math.Abs(extractedAmount - existingAmount)
 
 	dateDiffDays := daysBetween(extracted.CreatedAt, existing.CreatedAt)

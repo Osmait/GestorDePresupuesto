@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
@@ -65,11 +64,9 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 		return "", err
 	}
 	id := uuid.String()
-	if typeTransaction == BILL || typeTransaction == CARD_PAYMENT || typeTransaction == LOAN_DISBURSEMENT || typeTransaction == INVESTMENT_PURCHASE || typeTransaction == INVESTMENT_FUNDING {
-		amount = amount * -1
-	}
-	if typeTransaction == LOAN_COLLECTION || typeTransaction == LOAN_CANCELLATION_REFUND {
-		amount = math.Abs(amount)
+	// Amounts are always stored as positive; type_transation determines direction.
+	if amount < 0 {
+		amount = -amount
 	}
 
 	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, userId, accountId, currency)
@@ -126,10 +123,10 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 				return
 			}
 
-			// budget.Amount is positive, currentSpent is negative (bills). Make it positive for calculation.
-			spentPositive := currentSpent * -1
+			// budget.Amount is positive, currentSpent is positive (bills stored as positive).
+			spentPositive := currentSpent
 			limit := budget.Amount
-			currentTransactionImpact := amount * -1
+			currentTransactionImpact := amount
 			if resolvedCurrency == "USD" {
 				currentTransactionImpact = currentTransactionImpact * usdToDop
 			}
@@ -379,8 +376,8 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 
 // UpdateTransaction modifies an existing transaction.
 func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, transaction *transaction.Transaction) error {
-	if transaction.TypeTransation == BILL {
-		transaction.Amount = transaction.Amount * -1
+	if transaction.Amount < 0 {
+		transaction.Amount = -transaction.Amount
 	}
 
 	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, transaction.UserId, transaction.AccountId, transaction.Currency)

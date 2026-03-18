@@ -26,13 +26,13 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 		SELECT c.id,
 			c.name,
 			COALESCE(SUM(CASE
-				WHEN t.currency = 'USD' THEN ABS(t.amount) * $2
-				ELSE ABS(t.amount)
+				WHEN t.currency = 'USD' THEN t.amount * $2
+				ELSE t.amount
 			END), 0) as total,
 			c.color,
 			COUNT(*) as transaction_count,
-			COALESCE(SUM(CASE WHEN t.currency = 'DOP' THEN ABS(t.amount) ELSE 0 END), 0) as dop_total,
-			COALESCE(SUM(CASE WHEN t.currency = 'USD' THEN ABS(t.amount) ELSE 0 END), 0) as usd_total
+			COALESCE(SUM(CASE WHEN t.currency = 'DOP' THEN t.amount ELSE 0 END), 0) as dop_total,
+			COALESCE(SUM(CASE WHEN t.currency = 'USD' THEN t.amount ELSE 0 END), 0) as usd_total
 		FROM transactions t
 		JOIN categorys c ON t.category_id = c.id
 		WHERE t.user_id = $1
@@ -40,8 +40,8 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 			AND (NULLIF($5, '') IS NULL OR t.account_id::text = $5)
 			AND (NULLIF($6, '') IS NULL OR t.category_id::text = $6)
 			AND ($7 = '' OR $7 = 'bill')
-			AND ($8::numeric IS NULL OR ABS(t.amount) >= $8)
-			AND ($9::numeric IS NULL OR ABS(t.amount) <= $9)
+			AND ($8::numeric IS NULL OR t.amount >= $8)
+			AND ($9::numeric IS NULL OR t.amount <= $9)
 			AND t.created_at >= $3 AND t.created_at <= $4
 		GROUP BY c.id, c.name, c.color
 	`
@@ -96,13 +96,13 @@ func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID st
 		SELECT c.id,
 			c.name,
 			COALESCE(SUM(CASE
-				WHEN t.currency = 'USD' THEN ABS(t.amount) * $2
-				ELSE ABS(t.amount)
+				WHEN t.currency = 'USD' THEN t.amount * $2
+				ELSE t.amount
 			END), 0) as total,
 			c.color,
 			COUNT(*) as transaction_count,
-			COALESCE(SUM(CASE WHEN t.currency = 'DOP' THEN ABS(t.amount) ELSE 0 END), 0) as dop_total,
-			COALESCE(SUM(CASE WHEN t.currency = 'USD' THEN ABS(t.amount) ELSE 0 END), 0) as usd_total
+			COALESCE(SUM(CASE WHEN t.currency = 'DOP' THEN t.amount ELSE 0 END), 0) as dop_total,
+			COALESCE(SUM(CASE WHEN t.currency = 'USD' THEN t.amount ELSE 0 END), 0) as usd_total
 		FROM transactions t
 		JOIN categorys c ON t.category_id = c.id
 		WHERE t.user_id = $1 AND t.type_transation = 'bill'
@@ -153,8 +153,8 @@ func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID stri
 				ELSE 0
 			END), 0) as total_income,
 			COALESCE(SUM(CASE
-				WHEN type_transation = 'bill' AND currency = 'USD' THEN ABS(amount) * $2
-				WHEN type_transation = 'bill' THEN ABS(amount)
+				WHEN type_transation = 'bill' AND currency = 'USD' THEN amount * $2
+				WHEN type_transation = 'bill' THEN amount
 				ELSE 0
 			END), 0) as total_bill
 		FROM transactions
@@ -203,8 +203,8 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 				ELSE 0
 			END), 0) as total_income,
 			COALESCE(SUM(CASE
-				WHEN type_transation = 'bill' AND currency = 'USD' THEN ABS(amount) * $2
-				WHEN type_transation = 'bill' THEN ABS(amount)
+				WHEN type_transation = 'bill' AND currency = 'USD' THEN amount * $2
+				WHEN type_transation = 'bill' THEN amount
 				ELSE 0
 			END), 0) as total_bill
 		FROM transactions
@@ -212,8 +212,8 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 			AND (NULLIF($5, '') IS NULL OR account_id::text = $5)
 			AND (NULLIF($6, '') IS NULL OR category_id::text = $6)
 			AND (NULLIF($7, '') IS NULL OR type_transation::text = $7)
-			AND ($8::numeric IS NULL OR ABS(amount) >= $8)
-			AND ($9::numeric IS NULL OR ABS(amount) <= $9)
+			AND ($8::numeric IS NULL OR amount >= $8)
+			AND ($9::numeric IS NULL OR amount <= $9)
 			AND created_at >= $3 AND created_at <= $4
 		GROUP BY year, month
 		ORDER BY year, month
@@ -269,8 +269,8 @@ func (a *AnalyticsRepository) GetTotals(ctx context.Context, userID string, usdT
 				ELSE 0
 			END), 0) as total_income,
 			COALESCE(SUM(CASE
-				WHEN type_transation = 'bill' AND currency = 'USD' THEN ABS(amount) * $2
-				WHEN type_transation = 'bill' THEN ABS(amount)
+				WHEN type_transation = 'bill' AND currency = 'USD' THEN amount * $2
+				WHEN type_transation = 'bill' THEN amount
 				ELSE 0
 			END), 0) as total_bill
 		FROM transactions
@@ -298,8 +298,8 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 				ELSE 0
 			END), 0) as total_income,
 			COALESCE(SUM(CASE
-				WHEN type_transation = 'bill' AND currency = 'USD' THEN ABS(amount) * $2
-				WHEN type_transation = 'bill' THEN ABS(amount)
+				WHEN type_transation = 'bill' AND currency = 'USD' THEN amount * $2
+				WHEN type_transation = 'bill' THEN amount
 				ELSE 0
 			END), 0) as total_bill
 		FROM transactions
@@ -307,8 +307,8 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 			AND (NULLIF($5, '') IS NULL OR account_id::text = $5)
 			AND (NULLIF($6, '') IS NULL OR category_id::text = $6)
 			AND (NULLIF($7, '') IS NULL OR type_transation::text = $7)
-			AND ($8::numeric IS NULL OR ABS(amount) >= $8)
-			AND ($9::numeric IS NULL OR ABS(amount) <= $9)
+			AND ($8::numeric IS NULL OR amount >= $8)
+			AND ($9::numeric IS NULL OR amount <= $9)
 			AND created_at >= $3 AND created_at <= $4
 	`
 

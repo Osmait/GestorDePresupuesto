@@ -211,7 +211,11 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 }
 
 func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Context, accountId string, currency string) (float64, error) {
-	query := `SELECT COALESCE(SUM(amount), 0) FROM transactions WHERE account_id = $1 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))`
+	query := `SELECT COALESCE(SUM(CASE
+    WHEN type_transation IN ('income','loan_collection','loan_cancellation_refund')
+    THEN amount
+    ELSE -amount
+END), 0) FROM transactions WHERE account_id = $1 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))`
 	row := repo.db.QueryRowContext(ctx, query, accountId, currency)
 
 	var total float64
@@ -421,13 +425,13 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 
 	// Amount range filters
 	if filter.AmountMin != nil {
-		whereConditions = append(whereConditions, fmt.Sprintf("ABS(amount) >= $%d", argIndex))
+		whereConditions = append(whereConditions, fmt.Sprintf("amount >= $%d", argIndex))
 		args = append(args, *filter.AmountMin)
 		argIndex++
 	}
 
 	if filter.AmountMax != nil {
-		whereConditions = append(whereConditions, fmt.Sprintf("ABS(amount) <= $%d", argIndex))
+		whereConditions = append(whereConditions, fmt.Sprintf("amount <= $%d", argIndex))
 		args = append(args, *filter.AmountMax)
 		argIndex++
 	}
@@ -455,7 +459,7 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	if filter.SortBy != "" {
 		queryBuilder.WriteString(" ORDER BY ")
 		if filter.SortBy == "amount" {
-			queryBuilder.WriteString("ABS(amount)")
+			queryBuilder.WriteString("amount")
 		} else {
 			queryBuilder.WriteString(filter.SortBy)
 		}
