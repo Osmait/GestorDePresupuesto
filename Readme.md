@@ -46,6 +46,11 @@ This project serves as a **learning playground** to practice and implement:
 - Background worker for recurring payments
 - Support for daily, weekly, monthly frequencies
 
+### 🔐 Security & Data Integrity
+- **Row-Level Security (RLS)** — PostgreSQL enforces data isolation at the database level; application bugs cannot leak cross-user data
+- **Financial Audit Trail** — automatic before/after change tracking on all financial tables via PostgreSQL triggers
+- **Refresh Token Rotation** — dual-token authentication with theft detection; reusing a revoked refresh token revokes all user sessions
+
 ### 🛡️ Admin Backoffice
 - User management with editable table
 - Demo user cleanup automation
@@ -67,7 +72,8 @@ This project serves as a **learning playground** to practice and implement:
 │                   Interface Adapters                         │
 │  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────────┐│
 │  │  Handlers   │ │Repositories │ │      Middleware         ││
-│  │(Controllers)│ │ (Database)  │ │(Auth, RateLimit, CORS)  ││
+│  │(Controllers)│ │ (Database)  │ │Auth, RLS, RateLimit,    ││
+│  │             │ │             │ │CORS, ErrorHandler       ││
 │  └─────────────┘ └─────────────┘ └─────────────────────────┘│
 ├─────────────────────────────────────────────────────────────┤
 │                Application Business Rules                    │
@@ -177,6 +183,14 @@ Structured logging with Zerolog:
 - Performance metrics
 - Configurable log levels
 
+### 6. Row-Level Security (RLS)
+
+PostgreSQL RLS is enforced on all 22 user-owned tables with `FORCE ROW LEVEL SECURITY`. Each policy checks a transaction-scoped `app.current_user_id` setting established by `RLSMiddleware` at the start of every authenticated request. This means even if application code has a bug that omits a `WHERE user_id = ?` clause, the database still returns only the current user's rows. Background workers use a dedicated database role with `BYPASSRLS` privilege to operate across all users.
+
+### 7. Financial Audit Trail
+
+A PostgreSQL trigger function (`fn_financial_audit`) is attached to eight core financial tables: `transactions`, `account`, `budgets`, `investments`, `savings_goals`, `loans`, `certificates`, and `credit_cards`. On every `INSERT`, `UPDATE`, or `DELETE` it captures a full `to_jsonb()` snapshot of the before and after state into the `financial_audit_log` table. This provides a tamper-evident record of all financial changes without requiring any application-level code changes.
+
 ---
 
 ## 🎨 Frontend Features
@@ -252,6 +266,7 @@ Multiple chart libraries:
 | **Zerolog** | Structured logging |
 | **golang-migrate** | Database migrations |
 | **testify** | Testing framework |
+| **go-sqlmock** | Middleware unit testing |
 
 ### Frontend
 
@@ -410,28 +425,29 @@ erDiagram
         boolean confirmed
         boolean is_demo
         timestamp created_at
+        timestamp deleted_at
     }
-    
+
     ACCOUNT {
         string id PK
         string name
         string bank
-        float initial_balance
-        float current_balance
+        decimal initial_balance
+        decimal current_balance
         string user_id FK
     }
-    
+
     TRANSACTION {
         string id PK
         string name
         string description
-        float amount
+        decimal amount
         enum type
         string account_id FK
         string category_id FK
         string user_id FK
     }
-    
+
     CATEGORY {
         string id PK
         string name
@@ -439,11 +455,11 @@ erDiagram
         string color
         string user_id FK
     }
-    
+
     BUDGET {
         string id PK
-        float amount
-        float current_amount
+        decimal amount
+        decimal current_amount
         string category_id FK
         string user_id FK
     }
