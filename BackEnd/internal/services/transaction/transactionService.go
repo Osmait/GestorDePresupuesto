@@ -18,13 +18,13 @@ import (
 )
 
 const (
-	BILL                = "bill"
-	CARD_PAYMENT        = "card_payment"
-	LOAN_DISBURSEMENT   = "loan_disbursement"
-	LOAN_COLLECTION     = "loan_collection"
-	INVESTMENT_PURCHASE         = "investment_purchase"
-	INVESTMENT_FUNDING          = "investment_funding"
-	LOAN_CANCELLATION_REFUND    = "loan_cancellation_refund"
+	BILL                     = "bill"
+	CARD_PAYMENT             = "card_payment"
+	LOAN_DISBURSEMENT        = "loan_disbursement"
+	LOAN_COLLECTION          = "loan_collection"
+	INVESTMENT_PURCHASE      = "investment_purchase"
+	INVESTMENT_FUNDING       = "investment_funding"
+	LOAN_CANCELLATION_REFUND = "loan_cancellation_refund"
 )
 
 type AICacheInvalidator interface {

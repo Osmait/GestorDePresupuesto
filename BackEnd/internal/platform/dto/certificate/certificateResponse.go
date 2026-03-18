@@ -49,17 +49,17 @@ type CertificateWithHistoryResponse struct {
 
 type PaymentResponse struct {
 	Id             string     `json:"id"`
-	CertificateId  string    `json:"certificate_id"`
+	CertificateId  string     `json:"certificate_id"`
 	PaymentDate    time.Time  `json:"payment_date"`
 	PeriodStart    time.Time  `json:"period_start"`
 	PeriodEnd      time.Time  `json:"period_end"`
-	GrossInterest  float64   `json:"gross_interest"`
-	TaxWithheld    float64   `json:"tax_withheld"`
-	NetInterest    float64   `json:"net_interest"`
-	AppliedRate    float64   `json:"applied_rate"`
-	AppliedTaxRate float64   `json:"applied_tax_rate"`
-	AppliedCapital float64   `json:"applied_capital"`
-	TransactionId  *string   `json:"transaction_id"`
+	GrossInterest  float64    `json:"gross_interest"`
+	TaxWithheld    float64    `json:"tax_withheld"`
+	NetInterest    float64    `json:"net_interest"`
+	AppliedRate    float64    `json:"applied_rate"`
+	AppliedTaxRate float64    `json:"applied_tax_rate"`
+	AppliedCapital float64    `json:"applied_capital"`
+	TransactionId  *string    `json:"transaction_id"`
 	CreatedAt      time.Time  `json:"created_at"`
 	UpdatedAt      *time.Time `json:"updated_at"`
 }

@@ -45,7 +45,7 @@ func newRLSRouter(mw ...gin.HandlerFunc) *gin.Engine {
 func TestRLSMiddleware_SkipsUnauthenticated(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	// No DB expectations — no transaction should be opened.
 	r := newRLSRouter(RLSMiddleware(db))
@@ -65,14 +65,14 @@ func TestRLSMiddleware_SkipsUnauthenticated(t *testing.T) {
 func TestRLSMiddleware_SetsTransactionForAuthenticatedUser(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := "user-abc-123"
 
-	// set_config('app.current_user_id', $1, true) — only $1 is a Go arg.
+	// set_config called with userID and isAdmin="false" — two Go args ($1, $2).
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config`).
-		WithArgs(userID).
+		WithArgs(userID, "false").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 
@@ -95,15 +95,16 @@ func TestRLSMiddleware_SetsTransactionForAuthenticatedUser(t *testing.T) {
 func TestRLSMiddleware_AdminUserGetsSentinelValue(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := "admin-user-id"
 	adminUser := &dto.UserResponse{Role: "ADMIN"}
 
-	// Expect sentinel "__admin__", NOT the actual userID.
+	// Admin: userID is passed as-is, but app.is_admin is set to "true".
+	// No more fragile "__admin__" sentinel in app.current_user_id.
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config`).
-		WithArgs("__admin__").
+		WithArgs(userID, "true").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 
@@ -125,13 +126,13 @@ func TestRLSMiddleware_AdminUserGetsSentinelValue(t *testing.T) {
 func TestRLSMiddleware_RollsBackOnHandlerError(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	userID := "user-abc-123"
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config`).
-		WithArgs(userID).
+		WithArgs(userID, "false").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectRollback() // Rollback, NOT Commit
 
@@ -157,7 +158,7 @@ func TestRLSMiddleware_RollsBackOnHandlerError(t *testing.T) {
 func TestRLSMiddleware_Returns500WhenBeginTxFails(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin().WillReturnError(errors.New("connection pool exhausted"))
 
@@ -182,7 +183,7 @@ func TestRLSMiddleware_Returns500WhenBeginTxFails(t *testing.T) {
 func TestRLSMiddleware_Returns500WhenSetConfigFails(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	require.NoError(t, err)
-	defer db.Close()
+	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config`).
