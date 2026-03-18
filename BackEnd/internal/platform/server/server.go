@@ -149,6 +149,9 @@ func (s *Server) registerRoutes() {
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
 
+	// RLS middleware: pins each authenticated request to a transaction with SET LOCAL app.current_user_id
+	s.Engine.Use(middleware.RLSMiddleware(s.db))
+
 	// Notification Route (SSE)
 	notificationH := notificationHandler.NewNotificationHandler(s.notificationService)
 	s.Engine.GET("/notifications", notificationH.Subscribe)

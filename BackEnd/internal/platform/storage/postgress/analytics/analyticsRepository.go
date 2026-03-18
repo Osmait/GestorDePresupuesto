@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
+	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
 func NewAnalyticsRepository(db *sql.DB) *AnalyticsRepository {
@@ -46,7 +47,7 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 		GROUP BY c.id, c.name, c.color
 	`
 
-	rows, err := a.db.QueryContext(
+	rows, err := txhelper.FromContext(ctx, a.db).QueryContext(
 		ctx,
 		query,
 		userID,
@@ -109,7 +110,7 @@ func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID st
 		GROUP BY c.id, c.name, c.color
 	`
 
-	rows, err := a.db.QueryContext(ctx, query, userID, usdToDop)
+	rows, err := txhelper.FromContext(ctx, a.db).QueryContext(ctx, query, userID, usdToDop)
 	if err != nil {
 		return nil, fmt.Errorf("error getting category expenses: %w", err)
 	}
@@ -163,7 +164,7 @@ func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID stri
 		ORDER BY year, month
 	`
 
-	rows, err := a.db.QueryContext(ctx, query, userID, usdToDop)
+	rows, err := txhelper.FromContext(ctx, a.db).QueryContext(ctx, query, userID, usdToDop)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary: %w", err)
 	}
@@ -219,7 +220,7 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 		ORDER BY year, month
 	`
 
-	rows, err := a.db.QueryContext(
+	rows, err := txhelper.FromContext(ctx, a.db).QueryContext(
 		ctx,
 		query,
 		userID,
@@ -278,7 +279,7 @@ func (a *AnalyticsRepository) GetTotals(ctx context.Context, userID string, usdT
 	`
 
 	var totals analytics.TotalsRepository
-	if err := a.db.QueryRowContext(ctx, query, userID, usdToDop).Scan(&totals.TotalIncome, &totals.TotalBill); err != nil {
+	if err := txhelper.FromContext(ctx, a.db).QueryRowContext(ctx, query, userID, usdToDop).Scan(&totals.TotalIncome, &totals.TotalBill); err != nil {
 		return nil, err
 	}
 
@@ -313,7 +314,7 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 	`
 
 	var totals analytics.TotalsRepository
-	if err := a.db.QueryRowContext(
+	if err := txhelper.FromContext(ctx, a.db).QueryRowContext(
 		ctx,
 		query,
 		userID,

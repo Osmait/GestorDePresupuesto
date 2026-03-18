@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/loan"
+	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
 type LoanRepository struct {
@@ -111,7 +112,7 @@ func (r *LoanRepository) FindAllByUser(ctx context.Context, userId string) ([]*l
 		ORDER BY created_at DESC
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, userId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -161,7 +162,7 @@ func (r *LoanRepository) FindById(ctx context.Context, id string, userId string)
 	`
 
 	entity := &loan.Loan{}
-	err := r.db.QueryRowContext(ctx, query, id, userId).Scan(
+	err := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, id, userId).Scan(
 		&entity.Id,
 		&entity.UserId,
 		&entity.BorrowerName,
@@ -199,7 +200,7 @@ func (r *LoanRepository) FindInstallmentsByLoan(ctx context.Context, loanId stri
 		ORDER BY installment_number ASC
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, loanId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, loanId)
 	if err != nil {
 		return nil, err
 	}
@@ -238,7 +239,7 @@ func (r *LoanRepository) FindPaymentsByLoan(ctx context.Context, loanId string) 
 		ORDER BY payment_date DESC, created_at DESC
 	`
 
-	rows, err := r.db.QueryContext(ctx, query, loanId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, loanId)
 	if err != nil {
 		return nil, err
 	}
@@ -279,7 +280,7 @@ func (r *LoanRepository) SavePayment(ctx context.Context, payment *loan.Payment)
 		)
 	`
 
-	_, err := r.db.ExecContext(
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(
 		ctx,
 		query,
 		payment.Id,
@@ -307,7 +308,7 @@ func (r *LoanRepository) UpdateLoanTotals(ctx context.Context, entity *loan.Loan
 		WHERE id = $5 AND user_id = $6
 	`
 
-	_, err := r.db.ExecContext(
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(
 		ctx,
 		query,
 		entity.PaidPrincipal,
@@ -365,7 +366,7 @@ func (r *LoanRepository) BulkUpdateInstallments(ctx context.Context, installment
 }
 
 func (r *LoanRepository) UpdateLoanStatus(ctx context.Context, loanId string, userId string, status loan.LoanStatus) error {
-	_, err := r.db.ExecContext(
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(
 		ctx,
 		`UPDATE loans SET status = $1, updated_at = $2 WHERE id = $3 AND user_id = $4`,
 		status,

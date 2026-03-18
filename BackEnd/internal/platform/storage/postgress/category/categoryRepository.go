@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
+	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,12 +20,12 @@ func NewCategoryRepository(db *sql.DB) *CategoryRespository {
 }
 
 func (c *CategoryRespository) Save(ctx context.Context, category *category.Category) error {
-	_, err := c.db.ExecContext(ctx, "INSERT INTO categorys (id,name,icon,color,user_id) VALUES($1,$2,$3,$4,$5)  ", category.Id, category.Name, category.Icon, category.Color, category.UserId)
+	_, err := txhelper.FromContext(ctx, c.db).ExecContext(ctx, "INSERT INTO categorys (id,name,icon,color,user_id) VALUES($1,$2,$3,$4,$5)  ", category.Id, category.Name, category.Icon, category.Color, category.UserId)
 	return err
 }
 
 func (c *CategoryRespository) FindAll(ctx context.Context, userId string) ([]*category.Category, error) {
-	rows, err := c.db.QueryContext(ctx, "SELECT id, name ,icon ,color ,user_id,created_at FROM categorys WHERE user_id = $1 ", userId)
+	rows, err := txhelper.FromContext(ctx, c.db).QueryContext(ctx, "SELECT id, name ,icon ,color ,user_id,created_at FROM categorys WHERE user_id = $1 ", userId)
 	if err != nil {
 		return nil, err
 	}
@@ -50,7 +51,7 @@ func (c *CategoryRespository) FindAll(ctx context.Context, userId string) ([]*ca
 }
 
 func (c *CategoryRespository) FindOne(ctx context.Context, id string) (*category.Category, error) {
-	rows, err := c.db.QueryContext(ctx, "SELECT id, name ,icon ,color,user_id,created_at FROM categorys  WHERE id = $1 ", id)
+	rows, err := txhelper.FromContext(ctx, c.db).QueryContext(ctx, "SELECT id, name ,icon ,color,user_id,created_at FROM categorys  WHERE id = $1 ", id)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +76,7 @@ func (c *CategoryRespository) FindOne(ctx context.Context, id string) (*category
 }
 
 func (c *CategoryRespository) Delete(ctx context.Context, id string, userId string) error {
-	result, err := c.db.ExecContext(ctx, "DELETE FROM categorys WHERE id = $1 AND user_id = $2", id, userId)
+	result, err := txhelper.FromContext(ctx, c.db).ExecContext(ctx, "DELETE FROM categorys WHERE id = $1 AND user_id = $2", id, userId)
 	if err != nil {
 		return err
 	}
@@ -90,13 +91,13 @@ func (c *CategoryRespository) Delete(ctx context.Context, id string, userId stri
 }
 
 func (c *CategoryRespository) Update(ctx context.Context, category *category.Category) error {
-	_, err := c.db.ExecContext(ctx, "UPDATE categorys SET name = $1, icon = $2, color = $3 WHERE id = $4 AND user_id = $5", category.Name, category.Icon, category.Color, category.Id, category.UserId)
+	_, err := txhelper.FromContext(ctx, c.db).ExecContext(ctx, "UPDATE categorys SET name = $1, icon = $2, color = $3 WHERE id = $4 AND user_id = $5", category.Name, category.Icon, category.Color, category.Id, category.UserId)
 	return err
 }
 
 func (c *CategoryRespository) Search(ctx context.Context, userId string, query string) ([]*category.Category, error) {
 	searchTerm := "%" + query + "%"
-	rows, err := c.db.QueryContext(ctx, "SELECT id, name, icon, color, user_id, created_at FROM categorys WHERE user_id = $1 AND name ILIKE $2", userId, searchTerm)
+	rows, err := txhelper.FromContext(ctx, c.db).QueryContext(ctx, "SELECT id, name, icon, color, user_id, created_at FROM categorys WHERE user_id = $1 AND name ILIKE $2", userId, searchTerm)
 	if err != nil {
 		return nil, err
 	}

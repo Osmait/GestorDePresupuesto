@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
+	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/rs/zerolog/log"
 )
 
@@ -19,17 +20,17 @@ func NewBudgetRepository(db *sql.DB) *BudgetRepository {
 }
 
 func (b *BudgetRepository) Save(ctx context.Context, budget *budget.Budget) error {
-	_, err := b.db.ExecContext(ctx, "INSERT INTO budgets (id,category_id,user_id,amount) VALUES($1,$2,$3,$4)", budget.Id, budget.CategoryId, budget.UserId, budget.Amount)
+	_, err := txhelper.FromContext(ctx, b.db).ExecContext(ctx, "INSERT INTO budgets (id,category_id,user_id,amount) VALUES($1,$2,$3,$4)", budget.Id, budget.CategoryId, budget.UserId, budget.Amount)
 	return err
 }
 
 func (b *BudgetRepository) Update(ctx context.Context, budget *budget.Budget) error {
-	_, err := b.db.ExecContext(ctx, "UPDATE budgets SET amount = $1, category_id = $2 WHERE id = $3 AND user_id = $4", budget.Amount, budget.CategoryId, budget.Id, budget.UserId)
+	_, err := txhelper.FromContext(ctx, b.db).ExecContext(ctx, "UPDATE budgets SET amount = $1, category_id = $2 WHERE id = $3 AND user_id = $4", budget.Amount, budget.CategoryId, budget.Id, budget.UserId)
 	return err
 }
 
 func (b *BudgetRepository) FindAll(ctx context.Context, userId string) ([]*budget.Budget, error) {
-	rows, err := b.db.QueryContext(ctx, "SELECT id,category_id,user_id,amount,created_at FROM budgets WHERE user_id = $1 ", userId)
+	rows, err := txhelper.FromContext(ctx, b.db).QueryContext(ctx, "SELECT id,category_id,user_id,amount,created_at FROM budgets WHERE user_id = $1 ", userId)
 	if err != nil {
 		return nil, err
 	}
@@ -56,7 +57,7 @@ func (b *BudgetRepository) FindAll(ctx context.Context, userId string) ([]*budge
 }
 
 func (b *BudgetRepository) FindOne(ctx context.Context, id string) (*budget.Budget, error) {
-	rows, err := b.db.QueryContext(ctx, "SELECT id,category_id,user_id,amount,created_at FROM budgets WHERE id = $1 ", id)
+	rows, err := txhelper.FromContext(ctx, b.db).QueryContext(ctx, "SELECT id,category_id,user_id,amount,created_at FROM budgets WHERE id = $1 ", id)
 	if err != nil {
 		return nil, err
 	}
@@ -81,7 +82,7 @@ func (b *BudgetRepository) FindOne(ctx context.Context, id string) (*budget.Budg
 }
 
 func (b *BudgetRepository) Delete(ctx context.Context, id string, userId string) error {
-	result, err := b.db.ExecContext(ctx, "DELETE FROM budgets WHERE id = $1 AND user_id = $2", id, userId)
+	result, err := txhelper.FromContext(ctx, b.db).ExecContext(ctx, "DELETE FROM budgets WHERE id = $1 AND user_id = $2", id, userId)
 	if err != nil {
 		return err
 	}
@@ -96,7 +97,7 @@ func (b *BudgetRepository) Delete(ctx context.Context, id string, userId string)
 }
 
 func (b *BudgetRepository) FindByCategory(ctx context.Context, categoryID string) (*budget.Budget, error) {
-	rows, err := b.db.QueryContext(ctx, "SELECT id,category_id,user_id,amount,created_at FROM budgets WHERE category_id = $1 ", categoryID)
+	rows, err := txhelper.FromContext(ctx, b.db).QueryContext(ctx, "SELECT id,category_id,user_id,amount,created_at FROM budgets WHERE category_id = $1 ", categoryID)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +128,7 @@ func (b *BudgetRepository) Search(ctx context.Context, userId string, query stri
 		LEFT JOIN categorys c ON b.category_id = c.id
 		WHERE b.user_id = $1 AND c.name ILIKE $2
 	`
-	rows, err := b.db.QueryContext(ctx, querySQL, userId, searchTerm)
+	rows, err := txhelper.FromContext(ctx, b.db).QueryContext(ctx, querySQL, userId, searchTerm)
 	if err != nil {
 		return nil, err
 	}

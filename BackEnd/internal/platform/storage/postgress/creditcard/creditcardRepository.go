@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/creditcard"
+	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/rs/zerolog/log"
 )
 
@@ -20,7 +21,7 @@ func NewCreditCardRepository(db *sql.DB) *CreditCardRepository {
 func (r *CreditCardRepository) SaveCard(ctx context.Context, card *creditcard.CreditCard) error {
 	query := `INSERT INTO credit_cards (account_id, bank, last_four_digits, cut_day, due_day, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := r.db.ExecContext(ctx, query, card.AccountId, card.Bank, card.LastFourDigits,
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, card.AccountId, card.Bank, card.LastFourDigits,
 		card.CutDay, card.DueDay, card.CreatedAt, card.UpdatedAt)
 	if err != nil {
 		log.Error().Err(err).Str("account_id", card.AccountId).Msg("Failed to save credit card")
@@ -33,7 +34,7 @@ func (r *CreditCardRepository) FindCardById(ctx context.Context, accountId strin
 		FROM credit_cards cc
 		JOIN account a ON cc.account_id = a.id
 		WHERE cc.account_id = $1 AND a.user_id = $2`
-	row := r.db.QueryRowContext(ctx, query, accountId, userId)
+	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, accountId, userId)
 
 	card := &creditcard.CreditCard{}
 	err := row.Scan(&card.AccountId, &card.Bank, &card.LastFourDigits, &card.CutDay, &card.DueDay, &card.CreatedAt, &card.UpdatedAt)
@@ -46,7 +47,7 @@ func (r *CreditCardRepository) FindCardById(ctx context.Context, accountId strin
 func (r *CreditCardRepository) FindCardByAccountId(ctx context.Context, accountId string) (*creditcard.CreditCard, error) {
 	query := `SELECT account_id, bank, last_four_digits, cut_day, due_day, created_at, updated_at
 		FROM credit_cards WHERE account_id = $1`
-	row := r.db.QueryRowContext(ctx, query, accountId)
+	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, accountId)
 
 	card := &creditcard.CreditCard{}
 	err := row.Scan(&card.AccountId, &card.Bank, &card.LastFourDigits, &card.CutDay, &card.DueDay, &card.CreatedAt, &card.UpdatedAt)
@@ -62,7 +63,7 @@ func (r *CreditCardRepository) FindAllCards(ctx context.Context, userId string) 
 		JOIN account a ON cc.account_id = a.id
 		WHERE a.user_id = $1
 		ORDER BY cc.created_at DESC`
-	rows, err := r.db.QueryContext(ctx, query, userId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -88,7 +89,7 @@ func (r *CreditCardRepository) FindAllCards(ctx context.Context, userId string) 
 func (r *CreditCardRepository) UpdateCard(ctx context.Context, card *creditcard.CreditCard) error {
 	query := `UPDATE credit_cards SET bank = $1, last_four_digits = $2, cut_day = $3, due_day = $4, updated_at = $5
 		WHERE account_id = $6`
-	result, err := r.db.ExecContext(ctx, query, card.Bank, card.LastFourDigits, card.CutDay, card.DueDay, time.Now(), card.AccountId)
+	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, card.Bank, card.LastFourDigits, card.CutDay, card.DueDay, time.Now(), card.AccountId)
 	if err != nil {
 		return err
 	}
@@ -104,7 +105,7 @@ func (r *CreditCardRepository) UpdateCard(ctx context.Context, card *creditcard.
 
 func (r *CreditCardRepository) DeleteCard(ctx context.Context, accountId string, userId string) error {
 	query := `DELETE FROM credit_cards WHERE account_id = $1 AND account_id IN (SELECT id FROM account WHERE user_id = $2)`
-	result, err := r.db.ExecContext(ctx, query, accountId, userId)
+	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, accountId, userId)
 	if err != nil {
 		return err
 	}
@@ -121,7 +122,7 @@ func (r *CreditCardRepository) DeleteCard(ctx context.Context, accountId string,
 func (r *CreditCardRepository) SaveBalance(ctx context.Context, balance *creditcard.CardBalance) error {
 	query := `INSERT INTO card_balances (id, card_id, currency, current_balance, credit_limit, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := r.db.ExecContext(ctx, query, balance.Id, balance.CardId, balance.Currency, balance.CurrentBalance,
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, balance.Id, balance.CardId, balance.Currency, balance.CurrentBalance,
 		balance.CreditLimit, balance.CreatedAt, balance.UpdatedAt)
 	if err != nil {
 		log.Error().Err(err).Str("card_id", balance.CardId).Str("currency", balance.Currency).Msg("Failed to save card balance")
@@ -132,7 +133,7 @@ func (r *CreditCardRepository) SaveBalance(ctx context.Context, balance *creditc
 func (r *CreditCardRepository) FindBalanceById(ctx context.Context, id string) (*creditcard.CardBalance, error) {
 	query := `SELECT id, card_id, currency, current_balance, credit_limit, created_at, updated_at
 		FROM card_balances WHERE id = $1`
-	row := r.db.QueryRowContext(ctx, query, id)
+	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, id)
 
 	balance := &creditcard.CardBalance{}
 	err := row.Scan(&balance.Id, &balance.CardId, &balance.Currency, &balance.CurrentBalance,
@@ -146,7 +147,7 @@ func (r *CreditCardRepository) FindBalanceById(ctx context.Context, id string) (
 func (r *CreditCardRepository) FindBalancesByCard(ctx context.Context, cardId string) ([]*creditcard.CardBalance, error) {
 	query := `SELECT id, card_id, currency, current_balance, credit_limit, created_at, updated_at
 		FROM card_balances WHERE card_id = $1 ORDER BY currency`
-	rows, err := r.db.QueryContext(ctx, query, cardId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, cardId)
 	if err != nil {
 		return nil, err
 	}
@@ -173,7 +174,7 @@ func (r *CreditCardRepository) FindBalancesByCard(ctx context.Context, cardId st
 func (r *CreditCardRepository) FindBalanceByCardAndCurrency(ctx context.Context, cardId string, currency string) (*creditcard.CardBalance, error) {
 	query := `SELECT id, card_id, currency, current_balance, credit_limit, created_at, updated_at
 		FROM card_balances WHERE card_id = $1 AND currency = $2`
-	row := r.db.QueryRowContext(ctx, query, cardId, currency)
+	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, cardId, currency)
 
 	balance := &creditcard.CardBalance{}
 	err := row.Scan(&balance.Id, &balance.CardId, &balance.Currency, &balance.CurrentBalance,
@@ -187,7 +188,7 @@ func (r *CreditCardRepository) FindBalanceByCardAndCurrency(ctx context.Context,
 func (r *CreditCardRepository) UpdateBalance(ctx context.Context, balance *creditcard.CardBalance) error {
 	query := `UPDATE card_balances SET current_balance = $1, credit_limit = $2, updated_at = $3
 		WHERE id = $4`
-	result, err := r.db.ExecContext(ctx, query, balance.CurrentBalance, balance.CreditLimit, time.Now(), balance.Id)
+	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, balance.CurrentBalance, balance.CreditLimit, time.Now(), balance.Id)
 	if err != nil {
 		return err
 	}
@@ -203,14 +204,14 @@ func (r *CreditCardRepository) UpdateBalance(ctx context.Context, balance *credi
 
 func (r *CreditCardRepository) DeleteBalance(ctx context.Context, id string) error {
 	query := `DELETE FROM card_balances WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id)
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, id)
 	return err
 }
 
 func (r *CreditCardRepository) UpdateBalanceByAmount(ctx context.Context, cardId string, currency string, amount float64) error {
 	query := `UPDATE card_balances SET current_balance = current_balance + $1, updated_at = $2 
 		WHERE card_id = $3 AND currency = $4`
-	result, err := r.db.ExecContext(ctx, query, amount, time.Now(), cardId, currency)
+	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, amount, time.Now(), cardId, currency)
 	if err != nil {
 		log.Error().Err(err).Str("card_id", cardId).Str("currency", currency).Float64("amount", amount).Msg("Failed to update card balance by amount")
 		return err
@@ -228,7 +229,7 @@ func (r *CreditCardRepository) UpdateBalanceByAmount(ctx context.Context, cardId
 func (r *CreditCardRepository) SavePayment(ctx context.Context, payment *creditcard.CardPayment) error {
 	query := `INSERT INTO card_payments (id, card_id, from_account_id, currency, amount, source_currency, source_amount, exchange_rate, includes_interest, interest_amount, payment_date, status, notes, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`
-	_, err := r.db.ExecContext(ctx, query, payment.Id, payment.CardId, payment.FromAccountId, payment.Currency,
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, payment.Id, payment.CardId, payment.FromAccountId, payment.Currency,
 		payment.Amount, payment.SourceCurrency, payment.SourceAmount, payment.ExchangeRate, payment.IncludesInterest, payment.InterestAmount, payment.PaymentDate, payment.Status, payment.Notes, payment.CreatedAt)
 	if err != nil {
 		log.Error().Err(err).Str("card_id", payment.CardId).Msg("Failed to save card payment")
@@ -237,7 +238,7 @@ func (r *CreditCardRepository) SavePayment(ctx context.Context, payment *creditc
 }
 
 func (r *CreditCardRepository) DeletePayment(ctx context.Context, id string) error {
-	result, err := r.db.ExecContext(ctx, `DELETE FROM card_payments WHERE id = $1`, id)
+	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, `DELETE FROM card_payments WHERE id = $1`, id)
 	if err != nil {
 		return err
 	}
@@ -254,7 +255,7 @@ func (r *CreditCardRepository) DeletePayment(ctx context.Context, id string) err
 func (r *CreditCardRepository) FindPaymentById(ctx context.Context, id string) (*creditcard.CardPayment, error) {
 	query := `SELECT id, card_id, from_account_id, currency, amount, COALESCE(source_currency, ''), COALESCE(source_amount, 0), COALESCE(exchange_rate, 1), includes_interest, interest_amount, payment_date, status, notes, created_at
 		FROM card_payments WHERE id = $1`
-	row := r.db.QueryRowContext(ctx, query, id)
+	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, id)
 
 	payment := &creditcard.CardPayment{}
 	err := row.Scan(&payment.Id, &payment.CardId, &payment.FromAccountId, &payment.Currency, &payment.Amount,
@@ -268,7 +269,7 @@ func (r *CreditCardRepository) FindPaymentById(ctx context.Context, id string) (
 func (r *CreditCardRepository) FindPaymentsByCard(ctx context.Context, cardId string) ([]*creditcard.CardPayment, error) {
 	query := `SELECT id, card_id, from_account_id, currency, amount, COALESCE(source_currency, ''), COALESCE(source_amount, 0), COALESCE(exchange_rate, 1), includes_interest, interest_amount, payment_date, status, notes, created_at
 		FROM card_payments WHERE card_id = $1 ORDER BY payment_date DESC`
-	rows, err := r.db.QueryContext(ctx, query, cardId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, cardId)
 	if err != nil {
 		return nil, err
 	}
@@ -295,7 +296,7 @@ func (r *CreditCardRepository) FindPaymentsByCard(ctx context.Context, cardId st
 func (r *CreditCardRepository) FindPaymentsByCardAndCurrency(ctx context.Context, cardId string, currency string) ([]*creditcard.CardPayment, error) {
 	query := `SELECT id, card_id, from_account_id, currency, amount, COALESCE(source_currency, ''), COALESCE(source_amount, 0), COALESCE(exchange_rate, 1), includes_interest, interest_amount, payment_date, status, notes, created_at
 		FROM card_payments WHERE card_id = $1 AND currency = $2 ORDER BY payment_date DESC`
-	rows, err := r.db.QueryContext(ctx, query, cardId, currency)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, cardId, currency)
 	if err != nil {
 		return nil, err
 	}
@@ -321,7 +322,7 @@ func (r *CreditCardRepository) FindPaymentsByCardAndCurrency(ctx context.Context
 
 func (r *CreditCardRepository) GetTotalPaymentsByCardAndCurrency(ctx context.Context, cardId string, currency string) (float64, error) {
 	query := `SELECT COALESCE(SUM(amount), 0) FROM card_payments WHERE card_id = $1 AND currency = $2 AND status = 'completed'`
-	row := r.db.QueryRowContext(ctx, query, cardId, currency)
+	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, cardId, currency)
 
 	var total float64
 	err := row.Scan(&total)

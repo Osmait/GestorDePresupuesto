@@ -9,6 +9,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
+	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/rs/zerolog/log"
 )
 
@@ -37,14 +38,14 @@ func (repo *TransactionRepository) Save(ctx context.Context, transaction *transa
 		categoryID = resolvedCategoryID
 	}
 
-	_, err := repo.db.ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id,currency,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, categoryID, transaction.BudgetId, currency, transaction.CreatedAt)
+	_, err := txhelper.FromContext(ctx, repo.db).ExecContext(ctx, "INSERT INTO transactions (id,transaction_name,transaction_description,amount,type_transation,account_id,user_id,category_id,budget_id,currency,created_at) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)", transaction.Id, transaction.Name, transaction.Description, transaction.Amount, transaction.TypeTransation, transaction.AccountId, transaction.UserId, categoryID, transaction.BudgetId, currency, transaction.CreatedAt)
 
 	return err
 }
 
 func (repo *TransactionRepository) resolveFallbackCategoryID(ctx context.Context, userId string) (string, error) {
 	var categoryID string
-	err := repo.db.QueryRowContext(ctx, `SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, userId).Scan(&categoryID)
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, `SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, userId).Scan(&categoryID)
 	if err == nil {
 		return categoryID, nil
 	}
@@ -52,7 +53,7 @@ func (repo *TransactionRepository) resolveFallbackCategoryID(ctx context.Context
 		return "", err
 	}
 
-	_, err = repo.db.ExecContext(ctx, `
+	_, err = txhelper.FromContext(ctx, repo.db).ExecContext(ctx, `
 		INSERT INTO categorys (id, name, icon, color, created_at, user_id)
 		VALUES ('autocat_' || SUBSTRING(MD5($1) FROM 1 FOR 24), 'General', 'tag', '#64748b', NOW(), $1)
 		ON CONFLICT (id) DO NOTHING
@@ -61,7 +62,7 @@ func (repo *TransactionRepository) resolveFallbackCategoryID(ctx context.Context
 		return "", err
 	}
 
-	err = repo.db.QueryRowContext(ctx, `SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, userId).Scan(&categoryID)
+	err = txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, `SELECT id FROM categorys WHERE user_id = $1 ORDER BY created_at ASC LIMIT 1`, userId).Scan(&categoryID)
 	if err != nil {
 		return "", err
 	}
@@ -71,7 +72,7 @@ func (repo *TransactionRepository) resolveFallbackCategoryID(ctx context.Context
 
 func (repo *TransactionRepository) ResolveAndValidateCurrencyForAccount(ctx context.Context, userId string, accountId string, currency string) (string, error) {
 	query := `SELECT account_type, currency FROM account WHERE id = $1 AND user_id = $2`
-	row := repo.db.QueryRowContext(ctx, query, accountId, userId)
+	row := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, query, accountId, userId)
 
 	var accountType string
 	var accountCurrency string
@@ -95,7 +96,7 @@ func (repo *TransactionRepository) ResolveAndValidateCurrencyForAccount(ctx cont
 
 	if accountType == "credit_card" {
 		cardBalanceQuery := `SELECT 1 FROM card_balances WHERE card_id = $1 AND currency = $2 LIMIT 1`
-		cardBalanceRow := repo.db.QueryRowContext(ctx, cardBalanceQuery, accountId, resolvedCurrency)
+		cardBalanceRow := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, cardBalanceQuery, accountId, resolvedCurrency)
 		var exists int
 		if err := cardBalanceRow.Scan(&exists); err != nil {
 			if err == sql.ErrNoRows {
@@ -114,7 +115,7 @@ func (repo *TransactionRepository) ResolveAndValidateCurrencyForAccount(ctx cont
 }
 
 func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error) {
-	rows, err := repo.db.QueryContext(ctx,
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
 		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,COALESCE(currency, 'DOP'),created_at FROM transactions WHERE  user_id = $1 ORDER BY created_at DESC", id)
 	if err != nil {
 		return nil, err
@@ -148,7 +149,7 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id 
 }
 
 func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
-	rows, err := repo.db.QueryContext(ctx,
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
 		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,COALESCE(currency, 'DOP'),created_at FROM transactions WHERE  account_id = $1 and created_at BETWEEN $2 and $3 ORDER BY created_at DESC", id, date1, date2)
 	if err != nil {
 		return nil, err
@@ -186,7 +187,7 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 	if usdToDop <= 0 {
 		usdToDop = 60
 	}
-	rows, err := repo.db.QueryContext(ctx,
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
 		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)", budgetID, usdToDop)
 	if err != nil {
 		return 0, err
@@ -216,7 +217,7 @@ func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Conte
     THEN amount
     ELSE -amount
 END), 0) FROM transactions WHERE account_id = $1 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))`
-	row := repo.db.QueryRowContext(ctx, query, accountId, currency)
+	row := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, query, accountId, currency)
 
 	var total float64
 	err := row.Scan(&total)
@@ -234,7 +235,7 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill' 
 		AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
 		GROUP BY budget_id`
-	rows, err := repo.db.QueryContext(ctx, query, userId, usdToDop)
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, usdToDop)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +260,7 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 }
 
 func (repo *TransactionRepository) Delete(ctx context.Context, id string, userId string) error {
-	result, err := repo.db.ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND user_id = $2", id, userId)
+	result, err := txhelper.FromContext(ctx, repo.db).ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND user_id = $2", id, userId)
 	if err != nil {
 		return err
 	}
@@ -281,7 +282,7 @@ func (repo *TransactionRepository) Update(ctx context.Context, id string, t *tra
 	if currency == "" {
 		currency = "DOP"
 	}
-	result, err := repo.db.ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id)
+	result, err := txhelper.FromContext(ctx, repo.db).ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id)
 	if err != nil {
 		return err
 	}
@@ -301,7 +302,7 @@ func (repo *TransactionRepository) FindAllOfAllAccountsWithFilters(ctx context.C
 
 	log.Debug().Str("query", query).Interface("args", args).Msg("executing transaction query")
 
-	rows, err := repo.db.QueryContext(ctx, query, args...)
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transaction query: %w", err)
 	}
@@ -320,7 +321,7 @@ func (repo *TransactionRepository) FindAllWithFilters(ctx context.Context, filte
 
 	log.Debug().Str("query", query).Interface("args", args).Msg("executing transaction query")
 
-	rows, err := repo.db.QueryContext(ctx, query, args...)
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to execute transaction query: %w", err)
 	}
@@ -340,7 +341,7 @@ func (repo *TransactionRepository) CountWithFilters(ctx context.Context, userId 
 	log.Debug().Str("count_query", query).Interface("args", args).Msg("executing transaction count query")
 
 	var count int64
-	err := repo.db.QueryRowContext(ctx, query, args...).Scan(&count)
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, query, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count transactions: %w", err)
 	}
@@ -533,7 +534,7 @@ func (repo *TransactionRepository) FindByUserAndDateRange(ctx context.Context, u
 		WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3 
 		ORDER BY created_at DESC`
 
-	rows, err := repo.db.QueryContext(ctx, query, userId, dateFrom, dateTo)
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, dateFrom, dateTo)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query transactions: %w", err)
 	}

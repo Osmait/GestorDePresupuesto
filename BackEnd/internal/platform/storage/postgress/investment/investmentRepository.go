@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
+	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
 type InvestmentRepository struct {
@@ -24,7 +25,7 @@ func NewInvestmentRepository(db *sql.DB) *InvestmentRepository {
 func (r *InvestmentRepository) Save(ctx context.Context, investment *investment.Investment) error {
 	query := `INSERT INTO investments (id, user_id, investment_type, name, symbol, quantity, purchase_price, current_price, source_account_id, source_amount, settlement_currency, exchange_rate, created_at, updated_at) 
 	              VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), $10, NULLIF($11, ''), NULLIF($12, 0), $13, $14)`
-	_, err := r.db.ExecContext(ctx, query, investment.ID, investment.UserID, investment.Type, investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice, investment.SourceAccountID, investment.SourceAmount, investment.SettlementCurrency, investment.ExchangeRate, investment.CreatedAt, investment.UpdatedAt)
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, investment.ID, investment.UserID, investment.Type, investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice, investment.SourceAccountID, investment.SourceAmount, investment.SettlementCurrency, investment.ExchangeRate, investment.CreatedAt, investment.UpdatedAt)
 	if err != nil {
 		return fmt.Errorf("error saving investment: %w", err)
 	}
@@ -33,7 +34,7 @@ func (r *InvestmentRepository) Save(ctx context.Context, investment *investment.
 
 func (r *InvestmentRepository) FindAll(ctx context.Context, userId string) ([]*investment.Investment, error) {
 	query := `SELECT id, user_id, investment_type, name, symbol, quantity, purchase_price, current_price, COALESCE(source_account_id, ''), COALESCE(source_amount, 0), COALESCE(settlement_currency, ''), COALESCE(exchange_rate, 0), created_at, updated_at FROM investments WHERE user_id = $1`
-	rows, err := r.db.QueryContext(ctx, query, userId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, userId)
 	if err != nil {
 		return nil, fmt.Errorf("error finding investments: %w", err)
 	}
@@ -52,7 +53,7 @@ func (r *InvestmentRepository) FindAll(ctx context.Context, userId string) ([]*i
 
 func (r *InvestmentRepository) FindByID(ctx context.Context, id string) (*investment.Investment, error) {
 	query := `SELECT id, user_id, investment_type, name, symbol, quantity, purchase_price, current_price, COALESCE(source_account_id, ''), COALESCE(source_amount, 0), COALESCE(settlement_currency, ''), COALESCE(exchange_rate, 0), created_at, updated_at FROM investments WHERE id = $1`
-	row := r.db.QueryRowContext(ctx, query, id)
+	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, id)
 
 	var i investment.Investment
 	if err := row.Scan(&i.ID, &i.UserID, &i.Type, &i.Name, &i.Symbol, &i.Quantity, &i.PurchasePrice, &i.CurrentPrice, &i.SourceAccountID, &i.SourceAmount, &i.SettlementCurrency, &i.ExchangeRate, &i.CreatedAt, &i.UpdatedAt); err != nil {
@@ -66,7 +67,7 @@ func (r *InvestmentRepository) FindByID(ctx context.Context, id string) (*invest
 
 func (r *InvestmentRepository) Update(ctx context.Context, investment *investment.Investment) error {
 	query := `UPDATE investments SET investment_type = $1, name = $2, symbol = $3, quantity = $4, purchase_price = $5, current_price = $6, source_account_id = NULLIF($7, ''), source_amount = $8, settlement_currency = NULLIF($9, ''), exchange_rate = NULLIF($10, 0), updated_at = $11 WHERE id = $12`
-	_, err := r.db.ExecContext(ctx, query, investment.Type, investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice, investment.SourceAccountID, investment.SourceAmount, investment.SettlementCurrency, investment.ExchangeRate, time.Now(), investment.ID)
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, investment.Type, investment.Name, investment.Symbol, investment.Quantity, investment.PurchasePrice, investment.CurrentPrice, investment.SourceAccountID, investment.SourceAmount, investment.SettlementCurrency, investment.ExchangeRate, time.Now(), investment.ID)
 	if err != nil {
 		return fmt.Errorf("error updating investment: %w", err)
 	}
@@ -75,7 +76,7 @@ func (r *InvestmentRepository) Update(ctx context.Context, investment *investmen
 
 func (r *InvestmentRepository) Delete(ctx context.Context, id string) error {
 	query := `DELETE FROM investments WHERE id = $1`
-	_, err := r.db.ExecContext(ctx, query, id)
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, id)
 	if err != nil {
 		return fmt.Errorf("error deleting investment: %w", err)
 	}
@@ -84,7 +85,7 @@ func (r *InvestmentRepository) Delete(ctx context.Context, id string) error {
 
 func (r *InvestmentRepository) GetFundingBalances(ctx context.Context, userId string) ([]*investment.FundingBalance, error) {
 	query := `SELECT currency, available_amount FROM investment_funding_balances WHERE user_id = $1 ORDER BY currency`
-	rows, err := r.db.QueryContext(ctx, query, userId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, userId)
 	if err != nil {
 		return nil, fmt.Errorf("error loading funding balances: %w", err)
 	}
