@@ -9,7 +9,7 @@ import (
 )
 
 // RLSMiddleware pins every authenticated request to a single *sql.Tx,
-// sets app.current_user_id via SET LOCAL, and stores the *sql.Tx in
+// sets app.current_user_id via set_config(), and stores the *sql.Tx in
 // Gin context under "db_tx" for repositories to use via txhelper.FromContext.
 //
 // Must be registered AFTER AuthMiddleware.
@@ -36,8 +36,10 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 			return
 		}
 
+		// set_config(name, value, is_local=true) is the parameterized equivalent of
+		// SET LOCAL — PostgreSQL does not support $1 placeholders in SET commands.
 		if _, err := tx.ExecContext(c.Request.Context(),
-			"SET LOCAL app.current_user_id = $1", rlsUserID); err != nil {
+			"SELECT set_config('app.current_user_id', $1, true)", rlsUserID); err != nil {
 			_ = tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not set rls context"})
 			c.Abort()
