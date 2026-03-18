@@ -74,7 +74,7 @@ func (h *NotificationHandler) SendTestNotification(ctx *gin.Context) {
 	userIDStr := userID.(string)
 
 	message := `{"type": "test", "message": "This is a test notification 🚀"}`
-	h.service.SendToUser(userIDStr, message)
+	h.service.SendToUser(ctx.Request.Context(), userIDStr, message)
 
 	ctx.JSON(http.StatusOK, gin.H{"message": "Notification sent"})
 }
@@ -87,7 +87,7 @@ func (h *NotificationHandler) GetHistory(ctx *gin.Context) {
 	}
 	userIDStr := userID.(string)
 
-	history, err := h.service.GetHistory(userIDStr)
+	history, err := h.service.GetHistory(ctx.Request.Context(), userIDStr)
 	if err != nil {
 		log.Printf("Error getting notification history: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
@@ -111,7 +111,7 @@ func (h *NotificationHandler) MarkAsRead(ctx *gin.Context) {
 		return
 	}
 
-	if err := h.service.MarkAsRead(notificationID, userIDStr); err != nil {
+	if err := h.service.MarkAsRead(ctx.Request.Context(), notificationID, userIDStr); err != nil {
 		log.Printf("Error marking notification as read: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
@@ -128,7 +128,7 @@ func (h *NotificationHandler) MarkAllAsRead(ctx *gin.Context) {
 	}
 	userIDStr := userID.(string)
 
-	if err := h.service.MarkAllAsRead(userIDStr); err != nil {
+	if err := h.service.MarkAllAsRead(ctx.Request.Context(), userIDStr); err != nil {
 		log.Printf("Error marking all notifications as read: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return
@@ -145,7 +145,7 @@ func (h *NotificationHandler) DeleteAll(ctx *gin.Context) {
 	}
 	userIDStr := userID.(string)
 
-	if err := h.service.DeleteAll(userIDStr); err != nil {
+	if err := h.service.DeleteAll(ctx.Request.Context(), userIDStr); err != nil {
 		log.Printf("Error deleting all notifications: %v", err)
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": "Internal Server Error"})
 		return

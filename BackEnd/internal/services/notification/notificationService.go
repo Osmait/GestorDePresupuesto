@@ -1,6 +1,7 @@
 package notification
 
 import (
+	"context"
 	"encoding/json"
 	"log"
 	"time"
@@ -46,7 +47,7 @@ func (s *NotificationService) Publish(streamID string, event string, data string
 
 // SendToUser sends a notification to a specific user's stream and persists it to the database.
 // It handles JSON parsing of the message and ensures a valid notification structure.
-func (s *NotificationService) SendToUser(userID string, messageJSON string) {
+func (s *NotificationService) SendToUser(ctx context.Context, userID string, messageJSON string) {
 	// 1. Persist to Database
 	var notifPayload struct {
 		Type    string   `json:"type"`
@@ -76,7 +77,7 @@ func (s *NotificationService) SendToUser(userID string, messageJSON string) {
 		notif.Message = messageJSON
 	}
 
-	if err := s.repo.Save(notif); err != nil {
+	if err := s.repo.Save(ctx, notif); err != nil {
 		log.Printf("Error saving notification to DB: %v", err)
 		// We continue to send SSE even if DB fails
 	} else {
@@ -94,21 +95,21 @@ func (s *NotificationService) SendToUser(userID string, messageJSON string) {
 }
 
 // GetHistory retrieves the notification history for a user.
-func (s *NotificationService) GetHistory(userID string) ([]notification.Notification, error) {
-	return s.repo.GetByUserID(userID)
+func (s *NotificationService) GetHistory(ctx context.Context, userID string) ([]notification.Notification, error) {
+	return s.repo.GetByUserID(ctx, userID)
 }
 
 // MarkAsRead marks a specific notification as read.
-func (s *NotificationService) MarkAsRead(id string, userID string) error {
-	return s.repo.MarkAsRead(id, userID)
+func (s *NotificationService) MarkAsRead(ctx context.Context, id string, userID string) error {
+	return s.repo.MarkAsRead(ctx, id, userID)
 }
 
 // MarkAllAsRead marks all notifications for a user as read.
-func (s *NotificationService) MarkAllAsRead(userID string) error {
-	return s.repo.MarkAllAsRead(userID)
+func (s *NotificationService) MarkAllAsRead(ctx context.Context, userID string) error {
+	return s.repo.MarkAllAsRead(ctx, userID)
 }
 
 // DeleteAll removes all notifications for a user.
-func (s *NotificationService) DeleteAll(userID string) error {
-	return s.repo.DeleteAll(userID)
+func (s *NotificationService) DeleteAll(ctx context.Context, userID string) error {
+	return s.repo.DeleteAll(ctx, userID)
 }

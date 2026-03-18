@@ -1,6 +1,7 @@
 package notification
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -17,9 +18,9 @@ type Notification struct {
 }
 
 type NotificationRepository interface {
-	Save(notification Notification) error
-	GetByUserID(userID string) ([]Notification, error)
-	MarkAsRead(id string, userID string) error
-	MarkAllAsRead(userID string) error
-	DeleteAll(userID string) error
+	Save(ctx context.Context, notification Notification) error
+	GetByUserID(ctx context.Context, userID string) ([]Notification, error)
+	MarkAsRead(ctx context.Context, id string, userID string) error
+	MarkAllAsRead(ctx context.Context, userID string) error
+	DeleteAll(ctx context.Context, userID string) error
 }

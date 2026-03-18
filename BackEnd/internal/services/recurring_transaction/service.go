@@ -112,7 +112,7 @@ func (s *RecurringTransactionService) ProcessDueTransactions(ctx context.Context
 			log.Info().Str("recurring_id", rt.ID).Msg("successfully executed recurring transaction")
 			// Notify the user
 			msg := fmt.Sprintf(`{"type": "recurring_executed", "message": "Transaction '%s' executed", "amount": %.2f}`, rt.Name, rt.Amount)
-			s.notificationService.SendToUser(rt.UserID, msg)
+			s.notificationService.SendToUser(ctx, rt.UserID, msg)
 		}
 	}
 	return nil

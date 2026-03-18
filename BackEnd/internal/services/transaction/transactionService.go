@@ -159,7 +159,7 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 						"amount":  spentPositive,
 					}
 					payloadBytes, _ := json.Marshal(notificationPayload)
-					s.notificationService.SendToUser(userId, string(payloadBytes))
+					s.notificationService.SendToUser(context.Background(), userId, string(payloadBytes))
 				} else {
 					log.Debug().Msg("no alert threshold crossed")
 				}
