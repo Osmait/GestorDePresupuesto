@@ -55,8 +55,7 @@ export class InvestmentRepository extends BaseRepository {
 
     async update(investment: UpdateInvestmentDTO): Promise<void> {
         try {
-            const { id, ...body } = investment;
-            await this.put(`/investments/${id}`, body);
+            await this.put(`/investments`, investment);
         } catch (error) {
             console.error("Error updating investment:", error);
             throw error;
