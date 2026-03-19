@@ -84,10 +84,12 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 	const sourceCurrency = selectedAccount?.currency || 'DOP'
 	const requiresExchangeRate = sourceCurrency !== watchedValues.targetCurrency
 	const estimatedTargetAmount = useMemo(() => {
-		if (watchedValues.sourceAmount <= 0) return 0
-		if (!requiresExchangeRate) return watchedValues.sourceAmount
-		if (watchedValues.exchangeRate <= 0) return 0
-		return watchedValues.sourceAmount / watchedValues.exchangeRate
+		const sourceAmount = Number(watchedValues.sourceAmount) || 0
+		const exchangeRate = Number(watchedValues.exchangeRate) || 0
+		if (sourceAmount <= 0) return 0
+		if (!requiresExchangeRate) return sourceAmount
+		if (exchangeRate <= 0) return 0
+		return sourceAmount / exchangeRate
 	}, [watchedValues.sourceAmount, requiresExchangeRate, watchedValues.exchangeRate])
 
 	const onSubmit = async (values: FundingFormValues) => {
@@ -234,7 +236,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 						<div className='rounded-md border p-3 text-sm text-muted-foreground'>
 							<p className='font-medium text-foreground'>Estimated credit</p>
 							<div className='mt-1 flex items-center gap-2'>
-								<span>{watchedValues.sourceAmount.toFixed(2)} {sourceCurrency}</span>
+								<span>{(Number(watchedValues.sourceAmount) || 0).toFixed(2)} {sourceCurrency}</span>
 								<ArrowRightLeft className='h-4 w-4' />
 								<span>{estimatedTargetAmount.toFixed(2)} {watchedValues.targetCurrency}</span>
 							</div>

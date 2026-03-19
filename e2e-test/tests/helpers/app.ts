@@ -11,7 +11,23 @@ export async function closeDemoWelcomeModal(page: Page): Promise<void> {
 	}
 }
 
+/** Marks all demo tour keys as seen so driver.js never shows the overlay */
+const DISABLE_DEMO_TOUR_SCRIPT = () => {
+	const tourKeys = [
+		'hasSeenDemoTour_dashboard',
+		'hasSeenDemoTour_accounts',
+		'hasSeenDemoTour_categories',
+		'hasSeenDemoTour_budgets',
+		'hasSeenDemoTour_transactions',
+		'hasSeenDemoTour_investments',
+		'hasSeenDemoTour_recurring',
+	]
+	tourKeys.forEach(key => sessionStorage.setItem(key, 'true'))
+}
+
 export async function gotoApp(page: Page): Promise<void> {
+	// Prevent driver.js demo tours from covering the page — the demo user always triggers them
+	await page.addInitScript(DISABLE_DEMO_TOUR_SCRIPT)
 	await page.goto('/app')
 	await expect(page.locator('header')).toBeVisible({ timeout: 120000 })
 	await closeDemoWelcomeModal(page)

@@ -29,7 +29,7 @@ export default defineConfig({
     baseURL: targetURL || 'http://localhost:3000',
     trace: 'on-first-retry',
   },
-  timeout: 120000,
+  timeout: 60000,
 
   projects: [
     { name: 'setup', testMatch: /.*\.setup\.ts/ },
