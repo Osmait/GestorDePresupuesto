@@ -1,9 +1,12 @@
 name: E2E Tests
 
 on:
-
   pull_request:
     branches: [main, development]
+    paths:
+      - 'BackEnd/**'
+      - 'FrontendNextjs/**'
+      - 'e2e-test/**'
   workflow_dispatch:
 
 jobs:
