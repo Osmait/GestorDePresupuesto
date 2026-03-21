@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	"github.com/osmait/gestorDePresupuesto/internal/version"
 	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
@@ -142,7 +143,7 @@ func (s *Server) registerRoutes() {
 	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Health routes (before authentication)
-	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Server.Environment))
+	routes.HealthRoutes(s.Engine, s.db, version.Number, string(s.config.Server.Environment))
 	routes.QuoteRoutes(s.Engine, s.quoteService)
 	routes.ExchangeRoutes(s.Engine, s.exchangeService)
 

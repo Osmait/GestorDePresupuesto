@@ -12,7 +12,7 @@
       "extra-files": [
         {
           "type": "generic",
-          "path": "version.go",
+          "path": "internal/version/version.go",
           "glob": false
         }
       ]
