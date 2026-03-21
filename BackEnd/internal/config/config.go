@@ -202,6 +202,7 @@ type MCPConfig struct {
 	Enabled       bool   `json:"enabled"`
 	ServerName    string `json:"server_name"`
 	ServerVersion string `json:"server_version"`
+	BaseURL       string `json:"base_url"`
 }
 
 // Config holds all application configuration settings
@@ -398,6 +399,7 @@ func LoadConfig() (*Config, error) {
 			Enabled:       getEnvBool("MCP_ENABLED", false),
 			ServerName:    getEnvString("MCP_SERVER_NAME", "Gestor de Presupuesto"),
 			ServerVersion: getEnvString("MCP_SERVER_VERSION", "1.0.0"),
+			BaseURL:       getEnvString("MCP_BASE_URL", ""),
 		},
 	}
 

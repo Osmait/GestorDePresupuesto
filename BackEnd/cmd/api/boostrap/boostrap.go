@@ -133,7 +133,10 @@ func Run() error {
 			Analytics:   services.analyticsService,
 		}, db)
 
-		issuer := fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)
+		issuer := cfg.MCP.BaseURL
+		if issuer == "" {
+			issuer = fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)
+		}
 		oauthSrv, err = mcp.NewOAuthServer(issuer, services.authService)
 		if err != nil {
 			return fmt.Errorf("failed to create OAuth server: %w", err)

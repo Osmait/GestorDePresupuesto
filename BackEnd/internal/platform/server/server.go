@@ -174,16 +174,27 @@ func (s *Server) registerRoutes() {
 	// must be registered BEFORE the JWT AuthMiddleware so they are not
 	// blocked by it.
 	if s.mcpServer != nil {
+		baseURL := s.config.MCP.BaseURL
+		if baseURL == "" {
+			baseURL = fmt.Sprintf("http://127.0.0.1:%d", s.config.Server.Port)
+		}
 		mcpGroup := s.Engine.Group("/mcp")
 		if s.oauthServer != nil {
-			// Dual-auth: OAuth token first, API key as fallback.
-			mcpGroup.Use(mcpPkg.MCPAuthMiddleware(s.apiKeyService, s.oauthServer.TokenVerifier()))
+			// Resolve OAuth subject (email) to internal user ID
+			userResolver := func(ctx context.Context, email string) (string, error) {
+				u, err := s.servicesUser.FindByEmail(ctx, email)
+				if err != nil {
+					return "", err
+				}
+				return u.Id, nil
+			}
+			mcpGroup.Use(mcpPkg.MCPAuthMiddleware(s.apiKeyService, s.oauthServer.TokenVerifier(), baseURL, userResolver))
 		} else {
 			mcpGroup.Use(mcpPkg.APIKeyAuthMiddleware(s.apiKeyService))
 		}
 		sseHandler := mcpServer.NewSSEServer(s.mcpServer.GetServer(),
 			mcpServer.WithStaticBasePath("/mcp"),
-			mcpServer.WithBaseURL("http://127.0.0.1:"+fmt.Sprintf("%d", s.config.Server.Port)),
+			mcpServer.WithBaseURL(baseURL),
 		)
 		mcpGroup.GET("/sse", gin.WrapH(sseHandler.SSEHandler()))
 		mcpGroup.POST("/message", gin.WrapH(sseHandler.MessageHandler()))
