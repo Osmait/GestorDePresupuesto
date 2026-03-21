@@ -40,12 +40,21 @@ test.describe('Budgets @prod-write', () => {
 		// --- 4. Assert the budget card is visible ---
 		await expect(page.getByText(categoryName).first()).toBeVisible({ timeout: 10000 })
 
+		// Helper: open the dropdown menu on a budget card without triggering card navigation.
+		// Radix DropdownMenu listens to pointerdown; we dispatch it directly on the trigger.
+		async function openBudgetDropdown(card: ReturnType<typeof page.locator>) {
+			const btn = card.getByRole('button', { name: /Editar presupuesto|Edit budget/i })
+			await btn.evaluate((el) => {
+				el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }))
+				el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' }))
+				el.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
+			})
+		}
+
 		// --- 5. Edit the budget ---
-		// Scope to the specific budget card to avoid Framer Motion animation issues
 		const budgetCard = page.locator('[id^="budget-card-"]').filter({ hasText: categoryName })
 		await expect(budgetCard).toBeVisible({ timeout: 10000 })
-		// force: true bypasses the CardContent div intercepting clicks at the button center
-		await budgetCard.getByRole('button', { name: /Editar presupuesto|Edit budget/i }).click({ force: true })
+		await openBudgetDropdown(budgetCard)
 		await page.getByRole('menuitem', { name: /Edit|Editar/i }).click()
 
 		const editDialog = page.getByRole('dialog')
@@ -59,12 +68,9 @@ test.describe('Budgets @prod-write', () => {
 		await expect(page.getByText('750').first()).toBeVisible({ timeout: 10000 })
 
 		// --- 6. Delete the budget ---
-		// The card's onClick navigates away, so ensure we're on the budget page
-		await page.locator('a[href="/app/budget"]').first().click()
-		await page.waitForURL('**/app/budget')
 		const budgetCardForDelete = page.locator('[id^="budget-card-"]').filter({ hasText: categoryName })
 		await expect(budgetCardForDelete).toBeVisible({ timeout: 10000 })
-		await budgetCardForDelete.getByRole('button', { name: /Editar presupuesto|Edit budget/i }).click({ force: true })
+		await openBudgetDropdown(budgetCardForDelete)
 		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
 
 		const deleteDialog = page.getByRole('dialog').last()
