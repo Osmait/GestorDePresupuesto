@@ -161,9 +161,12 @@ func (s *Server) registerRoutes() {
 	if s.mcpServer != nil {
 		mcpGroup := s.Engine.Group("/mcp")
 		mcpGroup.Use(mcpPkg.APIKeyAuthMiddleware(s.apiKeyService))
-		sseHandler := mcpServer.NewSSEServer(s.mcpServer.GetServer())
-		mcpGroup.GET("/sse", gin.WrapH(sseHandler))
-		mcpGroup.POST("/message", gin.WrapH(sseHandler))
+		sseHandler := mcpServer.NewSSEServer(s.mcpServer.GetServer(),
+			mcpServer.WithStaticBasePath("/mcp"),
+			mcpServer.WithBaseURL("http://127.0.0.1:"+fmt.Sprintf("%d", s.config.Server.Port)),
+		)
+		mcpGroup.GET("/sse", gin.WrapH(sseHandler.SSEHandler()))
+		mcpGroup.POST("/message", gin.WrapH(sseHandler.MessageHandler()))
 	}
 
 	// Authentication middleware for protected routes
