@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.3.1](https://github.com/Osmait/GestorDePresupuesto/compare/backend-v0.3.0...backend-v0.3.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* **ci:** auto-merge release PR and fix version.go updates ([5d60afc](https://github.com/Osmait/GestorDePresupuesto/commit/5d60afcb3e0c2dd88e63afcd3b349cb9f678ea15))
+* **ci:** auto-merge release PR and fix version.go updates ([33339a4](https://github.com/Osmait/GestorDePresupuesto/commit/33339a466bc4d14e5bd1a0ca7866056fa425480a))
+
 ## [0.3.0](https://github.com/Osmait/GestorDePresupuesto/compare/backend-v0.2.0...backend-v0.3.0) (2026-03-21)
 
 
