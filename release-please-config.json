@@ -20,11 +20,5 @@
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true
     }
-  },
-  "plugins": [
-    {
-      "type": "merge",
-      "merge": true
-    }
-  ]
+  }
 }
