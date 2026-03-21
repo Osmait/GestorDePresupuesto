@@ -59,8 +59,17 @@ test.describe('Budgets @prod-write', () => {
 		await expect(page.getByText('750').first()).toBeVisible({ timeout: 10000 })
 
 		// --- 6. Delete the budget ---
-		await budgetCard.getByRole('button', { name: /Editar presupuesto|Edit budget/i }).click({ force: true })
-		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
+		// Re-locate the budget card after edit and wait for animations to settle
+		const budgetCardForDelete = page.locator('[id^="budget-card-"]').filter({ hasText: categoryName })
+		await expect(budgetCardForDelete).toBeVisible({ timeout: 10000 })
+		// Wait for Framer Motion animations to complete before interacting
+		await page.waitForTimeout(500)
+		const deleteDropdownBtn = budgetCardForDelete.getByRole('button', { name: /Editar presupuesto|Edit budget/i })
+		await deleteDropdownBtn.click({ force: true })
+		// Wait for dropdown menu to appear
+		const deleteMenuItem = page.getByRole('menuitem', { name: /Delete|Eliminar/i })
+		await expect(deleteMenuItem).toBeVisible({ timeout: 5000 })
+		await deleteMenuItem.click()
 
 		const deleteDialog = page.getByRole('dialog').last()
 		await expect(deleteDialog).toBeVisible()
