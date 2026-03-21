@@ -10,7 +10,11 @@
       "changelog-path": "CHANGELOG.md",
       "bump-minor-pre-major": true,
       "extra-files": [
-        "version.go"
+        {
+          "type": "generic",
+          "path": "version.go",
+          "glob": false
+        }
       ]
     },
     "FrontendNextjs/gestor": {
