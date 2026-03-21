@@ -1,8 +1,6 @@
-import { useState, useCallback } from 'react'
+import { useCallback, useState } from 'react'
+import { getAuthRepository } from '@/lib/repositoryConfig'
 import { User } from '@/types/user'
-import {
-	getAuthRepository,
-} from '@/lib/repositoryConfig'
 
 // Hook para manejar autenticación
 // Hook para manejar autenticación
@@ -27,12 +25,7 @@ export const useAuth = () => {
 		}
 	}, [])
 
-	const signUp = useCallback(async (
-		name: string,
-		lastName: string,
-		email: string,
-		password: string
-	) => {
+	const signUp = useCallback(async (name: string, lastName: string, email: string, password: string) => {
 		try {
 			setIsLoading(true)
 			setError(null)

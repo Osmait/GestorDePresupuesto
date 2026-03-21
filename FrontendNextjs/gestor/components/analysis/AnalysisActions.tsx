@@ -1,22 +1,21 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Minus, Wrench, X } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import type { PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerFooter, DrawerClose } from '@/components/ui/drawer'
+import { Drawer, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Input } from '@/components/ui/input'
-import { useAnalysisContext } from './AnalysisContext'
-import { AnalysisFiltersForm } from './AnalysisFilters'
-import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetDashboardSummary } from '@/hooks/queries/useAnalyticsQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
-import { useTranslations } from 'next-intl'
+import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { AnalyticsQueryFilters, CategoryExpense } from '@/types/analytics'
-import { AnalysisFiltersState } from './AnalysisContext'
-import { Minus, Wrench, X } from 'lucide-react'
+import { AnalysisFiltersState, useAnalysisContext } from './AnalysisContext'
+import { AnalysisFiltersForm } from './AnalysisFilters'
 
 const now = new Date()
 const defaultMonth = String(now.getMonth() + 1).padStart(2, '0')
@@ -29,7 +28,7 @@ const toolDefinitions = [
 	{ id: 'export', titleKey: 'toolExportTitle' },
 ] as const
 
-type ToolId = typeof toolDefinitions[number]['id']
+type ToolId = (typeof toolDefinitions)[number]['id']
 
 type FloatingWindowState = {
 	id: ToolId
@@ -97,7 +96,17 @@ function formatDOP(value: number): string {
 	}).format(value)
 }
 
-function WhatIfTool({ categories, totalIncome, totalExpenses, t }: { categories: CategoryExpense[]; totalIncome: number; totalExpenses: number; t: ReturnType<typeof useTranslations> }) {
+function WhatIfTool({
+	categories,
+	totalIncome,
+	totalExpenses,
+	t,
+}: {
+	categories: CategoryExpense[]
+	totalIncome: number
+	totalExpenses: number
+	t: ReturnType<typeof useTranslations>
+}) {
 	const [categoryId, setCategoryId] = useState<string>('')
 	const [reductionPct, setReductionPct] = useState<number>(10)
 
@@ -122,7 +131,9 @@ function WhatIfTool({ categories, totalIncome, totalExpenses, t }: { categories:
 					</SelectTrigger>
 					<SelectContent className='z-[1000]'>
 						{categories.map((category) => (
-							<SelectItem key={category.id} value={category.id}>{category.label}</SelectItem>
+							<SelectItem key={category.id} value={category.id}>
+								{category.label}
+							</SelectItem>
 						))}
 					</SelectContent>
 				</Select>
@@ -222,7 +233,9 @@ function CompareTool({ categories, t }: { categories: CategoryExpense[]; t: Retu
 					</SelectTrigger>
 					<SelectContent className='z-[1000]'>
 						{categories.map((category) => (
-							<SelectItem key={category.id} value={category.id}>{category.label}</SelectItem>
+							<SelectItem key={category.id} value={category.id}>
+								{category.label}
+							</SelectItem>
 						))}
 					</SelectContent>
 				</Select>
@@ -232,14 +245,18 @@ function CompareTool({ categories, t }: { categories: CategoryExpense[]; t: Retu
 					</SelectTrigger>
 					<SelectContent className='z-[1000]'>
 						{categories.map((category) => (
-							<SelectItem key={category.id} value={category.id}>{category.label}</SelectItem>
+							<SelectItem key={category.id} value={category.id}>
+								{category.label}
+							</SelectItem>
 						))}
 					</SelectContent>
 				</Select>
 			</div>
 			<div className='rounded-md border border-border/50 p-2'>
 				<p className='text-xs text-muted-foreground'>{t('toolDifference')}</p>
-				<p className={`font-semibold ${diff >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}>{formatDOP(Math.abs(diff))}</p>
+				<p className={`font-semibold ${diff >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
+					{formatDOP(Math.abs(diff))}
+				</p>
 				<p className='text-xs text-muted-foreground'>
 					{diff >= 0
 						? t('toolDifferenceHigher', { category: firstCategory?.label || '-', amount: formatDOP(Math.abs(diff)) })
@@ -310,8 +327,12 @@ function ExportTool({
 				<pre>{snapshotText}</pre>
 			</div>
 			<div className='flex gap-2'>
-				<Button type='button' size='sm' variant='secondary' onClick={handleCopy}>{t('toolCopy')}</Button>
-				<Button type='button' size='sm' variant='outline' onClick={handleDownload}>{t('toolDownload')}</Button>
+				<Button type='button' size='sm' variant='secondary' onClick={handleCopy}>
+					{t('toolCopy')}
+				</Button>
+				<Button type='button' size='sm' variant='outline' onClick={handleDownload}>
+					{t('toolDownload')}
+				</Button>
 			</div>
 			{status && <p className='text-xs text-muted-foreground'>{status}</p>}
 		</div>
@@ -319,15 +340,15 @@ function ExportTool({
 }
 
 export function AnalysisActions() {
-    const t = useTranslations('analysis')
-    const [drawerOpen, setDrawerOpen] = useState(false)
+	const t = useTranslations('analysis')
+	const [drawerOpen, setDrawerOpen] = useState(false)
 	const dragRef = useRef<{ id: ToolId; startX: number; startY: number; originX: number; originY: number } | null>(null)
-    const [windows, setWindows] = useState<Record<ToolId, FloatingWindowState>>(() => createInitialWindows())
-    const [zCounter, setZCounter] = useState(60)
-    const { filters, setFilters } = useAnalysisContext()
-    const { data: accounts = [] } = useGetAccounts()
-    const { data: categories = [] } = useGetCategories()
-    const { data: budgets = [] } = useGetBudgets()
+	const [windows, setWindows] = useState<Record<ToolId, FloatingWindowState>>(() => createInitialWindows())
+	const [_zCounter, setZCounter] = useState(60)
+	const { filters, setFilters } = useAnalysisContext()
+	const { data: accounts = [] } = useGetAccounts()
+	const { data: categories = [] } = useGetCategories()
+	const { data: budgets = [] } = useGetBudgets()
 
 	const activeFilters = useMemo(() => buildAnalyticsFiltersFromState(filters), [filters])
 	const { data: dashboardSummary } = useGetDashboardSummary(activeFilters)
@@ -431,74 +452,103 @@ export function AnalysisActions() {
 	const renderToolContent = (id: ToolId) => {
 		switch (id) {
 			case 'what_if':
-				return <WhatIfTool categories={categoryExpenses} totalIncome={totalIncome} totalExpenses={totalExpenses} t={t} />
+				return (
+					<WhatIfTool categories={categoryExpenses} totalIncome={totalIncome} totalExpenses={totalExpenses} t={t} />
+				)
 			case 'projection':
-				return <ProjectionTool totalExpenses={totalExpenses} plannedBudget={plannedBudget} dateFrom={activeFilters.date_from} dateTo={activeFilters.date_to} t={t} />
+				return (
+					<ProjectionTool
+						totalExpenses={totalExpenses}
+						plannedBudget={plannedBudget}
+						dateFrom={activeFilters.date_from}
+						dateTo={activeFilters.date_to}
+						t={t}
+					/>
+				)
 			case 'compare':
 				return <CompareTool categories={categoryExpenses} t={t} />
 			case 'export':
-				return <ExportTool activeFilters={activeFilters} totalIncome={totalIncome} totalExpenses={totalExpenses} categories={categoryExpenses} t={t} />
+				return (
+					<ExportTool
+						activeFilters={activeFilters}
+						totalIncome={totalIncome}
+						totalExpenses={totalExpenses}
+						categories={categoryExpenses}
+						t={t}
+					/>
+				)
 			default:
 				return null
 		}
 	}
 
-    return (
-        <>
-            <div className="flex items-center gap-3">
-                <Button variant="outline" className="border-border/50" onClick={() => setDrawerOpen(true)}>
-                    {t('filter')}
-                </Button>
+	return (
+		<>
+			<div className='flex items-center gap-3'>
+				<Button variant='outline' className='border-border/50' onClick={() => setDrawerOpen(true)}>
+					{t('filter')}
+				</Button>
 
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant='outline' className='border-border/50'>
-                            <Wrench className='mr-2 h-4 w-4' />
-                            {t('tools')}
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align='end' className='w-56'>
-                        {toolDefinitions.map((tool) => (
-                            <DropdownMenuItem key={tool.id} onSelect={() => openTool(tool.id)}>
-                                {t(tool.titleKey)}
-                            </DropdownMenuItem>
-                        ))}
-                    </DropdownMenuContent>
-                </DropdownMenu>
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant='outline' className='border-border/50'>
+							<Wrench className='mr-2 h-4 w-4' />
+							{t('tools')}
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align='end' className='w-56'>
+						{toolDefinitions.map((tool) => (
+							<DropdownMenuItem key={tool.id} onSelect={() => openTool(tool.id)}>
+								{t(tool.titleKey)}
+							</DropdownMenuItem>
+						))}
+					</DropdownMenuContent>
+				</DropdownMenu>
 
-                <Drawer open={drawerOpen} onOpenChange={setDrawerOpen} side="right">
-                    <DrawerContent side="right" className="p-6">
-                        <DrawerHeader>
-                            <DrawerTitle>{t('filterAnalytics')}</DrawerTitle>
-                        </DrawerHeader>
-                        <AnalysisFiltersForm
-                            filters={filters}
-                            setFilters={setFilters}
-                            accounts={accounts}
-                            categories={categories}
-                        />
-                        <DrawerFooter>
-                            <Button type="button" variant="outline" onClick={() => setFilters({
-                                filterMode: 'month',
-                                month: defaultMonth,
-                                year: defaultYear,
-                                dateRange: { from: undefined, to: undefined },
-                                account: 'all',
-                                category: 'all',
-                                type: 'all',
-                                minAmount: '',
-                                maxAmount: '',
-                                search: '',
-                            })} className="w-full">{t('clearFilters')}</Button>
-                            <DrawerClose asChild>
-                                <Button type="button" variant="ghost" className="w-full">{t('close')}</Button>
-                            </DrawerClose>
-                        </DrawerFooter>
-                    </DrawerContent>
-                </Drawer>
-            </div>
+				<Drawer open={drawerOpen} onOpenChange={setDrawerOpen} side='right'>
+					<DrawerContent side='right' className='p-6'>
+						<DrawerHeader>
+							<DrawerTitle>{t('filterAnalytics')}</DrawerTitle>
+						</DrawerHeader>
+						<AnalysisFiltersForm
+							filters={filters}
+							setFilters={setFilters}
+							accounts={accounts}
+							categories={categories}
+						/>
+						<DrawerFooter>
+							<Button
+								type='button'
+								variant='outline'
+								onClick={() =>
+									setFilters({
+										filterMode: 'month',
+										month: defaultMonth,
+										year: defaultYear,
+										dateRange: { from: undefined, to: undefined },
+										account: 'all',
+										category: 'all',
+										type: 'all',
+										minAmount: '',
+										maxAmount: '',
+										search: '',
+									})
+								}
+								className='w-full'
+							>
+								{t('clearFilters')}
+							</Button>
+							<DrawerClose asChild>
+								<Button type='button' variant='ghost' className='w-full'>
+									{t('close')}
+								</Button>
+							</DrawerClose>
+						</DrawerFooter>
+					</DrawerContent>
+				</Drawer>
+			</div>
 
-            {toolDefinitions.map((tool) => {
+			{toolDefinitions.map((tool) => {
 				const windowState = windows[tool.id]
 				if (!windowState.open || windowState.minimized) return null
 
@@ -520,17 +570,27 @@ export function AnalysisActions() {
 								<p className='text-xs font-semibold text-foreground'>{t(tool.titleKey)}</p>
 							</div>
 							<div className='flex items-center gap-1'>
-								<Button type='button' variant='ghost' size='sm' className='h-6 w-6 p-0' onClick={() => minimizeWindow(tool.id)}>
+								<Button
+									type='button'
+									variant='ghost'
+									size='sm'
+									className='h-6 w-6 p-0'
+									onClick={() => minimizeWindow(tool.id)}
+								>
 									<Minus className='h-3.5 w-3.5' />
 								</Button>
-								<Button type='button' variant='ghost' size='sm' className='h-6 w-6 p-0' onClick={() => closeWindow(tool.id)}>
+								<Button
+									type='button'
+									variant='ghost'
+									size='sm'
+									className='h-6 w-6 p-0'
+									onClick={() => closeWindow(tool.id)}
+								>
 									<X className='h-3.5 w-3.5' />
 								</Button>
 							</div>
 						</div>
-						<div className='p-3'>
-							{renderToolContent(tool.id)}
-						</div>
+						<div className='p-3'>{renderToolContent(tool.id)}</div>
 					</div>
 				)
 			})}
@@ -544,6 +604,6 @@ export function AnalysisActions() {
 					))}
 				</div>
 			)}
-        </>
-    )
+		</>
+	)
 }

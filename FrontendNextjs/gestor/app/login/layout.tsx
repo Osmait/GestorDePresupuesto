@@ -6,14 +6,6 @@ export const metadata: Metadata = {
 	description: 'Accede a tu cuenta de gestión financiera personal',
 }
 
-export default function LoginLayout({
-	children,
-}: {
-	children: React.ReactNode
-}) {
-	return (
-		<>
-			{children}
-		</>
-	)
+export default function LoginLayout({ children }: { children: React.ReactNode }) {
+	return <>{children}</>
 }

@@ -1,8 +1,9 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { AlertCircle, Loader2, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Loader2, AlertCircle, Search } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import {
 	Dialog,
@@ -12,24 +13,14 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form'
-import { useCreateInvestmentMutation, useGetInvestmentFundingBalances, useUpdateInvestmentMutation } from '@/hooks/queries/useInvestmentsQuery'
+	useCreateInvestmentMutation,
+	useGetInvestmentFundingBalances,
+	useUpdateInvestmentMutation,
+} from '@/hooks/queries/useInvestmentsQuery'
 import { investmentRepository } from '@/lib/repositoryConfig'
 import { Investment, InvestmentType } from '@/types/investment'
 
@@ -41,12 +32,18 @@ interface InvestmentFormModalProps {
 
 const investmentSchema = z.object({
 	name: z.string().min(1, 'Name is required'),
-	symbol: z.string().min(1, 'Symbol is required').transform(v => v.toUpperCase()),
+	symbol: z
+		.string()
+		.min(1, 'Symbol is required')
+		.transform((v) => v.toUpperCase()),
 	type: z.nativeEnum(InvestmentType),
 	quantity: z.coerce.number().min(0, 'Must be >= 0'),
 	purchase_price: z.coerce.number().min(0, 'Must be >= 0'),
 	current_price: z.coerce.number().min(0, 'Must be >= 0'),
-	settlement_currency: z.string().min(1).transform(v => v.toUpperCase()),
+	settlement_currency: z
+		.string()
+		.min(1)
+		.transform((v) => v.toUpperCase()),
 })
 
 type InvestmentFormValues = z.infer<typeof investmentSchema>
@@ -88,7 +85,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 			return
 		}
 		form.reset(defaultValues)
-	}, [investmentToEdit, isOpen, form])
+	}, [investmentToEdit, form])
 
 	const watchedValues = form.watch()
 	const settlementCurrency = (watchedValues.settlement_currency || 'USD').toUpperCase()
@@ -129,7 +126,9 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 		setError(null)
 
 		if (!investmentToEdit && requiredAmount > availableBalance) {
-			setError(`Insufficient broker balance in ${settlementCurrency}. Required: ${requiredAmount.toFixed(2)}, available: ${availableBalance.toFixed(2)}`)
+			setError(
+				`Insufficient broker balance in ${settlementCurrency}. Required: ${requiredAmount.toFixed(2)}, available: ${availableBalance.toFixed(2)}`,
+			)
 			return
 		}
 
@@ -141,7 +140,8 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 			}
 			onClose()
 		} catch (submitError: unknown) {
-			const errorMessage = submitError instanceof Error ? submitError.message : 'Failed to save investment. Please try again.'
+			const errorMessage =
+				submitError instanceof Error ? submitError.message : 'Failed to save investment. Please try again.'
 			setError(errorMessage)
 		}
 	}
@@ -174,9 +174,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 							<p className='text-muted-foreground'>
 								{settlementCurrency}: {availableBalance.toFixed(2)}
 							</p>
-							<p className='text-muted-foreground'>
-								Required for this purchase: {requiredAmount.toFixed(2)}
-							</p>
+							<p className='text-muted-foreground'>Required for this purchase: {requiredAmount.toFixed(2)}</p>
 						</div>
 
 						<FormField
@@ -207,7 +205,13 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 													onChange={(e) => field.onChange(e.target.value.toUpperCase())}
 													placeholder='e.g. AAPL, BTC-USD'
 												/>
-												<Button type='button' size='icon' variant='outline' onClick={handleFetchPrice} disabled={fetchLoading || !watchedValues.symbol}>
+												<Button
+													type='button'
+													size='icon'
+													variant='outline'
+													onClick={handleFetchPrice}
+													disabled={fetchLoading || !watchedValues.symbol}
+												>
 													{fetchLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : <Search className='h-4 w-4' />}
 												</Button>
 											</div>

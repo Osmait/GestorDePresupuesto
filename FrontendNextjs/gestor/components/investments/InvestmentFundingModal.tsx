@@ -1,8 +1,10 @@
+import { zodResolver } from '@hookform/resolvers/zod'
+import { ArrowRightLeft, Loader2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Loader2, ArrowRightLeft } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
 import {
 	Dialog,
 	DialogContent,
@@ -11,24 +13,9 @@ import {
 	DialogHeader,
 	DialogTitle,
 } from '@/components/ui/dialog'
-import { Button } from '@/components/ui/button'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import {
-	Select,
-	SelectContent,
-	SelectItem,
-	SelectTrigger,
-	SelectValue,
-} from '@/components/ui/select'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useFundBrokerMutation, useGetInvestmentFundingBalances } from '@/hooks/queries/useInvestmentsQuery'
 
@@ -80,7 +67,10 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 		if (isOpen) setError(null)
 	}, [isOpen])
 
-	const selectedAccount = useMemo(() => accounts.find((account) => account.id === watchedValues.sourceAccountID), [accounts, watchedValues.sourceAccountID])
+	const selectedAccount = useMemo(
+		() => accounts.find((account) => account.id === watchedValues.sourceAccountID),
+		[accounts, watchedValues.sourceAccountID],
+	)
 	const sourceCurrency = selectedAccount?.currency || 'DOP'
 	const requiresExchangeRate = sourceCurrency !== watchedValues.targetCurrency
 	const estimatedTargetAmount = useMemo(() => {
@@ -128,7 +118,9 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 					<div className='mt-1 space-y-1 text-muted-foreground'>
 						{balances.length === 0 && <p>No funding yet.</p>}
 						{balances.map((balance) => (
-							<p key={balance.currency}>{balance.currency}: {balance.available.toFixed(2)}</p>
+							<p key={balance.currency}>
+								{balance.currency}: {balance.available.toFixed(2)}
+							</p>
 						))}
 					</div>
 				</div>
@@ -195,7 +187,9 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 											</FormControl>
 											<SelectContent>
 												{SUPPORTED_CURRENCIES.map((currency) => (
-													<SelectItem key={currency} value={currency}>{currency}</SelectItem>
+													<SelectItem key={currency} value={currency}>
+														{currency}
+													</SelectItem>
 												))}
 											</SelectContent>
 										</Select>
@@ -209,7 +203,9 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 								name='exchangeRate'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Exchange rate ({sourceCurrency} per {watchedValues.targetCurrency})</FormLabel>
+										<FormLabel>
+											Exchange rate ({sourceCurrency} per {watchedValues.targetCurrency})
+										</FormLabel>
 										<FormControl>
 											<Input type='number' step='any' {...field} disabled={!requiresExchangeRate} />
 										</FormControl>
@@ -236,9 +232,13 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 						<div className='rounded-md border p-3 text-sm text-muted-foreground'>
 							<p className='font-medium text-foreground'>Estimated credit</p>
 							<div className='mt-1 flex items-center gap-2'>
-								<span>{(Number(watchedValues.sourceAmount) || 0).toFixed(2)} {sourceCurrency}</span>
+								<span>
+									{(Number(watchedValues.sourceAmount) || 0).toFixed(2)} {sourceCurrency}
+								</span>
 								<ArrowRightLeft className='h-4 w-4' />
-								<span>{estimatedTargetAmount.toFixed(2)} {watchedValues.targetCurrency}</span>
+								<span>
+									{estimatedTargetAmount.toFixed(2)} {watchedValues.targetCurrency}
+								</span>
 							</div>
 						</div>
 

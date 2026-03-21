@@ -1,19 +1,13 @@
 'use client'
 
-import { useState } from 'react'
-import { Plus, Loader2 } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
-import { Category } from '@/types/category'
-import { cn } from '@/lib/utils'
+import { Loader2, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { cn } from '@/lib/utils'
+import { Category } from '@/types/category'
 
 const EMOJI_ICONS = [
 	'🍕',
@@ -101,15 +95,15 @@ export function QuickCategoryCreate({
 
 	return (
 		<Dialog open={open} onOpenChange={handleClose}>
-			<DialogContent className="sm:max-w-md">
+			<DialogContent className='sm:max-w-md'>
 				<DialogHeader>
 					<DialogTitle>{t('title')}</DialogTitle>
 					<DialogDescription>{t('description')}</DialogDescription>
 				</DialogHeader>
 
-				<div className="space-y-4">
+				<div className='space-y-4'>
 					<div>
-						<label className="text-sm font-medium mb-2 block">{t('name')}</label>
+						<label className='text-sm font-medium mb-2 block'>{t('name')}</label>
 						<Input
 							value={name}
 							onChange={(e) => setName(e.target.value)}
@@ -119,19 +113,17 @@ export function QuickCategoryCreate({
 					</div>
 
 					<div>
-						<label className="text-sm font-medium mb-2 block">{t('icon')}</label>
-						<div className="grid grid-cols-9 gap-1.5">
+						<label className='text-sm font-medium mb-2 block'>{t('icon')}</label>
+						<div className='grid grid-cols-9 gap-1.5'>
 							{EMOJI_ICONS.map((icon) => (
 								<button
 									key={icon}
-									type="button"
+									type='button'
 									onClick={() => setSelectedIcon(icon)}
 									disabled={isCreating}
 									className={cn(
 										'h-8 w-8 flex items-center justify-center text-lg rounded-md transition-colors',
-										selectedIcon === icon
-											? 'bg-primary text-primary-foreground'
-											: 'bg-muted hover:bg-muted/80'
+										selectedIcon === icon ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80',
 									)}
 								>
 									{icon}
@@ -141,19 +133,17 @@ export function QuickCategoryCreate({
 					</div>
 
 					<div>
-						<label className="text-sm font-medium mb-2 block">{t('color')}</label>
-						<div className="flex gap-2 flex-wrap">
+						<label className='text-sm font-medium mb-2 block'>{t('color')}</label>
+						<div className='flex gap-2 flex-wrap'>
 							{COLORS.map((color) => (
 								<button
 									key={color.value}
-									type="button"
+									type='button'
 									onClick={() => setSelectedColor(color.value)}
 									disabled={isCreating}
 									className={cn(
 										'h-8 w-8 rounded-full transition-all',
-										selectedColor === color.value
-											? 'ring-2 ring-offset-2 ring-primary'
-											: 'hover:scale-110'
+										selectedColor === color.value ? 'ring-2 ring-offset-2 ring-primary' : 'hover:scale-110',
 									)}
 									style={{ backgroundColor: color.value }}
 									title={color.name}
@@ -162,29 +152,26 @@ export function QuickCategoryCreate({
 						</div>
 					</div>
 
-					<div className="flex items-center gap-2 p-3 bg-muted rounded-lg">
-						<span className="text-2xl">{selectedIcon}</span>
-						<span className="font-medium">{name || t('preview')}</span>
-						<span
-							className="w-3 h-3 rounded-full ml-auto"
-							style={{ backgroundColor: selectedColor }}
-						/>
+					<div className='flex items-center gap-2 p-3 bg-muted rounded-lg'>
+						<span className='text-2xl'>{selectedIcon}</span>
+						<span className='font-medium'>{name || t('preview')}</span>
+						<span className='w-3 h-3 rounded-full ml-auto' style={{ backgroundColor: selectedColor }} />
 					</div>
 				</div>
 
-				<div className="flex justify-end gap-2 mt-4">
-					<Button variant="outline" onClick={handleClose} disabled={isCreating}>
+				<div className='flex justify-end gap-2 mt-4'>
+					<Button variant='outline' onClick={handleClose} disabled={isCreating}>
 						{tCommon('cancel')}
 					</Button>
 					<Button onClick={handleCreate} disabled={!name.trim() || isCreating}>
 						{isCreating ? (
 							<>
-								<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+								<Loader2 className='h-4 w-4 mr-2 animate-spin' />
 								{tCommon('creating')}
 							</>
 						) : (
 							<>
-								<Plus className="h-4 w-4 mr-2" />
+								<Plus className='h-4 w-4 mr-2' />
 								{tCommon('create')}
 							</>
 						)}

@@ -1,30 +1,17 @@
 'use client'
 
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Plus, Trash2 } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { CreditCard, CreateCreditCardDTO, CreateBalanceDTO } from '@/types/creditcard'
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Plus, Trash2 } from 'lucide-react'
+import { CreateBalanceDTO, CreateCreditCardDTO, CreditCard } from '@/types/creditcard'
 
 interface CreditCardFormModalProps {
 	open: boolean
@@ -38,7 +25,12 @@ const CURRENCIES = ['DOP', 'USD', 'EUR']
 const creditCardSchema = z.object({
 	name: z.string().min(1, 'Card name is required'),
 	bank: z.string().min(1, 'Bank is required'),
-	lastFourDigits: z.string().max(4).regex(/^\d{0,4}$/, 'Only digits allowed').optional().default(''),
+	lastFourDigits: z
+		.string()
+		.max(4)
+		.regex(/^\d{0,4}$/, 'Only digits allowed')
+		.optional()
+		.default(''),
 	cutDay: z.coerce.number().min(1, 'Min 1').max(28, 'Max 28'),
 	dueDay: z.coerce.number().min(1, 'Min 1').max(28, 'Max 28'),
 })
@@ -52,7 +44,7 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 			currency: b.currency,
 			credit_limit: b.credit_limit,
 			initial_debt: Math.abs(b.current_balance),
-		})) || [{ currency: 'DOP', credit_limit: 100000, initial_debt: 0 }]
+		})) || [{ currency: 'DOP', credit_limit: 100000, initial_debt: 0 }],
 	)
 
 	const form = useForm<CreditCardFormValues>({
@@ -101,35 +93,35 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 
 	return (
 		<Dialog open={open} onOpenChange={onClose}>
-			<DialogContent className="max-w-md">
+			<DialogContent className='max-w-md'>
 				<DialogHeader>
 					<DialogTitle>{card ? 'Edit Credit Card' : 'Add Credit Card'}</DialogTitle>
 				</DialogHeader>
 				<Form {...form}>
-					<form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+					<form onSubmit={form.handleSubmit(handleFormSubmit)} className='space-y-4'>
 						<FormField
 							control={form.control}
-							name="name"
+							name='name'
 							render={({ field }) => (
 								<FormItem>
 									<FormLabel>Card Name</FormLabel>
 									<FormControl>
-										<Input {...field} placeholder="My Credit Card" />
+										<Input {...field} placeholder='My Credit Card' />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
 
-						<div className="grid grid-cols-2 gap-4">
+						<div className='grid grid-cols-2 gap-4'>
 							<FormField
 								control={form.control}
-								name="bank"
+								name='bank'
 								render={({ field }) => (
 									<FormItem>
 										<FormLabel>Bank</FormLabel>
 										<FormControl>
-											<Input {...field} placeholder="Banco Popular" />
+											<Input {...field} placeholder='Banco Popular' />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -137,7 +129,7 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 							/>
 							<FormField
 								control={form.control}
-								name="lastFourDigits"
+								name='lastFourDigits'
 								render={({ field }) => (
 									<FormItem>
 										<FormLabel>Last 4 Digits</FormLabel>
@@ -145,7 +137,7 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 											<Input
 												{...field}
 												onChange={(e) => field.onChange(e.target.value.replace(/\D/g, '').slice(0, 4))}
-												placeholder="1234"
+												placeholder='1234'
 												maxLength={4}
 											/>
 										</FormControl>
@@ -155,15 +147,15 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 							/>
 						</div>
 
-						<div className="grid grid-cols-2 gap-4">
+						<div className='grid grid-cols-2 gap-4'>
 							<FormField
 								control={form.control}
-								name="cutDay"
+								name='cutDay'
 								render={({ field }) => (
 									<FormItem>
 										<FormLabel>Cut Day (1-28)</FormLabel>
 										<FormControl>
-											<Input type="number" min={1} max={28} {...field} />
+											<Input type='number' min={1} max={28} {...field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -171,12 +163,12 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 							/>
 							<FormField
 								control={form.control}
-								name="dueDay"
+								name='dueDay'
 								render={({ field }) => (
 									<FormItem>
 										<FormLabel>Due Day (1-28)</FormLabel>
 										<FormControl>
-											<Input type="number" min={1} max={28} {...field} />
+											<Input type='number' min={1} max={28} {...field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>
@@ -184,22 +176,19 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 							/>
 						</div>
 
-						<div className="space-y-2">
-							<div className="flex items-center justify-between">
+						<div className='space-y-2'>
+							<div className='flex items-center justify-between'>
 								<Label>Balances</Label>
-								<Button type="button" variant="outline" size="sm" onClick={addBalance}>
-									<Plus className="h-4 w-4 mr-1" />
+								<Button type='button' variant='outline' size='sm' onClick={addBalance}>
+									<Plus className='h-4 w-4 mr-1' />
 									Add Currency
 								</Button>
 							</div>
 							{balances.map((balance, index) => (
-								<div key={index} className="p-3 border rounded-lg space-y-2">
-									<div className="flex items-center justify-between">
-										<Select
-											value={balance.currency}
-											onValueChange={(v) => updateBalance(index, 'currency', v)}
-										>
-											<SelectTrigger className="w-24">
+								<div key={index} className='p-3 border rounded-lg space-y-2'>
+									<div className='flex items-center justify-between'>
+										<Select value={balance.currency} onValueChange={(v) => updateBalance(index, 'currency', v)}>
+											<SelectTrigger className='w-24'>
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
@@ -211,30 +200,25 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 											</SelectContent>
 										</Select>
 										{balances.length > 1 && (
-											<Button
-												type="button"
-												variant="ghost"
-												size="icon"
-												onClick={() => removeBalance(index)}
-											>
-												<Trash2 className="h-4 w-4 text-destructive" />
+											<Button type='button' variant='ghost' size='icon' onClick={() => removeBalance(index)}>
+												<Trash2 className='h-4 w-4 text-destructive' />
 											</Button>
 										)}
 									</div>
-									<div className="grid grid-cols-2 gap-2">
+									<div className='grid grid-cols-2 gap-2'>
 										<div>
-											<Label className="text-xs">Credit Limit</Label>
+											<Label className='text-xs'>Credit Limit</Label>
 											<Input
-												type="number"
+												type='number'
 												value={balance.credit_limit}
 												onChange={(e) => updateBalance(index, 'credit_limit', parseFloat(e.target.value))}
 												required
 											/>
 										</div>
 										<div>
-											<Label className="text-xs">Initial Debt</Label>
+											<Label className='text-xs'>Initial Debt</Label>
 											<Input
-												type="number"
+												type='number'
 												value={balance.initial_debt}
 												onChange={(e) => updateBalance(index, 'initial_debt', parseFloat(e.target.value))}
 											/>
@@ -245,10 +229,10 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 						</div>
 
 						<DialogFooter>
-							<Button type="button" variant="outline" onClick={onClose}>
+							<Button type='button' variant='outline' onClick={onClose}>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={loading}>
+							<Button type='submit' disabled={loading}>
 								{loading ? 'Saving…' : card ? 'Update' : 'Create'}
 							</Button>
 						</DialogFooter>

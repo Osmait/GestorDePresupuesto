@@ -1,73 +1,73 @@
 import { render, screen } from '@testing-library/react'
-import { UserNav } from '@/components/auth/user-nav'
-import { vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
+import { vi } from 'vitest'
+import { UserNav } from '@/components/auth/user-nav'
 
 // Mock next-auth - use inline function to avoid hoisting issues
 vi.mock('next-auth/react', () => ({
-    useSession: () => ({
-        data: {
-            user: {
-                name: 'John',
-                lastName: 'Doe',
-                email: 'john@example.com',
-                image: null
-            }
-        },
-        status: 'authenticated'
-    }),
-    signOut: vi.fn()
+	useSession: () => ({
+		data: {
+			user: {
+				name: 'John',
+				lastName: 'Doe',
+				email: 'john@example.com',
+				image: null,
+			},
+		},
+		status: 'authenticated',
+	}),
+	signOut: vi.fn(),
 }))
 
 // Mock next-intl
 vi.mock('next-intl', () => ({
-    useLocale: () => 'en',
-    useTranslations: () => (key: string) => {
-        const translations: Record<string, string> = {
-            'theme': 'Theme',
-            'language': 'Language',
-            'profile': 'Profile',
-            'configuration': 'Settings',
-            'logout': 'Logout',
-        }
-        return translations[key] || key
-    },
+	useLocale: () => 'en',
+	useTranslations: () => (key: string) => {
+		const translations: Record<string, string> = {
+			theme: 'Theme',
+			language: 'Language',
+			profile: 'Profile',
+			configuration: 'Settings',
+			logout: 'Logout',
+		}
+		return translations[key] || key
+	},
 }))
 
 // Mock ModeToggle
 vi.mock('@/components/common/ToggleMode', () => ({
-    ModeToggle: () => <div data-testid="mode-toggle">Theme Toggle</div>
+	ModeToggle: () => <div data-testid='mode-toggle'>Theme Toggle</div>,
 }))
 
 // Mock SettingsModal
 vi.mock('@/components/settings/SettingsModal', () => ({
-    SettingsModal: ({ open }: { open: boolean }) => open ? <div data-testid="settings-modal">Settings</div> : null
+	SettingsModal: ({ open }: { open: boolean }) => (open ? <div data-testid='settings-modal'>Settings</div> : null),
 }))
 
 describe('UserNav', () => {
-    it('renders user avatar with initials', () => {
-        render(<UserNav />)
-        expect(screen.getByText('JD')).toBeInTheDocument()
-    })
+	it('renders user avatar with initials', () => {
+		render(<UserNav />)
+		expect(screen.getByText('JD')).toBeInTheDocument()
+	})
 
-    it('shows user info in dropdown', async () => {
-        const user = userEvent.setup()
-        render(<UserNav />)
+	it('shows user info in dropdown', async () => {
+		const user = userEvent.setup()
+		render(<UserNav />)
 
-        await user.click(screen.getByRole('button'))
+		await user.click(screen.getByRole('button'))
 
-        expect(await screen.findByText('John Doe')).toBeInTheDocument()
-        expect(await screen.findByText('john@example.com')).toBeInTheDocument()
-    })
+		expect(await screen.findByText('John Doe')).toBeInTheDocument()
+		expect(await screen.findByText('john@example.com')).toBeInTheDocument()
+	})
 
-    it('shows theme toggle and language buttons', async () => {
-        const user = userEvent.setup()
-        render(<UserNav />)
+	it('shows theme toggle and language buttons', async () => {
+		const user = userEvent.setup()
+		render(<UserNav />)
 
-        await user.click(screen.getByRole('button'))
+		await user.click(screen.getByRole('button'))
 
-        expect(await screen.findByTestId('mode-toggle')).toBeInTheDocument()
-        expect(await screen.findByText('ES')).toBeInTheDocument()
-        expect(await screen.findByText('EN')).toBeInTheDocument()
-    })
+		expect(await screen.findByTestId('mode-toggle')).toBeInTheDocument()
+		expect(await screen.findByText('ES')).toBeInTheDocument()
+		expect(await screen.findByText('EN')).toBeInTheDocument()
+	})
 })

@@ -1,85 +1,84 @@
-import { useEffect, useState } from 'react'
 import { fetchEventSource } from '@microsoft/fetch-event-source'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-import { useSession } from "next-auth/react"
 
 interface NotificationEvent {
-    type: string
-    message: string
-    amount?: number
+	type: string
+	message: string
+	amount?: number
 }
 
 export function useNotification() {
-    const { data: session } = useSession()
-    const [lastMessage, setLastMessage] = useState<NotificationEvent | null>(null)
-    const [isConnected, setIsConnected] = useState(false)
+	const { data: session } = useSession()
+	const [lastMessage, setLastMessage] = useState<NotificationEvent | null>(null)
+	const [isConnected, setIsConnected] = useState(false)
 
-    const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8080";
+	const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
 
-    useEffect(() => {
-        // @ts-ignore
-        const token = session?.accessToken || (session?.user as any)?.accessToken
+	useEffect(() => {
+		const token = session?.accessToken || (session?.user as any)?.accessToken
 
-        if (!token) {
-            console.log("SSE: Waiting for session token...")
-            return
-        }
+		if (!token) {
+			console.log('SSE: Waiting for session token...')
+			return
+		}
 
-        const controller = new AbortController()
+		const controller = new AbortController()
 
-        const connect = async () => {
-            await fetchEventSource(`${BASE_URL}/notifications`, {
-                method: 'GET',
-                headers: {
-                    Authorization: `Bearer ${token}`,
-                },
-                signal: controller.signal,
-                onopen(response) {
-                    if (response.ok) {
-                        console.log("SSE Connected successfully!")
-                        setIsConnected(true)
-                        return Promise.resolve()
-                    } else {
-                        console.error("SSE Connection failed", response.statusText)
-                        setIsConnected(false)
-                        return Promise.reject()
-                    }
-                },
-                onmessage(ev) {
-                    console.log("SSE Message Received:", ev.data)
-                    console.log("SSE Event Type:", ev.event)
-                    try {
-                        const data = JSON.parse(ev.data) as NotificationEvent
-                        setLastMessage(data)
+		const connect = async () => {
+			await fetchEventSource(`${BASE_URL}/notifications`, {
+				method: 'GET',
+				headers: {
+					Authorization: `Bearer ${token}`,
+				},
+				signal: controller.signal,
+				onopen(response) {
+					if (response.ok) {
+						console.log('SSE Connected successfully!')
+						setIsConnected(true)
+						return Promise.resolve()
+					} else {
+						console.error('SSE Connection failed', response.statusText)
+						setIsConnected(false)
+						return Promise.reject()
+					}
+				},
+				onmessage(ev) {
+					console.log('SSE Message Received:', ev.data)
+					console.log('SSE Event Type:', ev.event)
+					try {
+						const data = JSON.parse(ev.data) as NotificationEvent
+						setLastMessage(data)
 
-                        // Show toast immediately
-                        toast(data.message, {
-                            description: data.type === 'recurring_executed' ? `Amount: $${data.amount}` : undefined,
-                            action: {
-                                label: 'Dismiss',
-                                onClick: () => console.log('Dismissed'),
-                            },
-                        })
-                    } catch (error) {
-                        console.error('Failed to parse notification:', error)
-                    }
-                },
-                onerror(err) {
-                    console.error('SSE Error:', err)
-                    setIsConnected(false)
-                    // Rethrow to allow auto-retry
-                    // Or return nothing to stop retrying
-                },
-            })
-        }
+						// Show toast immediately
+						toast(data.message, {
+							description: data.type === 'recurring_executed' ? `Amount: $${data.amount}` : undefined,
+							action: {
+								label: 'Dismiss',
+								onClick: () => console.log('Dismissed'),
+							},
+						})
+					} catch (error) {
+						console.error('Failed to parse notification:', error)
+					}
+				},
+				onerror(err) {
+					console.error('SSE Error:', err)
+					setIsConnected(false)
+					// Rethrow to allow auto-retry
+					// Or return nothing to stop retrying
+				},
+			})
+		}
 
-        connect()
+		connect()
 
-        return () => {
-            setIsConnected(false)
-            controller.abort()
-        }
-    }, [session])
+		return () => {
+			setIsConnected(false)
+			controller.abort()
+		}
+	}, [session, BASE_URL])
 
-    return { lastMessage, isConnected }
+	return { lastMessage, isConnected }
 }

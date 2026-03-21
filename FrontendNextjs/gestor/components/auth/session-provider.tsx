@@ -1,31 +1,31 @@
-"use client"
+'use client'
 
-import { SessionProvider, useSession, signOut } from "next-auth/react"
-import { ReactNode, useEffect } from "react"
+import { SessionProvider, signOut, useSession } from 'next-auth/react'
+import { ReactNode, useEffect } from 'react'
 
 interface AuthSessionProviderProps {
-  children: ReactNode
+	children: ReactNode
 }
 
 // Component that monitors session errors and handles automatic signout
 function SessionErrorHandler({ children }: { children: ReactNode }) {
-  const { data: session } = useSession()
+	const { data: session } = useSession()
 
-  useEffect(() => {
-    if (session?.error === "RefreshAccessTokenError") {
-      // Token refresh failed - sign out the user
-      console.warn("Session expired - refresh token failed. Signing out...")
-      signOut({ callbackUrl: "/login" })
-    }
-  }, [session?.error])
+	useEffect(() => {
+		if (session?.error === 'RefreshAccessTokenError') {
+			// Token refresh failed - sign out the user
+			console.warn('Session expired - refresh token failed. Signing out...')
+			signOut({ callbackUrl: '/login' })
+		}
+	}, [session?.error])
 
-  return <>{children}</>
+	return <>{children}</>
 }
 
 export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
-  return (
-    <SessionProvider>
-      <SessionErrorHandler>{children}</SessionErrorHandler>
-    </SessionProvider>
-  )
+	return (
+		<SessionProvider>
+			<SessionErrorHandler>{children}</SessionErrorHandler>
+		</SessionProvider>
+	)
 }

@@ -6,14 +6,6 @@ export const metadata: Metadata = {
 	description: 'Crea tu cuenta de gestión financiera personal',
 }
 
-export default function RegisterLayout({
-	children,
-}: {
-	children: React.ReactNode
-}) {
-	return (
-		<>
-			{children}
-		</>
-	)
+export default function RegisterLayout({ children }: { children: React.ReactNode }) {
+	return <>{children}</>
 }

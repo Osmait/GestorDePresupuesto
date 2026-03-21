@@ -1,12 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
 import Atropos from 'atropos/react'
+import { useEffect, useState } from 'react'
 import 'atropos/css'
-import { CreditCard } from '@/types/creditcard'
-import { formatCurrency } from '@/types/creditcard'
-import { Button } from '@/components/ui/button'
 import { ArrowLeftRight, CreditCard as CardIcon } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { CreditCard, formatCurrency } from '@/types/creditcard'
 
 interface CreditCardAtroposVisualProps {
 	card: CreditCard
@@ -25,7 +24,10 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 	}, [])
 
 	const visualContent = (
-		<div className='relative cursor-pointer overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground' onClick={onFlip}>
+		<div
+			className='relative cursor-pointer overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground'
+			onClick={onFlip}
+		>
 			<div className='pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent' />
 			<div className='relative space-y-4'>
 				<div className='flex items-center justify-between'>
@@ -34,7 +36,10 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 							<CardIcon className='h-3.5 w-3.5 text-muted-foreground' />
 						</div>
 						{card.balances.map((balance) => (
-							<span key={balance.id} className='rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-medium text-muted-foreground'>
+							<span
+								key={balance.id}
+								className='rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-medium text-muted-foreground'
+							>
 								{balance.currency}
 							</span>
 						))}
@@ -57,14 +62,13 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 
 				<div className='flex items-start justify-between'>
 					<div data-atropos-offset='2'>
-						<p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>
-							{card.bank}
-						</p>
-						<p className='text-base font-semibold leading-tight text-card-foreground'>
-							{card.name}
-						</p>
+						<p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>{card.bank}</p>
+						<p className='text-base font-semibold leading-tight text-card-foreground'>{card.name}</p>
 					</div>
-					<p className='rounded-md border border-border/60 bg-muted/25 px-2 py-1 text-xs font-medium text-muted-foreground' data-atropos-offset='4'>
+					<p
+						className='rounded-md border border-border/60 bg-muted/25 px-2 py-1 text-xs font-medium text-muted-foreground'
+						data-atropos-offset='4'
+					>
 						•••• {card.last_four_digits || '****'}
 					</p>
 				</div>
@@ -75,7 +79,9 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 						totalDebtByCurrency.map((item) => (
 							<div key={item.currency} className='flex items-center justify-between'>
 								<span className='text-xs text-muted-foreground'>{item.currency}</span>
-								<span className='text-sm font-semibold text-card-foreground'>{formatCurrency(item.debt, item.currency)}</span>
+								<span className='text-sm font-semibold text-card-foreground'>
+									{formatCurrency(item.debt, item.currency)}
+								</span>
 							</div>
 						))
 					) : (
@@ -86,7 +92,10 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 					)}
 				</div>
 
-				<div className='grid grid-cols-2 gap-3 rounded-lg border border-border/60 bg-muted/20 p-2 text-xs' data-atropos-offset='4'>
+				<div
+					className='grid grid-cols-2 gap-3 rounded-lg border border-border/60 bg-muted/20 p-2 text-xs'
+					data-atropos-offset='4'
+				>
 					<div>
 						<p className='text-muted-foreground'>Cut Day</p>
 						<p className='font-semibold text-card-foreground'>{card.cut_day}</p>

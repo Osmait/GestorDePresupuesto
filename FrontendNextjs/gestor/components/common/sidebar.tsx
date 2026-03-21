@@ -1,25 +1,27 @@
-"use client"
+'use client'
 
-import React from 'react'
+import {
+	ArrowUpDown,
+	ChevronLeft,
+	ChevronRight,
+	Menu,
+	Mouse,
+	PiggyBank,
+	Plus,
+	Tags,
+	TrendingUp,
+	Wallet,
+} from 'lucide-react'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import { Button } from '@/components/ui/button'
+import { useTranslations } from 'next-intl'
+import React from 'react'
 import { UserNav } from '@/components/auth/user-nav'
+import { NotificationCenter } from '@/components/common/NotificationCenter'
 import { Search } from '@/components/common/search'
 import { SidebarController } from '@/components/common/sidebar-controller'
 import { AnimatedSidebarNav } from '@/components/common/sidebar-nav-animated'
-import {
-	ArrowUpDown,
-	Tags,
-	PiggyBank,
-	Menu,
-	ChevronLeft,
-	ChevronRight,
-	Plus,
-	Mouse,
-	TrendingUp,
-	Wallet
-} from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
 	DropdownMenu,
 	DropdownMenuContent,
@@ -29,8 +31,6 @@ import {
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useGlobalAction } from '@/contexts/GlobalActionContext'
-import { NotificationCenter } from '@/components/common/NotificationCenter'
-import { useTranslations } from 'next-intl'
 import { useNavItems } from '@/hooks/use-nav-items'
 
 interface SidebarProps {
@@ -52,30 +52,30 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 	return (
 		<div className={`flex items-center gap-3 p-4 border-b border-border/50 ${!isExpanded && 'justify-center'}`}>
 			{isExpanded && (
-				<div className="flex items-center gap-2">
-					<div className="w-8 h-8 rounded-lg overflow-hidden border border-border/40 bg-background flex items-center justify-center">
+				<div className='flex items-center gap-2'>
+					<div className='w-8 h-8 rounded-lg overflow-hidden border border-border/40 bg-background flex items-center justify-center'>
 						<Image
-							src="/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png"
-							alt="SBFinance logo"
+							src='/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png'
+							alt='SBFinance logo'
 							width={32}
 							height={32}
-							className="w-full h-full object-cover"
+							className='w-full h-full object-cover'
 						/>
 					</div>
 					<div>
-						<h2 className="text-lg font-semibold text-foreground">SBFinance</h2>
-						<p className="text-xs text-muted-foreground">Gestor Personal</p>
+						<h2 className='text-lg font-semibold text-foreground'>SBFinance</h2>
+						<p className='text-xs text-muted-foreground'>Gestor Personal</p>
 					</div>
 				</div>
 			)}
 			{!isExpanded && (
-				<div className="w-8 h-8 rounded-lg overflow-hidden border border-border/40 bg-background flex items-center justify-center">
+				<div className='w-8 h-8 rounded-lg overflow-hidden border border-border/40 bg-background flex items-center justify-center'>
 					<Image
-						src="/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png"
-						alt="SBFinance logo"
+						src='/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png'
+						alt='SBFinance logo'
 						width={32}
 						height={32}
-						className="w-full h-full object-cover"
+						className='w-full h-full object-cover'
 					/>
 				</div>
 			)}
@@ -84,18 +84,18 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 }
 
 // Wrapper para la navegación animada
-function SidebarNavWrapper({ items, isExpanded, onMobileClose }: {
+function SidebarNavWrapper({
+	items,
+	isExpanded,
+	onMobileClose,
+}: {
 	items: NavItem[]
 	isExpanded: boolean
 	onMobileClose?: () => void
 }) {
 	return (
-		<nav className="flex-1 p-4 space-y-2">
-			<AnimatedSidebarNav
-				items={items}
-				isExpanded={isExpanded}
-				onMobileClose={onMobileClose}
-			/>
+		<nav className='flex-1 p-4 space-y-2'>
+			<AnimatedSidebarNav items={items} isExpanded={isExpanded} onMobileClose={onMobileClose} />
 		</nav>
 	)
 }
@@ -106,7 +106,7 @@ function SidebarFooter({
 	isExpanded,
 	sidebarHoverEnabled,
 	toggleCollapsed,
-	onItemClick
+	onItemClick,
 }: {
 	items: NavItem[]
 	isExpanded: boolean
@@ -116,30 +116,26 @@ function SidebarFooter({
 }) {
 	const t = useTranslations('nav')
 	return (
-		<div className="border-t border-border/50 p-4 space-y-2">
-			<AnimatedSidebarNav
-				items={items}
-				isExpanded={isExpanded}
-				onItemClick={onItemClick}
-			/>
+		<div className='border-t border-border/50 p-4 space-y-2'>
+			<AnimatedSidebarNav items={items} isExpanded={isExpanded} onItemClick={onItemClick} />
 
-			<div className="pt-2">
+			<div className='pt-2'>
 				<Button
-					variant="ghost"
-					size="sm"
+					variant='ghost'
+					size='sm'
 					onClick={toggleCollapsed}
 					className={`w-full transition-colors duration-300 ${!isExpanded && 'px-2'} group`}
 				>
 					{isExpanded ? (
 						<>
-							<ChevronLeft className="h-4 w-4 mr-2 transition-all duration-200 group-hover:scale-110" />
-							<span className="transition-all duration-200 group-hover:translate-x-1">{t('collapse')}</span>
+							<ChevronLeft className='h-4 w-4 mr-2 transition-all duration-200 group-hover:scale-110' />
+							<span className='transition-all duration-200 group-hover:translate-x-1'>{t('collapse')}</span>
 							{sidebarHoverEnabled && (
-								<Mouse className="h-3 w-3 ml-2 opacity-50 transition-all duration-200 group-hover:opacity-100" />
+								<Mouse className='h-3 w-3 ml-2 opacity-50 transition-all duration-200 group-hover:opacity-100' />
 							)}
 						</>
 					) : (
-						<ChevronRight className="h-4 w-4 transition-all duration-200 group-hover:scale-110 group-hover:translate-x-1" />
+						<ChevronRight className='h-4 w-4 transition-all duration-200 group-hover:scale-110 group-hover:translate-x-1' />
 					)}
 				</Button>
 			</div>
@@ -148,67 +144,64 @@ function SidebarFooter({
 }
 
 // Component for main header
-function MainHeader({ isExpanded, toggleMobile }: {
-	isExpanded: boolean
-	toggleMobile: () => void
-}) {
+function MainHeader({ isExpanded, toggleMobile }: { isExpanded: boolean; toggleMobile: () => void }) {
 	const { openModal } = useGlobalAction()
 	const t = useTranslations('nav')
 	const tDash = useTranslations('dashboard')
 	return (
-		<header className="sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg">
-			<div className="flex h-14 sm:h-16 items-center justify-between px-2 sm:px-4 lg:px-6 gap-2">
-				<div className="flex items-center gap-2 sm:gap-4 min-w-0">
+		<header className='sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg'>
+			<div className='flex h-14 sm:h-16 items-center justify-between px-2 sm:px-4 lg:px-6 gap-2'>
+				<div className='flex items-center gap-2 sm:gap-4 min-w-0'>
 					<Button
-						variant="ghost"
-						size="sm"
+						variant='ghost'
+						size='sm'
 						onClick={toggleMobile}
-						className="lg:hidden flex-shrink-0"
+						className='lg:hidden flex-shrink-0'
 						aria-label={t('dashboard')}
 					>
-						<Menu className="h-4 w-4" aria-hidden="true" />
+						<Menu className='h-4 w-4' aria-hidden='true' />
 					</Button>
 
 					{isExpanded && (
-						<div className="hidden sm:block min-w-0">
-							<h1 className="text-lg sm:text-xl font-semibold text-foreground truncate">{tDash('title')}</h1>
-							<p className="text-xs sm:text-sm text-muted-foreground truncate">{t('dashboardDesc')}</p>
+						<div className='hidden sm:block min-w-0'>
+							<h1 className='text-lg sm:text-xl font-semibold text-foreground truncate'>{tDash('title')}</h1>
+							<p className='text-xs sm:text-sm text-muted-foreground truncate'>{t('dashboardDesc')}</p>
 						</div>
 					)}
 				</div>
 
-				<div className="flex items-center gap-1 sm:gap-2 lg:gap-4 flex-shrink-0">
+				<div className='flex items-center gap-1 sm:gap-2 lg:gap-4 flex-shrink-0'>
 					<Search />
 
-					<div className="flex items-center gap-1">
+					<div className='flex items-center gap-1'>
 						<NotificationCenter />
 						<DropdownMenu>
 							<DropdownMenuTrigger asChild>
-								<Button variant="ghost" size="sm" aria-label={t('quickActions')}>
-									<Plus className="h-4 w-4" aria-hidden="true" />
+								<Button variant='ghost' size='sm' aria-label={t('quickActions')}>
+									<Plus className='h-4 w-4' aria-hidden='true' />
 								</Button>
 							</DropdownMenuTrigger>
-							<DropdownMenuContent align="end" className="w-56">
+							<DropdownMenuContent align='end' className='w-56'>
 								<DropdownMenuLabel>{t('quickActions')}</DropdownMenuLabel>
 								<DropdownMenuSeparator />
 								<DropdownMenuItem onClick={() => openModal('TRANSACTION')}>
-									<ArrowUpDown className="mr-2 h-4 w-4" />
+									<ArrowUpDown className='mr-2 h-4 w-4' />
 									<span>{t('newTransaction')}</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => openModal('CATEGORY')}>
-									<Tags className="mr-2 h-4 w-4" />
+									<Tags className='mr-2 h-4 w-4' />
 									<span>{t('newCategory')}</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => openModal('BUDGET')}>
-									<PiggyBank className="mr-2 h-4 w-4" />
+									<PiggyBank className='mr-2 h-4 w-4' />
 									<span>{t('newBudget')}</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => openModal('ACCOUNT')}>
-									<Wallet className="mr-2 h-4 w-4" />
+									<Wallet className='mr-2 h-4 w-4' />
 									<span>{t('newAccount')}</span>
 								</DropdownMenuItem>
 								<DropdownMenuItem onClick={() => openModal('INVESTMENT')}>
-									<TrendingUp className="mr-2 h-4 w-4" />
+									<TrendingUp className='mr-2 h-4 w-4' />
 									<span>{t('newInvestment')}</span>
 								</DropdownMenuItem>
 							</DropdownMenuContent>
@@ -243,33 +236,25 @@ export function Sidebar({ children }: SidebarProps) {
 				toggleMobile,
 				handleMouseEnter,
 				handleMouseLeave,
-				getSidebarClassName
+				getSidebarClassName,
 			}) => (
-				<div className="flex h-screen bg-background">
+				<div className='flex h-screen bg-background'>
 					{/* Mobile Overlay */}
 					{isMobileOpen && (
 						<button
-							type="button"
-							className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden cursor-default"
+							type='button'
+							className='fixed inset-0 bg-black/20 backdrop-blur-sm z-40 lg:hidden cursor-default'
 							onClick={toggleMobile}
 							aria-label={t('collapse')}
 						/>
 					)}
 
 					{/* Sidebar */}
-					<aside
-						className={getSidebarClassName()}
-						onMouseEnter={handleMouseEnter}
-						onMouseLeave={handleMouseLeave}
-					>
-						<div className="flex h-full flex-col">
+					<aside className={getSidebarClassName()} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+						<div className='flex h-full flex-col'>
 							<SidebarHeader isExpanded={isExpanded} />
 
-							<SidebarNavWrapper
-								items={navItems}
-								isExpanded={isExpanded}
-								onMobileClose={toggleMobile}
-							/>
+							<SidebarNavWrapper items={navItems} isExpanded={isExpanded} onMobileClose={toggleMobile} />
 
 							<SidebarFooter
 								items={bottomNavItems}
@@ -282,17 +267,11 @@ export function Sidebar({ children }: SidebarProps) {
 					</aside>
 
 					{/* Main content */}
-					<div className="flex-1 flex flex-col min-w-0">
-						<MainHeader
-							isExpanded={isExpanded}
-							toggleMobile={toggleMobile}
-						/>
+					<div className='flex-1 flex flex-col min-w-0'>
+						<MainHeader isExpanded={isExpanded} toggleMobile={toggleMobile} />
 
-						<main className="flex-1 overflow-auto">
-							{children}
-						</main>
+						<main className='flex-1 overflow-auto'>{children}</main>
 					</div>
-
 				</div>
 			)}
 		</SidebarController>

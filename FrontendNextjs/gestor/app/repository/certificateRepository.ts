@@ -1,13 +1,13 @@
 import { BaseRepository } from '@/lib/base-repository'
 import {
 	Certificate,
-	CertificateWithHistory,
 	CertificateSummary,
+	CertificateWithHistory,
 	CreateCertificateDTO,
-	UpdateCertificateDTO,
-	UpdateCertificatePaymentDTO,
 	SimulatePaymentDTO,
 	SimulationResult,
+	UpdateCertificateDTO,
+	UpdateCertificatePaymentDTO,
 } from '@/types/certificate'
 
 export class CertificateRepository extends BaseRepository {

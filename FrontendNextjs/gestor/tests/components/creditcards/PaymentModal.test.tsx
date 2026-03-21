@@ -1,6 +1,6 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi, describe, it, expect, beforeEach, beforeAll } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PaymentModal } from '@/components/creditcards/PaymentModal'
 import { CreditCard } from '@/types/creditcard'
 
@@ -20,8 +20,26 @@ vi.mock('next-intl', () => ({
 }))
 
 const mockFindAll = vi.fn().mockResolvedValue([
-	{ id: 'acc1', name: 'Savings', bank: 'BPD', currency: 'DOP', type: 'bank', initial_balance: 50000, user_id: 'u1', created_at: '' },
-	{ id: 'acc2', name: 'USD Account', bank: 'BPD', currency: 'USD', type: 'bank', initial_balance: 1000, user_id: 'u1', created_at: '' },
+	{
+		id: 'acc1',
+		name: 'Savings',
+		bank: 'BPD',
+		currency: 'DOP',
+		type: 'bank',
+		initial_balance: 50000,
+		user_id: 'u1',
+		created_at: '',
+	},
+	{
+		id: 'acc2',
+		name: 'USD Account',
+		bank: 'BPD',
+		currency: 'USD',
+		type: 'bank',
+		initial_balance: 1000,
+		user_id: 'u1',
+		created_at: '',
+	},
 ])
 
 vi.mock('@/lib/repositoryConfig', () => ({
@@ -68,14 +86,7 @@ describe('PaymentModal', () => {
 	})
 
 	function renderModal(card: CreditCard | null = mockCard) {
-		return render(
-			<PaymentModal
-				open={true}
-				onClose={mockOnClose}
-				onSubmit={mockOnSubmit}
-				card={card}
-			/>
-		)
+		return render(<PaymentModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} card={card} />)
 	}
 
 	it('renders with card data', async () => {

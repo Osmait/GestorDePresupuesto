@@ -1,17 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { PiggyBank, Loader2 } from 'lucide-react'
+import { Loader2, PiggyBank } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import {
 	useCreateSavingsGoalMutation,
@@ -20,8 +16,6 @@ import {
 	useSavingsGoalProgressMutation,
 	useSavingsPlanMutation,
 } from '@/hooks/queries/useAIQuery'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { toast } from 'sonner'
 
 interface SavingsPlanModalProps {
 	open: boolean
@@ -45,22 +39,17 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 	const [accountId, setAccountId] = useState('')
 	const [selectedGoalId, setSelectedGoalId] = useState('')
 
-	const result = savingsPlan.data && 'success' in savingsPlan.data && savingsPlan.data.success
-		? savingsPlan.data
-		: null
-	const goals = listGoals.data && 'success' in listGoals.data && listGoals.data.success
-		? listGoals.data.data
-		: []
-	const progress = goalProgress.data && 'success' in goalProgress.data && goalProgress.data.success
-		? goalProgress.data.data
-		: null
+	const result = savingsPlan.data && 'success' in savingsPlan.data && savingsPlan.data.success ? savingsPlan.data : null
+	const goals = listGoals.data && 'success' in listGoals.data && listGoals.data.success ? listGoals.data.data : []
+	const progress =
+		goalProgress.data && 'success' in goalProgress.data && goalProgress.data.success ? goalProgress.data.data : null
 
 	useEffect(() => {
 		if (!open) {
 			return
 		}
 		void listGoals.mutateAsync()
-	}, [open])
+	}, [open, listGoals.mutateAsync])
 
 	const handleCalculate = async () => {
 		const amount = Number(targetAmount)
@@ -166,11 +155,7 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 
 					<div>
 						<label className='text-sm font-medium mb-2 block'>{t('targetDate')}</label>
-						<Input
-							type='date'
-							value={targetDate}
-							onChange={(e) => setTargetDate(e.target.value)}
-						/>
+						<Input type='date' value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
 					</div>
 
 					<div>
@@ -214,11 +199,7 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 							<div>{t('monthly', { value: result.data.recommended_monthly_save.toFixed(2) })}</div>
 							<div>{t('weekly', { value: result.data.recommended_weekly_save.toFixed(2) })}</div>
 							<div>{t('months', { value: result.data.estimated_months_to_target })}</div>
-							{result.data.target_date && (
-								<div>
-									{result.data.feasible_by_date ? t('feasible') : t('notFeasible')}
-								</div>
-							)}
+							{result.data.target_date && <div>{result.data.feasible_by_date ? t('feasible') : t('notFeasible')}</div>}
 						</div>
 					)}
 

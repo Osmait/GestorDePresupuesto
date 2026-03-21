@@ -1,7 +1,7 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { vi, describe, it, expect, beforeEach, beforeAll } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InvestmentFundingModal } from '@/components/investments/InvestmentFundingModal'
 
 // Polyfill for Radix UI
@@ -20,8 +20,26 @@ const mockFundMutateAsync = vi.fn().mockResolvedValue({})
 vi.mock('@/hooks/queries/useAccountsQuery', () => ({
 	useGetAccounts: () => ({
 		data: [
-			{ id: 'acc1', name: 'Savings', bank: 'BPD', currency: 'DOP', type: 'bank', initial_balance: 50000, user_id: 'u1', created_at: '' },
-			{ id: 'acc2', name: 'USD Account', bank: 'BPD', currency: 'USD', type: 'bank', initial_balance: 1000, user_id: 'u1', created_at: '' },
+			{
+				id: 'acc1',
+				name: 'Savings',
+				bank: 'BPD',
+				currency: 'DOP',
+				type: 'bank',
+				initial_balance: 50000,
+				user_id: 'u1',
+				created_at: '',
+			},
+			{
+				id: 'acc2',
+				name: 'USD Account',
+				bank: 'BPD',
+				currency: 'USD',
+				type: 'bank',
+				initial_balance: 1000,
+				user_id: 'u1',
+				created_at: '',
+			},
 		],
 	}),
 }))
@@ -54,7 +72,7 @@ describe('InvestmentFundingModal', () => {
 		return render(
 			<QueryClientProvider client={queryClient}>
 				<InvestmentFundingModal isOpen={true} onClose={mockOnClose} />
-			</QueryClientProvider>
+			</QueryClientProvider>,
 		)
 	}
 

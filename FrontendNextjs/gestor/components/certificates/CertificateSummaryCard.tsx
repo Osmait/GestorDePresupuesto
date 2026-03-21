@@ -1,8 +1,8 @@
 'use client'
 
+import { PiggyBank, Receipt, TrendingUp, Wallet } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { CertificateSummary, formatCurrency } from '@/types/certificate'
-import { Wallet, TrendingUp, Receipt, PiggyBank } from 'lucide-react'
 
 interface CertificateSummaryCardProps {
 	summary: CertificateSummary | undefined
@@ -11,14 +11,14 @@ interface CertificateSummaryCardProps {
 export function CertificateSummaryCard({ summary }: CertificateSummaryCardProps) {
 	if (!summary) {
 		return (
-			<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+			<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
 				{[1, 2, 3, 4].map((i) => (
-					<Card key={i} className="animate-pulse">
-						<CardHeader className="pb-2">
-							<div className="h-4 w-24 bg-muted rounded" />
+					<Card key={i} className='animate-pulse'>
+						<CardHeader className='pb-2'>
+							<div className='h-4 w-24 bg-muted rounded' />
 						</CardHeader>
 						<CardContent>
-							<div className="h-8 w-32 bg-muted rounded" />
+							<div className='h-8 w-32 bg-muted rounded' />
 						</CardContent>
 					</Card>
 				))}
@@ -54,17 +54,17 @@ export function CertificateSummaryCard({ summary }: CertificateSummaryCardProps)
 	]
 
 	return (
-		<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+		<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
 			{cards.map((card) => (
 				<Card key={card.title}>
-					<CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-						<CardTitle className="text-sm font-medium text-muted-foreground">{card.title}</CardTitle>
+					<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
+						<CardTitle className='text-sm font-medium text-muted-foreground'>{card.title}</CardTitle>
 						<card.icon className={`h-4 w-4 ${card.color}`} />
 					</CardHeader>
 					<CardContent>
-						<div className="text-2xl font-bold">{card.value}</div>
+						<div className='text-2xl font-bold'>{card.value}</div>
 						{card.title === 'Total Capital' && (
-							<p className="text-xs text-muted-foreground">{summary.active_certificates} active certificates</p>
+							<p className='text-xs text-muted-foreground'>{summary.active_certificates} active certificates</p>
 						)}
 					</CardContent>
 				</Card>

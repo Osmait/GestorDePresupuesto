@@ -1,238 +1,273 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react'
-import { DateRange } from 'react-day-picker'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useGetTransactions, useCreateTransactionMutation, useDeleteTransactionMutation, useUpdateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
+import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
+import { DateRange } from 'react-day-picker'
+import {
+	useCreateTransactionMutation,
+	useDeleteTransactionMutation,
+	useGetTransactions,
+	useUpdateTransactionMutation,
+} from '@/hooks/queries/useTransactionsQuery'
 import { TransactionFilters, TransactionSummary } from '@/types/transaction'
 
 const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
 
 function getDatePartsInTimeZone(date: Date, timeZone: string): { year: number; month: number; day: number } {
-    const parts = new Intl.DateTimeFormat('en-US', {
-        timeZone,
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    }).formatToParts(date)
+	const parts = new Intl.DateTimeFormat('en-US', {
+		timeZone,
+		year: 'numeric',
+		month: '2-digit',
+		day: '2-digit',
+	}).formatToParts(date)
 
-    const year = Number(parts.find((part) => part.type === 'year')?.value || '0')
-    const month = Number(parts.find((part) => part.type === 'month')?.value || '1')
-    const day = Number(parts.find((part) => part.type === 'day')?.value || '1')
+	const year = Number(parts.find((part) => part.type === 'year')?.value || '0')
+	const month = Number(parts.find((part) => part.type === 'month')?.value || '1')
+	const day = Number(parts.find((part) => part.type === 'day')?.value || '1')
 
-    return { year, month, day }
+	return { year, month, day }
 }
 
 function formatDateInTimeZone(date: Date, timeZone: string): string {
-    const { year, month, day } = getDatePartsInTimeZone(date, timeZone)
-    return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+	const { year, month, day } = getDatePartsInTimeZone(date, timeZone)
+	return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
 }
 
 function getCurrentMonthRangeInSantoDomingo(): DateRange {
-    const now = new Date()
-    const { year, month } = getDatePartsInTimeZone(now, SANTO_DOMINGO_TZ)
-    const from = new Date(year, month - 1, 1)
-    const to = new Date(year, month - 1 + 1, 0)
-    return { from, to }
+	const now = new Date()
+	const { year, month } = getDatePartsInTimeZone(now, SANTO_DOMINGO_TZ)
+	const from = new Date(year, month - 1, 1)
+	const to = new Date(year, month - 1 + 1, 0)
+	return { from, to }
 }
 
 function parseDateFromParam(value: string | null): Date | undefined {
-    if (!value) return undefined
-    const date = new Date(`${value}T00:00:00`)
-    if (Number.isNaN(date.getTime())) return undefined
-    return date
+	if (!value) return undefined
+	const date = new Date(`${value}T00:00:00`)
+	if (Number.isNaN(date.getTime())) return undefined
+	return date
 }
 
 function buildInitialFiltersFromURL(searchParams: URLSearchParams): TransactionFiltersState {
-    const from = parseDateFromParam(searchParams.get('dateFrom'))
-    const to = parseDateFromParam(searchParams.get('dateTo'))
-    const defaultRange = getCurrentMonthRangeInSantoDomingo()
+	const from = parseDateFromParam(searchParams.get('dateFrom'))
+	const to = parseDateFromParam(searchParams.get('dateTo'))
+	const defaultRange = getCurrentMonthRangeInSantoDomingo()
 
-    return {
-        dateRange: { from: from || defaultRange.from, to: to || defaultRange.to },
-        type: searchParams.get('type') || 'all',
-        account: searchParams.get('account') || 'all',
-        category: searchParams.get('category') || 'all',
-        budget: searchParams.get('budget') || 'all',
-        minAmount: searchParams.get('minAmount') || '',
-        maxAmount: searchParams.get('maxAmount') || '',
-        search: searchParams.get('search') || '',
-        sortBy: searchParams.get('sortBy') || 'created_at',
-        sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
-    }
+	return {
+		dateRange: { from: from || defaultRange.from, to: to || defaultRange.to },
+		type: searchParams.get('type') || 'all',
+		account: searchParams.get('account') || 'all',
+		category: searchParams.get('category') || 'all',
+		budget: searchParams.get('budget') || 'all',
+		minAmount: searchParams.get('minAmount') || '',
+		maxAmount: searchParams.get('maxAmount') || '',
+		search: searchParams.get('search') || '',
+		sortBy: searchParams.get('sortBy') || 'created_at',
+		sortOrder: (searchParams.get('sortOrder') as 'asc' | 'desc') || 'desc',
+	}
 }
 
 // Filter Type
 export interface TransactionFiltersState {
-    dateRange: DateRange
-    type: string
-    account: string
-    category: string
-    budget: string
-    minAmount: string
-    maxAmount: string
-    search: string
-    sortBy: string
-    sortOrder: 'asc' | 'desc'
+	dateRange: DateRange
+	type: string
+	account: string
+	category: string
+	budget: string
+	minAmount: string
+	maxAmount: string
+	search: string
+	sortBy: string
+	sortOrder: 'asc' | 'desc'
 }
 
 interface TransactionContextType {
-    filters: TransactionFiltersState
-    setFilters: React.Dispatch<React.SetStateAction<TransactionFiltersState>>
-    clearFilters: () => void
-    reloadCurrentView: () => void
-    // Data
-    transactions: any[]
-    pagination: any
-    summary: TransactionSummary | null
-    isLoading: boolean
-    error: string | null
-    createTransaction: (..._args: any[]) => Promise<void>
-    updateTransaction: (_id: string, ..._args: any[]) => Promise<void>
-    deleteTransaction: (_id: string) => Promise<void>
-    editingTransaction: any | null
-    setEditingTransaction: (_tx: any | null) => void
-    isModalOpen: boolean
-    setModalOpen: (_open: boolean) => void
+	filters: TransactionFiltersState
+	setFilters: React.Dispatch<React.SetStateAction<TransactionFiltersState>>
+	clearFilters: () => void
+	reloadCurrentView: () => void
+	// Data
+	transactions: any[]
+	pagination: any
+	summary: TransactionSummary | null
+	isLoading: boolean
+	error: string | null
+	createTransaction: (..._args: any[]) => Promise<void>
+	updateTransaction: (_id: string, ..._args: any[]) => Promise<void>
+	deleteTransaction: (_id: string) => Promise<void>
+	editingTransaction: any | null
+	setEditingTransaction: (_tx: any | null) => void
+	isModalOpen: boolean
+	setModalOpen: (_open: boolean) => void
 }
 
 export const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
 
 export function TransactionProvider({ children }: { children: ReactNode }) {
-    const router = useRouter()
-    const searchParams = useSearchParams()
+	const router = useRouter()
+	const searchParams = useSearchParams()
 
-    // Filter State
-    const [filters, setFilters] = useState<TransactionFiltersState>(() => buildInitialFiltersFromURL(searchParams))
+	// Filter State
+	const [filters, setFilters] = useState<TransactionFiltersState>(() => buildInitialFiltersFromURL(searchParams))
 
-    // React Query Hooks
-    const [activeFilters, setActiveFilters] = useState<TransactionFilters>({})
+	// React Query Hooks
+	const [activeFilters, setActiveFilters] = useState<TransactionFilters>({})
 
-    const updateURLWithFilters = useCallback((newFilters: TransactionFiltersState) => {
-        const params = new URLSearchParams()
+	const updateURLWithFilters = useCallback(
+		(newFilters: TransactionFiltersState) => {
+			const params = new URLSearchParams()
 
-        if (newFilters.dateRange.from) params.set('dateFrom', formatDateInTimeZone(newFilters.dateRange.from, SANTO_DOMINGO_TZ))
-        if (newFilters.dateRange.to) params.set('dateTo', formatDateInTimeZone(newFilters.dateRange.to, SANTO_DOMINGO_TZ))
-        if (newFilters.type && newFilters.type !== 'all') params.set('type', newFilters.type)
-        if (newFilters.account && newFilters.account !== 'all') params.set('account', newFilters.account)
-        if (newFilters.category && newFilters.category !== 'all') params.set('category', newFilters.category)
-        if (newFilters.budget && newFilters.budget !== 'all') params.set('budget', newFilters.budget)
-        if (newFilters.minAmount) params.set('minAmount', newFilters.minAmount)
-        if (newFilters.maxAmount) params.set('maxAmount', newFilters.maxAmount)
-        if (newFilters.search) params.set('search', newFilters.search)
-        if (newFilters.sortBy && newFilters.sortBy !== 'created_at') params.set('sortBy', newFilters.sortBy)
-        if (newFilters.sortOrder && newFilters.sortOrder !== 'desc') params.set('sortOrder', newFilters.sortOrder)
+			if (newFilters.dateRange.from)
+				params.set('dateFrom', formatDateInTimeZone(newFilters.dateRange.from, SANTO_DOMINGO_TZ))
+			if (newFilters.dateRange.to) params.set('dateTo', formatDateInTimeZone(newFilters.dateRange.to, SANTO_DOMINGO_TZ))
+			if (newFilters.type && newFilters.type !== 'all') params.set('type', newFilters.type)
+			if (newFilters.account && newFilters.account !== 'all') params.set('account', newFilters.account)
+			if (newFilters.category && newFilters.category !== 'all') params.set('category', newFilters.category)
+			if (newFilters.budget && newFilters.budget !== 'all') params.set('budget', newFilters.budget)
+			if (newFilters.minAmount) params.set('minAmount', newFilters.minAmount)
+			if (newFilters.maxAmount) params.set('maxAmount', newFilters.maxAmount)
+			if (newFilters.search) params.set('search', newFilters.search)
+			if (newFilters.sortBy && newFilters.sortBy !== 'created_at') params.set('sortBy', newFilters.sortBy)
+			if (newFilters.sortOrder && newFilters.sortOrder !== 'desc') params.set('sortOrder', newFilters.sortOrder)
 
-        const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname
-        router.replace(newURL, { scroll: false })
-    }, [router])
+			const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname
+			router.replace(newURL, { scroll: false })
+		},
+		[router],
+	)
 
-    // Map Context Filters -> API Filters
-    useEffect(() => {
-        const apiFilters: TransactionFilters = {
-            page: 1,
-            limit: 50,
-            sort_by: (filters.sortBy as any) || 'created_at',
-            sort_order: filters.sortOrder || 'desc',
-            include_summary: true,
-        }
+	// Map Context Filters -> API Filters
+	useEffect(() => {
+		const apiFilters: TransactionFilters = {
+			page: 1,
+			limit: 50,
+			sort_by: (filters.sortBy as any) || 'created_at',
+			sort_order: filters.sortOrder || 'desc',
+			include_summary: true,
+		}
 
-        if (filters.dateRange.from && filters.dateRange.to) {
-            apiFilters.date_from = formatDateInTimeZone(filters.dateRange.from, SANTO_DOMINGO_TZ)
-            apiFilters.date_to = formatDateInTimeZone(filters.dateRange.to, SANTO_DOMINGO_TZ)
-        }
-        if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
-        if (filters.account !== 'all') apiFilters.account_id = filters.account
-        if (filters.category !== 'all') apiFilters.category_id = filters.category
-        if (filters.budget !== 'all') apiFilters.budget_id = filters.budget
-        if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
-        if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
-        if (filters.search) apiFilters.search = filters.search
+		if (filters.dateRange.from && filters.dateRange.to) {
+			apiFilters.date_from = formatDateInTimeZone(filters.dateRange.from, SANTO_DOMINGO_TZ)
+			apiFilters.date_to = formatDateInTimeZone(filters.dateRange.to, SANTO_DOMINGO_TZ)
+		}
+		if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
+		if (filters.account !== 'all') apiFilters.account_id = filters.account
+		if (filters.category !== 'all') apiFilters.category_id = filters.category
+		if (filters.budget !== 'all') apiFilters.budget_id = filters.budget
+		if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
+		if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
+		if (filters.search) apiFilters.search = filters.search
 
-        setActiveFilters(apiFilters)
-        updateURLWithFilters(filters)
-    }, [filters, updateURLWithFilters])
+		setActiveFilters(apiFilters)
+		updateURLWithFilters(filters)
+	}, [filters, updateURLWithFilters])
 
-    // Query Data
-    const { data, isLoading: isLoadingTx, error: errorTx, refetch } = useGetTransactions(activeFilters)
+	// Query Data
+	const { data, isLoading: isLoadingTx, error: errorTx, refetch } = useGetTransactions(activeFilters)
 
-    // Mutations
-    const createMutation = useCreateTransactionMutation()
-    const deleteMutation = useDeleteTransactionMutation()
-    const updateMutation = useUpdateTransactionMutation()
+	// Mutations
+	const createMutation = useCreateTransactionMutation()
+	const deleteMutation = useDeleteTransactionMutation()
+	const updateMutation = useUpdateTransactionMutation()
 
-    // Edit State
-    const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
-    const [isModalOpen, setModalOpen] = useState(false)
+	// Edit State
+	const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
+	const [isModalOpen, setModalOpen] = useState(false)
 
-    // Adapters for Legacy Interface
-    const transactions = data?.transactions || []
-    const pagination = data?.pagination || null
-    const summary = data?.summary || null
+	// Adapters for Legacy Interface
+	const transactions = data?.transactions || []
+	const pagination = data?.pagination || null
+	const summary = data?.summary || null
 
-    const createTransaction = async (...args: any[]) => {
-        const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
-        await createMutation.mutateAsync({
-            name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt
-        })
-    }
+	const createTransaction = async (...args: any[]) => {
+		const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
+		await createMutation.mutateAsync({
+			name,
+			description,
+			amount,
+			type,
+			accountId,
+			categoryId,
+			budgetId,
+			currency,
+			createdAt,
+		})
+	}
 
-    const updateTransaction = async (id: string, ...args: any[]) => {
-        const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
-        await updateMutation.mutateAsync({
-            id, name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt
-        })
-        setEditingTransaction(null)
-    }
+	const updateTransaction = async (id: string, ...args: any[]) => {
+		const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
+		await updateMutation.mutateAsync({
+			id,
+			name,
+			description,
+			amount,
+			type,
+			accountId,
+			categoryId,
+			budgetId,
+			currency,
+			createdAt,
+		})
+		setEditingTransaction(null)
+	}
 
-    const deleteTransaction = async (id: string) => {
-        await deleteMutation.mutateAsync(id)
-    }
+	const deleteTransaction = async (id: string) => {
+		await deleteMutation.mutateAsync(id)
+	}
 
-    const loadAllTransactions = useCallback(() => refetch(), [refetch])
+	const loadAllTransactions = useCallback(() => refetch(), [refetch])
 
-    const clearFilters = useCallback(() => {
-        const clearedFilters = {
-            dateRange: getCurrentMonthRangeInSantoDomingo(),
-            type: 'all', account: 'all', category: 'all', budget: 'all', minAmount: '', maxAmount: '', search: '',
-            sortBy: 'created_at', sortOrder: 'desc' as 'asc' | 'desc'
-        }
-        setFilters(clearedFilters)
-        router.replace(window.location.pathname)
-    }, [router])
+	const clearFilters = useCallback(() => {
+		const clearedFilters = {
+			dateRange: getCurrentMonthRangeInSantoDomingo(),
+			type: 'all',
+			account: 'all',
+			category: 'all',
+			budget: 'all',
+			minAmount: '',
+			maxAmount: '',
+			search: '',
+			sortBy: 'created_at',
+			sortOrder: 'desc' as 'asc' | 'desc',
+		}
+		setFilters(clearedFilters)
+		router.replace(window.location.pathname)
+	}, [router])
 
-    const reloadCurrentView = useCallback(() => {
-        loadAllTransactions()
-    }, [loadAllTransactions])
+	const reloadCurrentView = useCallback(() => {
+		loadAllTransactions()
+	}, [loadAllTransactions])
 
-    return (
-        <TransactionContext.Provider value={{
-            filters,
-            setFilters,
-            clearFilters,
-            reloadCurrentView,
-            transactions,
-            pagination,
-            summary,
-            isLoading: isLoadingTx,
-            error: errorTx ? (errorTx as Error).message : null,
-            createTransaction,
-            updateTransaction,
-            deleteTransaction,
-            editingTransaction,
-            setEditingTransaction,
-            isModalOpen,
-            setModalOpen,
-        }}>
-            {children}
-        </TransactionContext.Provider>
-    )
+	return (
+		<TransactionContext.Provider
+			value={{
+				filters,
+				setFilters,
+				clearFilters,
+				reloadCurrentView,
+				transactions,
+				pagination,
+				summary,
+				isLoading: isLoadingTx,
+				error: errorTx ? (errorTx as Error).message : null,
+				createTransaction,
+				updateTransaction,
+				deleteTransaction,
+				editingTransaction,
+				setEditingTransaction,
+				isModalOpen,
+				setModalOpen,
+			}}
+		>
+			{children}
+		</TransactionContext.Provider>
+	)
 }
 
 export function useTransactionContext() {
-    const context = useContext(TransactionContext)
-    if (!context) {
-        throw new Error('useTransactionContext must be used within a TransactionProvider')
-    }
-    return context
+	const context = useContext(TransactionContext)
+	if (!context) {
+		throw new Error('useTransactionContext must be used within a TransactionProvider')
+	}
+	return context
 }

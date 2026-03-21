@@ -1,9 +1,9 @@
 'use client'
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CreditCard, TrendingUp, FileCheck, PiggyBank, LucideIcon, DollarSign } from 'lucide-react'
-import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { Pie } from '@nivo/pie'
+import { CreditCard, DollarSign, FileCheck, LucideIcon, PiggyBank, TrendingUp } from 'lucide-react'
+import { AnimatedCounter } from '@/components/ui/animated-counter'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface PatrimonyData {
 	label: string
@@ -43,20 +43,18 @@ interface CategoryCardProps {
 
 function CategoryCard({ title, value, count, countLabel, icon: Icon, color, subtitle }: CategoryCardProps) {
 	return (
-		<Card className="border-border/50 dark:border-border/20">
-			<CardContent className="p-6">
+		<Card className='border-border/50 dark:border-border/20'>
+			<CardContent className='p-6'>
 				<div className={`rounded-lg p-4 bg-gradient-to-br ${color}`}>
-					<div className="flex items-center justify-between mb-3">
-						<Icon className="h-6 w-6" />
+					<div className='flex items-center justify-between mb-3'>
+						<Icon className='h-6 w-6' />
 					</div>
-					<p className="text-sm font-medium text-muted-foreground mb-1">{title}</p>
-					<p className="text-2xl font-bold text-foreground">
-						<AnimatedCounter value={value} prefix="$" />
+					<p className='text-sm font-medium text-muted-foreground mb-1'>{title}</p>
+					<p className='text-2xl font-bold text-foreground'>
+						<AnimatedCounter value={value} prefix='$' />
 					</p>
-					{subtitle && (
-						<p className="text-xs text-muted-foreground mt-1">{subtitle}</p>
-					)}
-					<p className="text-xs text-muted-foreground mt-1">
+					{subtitle && <p className='text-xs text-muted-foreground mt-1'>{subtitle}</p>}
+					<p className='text-xs text-muted-foreground mt-1'>
 						{count} {countLabel}
 					</p>
 				</div>
@@ -102,34 +100,35 @@ export function PatrimonyTab({
 	const hasData = pieData.length > 0
 
 	// Format USD value for subtitle
-	const investmentsSubtitle = investmentsTotalUSD !== undefined
-		? `USD ${investmentsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-		: undefined
+	const investmentsSubtitle =
+		investmentsTotalUSD !== undefined
+			? `USD ${investmentsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+			: undefined
 
 	return (
-		<div className="space-y-6">
+		<div className='space-y-6'>
 			{exchangeRate && (
-				<Card className="border-border/50 dark:border-border/20">
-					<CardContent className="py-4">
-						<div className="flex items-center justify-between">
-							<div className="flex items-center gap-2">
-								<DollarSign className="h-5 w-5 text-muted-foreground" />
-								<span className="text-sm text-muted-foreground">Exchange Rate (USD → DOP):</span>
+				<Card className='border-border/50 dark:border-border/20'>
+					<CardContent className='py-4'>
+						<div className='flex items-center justify-between'>
+							<div className='flex items-center gap-2'>
+								<DollarSign className='h-5 w-5 text-muted-foreground' />
+								<span className='text-sm text-muted-foreground'>Exchange Rate (USD → DOP):</span>
 							</div>
-							<span className="text-lg font-bold">{exchangeRate.toFixed(2)}</span>
+							<span className='text-lg font-bold'>{exchangeRate.toFixed(2)}</span>
 						</div>
 					</CardContent>
 				</Card>
 			)}
 
-			<div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+			<div className='grid grid-cols-1 md:grid-cols-3 gap-6'>
 				<CategoryCard
 					title={labels.accounts}
 					value={accountsTotal}
 					count={accountsCount}
 					countLabel={labels.activeItems}
 					icon={CreditCard}
-					color="from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5 text-blue-600 dark:text-blue-400"
+					color='from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5 text-blue-600 dark:text-blue-400'
 				/>
 				<CategoryCard
 					title={labels.investments}
@@ -137,7 +136,7 @@ export function PatrimonyTab({
 					count={investmentsCount}
 					countLabel={labels.activeItems}
 					icon={TrendingUp}
-					color="from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5 text-green-600 dark:text-green-400"
+					color='from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5 text-green-600 dark:text-green-400'
 					subtitle={investmentsSubtitle}
 				/>
 				<CategoryCard
@@ -146,36 +145,31 @@ export function PatrimonyTab({
 					count={certificatesCount}
 					countLabel={labels.activeItems}
 					icon={FileCheck}
-					color="from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5 text-purple-600 dark:text-purple-400"
+					color='from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5 text-purple-600 dark:text-purple-400'
 				/>
 			</div>
 
-			<div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-				<Card className="border-border/50 dark:border-border/20">
+			<div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
+				<Card className='border-border/50 dark:border-border/20'>
 					<CardHeader>
-						<CardTitle className="flex items-center gap-2 text-foreground">
-							<PiggyBank className="h-5 w-5" />
+						<CardTitle className='flex items-center gap-2 text-foreground'>
+							<PiggyBank className='h-5 w-5' />
 							{labels.total}
 						</CardTitle>
 					</CardHeader>
 					<CardContent>
-						<div className="text-center py-6">
-							<p className="text-5xl font-bold text-foreground mb-2">
-								<AnimatedCounter value={totalPatrimony} prefix="$" />
+						<div className='text-center py-6'>
+							<p className='text-5xl font-bold text-foreground mb-2'>
+								<AnimatedCounter value={totalPatrimony} prefix='$' />
 							</p>
-							<p className="text-muted-foreground">
-								{labels.total}
-							</p>
+							<p className='text-muted-foreground'>{labels.total}</p>
 						</div>
-						<div className="grid grid-cols-3 gap-4 mt-4 pt-4 border-t">
+						<div className='grid grid-cols-3 gap-4 mt-4 pt-4 border-t'>
 							{pieData.map((item) => (
-								<div key={item.label} className="text-center">
-									<div
-										className="w-3 h-3 rounded-full mx-auto mb-1"
-										style={{ backgroundColor: item.color }}
-									/>
-									<p className="text-xs text-muted-foreground">{item.label}</p>
-									<p className="text-sm font-semibold">
+								<div key={item.label} className='text-center'>
+									<div className='w-3 h-3 rounded-full mx-auto mb-1' style={{ backgroundColor: item.color }} />
+									<p className='text-xs text-muted-foreground'>{item.label}</p>
+									<p className='text-sm font-semibold'>
 										{totalPatrimony > 0 ? ((item.value / totalPatrimony) * 100).toFixed(1) : 0}%
 									</p>
 								</div>
@@ -184,15 +178,13 @@ export function PatrimonyTab({
 					</CardContent>
 				</Card>
 
-				<Card className="border-border/50 dark:border-border/20">
+				<Card className='border-border/50 dark:border-border/20'>
 					<CardHeader>
-						<CardTitle className="text-foreground">
-							Distribución
-						</CardTitle>
+						<CardTitle className='text-foreground'>Distribución</CardTitle>
 					</CardHeader>
 					<CardContent>
 						{hasData ? (
-							<div className="h-[250px] w-full">
+							<div className='h-[250px] w-full'>
 								<Pie
 									data={pieData}
 									width={400}
@@ -227,11 +219,11 @@ export function PatrimonyTab({
 										},
 									]}
 									tooltip={({ datum }) => (
-										<div className="bg-background border rounded-md px-3 py-2 shadow-md">
-											<p className="text-xs font-medium">{datum.label}</p>
-											<p className="text-sm font-bold">${(datum.value as number).toLocaleString()}</p>
-											<p className="text-xs text-muted-foreground">
-												{totalPatrimony > 0 ? ((datum.value as number / totalPatrimony) * 100).toFixed(1) : 0}%
+										<div className='bg-background border rounded-md px-3 py-2 shadow-md'>
+											<p className='text-xs font-medium'>{datum.label}</p>
+											<p className='text-sm font-bold'>${(datum.value as number).toLocaleString()}</p>
+											<p className='text-xs text-muted-foreground'>
+												{totalPatrimony > 0 ? (((datum.value as number) / totalPatrimony) * 100).toFixed(1) : 0}%
 											</p>
 										</div>
 									)}
@@ -246,7 +238,7 @@ export function PatrimonyTab({
 								/>
 							</div>
 						) : (
-							<div className="h-[250px] flex items-center justify-center text-muted-foreground">
+							<div className='h-[250px] flex items-center justify-center text-muted-foreground'>
 								No hay datos para mostrar
 							</div>
 						)}

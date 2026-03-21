@@ -1,175 +1,189 @@
-import { Transaction, TypeTransaction, PaginatedTransactionResponse, TransactionFilters } from "@/types/transaction";
-import { BaseRepository } from "@/lib/base-repository";
+import { BaseRepository } from '@/lib/base-repository'
+import { PaginatedTransactionResponse, Transaction, TransactionFilters, TypeTransaction } from '@/types/transaction'
 
 export class TransactionRepository extends BaseRepository {
-  private getTypeTransactionString(typeTransaction: TypeTransaction): string {
-    if (typeTransaction === TypeTransaction.INCOME) return "income";
-    if (typeTransaction === TypeTransaction.BILL) return "bill";
-    return "";
-  }
+	private getTypeTransactionString(typeTransaction: TypeTransaction): string {
+		if (typeTransaction === TypeTransaction.INCOME) return 'income'
+		if (typeTransaction === TypeTransaction.BILL) return 'bill'
+		return ''
+	}
 
-  private buildTransactionBody(
-    name: string,
-    description: string,
-    amount: number,
-    typeTransaction: TypeTransaction,
-    account_id: string,
-    category_id: string,
-    budget_id?: string,
-    currency?: string,
-  ) {
-    const body: Record<string, any> = {
-      name,
-      description,
-      amount,
-      type_transation: this.getTypeTransactionString(typeTransaction),
-      account_id,
-      category_id,
-      budget_id: budget_id || null,
-      currency: currency && currency.length === 3 ? currency : "DOP",
-    };
-    return body;
-  }
+	private buildTransactionBody(
+		name: string,
+		description: string,
+		amount: number,
+		typeTransaction: TypeTransaction,
+		account_id: string,
+		category_id: string,
+		budget_id?: string,
+		currency?: string,
+	) {
+		const body: Record<string, any> = {
+			name,
+			description,
+			amount,
+			type_transation: this.getTypeTransactionString(typeTransaction),
+			account_id,
+			category_id,
+			budget_id: budget_id || null,
+			currency: currency && currency.length === 3 ? currency : 'DOP',
+		}
+		return body
+	}
 
-  async findAll(filters?: TransactionFilters): Promise<PaginatedTransactionResponse> {
-    try {
-      const queryParams = new URLSearchParams();
+	async findAll(filters?: TransactionFilters): Promise<PaginatedTransactionResponse> {
+		try {
+			const queryParams = new URLSearchParams()
 
-      if (filters) {
-        Object.entries(filters).forEach(([key, value]) => {
-          if (value !== undefined && value !== null && value !== '') {
-            queryParams.append(key, String(value));
-          }
-        });
-      }
+			if (filters) {
+				Object.entries(filters).forEach(([key, value]) => {
+					if (value !== undefined && value !== null && value !== '') {
+						queryParams.append(key, String(value))
+					}
+				})
+			}
 
-      const url = `/transaction${queryParams.toString() ? `?${queryParams.toString()}` : ''}`;
-      const response = await this.get<PaginatedTransactionResponse>(url);
-      return response;
-    } catch (error) {
-      console.error("Error fetching transactions:", error);
-      return {
-        data: [],
-        pagination: {
-          current_page: 1,
-          has_next_page: false,
-          has_prev_page: false,
-          next_page: 1,
-          per_page: 20,
-          prev_page: 1,
-          total_pages: 1,
-          total_records: 0
-        }
-      };
-    }
-  }
+			const url = `/transaction${queryParams.toString() ? `?${queryParams.toString()}` : ''}`
+			const response = await this.get<PaginatedTransactionResponse>(url)
+			return response
+		} catch (error) {
+			console.error('Error fetching transactions:', error)
+			return {
+				data: [],
+				pagination: {
+					current_page: 1,
+					has_next_page: false,
+					has_prev_page: false,
+					next_page: 1,
+					per_page: 20,
+					prev_page: 1,
+					total_pages: 1,
+					total_records: 0,
+				},
+			}
+		}
+	}
 
-  async findAllSimple(): Promise<Transaction[]> {
-    try {
-      const allTransactions: Transaction[] = [];
-      const pageSize = 100;
-      let page = 1;
-      let hasNextPage = true;
-      let safetyCounter = 0;
+	async findAllSimple(): Promise<Transaction[]> {
+		try {
+			const allTransactions: Transaction[] = []
+			const pageSize = 100
+			let page = 1
+			let hasNextPage = true
+			let safetyCounter = 0
 
-      while (hasNextPage && safetyCounter < 100) {
-        const response = await this.findAll({
-          page,
-          limit: pageSize,
-          sort_by: 'created_at',
-          sort_order: 'desc',
-        });
+			while (hasNextPage && safetyCounter < 100) {
+				const response = await this.findAll({
+					page,
+					limit: pageSize,
+					sort_by: 'created_at',
+					sort_order: 'desc',
+				})
 
-        const pageData = response.data || [];
-        allTransactions.push(...pageData);
+				const pageData = response.data || []
+				allTransactions.push(...pageData)
 
-        const pagination = response.pagination;
-        hasNextPage = Boolean(pagination?.has_next_page) && pageData.length > 0;
+				const pagination = response.pagination
+				hasNextPage = Boolean(pagination?.has_next_page) && pageData.length > 0
 
-        if (hasNextPage) {
-          const nextPage = pagination?.next_page;
-          page = (typeof nextPage === 'number' && nextPage > page) ? nextPage : page + 1;
-        }
+				if (hasNextPage) {
+					const nextPage = pagination?.next_page
+					page = typeof nextPage === 'number' && nextPage > page ? nextPage : page + 1
+				}
 
-        safetyCounter += 1;
-      }
+				safetyCounter += 1
+			}
 
-      return allTransactions;
-    } catch (error) {
-      console.error("Error fetching simple transactions:", error);
-      return [];
-    }
-  }
+			return allTransactions
+		} catch (error) {
+			console.error('Error fetching simple transactions:', error)
+			return []
+		}
+	}
 
-  async create(
-    name: string,
-    description: string,
-    amount: number,
-    typeTransaction: TypeTransaction,
-    account_id: string,
-    category_id: string,
-    budget_id?: string,
-    currency?: string,
-    created_at?: Date,
-  ): Promise<void> {
-    try {
-      const body = {
-        ...this.buildTransactionBody(
-          name, description, amount, typeTransaction, account_id, category_id, budget_id, currency
-        ),
-        created_at: created_at ? created_at.toISOString() : new Date().toISOString()
-      };
+	async create(
+		name: string,
+		description: string,
+		amount: number,
+		typeTransaction: TypeTransaction,
+		account_id: string,
+		category_id: string,
+		budget_id?: string,
+		currency?: string,
+		created_at?: Date,
+	): Promise<void> {
+		try {
+			const body = {
+				...this.buildTransactionBody(
+					name,
+					description,
+					amount,
+					typeTransaction,
+					account_id,
+					category_id,
+					budget_id,
+					currency,
+				),
+				created_at: created_at ? created_at.toISOString() : new Date().toISOString(),
+			}
 
-      console.log("[TransactionRepository] Creating transaction with body:", JSON.stringify(body, null, 2));
-      const data = await this.post("/transaction", body);
-      console.log("[TransactionRepository] Transaction created:", data);
-    } catch (error) {
-      console.error("[TransactionRepository] Error creating transaction:", error);
-      throw error;
-    }
-  }
+			console.log('[TransactionRepository] Creating transaction with body:', JSON.stringify(body, null, 2))
+			const data = await this.post('/transaction', body)
+			console.log('[TransactionRepository] Transaction created:', data)
+		} catch (error) {
+			console.error('[TransactionRepository] Error creating transaction:', error)
+			throw error
+		}
+	}
 
-  async update(
-    id: string,
-    name: string,
-    description: string,
-    amount: number,
-    typeTransaction: TypeTransaction,
-    account_id: string,
-    category_id: string,
-    budget_id?: string,
-    currency?: string,
-    created_at?: Date,
-  ): Promise<void> {
-    try {
-      const body = {
-        ...this.buildTransactionBody(
-          name, description, amount, typeTransaction, account_id, category_id, budget_id, currency
-        ),
-        created_at: created_at ? created_at.toISOString() : undefined
-      };
-      await this.put(`/transaction/${id}`, body);
-    } catch (error) {
-      console.error("Error updating transaction:", error);
-      throw error;
-    }
-  }
+	async update(
+		id: string,
+		name: string,
+		description: string,
+		amount: number,
+		typeTransaction: TypeTransaction,
+		account_id: string,
+		category_id: string,
+		budget_id?: string,
+		currency?: string,
+		created_at?: Date,
+	): Promise<void> {
+		try {
+			const body = {
+				...this.buildTransactionBody(
+					name,
+					description,
+					amount,
+					typeTransaction,
+					account_id,
+					category_id,
+					budget_id,
+					currency,
+				),
+				created_at: created_at ? created_at.toISOString() : undefined,
+			}
+			await this.put(`/transaction/${id}`, body)
+		} catch (error) {
+			console.error('Error updating transaction:', error)
+			throw error
+		}
+	}
 
-  async delete(id: string): Promise<void> {
-    try {
-      await this.deleteRequest(`/transaction/${id}`);
-    } catch (error) {
-      console.error("Error deleting transaction:", error);
-      throw error;
-    }
-  }
+	async delete(id: string): Promise<void> {
+		try {
+			await this.deleteRequest(`/transaction/${id}`)
+		} catch (error) {
+			console.error('Error deleting transaction:', error)
+			throw error
+		}
+	}
 
-  async findById(id: string): Promise<Transaction | null> {
-    try {
-      return await this.get<Transaction>(`/transaction/${id}`);
-    } catch (error) {
-      console.error("Error fetching transaction by id:", error);
-      return null;
-    }
-  }
+	async findById(id: string): Promise<Transaction | null> {
+		try {
+			return await this.get<Transaction>(`/transaction/${id}`)
+		} catch (error) {
+			console.error('Error fetching transaction by id:', error)
+			return null
+		}
+	}
 }

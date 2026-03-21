@@ -1,26 +1,14 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import { CreditCard, CardPayment, formatCurrency } from '@/types/creditcard'
-import { creditCardRepository } from '@/lib/repositoryConfig'
-import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
-import {
-	Table,
-	TableBody,
-	TableCell,
-	TableHead,
-	TableHeader,
-	TableRow,
-} from '@/components/ui/table'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { creditCardRepository } from '@/lib/repositoryConfig'
+import { CardPayment, CreditCard, formatCurrency } from '@/types/creditcard'
 
 interface CreditCardPaymentHistoryProps {
 	open: boolean
@@ -92,29 +80,31 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 
 	return (
 		<Dialog open={open} onOpenChange={onClose}>
-			<DialogContent className="max-w-5xl">
+			<DialogContent className='max-w-5xl'>
 				<DialogHeader>
 					<DialogTitle>
 						Payment History {card ? `- ${card.bank} •••• ${card.last_four_digits || '****'}` : ''}
 					</DialogTitle>
 				</DialogHeader>
 
-				<div className="flex items-center justify-between gap-4">
+				<div className='flex items-center justify-between gap-4'>
 					<Select value={currencyFilter} onValueChange={setCurrencyFilter}>
-						<SelectTrigger className="w-40">
-							<SelectValue placeholder="All currencies" />
+						<SelectTrigger className='w-40'>
+							<SelectValue placeholder='All currencies' />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value="all">All currencies</SelectItem>
+							<SelectItem value='all'>All currencies</SelectItem>
 							{paymentCurrencies.map((currency) => (
-								<SelectItem key={currency} value={currency}>{currency}</SelectItem>
+								<SelectItem key={currency} value={currency}>
+									{currency}
+								</SelectItem>
 							))}
 						</SelectContent>
 					</Select>
 
-					<div className="flex flex-wrap items-center gap-2">
+					<div className='flex flex-wrap items-center gap-2'>
 						{Object.entries(totalsByCurrency).map(([currency, total]) => (
-							<Badge key={currency} variant="secondary">
+							<Badge key={currency} variant='secondary'>
 								{currency}: {formatCurrency(total, currency)}
 							</Badge>
 						))}
@@ -122,13 +112,13 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 				</div>
 
 				{loading ? (
-					<div className="space-y-2">
-						<Skeleton className="h-10 w-full" />
-						<Skeleton className="h-10 w-full" />
-						<Skeleton className="h-10 w-full" />
+					<div className='space-y-2'>
+						<Skeleton className='h-10 w-full' />
+						<Skeleton className='h-10 w-full' />
+						<Skeleton className='h-10 w-full' />
 					</div>
 				) : filteredPayments.length === 0 ? (
-					<div className="py-8 text-center text-muted-foreground">No payments registered yet.</div>
+					<div className='py-8 text-center text-muted-foreground'>No payments registered yet.</div>
 				) : (
 					<Table>
 						<TableHeader>

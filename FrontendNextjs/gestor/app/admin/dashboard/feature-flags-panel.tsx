@@ -1,12 +1,12 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
-import { UserResponse } from '@/types/user'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Switch } from '@/components/ui/switch'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { UserResponse } from '@/types/user'
 
 const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080'
 
@@ -44,7 +44,7 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 
 	const selectedUser = useMemo(
 		() => [...users, ...availableUsers].find((user) => user.id === selectedUserId),
-		[users, availableUsers, selectedUserId]
+		[users, availableUsers, selectedUserId],
 	)
 
 	const usersForSelect = useMemo(() => {
@@ -57,7 +57,7 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		return [selectedUser, ...availableUsers]
 	}, [availableUsers, selectedUser])
 
-	const loadCatalog = async () => {
+	const loadCatalog = useCallback(async () => {
 		setIsLoading(true)
 		try {
 			const response = await fetch(`${BASE_URL}/admin/features`, {
@@ -74,36 +74,39 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		} finally {
 			setIsLoading(false)
 		}
-	}
+	}, [token])
 
-	const loadUserFlags = async (userID: string) => {
-		if (!userID) {
-			setFeatures([])
-			setPending({})
-			return
-		}
-
-		setIsLoading(true)
-		try {
-			const response = await fetch(`${BASE_URL}/admin/users/${userID}/features`, {
-				headers: { Authorization: `Bearer ${token}` },
-			})
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
+	const loadUserFlags = useCallback(
+		async (userID: string) => {
+			if (!userID) {
+				setFeatures([])
+				setPending({})
+				return
 			}
-			const data = await response.json()
-			setFeatures(data?.data || [])
-			setPending({})
-		} catch (error: any) {
-			toast.error(`Error loading feature flags: ${error.message}`)
-		} finally {
-			setIsLoading(false)
-		}
-	}
+
+			setIsLoading(true)
+			try {
+				const response = await fetch(`${BASE_URL}/admin/users/${userID}/features`, {
+					headers: { Authorization: `Bearer ${token}` },
+				})
+				if (!response.ok) {
+					throw new Error(`failed: ${response.status}`)
+				}
+				const data = await response.json()
+				setFeatures(data?.data || [])
+				setPending({})
+			} catch (error: any) {
+				toast.error(`Error loading feature flags: ${error.message}`)
+			} finally {
+				setIsLoading(false)
+			}
+		},
+		[token],
+	)
 
 	useEffect(() => {
 		void loadCatalog()
-	}, [])
+	}, [loadCatalog])
 
 	useEffect(() => {
 		const timeout = setTimeout(async () => {
@@ -138,36 +141,41 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		if (selectedUserId) {
 			void loadUserFlags(selectedUserId)
 		}
-	}, [selectedUserId])
+	}, [selectedUserId, loadUserFlags])
 
 	const handleToggle = (featureKey: string, value: boolean) => {
 		setPending((prev) => ({ ...prev, [featureKey]: value }))
-		setFeatures((prev) => prev.map((feature) => {
-			if (feature.key !== featureKey) {
-				return feature
-			}
-			return {
-				...feature,
-				enabled: feature.has_global_override ? feature.enabled : value,
-				user_override_enabled: value,
-				has_override: true,
-				source: feature.has_global_override ? 'global' : 'user',
-			}
-		}))
+		setFeatures((prev) =>
+			prev.map((feature) => {
+				if (feature.key !== featureKey) {
+					return feature
+				}
+				return {
+					...feature,
+					enabled: feature.has_global_override ? feature.enabled : value,
+					user_override_enabled: value,
+					has_override: true,
+					source: feature.has_global_override ? 'global' : 'user',
+				}
+			}),
+		)
 	}
 
 	const handleGlobalToggle = (featureKey: string, value: boolean) => {
 		setPendingGlobal((prev) => ({ ...prev, [featureKey]: value }))
-		setCatalogFeatures((prev) => prev.map((feature) => feature.key === featureKey
-			? {
-				...feature,
-				enabled: value,
-				has_global_override: true,
-				global_enabled: value,
-				source: 'global',
-			}
-			: feature
-		))
+		setCatalogFeatures((prev) =>
+			prev.map((feature) =>
+				feature.key === featureKey
+					? {
+							...feature,
+							enabled: value,
+							has_global_override: true,
+							global_enabled: value,
+							source: 'global',
+						}
+					: feature,
+			),
+		)
 	}
 
 	const saveChanges = async () => {
@@ -296,7 +304,8 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 								<div className='text-sm font-medium'>{feature.name}</div>
 								<div className='text-xs text-muted-foreground truncate'>{feature.description || feature.key}</div>
 								<div className='text-[11px] text-muted-foreground mt-1'>
-									default: {feature.default_enabled ? 'ON' : 'OFF'} | global override: {feature.has_global_override ? 'YES' : 'NO'}
+									default: {feature.default_enabled ? 'ON' : 'OFF'} | global override:{' '}
+									{feature.has_global_override ? 'YES' : 'NO'}
 								</div>
 							</div>
 							<div className='flex items-center gap-2'>
@@ -304,7 +313,12 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 									checked={feature.has_global_override ? !!feature.global_enabled : feature.default_enabled}
 									onCheckedChange={(value) => handleGlobalToggle(feature.key, value)}
 								/>
-								<Button size='sm' variant='outline' onClick={() => resetGlobalOverride(feature.key)} disabled={!feature.has_global_override}>
+								<Button
+									size='sm'
+									variant='outline'
+									onClick={() => resetGlobalOverride(feature.key)}
+									disabled={!feature.has_global_override}
+								>
 									Reset Global
 								</Button>
 							</div>
@@ -345,7 +359,9 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 											key={user.id}
 											className={`border-b last:border-b-0 ${isSelected ? 'bg-primary/10' : 'hover:bg-muted/40'}`}
 										>
-											<td className='px-3 py-2 font-medium'>{user.name} {user.last_name}</td>
+											<td className='px-3 py-2 font-medium'>
+												{user.name} {user.last_name}
+											</td>
 											<td className='px-3 py-2 text-muted-foreground'>{user.email}</td>
 											<td className='px-3 py-2'>
 												<Button
@@ -369,12 +385,17 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 							</tbody>
 						</table>
 					</div>
-					{isSearchingUsers && <div className='px-3 py-2 text-xs text-muted-foreground border-t'>Buscando usuarios...</div>}
+					{isSearchingUsers && (
+						<div className='px-3 py-2 text-xs text-muted-foreground border-t'>Buscando usuarios...</div>
+					)}
 				</div>
 
 				{selectedUser && (
 					<div className='text-sm text-muted-foreground'>
-						Managing flags for: <span className='font-medium text-foreground'>{selectedUser.name} {selectedUser.last_name}</span>
+						Managing flags for:{' '}
+						<span className='font-medium text-foreground'>
+							{selectedUser.name} {selectedUser.last_name}
+						</span>
 					</div>
 				)}
 
@@ -390,7 +411,8 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 								<div className='text-sm font-medium'>{feature.name}</div>
 								<div className='text-xs text-muted-foreground truncate'>{feature.description || feature.key}</div>
 								<div className='text-[11px] text-muted-foreground mt-1'>
-									default: {feature.default_enabled ? 'ON' : 'OFF'} | user override: {feature.has_override ? 'YES' : 'NO'} | source: {feature.source || 'default'}
+									default: {feature.default_enabled ? 'ON' : 'OFF'} | user override:{' '}
+									{feature.has_override ? 'YES' : 'NO'} | source: {feature.source || 'default'}
 								</div>
 								{feature.blocked_by_global && (
 									<div className='text-[11px] text-amber-600 mt-1'>Overridden by global setting</div>
