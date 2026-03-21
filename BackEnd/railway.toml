@@ -1,2 +1,2 @@
 [build]
-watchPatterns = ["BackEnd/version.go"]
+watchPatterns = ["BackEnd/internal/version/version.go"]

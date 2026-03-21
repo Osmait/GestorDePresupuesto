@@ -34,6 +34,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
+	"github.com/osmait/gestorDePresupuesto/internal/version"
 
 	_ "github.com/osmait/gestorDePresupuesto/docs"
 
@@ -142,7 +143,7 @@ func (s *Server) registerRoutes() {
 	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Health routes (before authentication)
-	routes.HealthRoutes(s.Engine, s.db, "1.0.0", string(s.config.Server.Environment))
+	routes.HealthRoutes(s.Engine, s.db, version.Number, string(s.config.Server.Environment))
 	routes.QuoteRoutes(s.Engine, s.quoteService)
 	routes.ExchangeRoutes(s.Engine, s.exchangeService)
 

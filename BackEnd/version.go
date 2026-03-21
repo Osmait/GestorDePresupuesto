@@ -1,3 +1,7 @@
 package main
 
-const Version = "0.6.0" // x-release-please-version
+import "github.com/osmait/gestorDePresupuesto/internal/version"
+
+// Version exposes the app version from the internal package.
+// release-please updates internal/version/version.go directly.
+var Version = version.Number
