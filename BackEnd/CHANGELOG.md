@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.1](https://github.com/Osmait/GestorDePresupuesto/compare/backend-v0.4.0...backend-v0.4.1) (2026-03-21)
+
+
+### Bug Fixes
+
+* **ci:** use inline annotation for version.go in release-please ([269209c](https://github.com/Osmait/GestorDePresupuesto/commit/269209c8b2d4f172aba0959c809a783ecc7c043c))
+* **ci:** use inline x-release-please-version annotation in version.go ([451c8b5](https://github.com/Osmait/GestorDePresupuesto/commit/451c8b573b864bd0e381d5915b82db0656638c4a))
+
 ## [0.4.0](https://github.com/Osmait/GestorDePresupuesto/compare/backend-v0.3.1...backend-v0.4.0) (2026-03-21)
 
 
