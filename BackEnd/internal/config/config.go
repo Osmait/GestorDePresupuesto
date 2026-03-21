@@ -197,6 +197,13 @@ type AIConfig struct {
 	EnableMetrics  bool          `json:"enable_metrics"`
 }
 
+// MCPConfig holds Model Context Protocol server configuration
+type MCPConfig struct {
+	Enabled       bool   `json:"enabled"`
+	ServerName    string `json:"server_name"`
+	ServerVersion string `json:"server_version"`
+}
+
 // Config holds all application configuration settings
 type Config struct {
 	Server        ServerConfig        `json:"server"`
@@ -212,6 +219,7 @@ type Config struct {
 	Middleware    MiddlewareConfig    `json:"middleware"`
 	Admin         AdminConfig         `json:"admin"`
 	AI            AIConfig            `json:"ai"`
+	MCP           MCPConfig           `json:"mcp"`
 }
 
 // LoadConfig loads configuration from environment variables with comprehensive validation
@@ -384,6 +392,12 @@ func LoadConfig() (*Config, error) {
 			MaxFileSize:    int64(getEnvInt("AI_MAX_FILE_SIZE_MB", 10)) * 1024 * 1024,
 			MaxFiles:       getEnvInt("AI_MAX_FILES", 5),
 			EnableMetrics:  getEnvBool("AI_ENABLE_METRICS", true),
+		},
+
+		MCP: MCPConfig{
+			Enabled:       getEnvBool("MCP_ENABLED", false),
+			ServerName:    getEnvString("MCP_SERVER_NAME", "Gestor de Presupuesto"),
+			ServerVersion: getEnvString("MCP_SERVER_VERSION", "1.0.0"),
 		},
 	}
 

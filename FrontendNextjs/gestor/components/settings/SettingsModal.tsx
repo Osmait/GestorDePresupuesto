@@ -1,10 +1,24 @@
 'use client'
 
-import { Bell, Database, Download, Globe, Layout, Lock, Mail, Palette, Shield, Smartphone, User } from 'lucide-react'
+import {
+	Bell,
+	Database,
+	Download,
+	Globe,
+	Key,
+	Layout,
+	Lock,
+	Mail,
+	Palette,
+	Shield,
+	Smartphone,
+	User,
+} from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useLocale } from 'next-intl'
 import { useState } from 'react'
 import { ModeToggle } from '@/components/common/ToggleMode'
+import { APIKeysSection } from '@/components/settings/APIKeysSection'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -24,7 +38,7 @@ interface SettingsModalProps {
 	onOpenChange: (_open: boolean) => void
 }
 
-type SettingsTab = 'general' | 'security' | 'notifications' | 'data'
+type SettingsTab = 'general' | 'security' | 'notifications' | 'data' | 'apikeys'
 
 const sidebarNavItems = [
 	{
@@ -46,6 +60,11 @@ const sidebarNavItems = [
 		title: 'Datos y Privacidad',
 		id: 'data',
 		icon: Database,
+	},
+	{
+		title: 'API Keys',
+		id: 'apikeys',
+		icon: Key,
 	},
 ]
 
@@ -358,6 +377,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 										</div>
 									</div>
 								)}
+
+								{activeTab === 'apikeys' && <APIKeysSection />}
 							</div>
 						</ScrollArea>
 					</div>

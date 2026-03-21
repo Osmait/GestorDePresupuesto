@@ -9,6 +9,7 @@ var (
 	ErrNotFound     = errors.New("not found")
 	ErrNotDuplicate = errors.New("not duplicate email")
 	ErrBadRequest   = errors.New("bad request")
+	ErrUnauthorized = errors.New("unauthorized")
 )
 
 func IsErrNotDuplicate(err error) bool {

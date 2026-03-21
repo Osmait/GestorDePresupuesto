@@ -19,10 +19,12 @@ import (
 	domainAI "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
 	userDomain "github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
 	analyticsRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/analytics"
+	apikeyRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/apikey"
 	authRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/auth"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
@@ -41,6 +43,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/ai/providers/gemini"
 	"github.com/osmait/gestorDePresupuesto/internal/services/ai/tasks"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
+	"github.com/osmait/gestorDePresupuesto/internal/services/apikey"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
@@ -117,6 +120,18 @@ func Run() error {
 	demoCleanupWorker := worker.NewDemoCleanupWorker(services.userService, 24*time.Hour)
 	demoCleanupWorker.Start(ctx)
 
+	// Conditionally create the MCP server if enabled in config
+	var mcpServer *mcp.MCPServer
+	if cfg.MCP.Enabled {
+		mcpServer = mcp.NewMCPServer(cfg.MCP.ServerName, cfg.MCP.ServerVersion, &mcp.Services{
+			Account:     services.accountService,
+			Transaction: services.transactionService,
+			Category:    services.categoryService,
+			Budget:      services.budgetService,
+			Analytics:   services.analyticsService,
+		}, db)
+	}
+
 	serverCtx, srv := server.New(
 		ctx,
 		cfg.Server.Host,
@@ -144,6 +159,8 @@ func Run() error {
 		services.creditCardService,
 		services.loanService,
 		services.exchangeService,
+		services.apiKeyService,
+		mcpServer,
 	)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
@@ -246,6 +263,7 @@ type repositories struct {
 	certificateRepository  certificateRepo.CertificateRepositoryInterface
 	creditCardRepository   creditcardRepo.CreditCardRepositoryInterface
 	loanRepository         loanRepo.LoanRepositoryInterface
+	apiKeyRepository       apikeyRepo.APIKeyRepositoryInterface
 }
 
 // initializeRepositories creates all repository instances
@@ -264,6 +282,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		certificateRepository:  certificateRepo.NewCertificateRepository(db),
 		creditCardRepository:   creditcardRepo.NewCreditCardRepository(db),
 		loanRepository:         loanRepo.NewLoanRepository(db),
+		apiKeyRepository:       apikeyRepo.NewAPIKeyRepository(db),
 	}
 }
 
@@ -287,6 +306,7 @@ type services struct {
 	creditCardService   *creditcard.CreditCardService
 	loanService         *loan.LoanService
 	exchangeService     *exchange.ExchangeRateService
+	apiKeyService       *apikey.APIKeyService
 }
 
 // initializeServices creates all service instances
@@ -344,6 +364,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		creditCardService:   creditCardService,
 		loanService:         loanService,
 		exchangeService:     exchangeService,
+		apiKeyService:       apikey.NewAPIKeyService(repos.apiKeyRepository),
 	}
 }
 

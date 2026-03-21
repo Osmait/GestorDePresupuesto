@@ -5,6 +5,7 @@ const USE_MOCKS = false // Cambiado a false para usar el backend real
 
 import { AccountRepository } from '@/app/repository/accountRepository'
 import { AnalyticsRepository } from '@/app/repository/analyticsRepository'
+import { APIKeyRepository } from '@/app/repository/apiKeyRepository'
 import { AuthRepository } from '@/app/repository/authRepository'
 import { BudgetRepository } from '@/app/repository/budgetRepository'
 import { CategoryRepository } from '@/app/repository/categoryRepository'
@@ -29,6 +30,7 @@ let certificateRepositoryInstance: CertificateRepository | null = null
 let exchangeRateRepositoryInstance: ExchangeRateRepository | null = null
 let creditCardRepositoryInstance: CreditCardRepository | null = null
 let loanRepositoryInstance: LoanRepository | null = null
+let apiKeyRepositoryInstance: APIKeyRepository | null = null
 
 // Funciones para obtener repositorios (con singleton pattern)
 export const getAccountRepository = async () => {
@@ -115,6 +117,13 @@ export const getLoanRepository = async () => {
 	return loanRepositoryInstance
 }
 
+export const getAPIKeyRepository = async () => {
+	if (!apiKeyRepositoryInstance) {
+		apiKeyRepositoryInstance = new APIKeyRepository()
+	}
+	return apiKeyRepositoryInstance
+}
+
 // Exportar instancias directas para compatibilidad
 export const accountRepository = new AccountRepository()
 export const authRepository = new AuthRepository()
@@ -128,6 +137,7 @@ export const certificateRepository = new CertificateRepository()
 export const exchangeRateRepository = new ExchangeRateRepository()
 export const creditCardRepository = new CreditCardRepository()
 export const loanRepository = new LoanRepository()
+export const apiKeyRepository = new APIKeyRepository()
 
 // Función para verificar si estamos en modo mock
 export const isMockMode = (): boolean => USE_MOCKS
@@ -151,3 +161,4 @@ export type ICertificateRepository = CertificateRepository
 export type IExchangeRateRepository = ExchangeRateRepository
 export type ICreditCardRepository = CreditCardRepository
 export type ILoanRepository = LoanRepository
+export type IAPIKeyRepository = APIKeyRepository
