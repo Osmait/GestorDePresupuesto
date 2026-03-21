@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertCircle, CheckCircle, Loader2, Sparkles } from 'lucide-react'
+import { AlertCircle, AlertTriangle, CheckCircle, Loader2, Sparkles } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 import { toast } from 'sonner'
@@ -430,13 +430,34 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 								onCreateCategory={handleCreateCategoryRequest}
 							/>
 
-							<div className='flex justify-between'>
+							<div className='flex justify-between items-center'>
 								<Button variant='outline' onClick={handleBack}>
 									{tCommon('back')}
 								</Button>
-								<Button onClick={handleSaveTransactions} disabled={selectedIndices.size === 0}>
-									{t('saveTransactions', { count: selectedIndices.size })}
-								</Button>
+								<div className='flex items-center gap-3'>
+									{selectedIndices.size > 0 &&
+										extractedTransactions.filter(
+											(_, i) => selectedIndices.has(i) && !extractedTransactions[i].category_id,
+										).length > 0 && (
+											<span className='text-sm text-yellow-600 dark:text-yellow-400 flex items-center gap-1'>
+												<AlertTriangle className='h-4 w-4' />
+												{t('needCategory', {
+													count: extractedTransactions.filter(
+														(_, i) => selectedIndices.has(i) && !extractedTransactions[i].category_id,
+													).length,
+												})}
+											</span>
+										)}
+									<Button
+										onClick={handleSaveTransactions}
+										disabled={
+											selectedIndices.size === 0 ||
+											extractedTransactions.some((txn, i) => selectedIndices.has(i) && !txn.category_id)
+										}
+									>
+										{t('saveTransactions', { count: selectedIndices.size })}
+									</Button>
+								</div>
 							</div>
 						</div>
 					)}
