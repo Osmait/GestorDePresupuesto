@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/Osmait/GestorDePresupuesto/compare/frontend-v0.3.0...frontend-v0.4.0) (2026-03-21)
+
+
+### Features
+
+* migrate frontend linter to Biome and configure commitlint + Husky ([9dedd93](https://github.com/Osmait/GestorDePresupuesto/commit/9dedd93814f2b11f53d2d7b5b615bbc89972d3b1))
+* migrate frontend to Biome + add commitlint and Husky ([8d1fb3c](https://github.com/Osmait/GestorDePresupuesto/commit/8d1fb3c51c25a02d0da61bba27f7364ae2f66b83))
+
 ## [0.3.0](https://github.com/Osmait/GestorDePresupuesto/compare/frontend-v0.2.0...frontend-v0.3.0) (2026-03-21)
 
 
