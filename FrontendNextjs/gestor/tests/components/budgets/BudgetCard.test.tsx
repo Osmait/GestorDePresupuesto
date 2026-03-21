@@ -23,6 +23,12 @@ vi.mock('next-intl', () => ({
             'edit': 'Edit',
             'delete': 'Delete',
             'critical': 'Critical',
+            'active': 'Active',
+            'exceeded': 'Exceeded',
+            'deleteTitle': 'Delete Budget',
+            'deleteDescription': 'Are you sure?',
+            'deleting': 'Deleting...',
+            'cancel': 'Cancel',
         }
         return translations[key] || key
     },
@@ -32,7 +38,7 @@ describe('BudgetCard', () => {
     const mockBudget = {
         id: 'b1',
         amount: 1000,
-        current_amount: -800, // Spent 800
+        current_amount: 800, // Spent 800 (positive = spent in the component)
         category_id: 'c1',
         user_id: 'u1',
         created_at: '',
@@ -63,15 +69,13 @@ describe('BudgetCard', () => {
         )
 
         expect(screen.getByText('Budget For Groceries')).toBeInTheDocument()
-        // Format checks - assuming default formatter or flexible matcher
-        // $1,000 budget
-        expect(screen.getByText((content) => content.includes('1,000'))).toBeInTheDocument()
-        // $800 spent
-        expect(screen.getByText((content) => content.includes('800'))).toBeInTheDocument()
+        // $1,000 budget and $800 spent - use getAllByText since formatCurrency may match multiple elements
+        expect(screen.getAllByText((content) => content.includes('1,000')).length).toBeGreaterThan(0)
+        expect(screen.getAllByText((content) => content.includes('800')).length).toBeGreaterThan(0)
     })
 
     it('shows critical badge when progress is high', () => {
-        const criticalBudget = { ...mockBudget, current_amount: -900 } // 90%
+        const criticalBudget = { ...mockBudget, current_amount: 900 } // 90%
         render(
             <BudgetCard
                 budget={criticalBudget}
@@ -81,6 +85,7 @@ describe('BudgetCard', () => {
                 onEdit={vi.fn()}
             />
         )
+        // The badge has 'hidden sm:flex' so it may not be visible, check it exists in DOM
         expect(screen.getByText('Critical')).toBeInTheDocument()
     })
 
@@ -98,8 +103,8 @@ describe('BudgetCard', () => {
             />
         )
 
-        // Open menu
-        const trigger = screen.getByRole('button', { name: '' }) // more icon
+        // Open menu - button has aria-label="Edit"
+        const trigger = screen.getByRole('button', { name: 'Edit' })
         await user.click(trigger)
 
         // Click edit

@@ -39,7 +39,7 @@ func TestLoadConfig(t *testing.T) {
 
 	t.Run("default configuration", func(t *testing.T) {
 		_ = os.Setenv("ENV", "development")
-		defer os.Unsetenv("ENV")
+		defer func() { _ = os.Unsetenv("ENV") }()
 
 		config, err := LoadConfig()
 		require.NoError(t, err)

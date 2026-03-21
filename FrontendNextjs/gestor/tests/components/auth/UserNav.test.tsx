@@ -21,7 +21,17 @@ vi.mock('next-auth/react', () => ({
 
 // Mock next-intl
 vi.mock('next-intl', () => ({
-    useLocale: () => 'en'
+    useLocale: () => 'en',
+    useTranslations: () => (key: string) => {
+        const translations: Record<string, string> = {
+            'theme': 'Theme',
+            'language': 'Language',
+            'profile': 'Profile',
+            'configuration': 'Settings',
+            'logout': 'Logout',
+        }
+        return translations[key] || key
+    },
 }))
 
 // Mock ModeToggle

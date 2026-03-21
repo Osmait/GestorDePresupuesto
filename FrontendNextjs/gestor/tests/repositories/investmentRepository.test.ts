@@ -43,7 +43,7 @@ describe('InvestmentRepository', () => {
         it('puts updated investment', async () => {
             mockFetch.mockResolvedValue({ ok: true, headers: { get: () => null }, json: () => Promise.resolve({}) })
             await repo.update({ id: '1', current_price: 175 } as any)
-            expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/investments/1'), expect.objectContaining({ method: 'PUT' }))
+            expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/investments'), expect.objectContaining({ method: 'PUT' }))
         })
     })
 

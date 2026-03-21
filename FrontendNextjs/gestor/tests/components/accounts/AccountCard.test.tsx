@@ -66,7 +66,7 @@ describe('AccountCard', () => {
         render(<AccountCard account={mockAccount} onAccountEdit={onEdit} />)
 
         // Open dropdown
-        const trigger = screen.getByRole('button', { name: '' })
+        const trigger = screen.getByRole('button', { name: 'Editar' })
         await user.click(trigger)
 
         // Click edit - use findByText to wait for it to appear
