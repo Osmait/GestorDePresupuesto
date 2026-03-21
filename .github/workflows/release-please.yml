@@ -17,10 +17,12 @@ jobs:
     steps:
       - uses: googleapis/release-please-action@v4.4.0
         id: release
+        continue-on-error: true
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           config-file: release-please-config.json
           manifest-file: .release-please-manifest.json
+          skip-labeling: true
 
       # Auto-merge the release PR when CI passes
       - name: Enable auto-merge on release PR
