@@ -13,14 +13,16 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Formats a number as a USD currency string.
- * 
+ * Formats a number as a currency string.
+ *
  * @param value - The numerical value to format.
- * @returns The formatted currency string (e.g., "$1,234.56").
+ * @param currency - The ISO 4217 currency code (default: "USD").
+ * @returns The formatted currency string (e.g., "$1,234.56" or "RD$1,234.56").
  */
-export function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", {
+export function formatCurrency(value: number, currency: string = 'USD'): string {
+  const locale = currency === 'DOP' ? 'es-DO' : 'en-US'
+  return new Intl.NumberFormat(locale, {
     style: "currency",
-    currency: "USD",
+    currency,
   }).format(value)
 }

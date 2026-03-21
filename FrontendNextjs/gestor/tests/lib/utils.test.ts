@@ -29,7 +29,7 @@ describe('lib/utils', () => {
     })
 
     describe('formatCurrency', () => {
-        it('formats positive numbers', () => {
+        it('formats positive numbers in USD by default', () => {
             expect(formatCurrency(1234.56)).toBe('$1,234.56')
         })
 
@@ -48,6 +48,17 @@ describe('lib/utils', () => {
         it('rounds to 2 decimal places', () => {
             expect(formatCurrency(10.999)).toBe('$11.00')
             expect(formatCurrency(10.001)).toBe('$10.00')
+        })
+
+        it('formats DOP currency with es-DO locale', () => {
+            const result = formatCurrency(1234.56, 'DOP')
+            expect(result).toContain('1')
+            expect(result).toContain('234')
+            expect(result).toContain('56')
+        })
+
+        it('formats explicit USD currency', () => {
+            expect(formatCurrency(1234.56, 'USD')).toBe('$1,234.56')
         })
     })
 })

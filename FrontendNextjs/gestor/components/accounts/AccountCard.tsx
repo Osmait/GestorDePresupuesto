@@ -120,20 +120,20 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
                 <ArrowDownRight className="h-4 w-4 text-red-600 dark:text-red-400" />
               )}
               <span className={`font-bold text-2xl ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-                {formatCurrency(currentBalance)}
+                {formatCurrency(currentBalance, account.currency || 'USD')}
               </span>
             </div>
           </div>
           {initialBalance !== currentBalance && (
             <div className="flex justify-between items-center text-xs">
-              <span className="text-muted-foreground">{t('initial')}: {formatCurrency(initialBalance)}</span>
+              <span className="text-muted-foreground">{t('initial')}: {formatCurrency(initialBalance, account.currency || 'USD')}</span>
               <span className={`font-medium ${hasGrowth ? 'text-green-600' : 'text-red-600'}`}>
-                {hasGrowth ? '+' : ''}{formatCurrency(currentBalance - initialBalance).replace('$', '')}
+                {hasGrowth ? '+' : ''}{formatCurrency(currentBalance - initialBalance, account.currency || 'USD').replace(/^[^\d-]+/, '')}
               </span>
             </div>
           )}
           <div className="flex justify-between items-center pt-2 border-t border-border/50">
-            <span className="text-xs text-muted-foreground">USD</span>
+            <span className="text-xs text-muted-foreground">{account.currency || 'USD'}</span>
             <Badge variant="outline" className="bg-muted/30 dark:bg-muted/20">
               {currentBalance > 10000 ? t('high') : currentBalance > 5000 ? t('medium') : t('low')}
             </Badge>

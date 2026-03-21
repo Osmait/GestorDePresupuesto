@@ -26,7 +26,7 @@ describe('BudgetSummaryCard', () => {
         {
             id: '1',
             amount: 1000,
-            current_amount: -500, // spent 500
+            current_amount: 500, // spent 500
             category_id: 'c1',
             user_id: 'u1',
             created_at: '',
@@ -35,7 +35,7 @@ describe('BudgetSummaryCard', () => {
         {
             id: '2',
             amount: 2000,
-            current_amount: -2100, // spent 2100 (over budget)
+            current_amount: 2100, // spent 2100 (over budget)
             category_id: 'c2',
             user_id: 'u1',
             created_at: '',
@@ -58,7 +58,7 @@ describe('BudgetSummaryCard', () => {
         expect(screen.getByText('Total Remaining')).toBeInTheDocument()
         expect(screen.getByText('$400')).toBeInTheDocument()
 
-        // Exceeded: 1
+        // Exceeded: 1 (budget 2 has current_amount > amount)
         expect(screen.getByText('Exceeded Budgets')).toBeInTheDocument()
         expect(screen.getByText('1')).toBeInTheDocument()
     })
