@@ -4,11 +4,13 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
 	"github.com/osmait/gestorDePresupuesto/internal/services/apikey"
 )
 
 // APIKeyAuthMiddleware validates Bearer API keys for MCP endpoints.
-// On success it writes the resolved user ID into the Gin context under "X-User-Id".
+// On success it writes the resolved user ID into both the Gin context
+// and the request context so mcp-go tool handlers can access it.
 func APIKeyAuthMiddleware(apiKeySvc *apikey.APIKeyService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		authHeader := c.GetHeader("Authorization")
@@ -25,6 +27,10 @@ func APIKeyAuthMiddleware(apiKeySvc *apikey.APIKeyService) gin.HandlerFunc {
 		}
 
 		c.Set("X-User-Id", key.UserID)
+		// Inject userID into the request context so mcp-go tool handlers
+		// can retrieve it via mcpcontext.UserIDFromContext(ctx).
+		ctx := mcpcontext.WithUserID(c.Request.Context(), key.UserID)
+		c.Request = c.Request.WithContext(ctx)
 		c.Next()
 	}
 }
