@@ -2,7 +2,7 @@
 
 import { CreditCard as CardIcon, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { toast } from 'sonner'
 import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModal'
 import { CreditCardItem } from '@/components/creditcards/CreditCardItem'
@@ -19,79 +19,55 @@ import {
 	DialogTitle,
 } from '@/components/ui/dialog'
 import { Skeleton } from '@/components/ui/skeleton'
+import {
+	useCreateCreditCardMutation,
+	useCreatePaymentMutation,
+	useDeleteCreditCardMutation,
+	useGetCreditCardSummary,
+	useGetCreditCards,
+	useUpdateCreditCardMutation,
+} from '@/hooks/queries/useCreditCardsQuery'
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
-import { creditCardRepository } from '@/lib/repositoryConfig'
-import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard, CreditCardSummary } from '@/types/creditcard'
+import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard } from '@/types/creditcard'
 
 export default function CreditCardsPage() {
-	const [cards, setCards] = useState<CreditCard[]>([])
-	const [summary, setSummary] = useState<CreditCardSummary | null>(null)
-	const [loading, setLoading] = useState(true)
 	const [formOpen, setFormOpen] = useState(false)
 	const [paymentOpen, setPaymentOpen] = useState(false)
 	const [historyOpen, setHistoryOpen] = useState(false)
 	const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null)
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 	const router = useRouter()
+
 	const { data: exchangeRateData } = useExchangeRateQuery()
 	const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
 	const isCreditCardsModuleEnabled = isEnabled('module_credit_cards')
 
-	const loadCards = useCallback(async () => {
-		try {
-			setLoading(true)
-			const [data, summaryData] = await Promise.all([creditCardRepository.findAll(), creditCardRepository.getSummary()])
-			setCards(data || [])
-			setSummary(summaryData || null)
-		} catch (error) {
-			console.error('Error loading cards:', error)
-			toast.error('Failed to load credit cards')
-			setCards([])
-			setSummary(null)
-		} finally {
-			setLoading(false)
-		}
-	}, [])
+	const { data: cards = [], isLoading } = useGetCreditCards()
+	const { data: summary } = useGetCreditCardSummary()
 
-	useEffect(() => {
-		if (isFeatureFlagsLoading || !isCreditCardsModuleEnabled) {
-			return
-		}
-		loadCards()
-	}, [isFeatureFlagsLoading, isCreditCardsModuleEnabled, loadCards])
+	const createMutation = useCreateCreditCardMutation()
+	const updateMutation = useUpdateCreditCardMutation()
+	const deleteMutation = useDeleteCreditCardMutation()
+	const paymentMutation = useCreatePaymentMutation()
 
 	const handleCreateCard = async (data: CreateCreditCardDTO) => {
-		try {
-			await creditCardRepository.create(data)
-			await loadCards()
-			toast.success('Credit card created successfully')
-		} catch (error) {
-			console.error('Error creating card:', error)
-			throw error
-		}
+		await createMutation.mutateAsync(data)
+		toast.success('Credit card created successfully')
 	}
 
 	const handleUpdateCard = async (data: CreateCreditCardDTO) => {
 		if (!selectedCard) return
-		try {
-			await creditCardRepository.update(selectedCard.id, data)
-			await loadCards()
-			toast.success('Credit card updated successfully')
-		} catch (error) {
-			console.error('Error updating card:', error)
-			throw error
-		}
+		await updateMutation.mutateAsync({ id: selectedCard.id, data })
+		toast.success('Credit card updated successfully')
 	}
 
 	const handleDeleteCard = async () => {
 		if (!selectedCard) return
 		try {
-			await creditCardRepository.delete(selectedCard.id)
-			await loadCards()
+			await deleteMutation.mutateAsync(selectedCard.id)
 			toast.success('Credit card deleted successfully')
-		} catch (error) {
-			console.error('Error deleting card:', error)
+		} catch {
 			toast.error('Failed to delete credit card')
 		} finally {
 			setDeleteDialogOpen(false)
@@ -101,14 +77,8 @@ export default function CreditCardsPage() {
 
 	const handlePayment = async (data: CreatePaymentDTO) => {
 		if (!selectedCard) return
-		try {
-			await creditCardRepository.createPayment(selectedCard.id, data)
-			await loadCards()
-			toast.success('Payment processed successfully')
-		} catch (error) {
-			console.error('Error processing payment:', error)
-			throw error
-		}
+		await paymentMutation.mutateAsync({ cardId: selectedCard.id, data })
+		toast.success('Payment processed successfully')
 	}
 
 	const handleEdit = (card: CreditCard) => {
@@ -216,7 +186,7 @@ export default function CreditCardsPage() {
 		)
 	}
 
-	if (loading) {
+	if (isLoading) {
 		return (
 			<div className='container mx-auto p-6 space-y-6'>
 				<Skeleton className='h-8 w-48' />
@@ -334,8 +304,8 @@ export default function CreditCardsPage() {
 						<Button variant='outline' onClick={() => setDeleteDialogOpen(false)}>
 							Cancel
 						</Button>
-						<Button variant='destructive' onClick={handleDeleteCard}>
-							Delete
+						<Button variant='destructive' onClick={handleDeleteCard} disabled={deleteMutation.isPending}>
+							{deleteMutation.isPending ? 'Deleting...' : 'Delete'}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
