@@ -58,6 +58,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
+	"github.com/plexusone/mcpkit/oauth2"
 )
 
 func Run() error {
@@ -122,6 +123,7 @@ func Run() error {
 
 	// Conditionally create the MCP server if enabled in config
 	var mcpServer *mcp.MCPServer
+	var oauthSrv *oauth2.Server
 	if cfg.MCP.Enabled {
 		mcpServer = mcp.NewMCPServer(cfg.MCP.ServerName, cfg.MCP.ServerVersion, &mcp.Services{
 			Account:     services.accountService,
@@ -130,6 +132,12 @@ func Run() error {
 			Budget:      services.budgetService,
 			Analytics:   services.analyticsService,
 		}, db)
+
+		issuer := fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)
+		oauthSrv, err = mcp.NewOAuthServer(issuer, services.authService)
+		if err != nil {
+			return fmt.Errorf("failed to create OAuth server: %w", err)
+		}
 	}
 
 	serverCtx, srv := server.New(
@@ -161,6 +169,7 @@ func Run() error {
 		services.exchangeService,
 		services.apiKeyService,
 		mcpServer,
+		oauthSrv,
 	)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
