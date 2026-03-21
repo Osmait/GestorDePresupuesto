@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
 )
 
 // Querier is the common interface satisfied by both *sql.DB and *sql.Tx.
@@ -31,6 +32,10 @@ func FromContext(ctx context.Context, db *sql.DB) Querier {
 				return tx
 			}
 		}
+	}
+	// Check for a transaction injected by an MCP tool handler via mcpcontext
+	if tx := mcpcontext.TxFromContext(ctx); tx != nil {
+		return tx
 	}
 	return db
 }

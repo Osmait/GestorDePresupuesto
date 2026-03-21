@@ -11,7 +11,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	mcpServer "github.com/mark3labs/mcp-go/server"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	mcpPkg "github.com/osmait/gestorDePresupuesto/internal/platform/mcp"
 	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
@@ -20,6 +22,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
 	aiService "github.com/osmait/gestorDePresupuesto/internal/services/ai"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
+	"github.com/osmait/gestorDePresupuesto/internal/services/apikey"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
@@ -66,6 +69,8 @@ type Server struct {
 	creditCardService   *creditcard.CreditCardService
 	loanService         *loan.LoanService
 	exchangeService     *exchange.ExchangeRateService
+	apiKeyService       *apikey.APIKeyService
+	mcpServer           *mcpPkg.MCPServer
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -97,6 +102,8 @@ func New(ctx context.Context,
 	creditCardSvc *creditcard.CreditCardService,
 	loanSvc *loan.LoanService,
 	exchangeSvc *exchange.ExchangeRateService,
+	apiKeySvc *apikey.APIKeyService,
+	mcpSrv *mcpPkg.MCPServer,
 ) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
@@ -121,6 +128,8 @@ func New(ctx context.Context,
 		creditCardService:   creditCardSvc,
 		loanService:         loanSvc,
 		exchangeService:     exchangeSvc,
+		apiKeyService:       apiKeySvc,
+		mcpServer:           mcpSrv,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -146,6 +155,16 @@ func (s *Server) registerRoutes() {
 	routes.HealthRoutes(s.Engine, s.db, version.Number, string(s.config.Server.Environment))
 	routes.QuoteRoutes(s.Engine, s.quoteService)
 	routes.ExchangeRoutes(s.Engine, s.exchangeService)
+
+	// MCP endpoints — authenticated via API key, not JWT; must be registered
+	// BEFORE the JWT AuthMiddleware so they are not blocked by it.
+	if s.mcpServer != nil {
+		mcpGroup := s.Engine.Group("/mcp")
+		mcpGroup.Use(mcpPkg.APIKeyAuthMiddleware(s.apiKeyService))
+		sseHandler := mcpServer.NewSSEServer(s.mcpServer.GetServer())
+		mcpGroup.GET("/sse", gin.WrapH(sseHandler))
+		mcpGroup.POST("/message", gin.WrapH(sseHandler))
+	}
 
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
@@ -187,6 +206,7 @@ func (s *Server) registerRoutes() {
 	routes.CreditCardRoutes(s.Engine, s.creditCardService, s.db)
 	routes.LoanRoutes(s.Engine, s.loanService, s.db)
 	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache)
+	routes.APIKeyRoutes(s.Engine, s.apiKeyService)
 }
 
 func (s *Server) Run(ctx context.Context) error {
