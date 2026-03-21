@@ -12,7 +12,6 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
-	"github.com/osmait/gestorDePresupuesto/internal/version"
 	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
@@ -35,6 +34,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
+	"github.com/osmait/gestorDePresupuesto/internal/version"
 
 	_ "github.com/osmait/gestorDePresupuesto/docs"
 
