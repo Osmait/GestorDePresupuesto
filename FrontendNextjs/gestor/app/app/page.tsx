@@ -171,7 +171,7 @@ function AccountCard({ account, t }: { account: Account, t: any }) {
 				</div>
 				<div className="space-y-2">
 					<p className={`text-2xl font-bold ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-						${currentBalance.toLocaleString()}
+						{new Intl.NumberFormat(account.currency === 'DOP' ? 'es-DO' : 'en-US', { style: 'currency', currency: account.currency || 'USD' }).format(currentBalance)}
 					</p>
 					<div className="flex gap-2">
 						<Badge variant="outline" className="text-xs">
@@ -179,7 +179,7 @@ function AccountCard({ account, t }: { account: Account, t: any }) {
 						</Badge>
 						{account.current_balance !== account.initial_balance && (
 							<Badge variant="secondary" className="text-xs">
-								{t('initial')}: ${account.initial_balance.toLocaleString()}
+								{t('initial')}: {new Intl.NumberFormat(account.currency === 'DOP' ? 'es-DO' : 'en-US', { style: 'currency', currency: account.currency || 'USD' }).format(account.initial_balance)}
 							</Badge>
 						)}
 					</div>
@@ -464,7 +464,7 @@ export default async function DashboardPage() {
 																			<div>
 																				<p className="font-medium text-foreground">{category?.name || 'Sin categoría'}</p>
 																				<p className="text-xs text-muted-foreground">
-																					${spentAmount.toLocaleString()} / ${budget.amount.toLocaleString()}
+																					{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP', maximumFractionDigits: 0 }).format(spentAmount)} / {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP', maximumFractionDigits: 0 }).format(budget.amount)}
 																				</p>
 																			</div>
 																		</div>
