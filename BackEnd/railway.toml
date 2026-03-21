@@ -1,0 +1,2 @@
+[build]
+watchPatterns = ["BackEnd/version.go"]
