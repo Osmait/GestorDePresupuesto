@@ -3,66 +3,60 @@
 import { useMutation } from '@tanstack/react-query'
 import { aiRepository } from '@/app/repository/aiRepository'
 import {
-  AIExtractRequest,
-  AIExtractResponse,
-  AIError,
-  AIReconciliationPreviewRequest,
-  AIReconciliationPreviewResponse,
-  AIReconciliationApplyRequest,
-  AIReconciliationApplyResponse,
-  AICreateSavingsGoalRequest,
-  AISavingsGoalListResponse,
-  AISavingsGoalProgressResponse,
-  AISavingsGoalResponse,
-  AIUpdateSavingsGoalRequest,
-  AISavingsPlanRequest,
-  AISavingsPlanResponse,
-  AISuggestCategoryRequest,
-  AISuggestCategoryResponse,
-  DocumentType,
-  SpendingAnalysisRequest,
-  SpendingAnalysisResponse,
+	AICreateSavingsGoalRequest,
+	AIError,
+	AIExtractRequest,
+	AIExtractResponse,
+	AIReconciliationApplyRequest,
+	AIReconciliationApplyResponse,
+	AIReconciliationPreviewRequest,
+	AIReconciliationPreviewResponse,
+	AISavingsGoalListResponse,
+	AISavingsGoalProgressResponse,
+	AISavingsGoalResponse,
+	AISavingsPlanRequest,
+	AISavingsPlanResponse,
+	AISuggestCategoryRequest,
+	AISuggestCategoryResponse,
+	AIUpdateSavingsGoalRequest,
+	DocumentType,
+	SpendingAnalysisRequest,
+	SpendingAnalysisResponse,
 } from '@/types/ai'
 
-
 export function useExtractTransactionsMutation() {
-  return useMutation<AIExtractResponse | AIError, Error, AIExtractRequest>({
-    mutationFn: (request: AIExtractRequest) => aiRepository.extractTransactions(request),
-  })
+	return useMutation<AIExtractResponse | AIError, Error, AIExtractRequest>({
+		mutationFn: (request: AIExtractRequest) => aiRepository.extractTransactions(request),
+	})
 }
 
 export function useExtractFromFile() {
-  const extractMutation = useExtractTransactionsMutation()
+	const extractMutation = useExtractTransactionsMutation()
 
-  const extract = async (
-    files: File[],
-    accountId: string,
-    documentType: DocumentType,
-    accountCurrency?: string
-  ) => {
-    const preparedFiles = await aiRepository.prepareFiles(files)
-    
-    return extractMutation.mutateAsync({
-      account_id: accountId,
-      account_currency: accountCurrency,
-      document_type: documentType,
-      files: preparedFiles,
-    })
-  }
+	const extract = async (files: File[], accountId: string, documentType: DocumentType, accountCurrency?: string) => {
+		const preparedFiles = await aiRepository.prepareFiles(files)
 
-  return {
-    extract,
-    isExtracting: extractMutation.isPending,
-    extractError: extractMutation.error,
-    extractData: extractMutation.data,
-    reset: extractMutation.reset,
-  }
+		return extractMutation.mutateAsync({
+			account_id: accountId,
+			account_currency: accountCurrency,
+			document_type: documentType,
+			files: preparedFiles,
+		})
+	}
+
+	return {
+		extract,
+		isExtracting: extractMutation.isPending,
+		extractError: extractMutation.error,
+		extractData: extractMutation.data,
+		reset: extractMutation.reset,
+	}
 }
 
 export function useAnalyzeSpendingMutation() {
-  return useMutation<SpendingAnalysisResponse | AIError, Error, SpendingAnalysisRequest>({
-    mutationFn: (request: SpendingAnalysisRequest) => aiRepository.analyzeSpending(request),
-  })
+	return useMutation<SpendingAnalysisResponse | AIError, Error, SpendingAnalysisRequest>({
+		mutationFn: (request: SpendingAnalysisRequest) => aiRepository.analyzeSpending(request),
+	})
 }
 
 export function useSuggestCategoryMutation() {
@@ -78,7 +72,11 @@ export function useReconciliationPreviewMutation() {
 }
 
 export function useReconciliationApplyMutation() {
-	return useMutation<AIReconciliationApplyResponse | AIError, Error, { sessionId: string; request: AIReconciliationApplyRequest }>({
+	return useMutation<
+		AIReconciliationApplyResponse | AIError,
+		Error,
+		{ sessionId: string; request: AIReconciliationApplyRequest }
+	>({
 		mutationFn: ({ sessionId, request }) => aiRepository.reconciliationApply(sessionId, request),
 	})
 }

@@ -1,7 +1,7 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
 import { useTheme } from 'next-themes'
+import { createContext, ReactNode, useContext, useEffect, useState } from 'react'
 
 interface SettingsContextType {
 	sidebarHoverEnabled: boolean
@@ -28,8 +28,8 @@ const defaultSettings = {
 	notifications: {
 		email: true,
 		push: false,
-		sms: true
-	}
+		sms: true,
+	},
 }
 
 const SettingsContext = createContext<SettingsContextType | null>(null)
@@ -50,10 +50,10 @@ interface SettingsProviderProps {
 export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 	// Initialize with default values
 	const [sidebarHoverEnabled, setSidebarHoverEnabled] = useState(defaultSettings.sidebarHoverEnabled)
-	
+
 	// Use next-themes for theme management
 	const { theme: nextTheme, setTheme: setNextTheme } = useTheme()
-	
+
 	// Adapt next-themes to our context type
 	// If nextTheme is undefined (during SSR or initial mount), fallback to default
 	const theme = (nextTheme as 'light' | 'dark' | 'system') || defaultSettings.theme
@@ -71,7 +71,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 			const savedSettings = localStorage.getItem('app-settings')
 			if (savedSettings) {
 				const parsed = JSON.parse(savedSettings)
-				
+
 				setSidebarHoverEnabled(parsed.sidebarHoverEnabled ?? defaultSettings.sidebarHoverEnabled)
 				// We don't set theme here because next-themes handles it independently
 				// and is the source of truth based on its own storage/detection
@@ -94,7 +94,7 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 				theme, // Save current theme to app-settings for consistency/backup
 				language,
 				currency,
-				notifications
+				notifications,
 			}
 			localStorage.setItem('app-settings', JSON.stringify(settings))
 		} catch (error) {
@@ -112,12 +112,8 @@ export const SettingsProvider = ({ children }: SettingsProviderProps) => {
 		currency,
 		setCurrency,
 		notifications,
-		setNotifications
+		setNotifications,
 	}
 
-	return (
-		<SettingsContext.Provider value={value}>
-			{children}
-		</SettingsContext.Provider>
-	)
-} 
+	return <SettingsContext.Provider value={value}>{children}</SettingsContext.Provider>
+}

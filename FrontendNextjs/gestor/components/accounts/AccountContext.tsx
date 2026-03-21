@@ -1,70 +1,77 @@
 'use client'
 
-import { createContext, useContext, ReactNode } from 'react'
-import { useGetAccounts, useCreateAccountMutation, useUpdateAccountMutation, useDeleteAccountMutation } from '@/hooks/queries/useAccountsQuery'
+import { createContext, ReactNode, useContext } from 'react'
+import {
+	useCreateAccountMutation,
+	useDeleteAccountMutation,
+	useGetAccounts,
+	useUpdateAccountMutation,
+} from '@/hooks/queries/useAccountsQuery'
 import { Account } from '@/types/account'
 
 interface AccountContextType {
-    accounts: Account[]
-    isLoading: boolean
-    error: string | null
-    createAccount: (_name: string, _bank: string, _initial_balance: number) => Promise<void>
-    updateAccount: (_id: string, _name: string, _bank: string) => Promise<void>
-    deleteAccount: (_id: string) => Promise<void>
-    addAccount: (_acc: Account) => void
-    refetch: () => Promise<void>
+	accounts: Account[]
+	isLoading: boolean
+	error: string | null
+	createAccount: (_name: string, _bank: string, _initial_balance: number) => Promise<void>
+	updateAccount: (_id: string, _name: string, _bank: string) => Promise<void>
+	deleteAccount: (_id: string) => Promise<void>
+	addAccount: (_acc: Account) => void
+	refetch: () => Promise<void>
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined)
 
 export function AccountProvider({ children }: { children: ReactNode }) {
-    // React Query Hooks
-    const { data: accounts = [], isLoading, error: queryError, refetch } = useGetAccounts()
-    const createMutation = useCreateAccountMutation()
-    const updateMutation = useUpdateAccountMutation()
-    const deleteMutation = useDeleteAccountMutation()
+	// React Query Hooks
+	const { data: accounts = [], isLoading, error: queryError, refetch } = useGetAccounts()
+	const createMutation = useCreateAccountMutation()
+	const updateMutation = useUpdateAccountMutation()
+	const deleteMutation = useDeleteAccountMutation()
 
-    const error = queryError ? (queryError as Error).message : null
-    const bankAccounts = Array.isArray(accounts)
-        ? accounts.filter((acc) => (acc.type || 'bank') !== 'credit_card')
-        : []
+	const error = queryError ? (queryError as Error).message : null
+	const bankAccounts = Array.isArray(accounts) ? accounts.filter((acc) => (acc.type || 'bank') !== 'credit_card') : []
 
-    const createAccount = async (name: string, bank: string, initial_balance: number) => {
-        await createMutation.mutateAsync({ name, bank, initial_balance })
-    }
+	const createAccount = async (name: string, bank: string, initial_balance: number) => {
+		await createMutation.mutateAsync({ name, bank, initial_balance })
+	}
 
-    const updateAccount = async (id: string, name: string, bank: string) => {
-        await updateMutation.mutateAsync({ id, name, bank })
-    }
+	const updateAccount = async (id: string, name: string, bank: string) => {
+		await updateMutation.mutateAsync({ id, name, bank })
+	}
 
-    const deleteAccount = async (id: string) => {
-        await deleteMutation.mutateAsync(id)
-    }
+	const deleteAccount = async (id: string) => {
+		await deleteMutation.mutateAsync(id)
+	}
 
-    const addAccount = () => {
-        // No-op: Cache invalidation handles this
-    }
+	const addAccount = () => {
+		// No-op: Cache invalidation handles this
+	}
 
-    return (
-        <AccountContext.Provider value={{
-            accounts: bankAccounts,
-            isLoading,
-            error,
-            createAccount,
-            updateAccount,
-            deleteAccount,
-            addAccount,
-            refetch: async () => { await refetch() }
-        }}>
-            {children}
-        </AccountContext.Provider>
-    )
+	return (
+		<AccountContext.Provider
+			value={{
+				accounts: bankAccounts,
+				isLoading,
+				error,
+				createAccount,
+				updateAccount,
+				deleteAccount,
+				addAccount,
+				refetch: async () => {
+					await refetch()
+				},
+			}}
+		>
+			{children}
+		</AccountContext.Provider>
+	)
 }
 
 export function useAccountContext() {
-    const context = useContext(AccountContext)
-    if (!context) {
-        throw new Error('useAccountContext must be used within an AccountProvider')
-    }
-    return context
+	const context = useContext(AccountContext)
+	if (!context) {
+		throw new Error('useAccountContext must be used within an AccountProvider')
+	}
+	return context
 }

@@ -1,27 +1,27 @@
 import type { Metadata } from 'next'
 import { Inter, Plus_Jakarta_Sans } from 'next/font/google'
 import '../styles/globals.css'
-import { ThemeProvider } from '@/components/common/theme-provider'
+import { Analytics } from '@vercel/analytics/next'
+import { SpeedInsights } from '@vercel/speed-insights/next'
+import { NextIntlClientProvider } from 'next-intl'
+import { getLocale, getMessages } from 'next-intl/server'
 import { AuthSessionProvider } from '@/components/auth/session-provider'
 import { ProgressBarProvider } from '@/components/common/progress-bar-provider'
 import { ReactQueryProvider } from '@/components/common/react-query-provider'
-import { Toaster } from "@/components/ui/sonner"
+import { ThemeProvider } from '@/components/common/theme-provider'
+import { Toaster } from '@/components/ui/sonner'
 import { cn } from '@/lib/utils'
-import { NextIntlClientProvider } from 'next-intl'
-import { getMessages, getLocale } from 'next-intl/server'
-import { Analytics } from "@vercel/analytics/next"
-import { SpeedInsights } from "@vercel/speed-insights/next"
-
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const plusJakarta = Plus_Jakarta_Sans({
 	subsets: ['latin'],
-	variable: '--font-plus-jakarta'
+	variable: '--font-plus-jakarta',
 })
 
 export const metadata: Metadata = {
 	title: 'SBFinance',
-	description: 'La plataforma más completa para gestionar tus finanzas personales. Controla gastos, crea presupuestos inteligentes y alcanza tus metas financieras.',
+	description:
+		'La plataforma más completa para gestionar tus finanzas personales. Controla gastos, crea presupuestos inteligentes y alcanza tus metas financieras.',
 	keywords: ['finanzas personales', 'presupuesto', 'gastos', 'ahorro', 'inversiones', 'criptomonedas'],
 	authors: [{ name: 'SBFinance Team' }],
 	creator: 'SBFinance',
@@ -62,40 +62,25 @@ export const metadata: Metadata = {
 	manifest: '/site.webmanifest',
 }
 
-export default async function RootLayout({
-	children,
-}: {
-	children: React.ReactNode
-}) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
 	const locale = await getLocale()
 	const messages = await getMessages()
 
 	return (
 		<html lang={locale} suppressHydrationWarning>
-			<body className={cn(
-				inter.variable,
-				plusJakarta.variable,
-				'font-sans antialiased'
-			)}>
+			<body className={cn(inter.variable, plusJakarta.variable, 'font-sans antialiased')}>
 				<AuthSessionProvider>
-					<ThemeProvider
-						attribute="class"
-						defaultTheme="system"
-						enableSystem
-						disableTransitionOnChange
-					>
+					<ThemeProvider attribute='class' defaultTheme='system' enableSystem disableTransitionOnChange>
 						<NextIntlClientProvider messages={messages}>
 							<ProgressBarProvider>
-								<ReactQueryProvider>
-									{children}
-								</ReactQueryProvider>
+								<ReactQueryProvider>{children}</ReactQueryProvider>
 							</ProgressBarProvider>
 						</NextIntlClientProvider>
 					</ThemeProvider>
 				</AuthSessionProvider>
 				<Toaster />
-        <Analytics />
-        <SpeedInsights />
+				<Analytics />
+				<SpeedInsights />
 			</body>
 		</html>
 	)

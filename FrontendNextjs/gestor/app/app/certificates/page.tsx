@@ -1,25 +1,26 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useSession } from 'next-auth/react'
+import { AlertCircle } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
-import { CertificateProvider, useCertificates } from '@/components/certificates/CertificateContext'
-import { CertificateSummaryCard } from '@/components/certificates/CertificateSummaryCard'
-import { CertificatesList } from '@/components/certificates/CertificatesList'
+import { useSession } from 'next-auth/react'
+import { useEffect, useState } from 'react'
 import { CertificateActions } from '@/components/certificates/CertificateActions'
+import { CertificateProvider, useCertificates } from '@/components/certificates/CertificateContext'
 import { CertificateFormModal } from '@/components/certificates/CertificateFormModal'
 import { CertificatePaymentHistory } from '@/components/certificates/CertificatePaymentHistory'
-import { PaymentSimulator } from '@/components/certificates/PaymentSimulator'
+import { CertificateSummaryCard } from '@/components/certificates/CertificateSummaryCard'
+import { CertificatesList } from '@/components/certificates/CertificatesList'
 import { CertificatesPageSkeleton } from '@/components/certificates/CertificatesPageSkeleton'
-import { Certificate, CreateCertificateDTO, UpdateCertificateDTO } from '@/types/certificate'
-import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
-import { useFeatureFlags } from '@/hooks/useFeatureFlags'
-import { AlertCircle } from 'lucide-react'
+import { PaymentSimulator } from '@/components/certificates/PaymentSimulator'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { Certificate, CreateCertificateDTO, UpdateCertificateDTO } from '@/types/certificate'
 
 function CertificatesContent() {
-	const { certificates, summary, isLoading, error, createCertificate, updateCertificate, deleteCertificate } = useCertificates()
+	const { certificates, summary, isLoading, error, createCertificate, updateCertificate, deleteCertificate } =
+		useCertificates()
 	const { data: accountsData } = useGetAccounts()
 	const [isFormOpen, setIsFormOpen] = useState(false)
 	const [editingCertificate, setEditingCertificate] = useState<Certificate | null>(null)
@@ -32,11 +33,12 @@ function CertificatesContent() {
 	const selectedCertificateId = searchParams.get('selected') || ''
 	const openParam = searchParams.get('open') || ''
 
-	const accounts = accountsData?.map((a: any) => ({
-		id: a.id,
-		name: a.name,
-		bank: a.bank,
-	})) || []
+	const accounts =
+		accountsData?.map((a: any) => ({
+			id: a.id,
+			name: a.name,
+			bank: a.bank,
+		})) || []
 
 	const handleAddNew = () => {
 		setEditingCertificate(null)
@@ -73,7 +75,7 @@ function CertificatesContent() {
 		const element = document.getElementById(`certificate-card-${selectedCertificateId}`)
 		if (!element) return
 		element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-	}, [selectedCertificateId, certificates])
+	}, [selectedCertificateId])
 
 	useEffect(() => {
 		if (!selectedCertificateId || openParam !== 'history') return
@@ -92,7 +94,13 @@ function CertificatesContent() {
 		}
 	}
 
-	const handleSimulateFromForm = (data: { capital: number; rate: number; taxRate: number; interestType: string; reinvestInterest: boolean }) => {
+	const handleSimulateFromForm = (data: {
+		capital: number
+		rate: number
+		taxRate: number
+		interestType: string
+		reinvestInterest: boolean
+	}) => {
 		const tempCertificate: Certificate = {
 			id: 'temp',
 			bank: 'Simulation',
@@ -126,9 +134,9 @@ function CertificatesContent() {
 
 	if (error) {
 		return (
-			<div className="container mx-auto p-6">
-				<Alert variant="destructive">
-					<AlertCircle className="h-4 w-4" />
+			<div className='container mx-auto p-6'>
+				<Alert variant='destructive'>
+					<AlertCircle className='h-4 w-4' />
 					<AlertTitle>Error</AlertTitle>
 					<AlertDescription>Failed to load certificates. Please try again.</AlertDescription>
 				</Alert>
@@ -137,11 +145,11 @@ function CertificatesContent() {
 	}
 
 	return (
-		<div className="container mx-auto p-6 space-y-6">
-			<div className="flex justify-between items-center">
+		<div className='container mx-auto p-6 space-y-6'>
+			<div className='flex justify-between items-center'>
 				<div>
-					<h1 className="text-3xl font-bold">Certificates</h1>
-					<p className="text-muted-foreground">Manage your financial certificates and track interest payments</p>
+					<h1 className='text-3xl font-bold'>Certificates</h1>
+					<p className='text-muted-foreground'>Manage your financial certificates and track interest payments</p>
 				</div>
 			</div>
 
@@ -173,11 +181,7 @@ function CertificatesContent() {
 				onOpenChange={handleHistoryOpenChange}
 			/>
 
-			<PaymentSimulator
-				open={isSimulatorOpen}
-				onOpenChange={setIsSimulatorOpen}
-				certificate={simulatorCertificate}
-			/>
+			<PaymentSimulator open={isSimulatorOpen} onOpenChange={setIsSimulatorOpen} certificate={simulatorCertificate} />
 		</div>
 	)
 }
@@ -200,10 +204,12 @@ export default function CertificatesPage() {
 
 	if (!isCertificatesModuleEnabled) {
 		return (
-			<div className="container mx-auto p-6 space-y-4">
-				<h1 className="text-2xl font-semibold">Certificates</h1>
-				<p className="text-muted-foreground">This module is currently disabled for your account.</p>
-				<Button variant="outline" onClick={() => router.push('/app')}>Go to dashboard</Button>
+			<div className='container mx-auto p-6 space-y-4'>
+				<h1 className='text-2xl font-semibold'>Certificates</h1>
+				<p className='text-muted-foreground'>This module is currently disabled for your account.</p>
+				<Button variant='outline' onClick={() => router.push('/app')}>
+					Go to dashboard
+				</Button>
 			</div>
 		)
 	}

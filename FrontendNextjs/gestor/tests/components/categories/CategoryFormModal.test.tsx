@@ -1,6 +1,6 @@
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi, describe, it, expect, beforeEach, beforeAll } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CategoryFormModal } from '@/components/categories/CategoryFormModal'
 
 // Polyfill for Radix UI
@@ -46,13 +46,7 @@ describe('CategoryFormModal', () => {
 	})
 
 	function renderModal(open = true) {
-		return render(
-			<CategoryFormModal
-				open={open}
-				setOpen={mockSetOpen}
-				onCreateCategory={mockOnCreateCategory}
-			/>
-		)
+		return render(<CategoryFormModal open={open} setOpen={mockSetOpen} onCreateCategory={mockOnCreateCategory} />)
 	}
 
 	it('renders create mode correctly', () => {
@@ -113,11 +107,7 @@ describe('CategoryFormModal', () => {
 		await user.click(submitButton)
 
 		await waitFor(() => {
-			expect(mockOnCreateCategory).toHaveBeenCalledWith(
-				'Groceries',
-				expect.any(String),
-				expect.any(String)
-			)
+			expect(mockOnCreateCategory).toHaveBeenCalledWith('Groceries', expect.any(String), expect.any(String))
 		})
 	})
 
@@ -143,12 +133,7 @@ describe('CategoryFormModal', () => {
 		await user.click(submitButton)
 
 		await waitFor(() => {
-			expect(mockUpdateCategory).toHaveBeenCalledWith(
-				'cat1',
-				'Updated Food',
-				'🍔',
-				'#EF4444'
-			)
+			expect(mockUpdateCategory).toHaveBeenCalledWith('cat1', 'Updated Food', '🍔', '#EF4444')
 		})
 	})
 

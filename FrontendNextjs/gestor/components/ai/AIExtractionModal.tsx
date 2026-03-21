@@ -1,30 +1,23 @@
 'use client'
 
-import { useState, useCallback } from 'react'
-import { motion } from 'framer-motion'
-import { Sparkles, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { DocumentUploader } from './DocumentUploader'
-import { TransactionPreview } from './TransactionPreview'
-import { QuickCategoryCreate } from './QuickCategoryCreate'
-import { useExtractFromFile } from '@/hooks/queries/useAIQuery'
-import { useGetCategories, useCreateCategoryMutation } from '@/hooks/queries/useCategoriesQuery'
-import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
-import { useCreateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
-import { Transaction, TypeTransaction } from '@/types/transaction'
-import { Category } from '@/types/category'
-import { DocumentType, AIExtractResponse, AIPotentialDuplicate, AICategorySuggestion } from '@/types/ai'
-import { toast } from 'sonner'
+import { AlertCircle, CheckCircle, Loader2, Sparkles } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { useCallback, useState } from 'react'
+import { toast } from 'sonner'
+import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { useExtractFromFile } from '@/hooks/queries/useAIQuery'
+import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { useCreateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { AICategorySuggestion, AIExtractResponse, AIPotentialDuplicate, DocumentType } from '@/types/ai'
+import { Category } from '@/types/category'
+import { Transaction, TypeTransaction } from '@/types/transaction'
+import { DocumentUploader } from './DocumentUploader'
+import { QuickCategoryCreate } from './QuickCategoryCreate'
+import { TransactionPreview } from './TransactionPreview'
 
 interface AIExtractionModalProps {
 	open: boolean
@@ -66,7 +59,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 	const [categorySuggestionsByTransactionId, setCategorySuggestionsByTransactionId] = useState<
 		Record<string, AICategorySuggestion>
 	>({})
-	const [pendingCategorySelection, setPendingCategorySelection] = useState<{
+	const [_pendingCategorySelection, setPendingCategorySelection] = useState<{
 		index: number
 	} | null>(null)
 
@@ -105,7 +98,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					acc[duplicate.extracted_transaction_id] = duplicate
 					return acc
 				},
-				{} as Record<string, AIPotentialDuplicate>
+				{} as Record<string, AIPotentialDuplicate>,
 			)
 			setPotentialDuplicatesByTransactionId(duplicatesMap)
 
@@ -117,8 +110,8 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 							}
 							return acc
 						},
-						{} as Record<string, AICategorySuggestion>
-				  )
+						{} as Record<string, AICategorySuggestion>,
+					)
 				: {}
 			setCategorySuggestionsByTransactionId(categorySuggestionsMap)
 
@@ -176,7 +169,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 			toast.success(t('categoryCreated', { name: tempCategory.name }))
 
 			setShowQuickCategory(false)
-		} catch (error) {
+		} catch (_error) {
 			toast.error(t('failedToCreateCategory'))
 		}
 	}
@@ -282,11 +275,11 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 			prev.map((transaction) =>
 				transaction.id === transactionId
 					? {
-						...transaction,
-						category_id: suggestion.category_id,
-					}
-					: transaction
-			)
+							...transaction,
+							category_id: suggestion.category_id,
+						}
+					: transaction,
+			),
 		)
 
 		toast.success(t('appliedCategorySuggestion', { name: suggestion.category_name }))
@@ -295,7 +288,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 	const handleCreateCategoryFromSuggestion = async (transactionId: string, categoryName: string) => {
 		const normalizedName = ensureUniqueCategoryName(
 			categoryName,
-			categories.map((category) => category.name)
+			categories.map((category) => category.name),
 		)
 		if (!normalizedName) {
 			return
@@ -310,7 +303,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 
 			const refreshed = await refetchCategories()
 			const createdCategory = (refreshed.data || []).find(
-				(category) => category.name.toLowerCase() === normalizedName.toLowerCase()
+				(category) => category.name.toLowerCase() === normalizedName.toLowerCase(),
 			)
 
 			if (createdCategory) {
@@ -318,11 +311,11 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					prev.map((transaction) =>
 						transaction.id === transactionId
 							? {
-								...transaction,
-								category_id: createdCategory.id,
-							}
-							: transaction
-					)
+									...transaction,
+									category_id: createdCategory.id,
+								}
+							: transaction,
+					),
 				)
 			}
 
@@ -335,22 +328,20 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 	return (
 		<>
 			<Dialog open={open} onOpenChange={handleClose}>
-				<DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+				<DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
 					<DialogHeader>
-						<DialogTitle className="flex items-center gap-2">
-							<Sparkles className="h-5 w-5 text-primary" />
+						<DialogTitle className='flex items-center gap-2'>
+							<Sparkles className='h-5 w-5 text-primary' />
 							{t('title')}
 						</DialogTitle>
-						<DialogDescription>
-							{t('description')}
-						</DialogDescription>
+						<DialogDescription>{t('description')}</DialogDescription>
 					</DialogHeader>
 
 					{step === 'upload' && (
-						<div className="space-y-6">
-							<div className="space-y-4">
+						<div className='space-y-6'>
+							<div className='space-y-4'>
 								<div>
-									<label className="text-sm font-medium mb-2 block">{t('account')}</label>
+									<label className='text-sm font-medium mb-2 block'>{t('account')}</label>
 									<Select value={accountId} onValueChange={setAccountId}>
 										<SelectTrigger>
 											<SelectValue placeholder={t('selectAccount')} />
@@ -366,44 +357,35 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 								</div>
 
 								<div>
-									<label className="text-sm font-medium mb-2 block">{t('documentType')}</label>
-									<Select
-										value={documentType}
-										onValueChange={(v) => setDocumentType(v as DocumentType)}
-									>
+									<label className='text-sm font-medium mb-2 block'>{t('documentType')}</label>
+									<Select value={documentType} onValueChange={(v) => setDocumentType(v as DocumentType)}>
 										<SelectTrigger>
 											<SelectValue />
 										</SelectTrigger>
 										<SelectContent>
-											<SelectItem value="receipt">{t('receipt')}</SelectItem>
-											<SelectItem value="invoice">{t('invoice')}</SelectItem>
-											<SelectItem value="statement">{t('bankStatement')}</SelectItem>
+											<SelectItem value='receipt'>{t('receipt')}</SelectItem>
+											<SelectItem value='invoice'>{t('invoice')}</SelectItem>
+											<SelectItem value='statement'>{t('bankStatement')}</SelectItem>
 										</SelectContent>
 									</Select>
 								</div>
 							</div>
 
-							<DocumentUploader
-								onFilesSelected={handleFilesSelected}
-								disabled={isExtracting}
-							/>
+							<DocumentUploader onFilesSelected={handleFilesSelected} disabled={isExtracting} />
 
-							<div className="flex justify-end gap-2">
-								<Button variant="outline" onClick={handleClose}>
+							<div className='flex justify-end gap-2'>
+								<Button variant='outline' onClick={handleClose}>
 									{tCommon('cancel')}
 								</Button>
-								<Button
-									onClick={handleExtract}
-									disabled={files.length === 0 || !accountId || isExtracting}
-								>
+								<Button onClick={handleExtract} disabled={files.length === 0 || !accountId || isExtracting}>
 									{isExtracting ? (
 										<>
-											<Loader2 className="h-4 w-4 mr-2 animate-spin" />
+											<Loader2 className='h-4 w-4 mr-2 animate-spin' />
 											{t('extracting')}
 										</>
 									) : (
 										<>
-											<Sparkles className="h-4 w-4 mr-2" />
+											<Sparkles className='h-4 w-4 mr-2' />
 											{t('extractButton')}
 										</>
 									)}
@@ -413,22 +395,22 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					)}
 
 					{step === 'preview' && (
-						<div className="space-y-6">
+						<div className='space-y-6'>
 							{extractData && 'data' in extractData && (
-								<div className="flex items-center gap-4 text-sm text-muted-foreground bg-muted p-3 rounded-lg">
-									<div className="flex items-center gap-1">
-										<CheckCircle className="h-4 w-4 text-green-500" />
+								<div className='flex items-center gap-4 text-sm text-muted-foreground bg-muted p-3 rounded-lg'>
+									<div className='flex items-center gap-1'>
+										<CheckCircle className='h-4 w-4 text-green-500' />
 										<span>{t('transactionsFound', { count: extractData.data.count })}</span>
 									</div>
-									<div className="flex items-center gap-1">
+									<div className='flex items-center gap-1'>
 										{extractData.data.unmatched_categories > 0 && (
 											<>
-												<AlertCircle className="h-4 w-4 text-yellow-500" />
+												<AlertCircle className='h-4 w-4 text-yellow-500' />
 												<span>{t('needCategory', { count: extractData.data.unmatched_categories })}</span>
 											</>
 										)}
 									</div>
-									<div className="ml-auto">
+									<div className='ml-auto'>
 										<span>{extractData.processing_time_ms}ms</span>
 									</div>
 								</div>
@@ -448,14 +430,11 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 								onCreateCategory={handleCreateCategoryRequest}
 							/>
 
-							<div className="flex justify-between">
-								<Button variant="outline" onClick={handleBack}>
+							<div className='flex justify-between'>
+								<Button variant='outline' onClick={handleBack}>
 									{tCommon('back')}
 								</Button>
-								<Button
-									onClick={handleSaveTransactions}
-									disabled={selectedIndices.size === 0}
-								>
+								<Button onClick={handleSaveTransactions} disabled={selectedIndices.size === 0}>
 									{t('saveTransactions', { count: selectedIndices.size })}
 								</Button>
 							</div>
@@ -463,9 +442,9 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					)}
 
 					{step === 'saving' && (
-						<div className="flex flex-col items-center justify-center py-12">
-							<Loader2 className="h-12 w-12 animate-spin text-primary mb-4" />
-							<p className="text-muted-foreground">{t('savingTransactions')}</p>
+						<div className='flex flex-col items-center justify-center py-12'>
+							<Loader2 className='h-12 w-12 animate-spin text-primary mb-4' />
+							<p className='text-muted-foreground'>{t('savingTransactions')}</p>
 						</div>
 					)}
 				</DialogContent>

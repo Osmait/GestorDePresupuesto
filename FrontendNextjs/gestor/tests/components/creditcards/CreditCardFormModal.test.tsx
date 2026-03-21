@@ -1,6 +1,6 @@
-import { render, screen, waitFor, fireEvent } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi, describe, it, expect, beforeEach, beforeAll } from 'vitest'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModal'
 import { CreditCard } from '@/types/creditcard'
 
@@ -28,14 +28,7 @@ describe('CreditCardFormModal', () => {
 	})
 
 	function renderModal(card?: CreditCard | null) {
-		return render(
-			<CreditCardFormModal
-				open={true}
-				onClose={mockOnClose}
-				onSubmit={mockOnSubmit}
-				card={card}
-			/>
-		)
+		return render(<CreditCardFormModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} card={card} />)
 	}
 
 	it('renders create mode', () => {
@@ -178,9 +171,9 @@ describe('CreditCardFormModal', () => {
 		expect(limitLabels).toHaveLength(2)
 
 		// Click the first remove button (trash icon)
-		const removeButtons = screen.getAllByRole('button').filter(
-			(btn) => btn.querySelector('svg.lucide-trash-2') !== null
-		)
+		const removeButtons = screen
+			.getAllByRole('button')
+			.filter((btn) => btn.querySelector('svg.lucide-trash-2') !== null)
 		expect(removeButtons.length).toBeGreaterThan(0)
 		await user.click(removeButtons[0])
 
@@ -212,7 +205,7 @@ describe('CreditCardFormModal', () => {
 							credit_limit: 100000,
 						}),
 					]),
-				})
+				}),
 			)
 		})
 	})

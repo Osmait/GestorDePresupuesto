@@ -1,19 +1,13 @@
 'use client'
 
+import { ArrowLeftRight, DollarSign, MoreVertical } from 'lucide-react'
 import { useState } from 'react'
-import { CreditCard, CardBalance } from '@/types/creditcard'
-import { formatCurrency, getUtilizationColor } from '@/types/creditcard'
-import { Progress } from '@/components/ui/progress'
+import { CreditCardAtroposVisual } from '@/components/creditcards/CreditCardAtroposVisual'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { DollarSign, MoreVertical, ArrowLeftRight } from 'lucide-react'
-import {
-	DropdownMenu,
-	DropdownMenuContent,
-	DropdownMenuItem,
-	DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
-import { CreditCardAtroposVisual } from '@/components/creditcards/CreditCardAtroposVisual'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
+import { Progress } from '@/components/ui/progress'
+import { CardBalance, CreditCard, formatCurrency, getUtilizationColor } from '@/types/creditcard'
 
 interface CreditCardItemProps {
 	card: CreditCard
@@ -66,7 +60,9 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 							<div className='flex items-center justify-between'>
 								<div className='relative'>
 									<p className='text-sm font-semibold'>{card.name}</p>
-									<p className='text-xs text-muted-foreground'>{card.bank} •••• {card.last_four_digits || '****'}</p>
+									<p className='text-xs text-muted-foreground'>
+										{card.bank} •••• {card.last_four_digits || '****'}
+									</p>
 								</div>
 								<div className='relative flex items-center gap-1' onClick={(event) => event.stopPropagation()}>
 									<Button
@@ -80,7 +76,12 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 									</Button>
 									<DropdownMenu>
 										<DropdownMenuTrigger asChild>
-											<Button variant='ghost' size='icon' aria-label='Card options' className='text-muted-foreground hover:bg-accent hover:text-accent-foreground'>
+											<Button
+												variant='ghost'
+												size='icon'
+												aria-label='Card options'
+												className='text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+											>
 												<MoreVertical className='h-4 w-4' />
 											</Button>
 										</DropdownMenuTrigger>
@@ -94,7 +95,10 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 								</div>
 							</div>
 
-							<div className='relative space-y-4 rounded-xl border border-border/60 bg-muted/20 p-3' onClick={(event) => event.stopPropagation()}>
+							<div
+								className='relative space-y-4 rounded-xl border border-border/60 bg-muted/20 p-3'
+								onClick={(event) => event.stopPropagation()}
+							>
 								{card.balances.map((balance) => (
 									<BalanceBar key={balance.id} balance={balance} />
 								))}
@@ -126,19 +130,21 @@ function BalanceBar({ balance }: { balance: CardBalance }) {
 	const debt = Math.max(0, -balance.current_balance)
 
 	return (
-		<div className="space-y-2">
-			<div className="flex items-center justify-between">
-				<Badge variant="outline">{balance.currency}</Badge>
+		<div className='space-y-2'>
+			<div className='flex items-center justify-between'>
+				<Badge variant='outline'>{balance.currency}</Badge>
 				<span className={`text-sm font-medium ${getUtilizationColor(utilization)}`}>
 					{utilization.toFixed(1)}% used
 				</span>
 			</div>
-			<div className="space-y-1">
-				<Progress value={utilization} className="h-2" />
+			<div className='space-y-1'>
+				<Progress value={utilization} className='h-2' />
 			</div>
-			<div className="flex items-center justify-between text-sm">
-				<span className="text-muted-foreground">Debt: {formatCurrency(debt, balance.currency)}</span>
-				<span className="text-muted-foreground">Available: {formatCurrency(balance.available_credit, balance.currency)}</span>
+			<div className='flex items-center justify-between text-sm'>
+				<span className='text-muted-foreground'>Debt: {formatCurrency(debt, balance.currency)}</span>
+				<span className='text-muted-foreground'>
+					Available: {formatCurrency(balance.available_credit, balance.currency)}
+				</span>
 			</div>
 		</div>
 	)

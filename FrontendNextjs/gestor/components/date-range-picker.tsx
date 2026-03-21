@@ -1,85 +1,81 @@
-"use client";
+'use client'
 
-import * as React from "react";
-import { CalendarIcon } from "@radix-ui/react-icons";
-import { addDays, format } from "date-fns";
-import { DateRange } from "react-day-picker";
+import { CalendarIcon } from '@radix-ui/react-icons'
+import { addDays, format } from 'date-fns'
+import * as React from 'react'
+import { DateRange } from 'react-day-picker'
 
-import { cn } from "@/lib/utils";
-import { Button } from "./ui/button";
-import { Calendar } from "./ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { cn } from '@/lib/utils'
+import { Button } from './ui/button'
+import { Calendar } from './ui/calendar'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 export function CalendarDateRangePicker({
-  className,
-  value,
-  onChange,
+	className,
+	value,
+	onChange,
 }: React.HTMLAttributes<HTMLDivElement> & {
-  value?: DateRange | undefined
-  onChange?: (_range: DateRange | undefined) => void
+	value?: DateRange | undefined
+	onChange?: (_range: DateRange | undefined) => void
 }) {
-  const [isDesktop, setIsDesktop] = React.useState(false)
-  const [internalDate, setInternalDate] = React.useState<DateRange | undefined>({
-    from: new Date(2023, 0, 20),
-    to: addDays(new Date(2023, 0, 20), 20),
-  })
-  const date = value !== undefined ? value : internalDate
-  const setDate = (range: DateRange | undefined) => {
-    if (onChange) onChange(range)
-    else setInternalDate(range)
-  }
+	const [isDesktop, setIsDesktop] = React.useState(false)
+	const [internalDate, setInternalDate] = React.useState<DateRange | undefined>({
+		from: new Date(2023, 0, 20),
+		to: addDays(new Date(2023, 0, 20), 20),
+	})
+	const date = value !== undefined ? value : internalDate
+	const setDate = (range: DateRange | undefined) => {
+		if (onChange) onChange(range)
+		else setInternalDate(range)
+	}
 
-  React.useEffect(() => {
-    if (typeof window.matchMedia !== 'function') {
-      setIsDesktop(true)
-      return
-    }
+	React.useEffect(() => {
+		if (typeof window.matchMedia !== 'function') {
+			setIsDesktop(true)
+			return
+		}
 
-    const mediaQuery = window.matchMedia("(min-width: 1024px)")
-    const handleChange = () => setIsDesktop(mediaQuery.matches)
-    handleChange()
-    mediaQuery.addEventListener("change", handleChange)
-    return () => mediaQuery.removeEventListener("change", handleChange)
-  }, [])
+		const mediaQuery = window.matchMedia('(min-width: 1024px)')
+		const handleChange = () => setIsDesktop(mediaQuery.matches)
+		handleChange()
+		mediaQuery.addEventListener('change', handleChange)
+		return () => mediaQuery.removeEventListener('change', handleChange)
+	}, [])
 
-  return (
-    <div className={cn("grid gap-2", className)}>
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            id="date"
-            variant={"outline"}
-            className={cn(
-              "w-[260px] justify-start text-left font-normal",
-              !date && "text-muted-foreground",
-            )}
-          >
-            <CalendarIcon className="mr-2 h-4 w-4" />
-            {date?.from ? (
-              date.to ? (
-                <>
-                  {format(date.from, "LLL dd, y")} -{" "}
-                  {format(date.to, "LLL dd, y")}
-                </>
-              ) : (
-                format(date.from, "LLL dd, y")
-              )
-            ) : (
-              <span>Pick a date</span>
-            )}
-          </Button>
-        </PopoverTrigger>
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            initialFocus
-            mode="range"
-            defaultMonth={date?.from}
-            selected={date}
-            onSelect={setDate}
-            numberOfMonths={isDesktop ? 2 : 1}
-          />
-        </PopoverContent>
-      </Popover>
-    </div>
-  );
+	return (
+		<div className={cn('grid gap-2', className)}>
+			<Popover>
+				<PopoverTrigger asChild>
+					<Button
+						id='date'
+						variant={'outline'}
+						className={cn('w-[260px] justify-start text-left font-normal', !date && 'text-muted-foreground')}
+					>
+						<CalendarIcon className='mr-2 h-4 w-4' />
+						{date?.from ? (
+							date.to ? (
+								<>
+									{format(date.from, 'LLL dd, y')} - {format(date.to, 'LLL dd, y')}
+								</>
+							) : (
+								format(date.from, 'LLL dd, y')
+							)
+						) : (
+							<span>Pick a date</span>
+						)}
+					</Button>
+				</PopoverTrigger>
+				<PopoverContent className='w-auto p-0' align='start'>
+					<Calendar
+						initialFocus
+						mode='range'
+						defaultMonth={date?.from}
+						selected={date}
+						onSelect={setDate}
+						numberOfMonths={isDesktop ? 2 : 1}
+					/>
+				</PopoverContent>
+			</Popover>
+		</div>
+	)
 }

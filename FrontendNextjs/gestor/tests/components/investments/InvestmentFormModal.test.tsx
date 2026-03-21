@@ -1,9 +1,9 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi, describe, it, expect, beforeEach, beforeAll } from 'vitest'
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
+import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InvestmentFormModal } from '@/components/investments/InvestmentFormModal'
-import { InvestmentType, Investment } from '@/types/investment'
+import { Investment, InvestmentType } from '@/types/investment'
 
 // Polyfill for Radix UI
 beforeAll(() => {
@@ -54,12 +54,8 @@ describe('InvestmentFormModal', () => {
 	function renderModal(investmentToEdit?: Investment | null) {
 		return render(
 			<QueryClientProvider client={queryClient}>
-				<InvestmentFormModal
-					isOpen={true}
-					onClose={mockOnClose}
-					investmentToEdit={investmentToEdit}
-				/>
-			</QueryClientProvider>
+				<InvestmentFormModal isOpen={true} onClose={mockOnClose} investmentToEdit={investmentToEdit} />
+			</QueryClientProvider>,
 		)
 	}
 
@@ -217,7 +213,7 @@ describe('InvestmentFormModal', () => {
 					quantity: 5,
 					purchase_price: 150,
 					current_price: 180,
-				})
+				}),
 			)
 		})
 	})
@@ -251,7 +247,7 @@ describe('InvestmentFormModal', () => {
 				expect.objectContaining({
 					id: 'inv1',
 					name: 'Apple Updated',
-				})
+				}),
 			)
 		})
 	})

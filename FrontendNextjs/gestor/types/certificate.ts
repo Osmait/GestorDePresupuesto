@@ -110,11 +110,7 @@ export interface SimulationResult {
 	}
 }
 
-export function calculateMonthlyPayment(
-	capital: number,
-	rate: number,
-	taxRate: number
-): ProjectedPayment {
+export function calculateMonthlyPayment(capital: number, rate: number, taxRate: number): ProjectedPayment {
 	const grossInterest = (capital * (rate / 100)) / 12
 	const taxWithheld = grossInterest * (taxRate / 100)
 	const netInterest = grossInterest - taxWithheld

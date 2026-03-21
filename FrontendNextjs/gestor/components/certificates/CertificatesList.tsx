@@ -1,7 +1,7 @@
 'use client'
 
-import { CertificateCard } from './CertificateCard'
 import { Certificate } from '@/types/certificate'
+import { CertificateCard } from './CertificateCard'
 
 interface CertificatesListProps {
 	certificates: Certificate[]
@@ -12,22 +12,33 @@ interface CertificatesListProps {
 	selectedId?: string
 }
 
-export function CertificatesList({ certificates, onEdit, onDelete, onViewHistory, onSimulate, selectedId }: CertificatesListProps) {
+export function CertificatesList({
+	certificates,
+	onEdit,
+	onDelete,
+	onViewHistory,
+	onSimulate,
+	selectedId,
+}: CertificatesListProps) {
 	if (certificates.length === 0) {
 		return (
-			<div className="text-center py-12">
-				<p className="text-muted-foreground">No certificates found. Create your first certificate to get started.</p>
+			<div className='text-center py-12'>
+				<p className='text-muted-foreground'>No certificates found. Create your first certificate to get started.</p>
 			</div>
 		)
 	}
 
 	return (
-		<div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+		<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
 			{certificates.map((certificate) => (
 				<div
 					key={certificate.id}
 					id={`certificate-card-${certificate.id}`}
-					className={selectedId === certificate.id ? 'rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : ''}
+					className={
+						selectedId === certificate.id
+							? 'rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background'
+							: ''
+					}
 				>
 					<CertificateCard
 						certificate={certificate}

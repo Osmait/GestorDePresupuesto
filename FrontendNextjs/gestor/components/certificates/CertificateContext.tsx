@@ -1,22 +1,22 @@
 'use client'
 
-import { createContext, useContext, ReactNode, useCallback } from 'react'
+import { createContext, ReactNode, useCallback, useContext } from 'react'
+import {
+	useCreateCertificateMutation,
+	useDeleteCertificateMutation,
+	useGetCertificateSummary,
+	useGetCertificates,
+	useSimulateCertificateMutation,
+	useUpdateCertificateMutation,
+} from '@/hooks/queries/useCertificatesQuery'
 import {
 	Certificate,
 	CertificateSummary,
 	CreateCertificateDTO,
-	UpdateCertificateDTO,
 	SimulatePaymentDTO,
 	SimulationResult,
+	UpdateCertificateDTO,
 } from '@/types/certificate'
-import {
-	useGetCertificates,
-	useGetCertificateSummary,
-	useCreateCertificateMutation,
-	useUpdateCertificateMutation,
-	useDeleteCertificateMutation,
-	useSimulateCertificateMutation,
-} from '@/hooks/queries/useCertificatesQuery'
 
 interface CertificateContextType {
 	certificates: Certificate[] | undefined
@@ -44,28 +44,28 @@ export function CertificateProvider({ children }: { children: ReactNode }) {
 		async (data: CreateCertificateDTO) => {
 			await createMutation.mutateAsync(data)
 		},
-		[createMutation]
+		[createMutation],
 	)
 
 	const updateCertificate = useCallback(
 		async (id: string, data: UpdateCertificateDTO) => {
 			await updateMutation.mutateAsync({ id, data })
 		},
-		[updateMutation]
+		[updateMutation],
 	)
 
 	const deleteCertificate = useCallback(
 		async (id: string) => {
 			await deleteMutation.mutateAsync(id)
 		},
-		[deleteMutation]
+		[deleteMutation],
 	)
 
 	const simulate = useCallback(
 		async (id: string, data: SimulatePaymentDTO): Promise<SimulationResult> => {
 			return simulateMutation.mutateAsync({ id, data })
 		},
-		[simulateMutation]
+		[simulateMutation],
 	)
 
 	const refetch = useCallback(async () => {

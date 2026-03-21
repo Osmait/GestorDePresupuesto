@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useRef, useEffect, useCallback, ReactNode } from 'react'
-import { useSearchParams, useRouter, usePathname } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 interface TabItem {
@@ -30,27 +30,30 @@ export function AnimatedTabs({
 	orientation = 'horizontal',
 	onValueChange,
 	noContent = false,
-	urlParam = 'tab'
+	urlParam = 'tab',
 }: AnimatedTabsProps) {
 	const searchParams = useSearchParams()
 	const router = useRouter()
 	const pathname = usePathname()
 
 	const urlTab = urlParam ? searchParams.get(urlParam) : null
-	const validUrlTab = urlTab && tabs.some(t => t.value === urlTab) ? urlTab : null
+	const validUrlTab = urlTab && tabs.some((t) => t.value === urlTab) ? urlTab : null
 	const [activeTab, setActiveTab] = useState(validUrlTab || defaultValue)
 
-	const updateUrl = useCallback((value: string) => {
-		if (!urlParam) return
-		const params = new URLSearchParams(searchParams.toString())
-		if (value === defaultValue) {
-			params.delete(urlParam)
-		} else {
-			params.set(urlParam, value)
-		}
-		const query = params.toString()
-		router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
-	}, [urlParam, searchParams, defaultValue, router, pathname])
+	const updateUrl = useCallback(
+		(value: string) => {
+			if (!urlParam) return
+			const params = new URLSearchParams(searchParams.toString())
+			if (value === defaultValue) {
+				params.delete(urlParam)
+			} else {
+				params.set(urlParam, value)
+			}
+			const query = params.toString()
+			router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+		},
+		[urlParam, searchParams, defaultValue, router, pathname],
+	)
 	const tabsRef = useRef<HTMLDivElement>(null)
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
 	const [indicatorStyle, setIndicatorStyle] = useState({
@@ -58,11 +61,11 @@ export function AnimatedTabs({
 		width: 0,
 		top: 0,
 		height: 0,
-		opacity: 0
+		opacity: 0,
 	})
 
 	// Encuentra el índice del tab activo
-	const activeIndex = tabs.findIndex(tab => tab.value === activeTab)
+	const activeIndex = tabs.findIndex((tab) => tab.value === activeTab)
 
 	// Actualiza la posición del indicador cuando cambia el tab activo
 	useEffect(() => {
@@ -80,7 +83,7 @@ export function AnimatedTabs({
 						width: activeRect.width,
 						top: 0,
 						height: 0,
-						opacity: 1
+						opacity: 1,
 					})
 				} else {
 					setIndicatorStyle({
@@ -88,12 +91,12 @@ export function AnimatedTabs({
 						width: 0,
 						top: activeRect.top - containerRect.top,
 						height: activeRect.height,
-						opacity: 1
+						opacity: 1,
 					})
 				}
 			}
 		} else {
-			setIndicatorStyle(prev => ({ ...prev, opacity: 0 }))
+			setIndicatorStyle((prev) => ({ ...prev, opacity: 0 }))
 		}
 	}, [activeIndex, orientation])
 
@@ -103,7 +106,7 @@ export function AnimatedTabs({
 	}, [tabs.length])
 
 	const handleTabClick = (value: string) => {
-		if (tabs.find(tab => tab.value === value)?.disabled) return
+		if (tabs.find((tab) => tab.value === value)?.disabled) return
 		setActiveTab(value)
 		updateUrl(value)
 		if (onValueChange) {
@@ -111,19 +114,19 @@ export function AnimatedTabs({
 		}
 	}
 
-	const activeTabContent = tabs.find(tab => tab.value === activeTab)?.content
+	const activeTabContent = tabs.find((tab) => tab.value === activeTab)?.content
 
 	return (
 		<div className={cn('space-y-6', className)}>
 			{/* Tabs List */}
 			<div
 				ref={tabsRef}
-				role="tablist"
+				role='tablist'
 				aria-orientation={orientation}
 				className={cn(
 					'relative inline-flex h-10 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground backdrop-blur-sm border border-border/50 w-full sm:w-auto',
 					orientation === 'horizontal' && 'flex-row',
-					orientation === 'vertical' && 'flex-col h-auto'
+					orientation === 'vertical' && 'flex-col h-auto',
 				)}
 			>
 				{/* Indicador animado horizontal */}
@@ -131,21 +134,21 @@ export function AnimatedTabs({
 					<>
 						{/* Linea inferior del indicador */}
 						<div
-							className="absolute bottom-0 h-0.5 bg-primary rounded-full transition-[left,width,opacity] duration-300 ease-out pointer-events-none z-10"
+							className='absolute bottom-0 h-0.5 bg-primary rounded-full transition-[left,width,opacity] duration-300 ease-out pointer-events-none z-10'
 							style={{
 								left: `${indicatorStyle.left}px`,
 								width: `${indicatorStyle.width}px`,
-								opacity: indicatorStyle.opacity
+								opacity: indicatorStyle.opacity,
 							}}
 						/>
 
 						{/* Fondo del indicador */}
 						<div
-							className="absolute top-1 bottom-1 bg-primary/10 rounded-md transition-[left,width,opacity] duration-300 ease-out pointer-events-none z-0"
+							className='absolute top-1 bottom-1 bg-primary/10 rounded-md transition-[left,width,opacity] duration-300 ease-out pointer-events-none z-0'
 							style={{
 								left: `${indicatorStyle.left}px`,
 								width: `${indicatorStyle.width}px`,
-								opacity: indicatorStyle.opacity
+								opacity: indicatorStyle.opacity,
 							}}
 						/>
 					</>
@@ -155,20 +158,20 @@ export function AnimatedTabs({
 				{orientation === 'vertical' && (
 					<>
 						<div
-							className="absolute left-0 w-0.5 bg-primary rounded-full transition-[top,height,opacity] duration-300 ease-out pointer-events-none z-10"
+							className='absolute left-0 w-0.5 bg-primary rounded-full transition-[top,height,opacity] duration-300 ease-out pointer-events-none z-10'
 							style={{
 								top: `${indicatorStyle.top}px`,
 								height: `${indicatorStyle.height}px`,
-								opacity: indicatorStyle.opacity
+								opacity: indicatorStyle.opacity,
 							}}
 						/>
 
 						<div
-							className="absolute left-1 right-1 bg-primary/10 rounded-md transition-[top,height,opacity] duration-300 ease-out pointer-events-none z-0"
+							className='absolute left-1 right-1 bg-primary/10 rounded-md transition-[top,height,opacity] duration-300 ease-out pointer-events-none z-0'
 							style={{
 								top: `${indicatorStyle.top}px`,
 								height: `${indicatorStyle.height}px`,
-								opacity: indicatorStyle.opacity
+								opacity: indicatorStyle.opacity,
 							}}
 						/>
 					</>
@@ -185,7 +188,7 @@ export function AnimatedTabs({
 							ref={(el) => {
 								tabRefs.current[index] = el
 							}}
-							role="tab"
+							role='tab'
 							aria-selected={isActive}
 							aria-controls={`tabpanel-${tab.value}`}
 							id={`tab-${tab.value}`}
@@ -193,35 +196,33 @@ export function AnimatedTabs({
 							disabled={isDisabled}
 							className={cn(
 								'relative inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group z-20',
-								isActive
-									? 'text-primary font-semibold'
-									: 'text-muted-foreground hover:text-foreground',
-								isDisabled && 'opacity-50 cursor-not-allowed'
+								isActive ? 'text-primary font-semibold' : 'text-muted-foreground hover:text-foreground',
+								isDisabled && 'opacity-50 cursor-not-allowed',
 							)}
 						>
 							{/* Efecto de hover */}
-							<div className="absolute inset-0 bg-primary/5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none" />
+							<div className='absolute inset-0 bg-primary/5 rounded-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none' />
 
 							{/* Icono */}
 							{tab.icon && (
-								<span className={cn(
-									'transition-all duration-200 relative z-10',
-									isActive
-										? 'text-primary'
-										: 'group-hover:text-foreground'
-								)}>
+								<span
+									className={cn(
+										'transition-all duration-200 relative z-10',
+										isActive ? 'text-primary' : 'group-hover:text-foreground',
+									)}
+								>
 									{tab.icon}
 								</span>
 							)}
 
 							{/* Label - Hidden on mobile when icon exists */}
-							<span className={cn(
-								'transition-all duration-200 relative z-10',
-								tab.icon ? 'hidden sm:inline sm:ml-2' : '',
-								isActive
-									? 'text-primary font-semibold'
-									: 'group-hover:text-foreground'
-							)}>
+							<span
+								className={cn(
+									'transition-all duration-200 relative z-10',
+									tab.icon ? 'hidden sm:inline sm:ml-2' : '',
+									isActive ? 'text-primary font-semibold' : 'group-hover:text-foreground',
+								)}
+							>
 								{tab.label}
 							</span>
 						</button>
@@ -232,14 +233,14 @@ export function AnimatedTabs({
 			{/* Tab Content */}
 			{!noContent && (
 				<div
-					role="tabpanel"
+					role='tabpanel'
 					id={`tabpanel-${activeTab}`}
 					aria-labelledby={`tab-${activeTab}`}
-					className="min-h-[200px] transition-opacity duration-300 ease-in-out"
+					className='min-h-[200px] transition-opacity duration-300 ease-in-out'
 				>
 					{activeTabContent}
 				</div>
 			)}
 		</div>
 	)
-} 
+}

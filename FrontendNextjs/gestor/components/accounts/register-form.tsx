@@ -1,24 +1,16 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { AlertCircle, Check, Eye, EyeOff, Loader2, Lock, Mail, User, UserPlus } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
-import { Eye, EyeOff, Mail, Lock, User, AlertCircle, Loader2, UserPlus, Check } from 'lucide-react'
-
-import { Button } from '@/components/ui/button'
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { Input } from '@/components/ui/input'
 import { getAuthRepository } from '@/lib/repositoryConfig'
 
 // Schema de validación con Zod más robusto
@@ -34,11 +26,7 @@ const registerSchema = z
 			.min(2, 'El apellido debe tener al menos 2 caracteres')
 			.max(50, 'El apellido no puede tener más de 50 caracteres')
 			.regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'El apellido solo puede contener letras'),
-		email: z
-			.string()
-			.min(1, 'El email es requerido')
-			.email('Debe ser un email válido')
-			.toLowerCase(),
+		email: z.string().min(1, 'El email es requerido').email('Debe ser un email válido').toLowerCase(),
 		password: z
 			.string()
 			.min(6, 'La contraseña debe tener al menos 6 caracteres')
@@ -46,9 +34,7 @@ const registerSchema = z
 			.regex(/(?=.*[a-z])/, 'Debe contener al menos una letra minúscula')
 			.regex(/(?=.*[A-Z])/, 'Debe contener al menos una letra mayúscula')
 			.regex(/(?=.*\d)/, 'Debe contener al menos un número'),
-		confirmPassword: z
-			.string()
-			.min(6, 'Confirma tu contraseña'),
+		confirmPassword: z.string().min(6, 'Confirma tu contraseña'),
 	})
 	.refine((data) => data.password === data.confirmPassword, {
 		path: ['confirmPassword'],
@@ -110,12 +96,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 			const authRepository = await getAuthRepository()
 
 			// Crear cuenta
-			await authRepository.signUp(
-				values.name,
-				values.lastName,
-				values.email,
-				values.password
-			)
+			await authRepository.signUp(values.name, values.lastName, values.email, values.password)
 
 			console.log('✅ Registro exitoso')
 			setSuccess(true)
@@ -148,21 +129,19 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 	if (success) {
 		return (
-			<Card className="w-full max-w-md mx-auto shadow-lg border-border/50">
-				<CardContent className="p-8 text-center space-y-6">
-					<div className="flex items-center justify-center">
-						<div className="w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center">
-							<Check className="h-8 w-8 text-white" />
+			<Card className='w-full max-w-md mx-auto shadow-lg border-border/50'>
+				<CardContent className='p-8 text-center space-y-6'>
+					<div className='flex items-center justify-center'>
+						<div className='w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center'>
+							<Check className='h-8 w-8 text-white' />
 						</div>
 					</div>
-					<div className="space-y-2">
-						<h3 className="text-xl font-bold text-foreground">¡Cuenta creada exitosamente!</h3>
-						<p className="text-muted-foreground">
-							Iniciando sesión automáticamente...
-						</p>
+					<div className='space-y-2'>
+						<h3 className='text-xl font-bold text-foreground'>¡Cuenta creada exitosamente!</h3>
+						<p className='text-muted-foreground'>Iniciando sesión automáticamente...</p>
 					</div>
-					<div className="flex justify-center">
-						<Loader2 className="h-6 w-6 animate-spin text-primary" />
+					<div className='flex justify-center'>
+						<Loader2 className='h-6 w-6 animate-spin text-primary' />
 					</div>
 				</CardContent>
 			</Card>
@@ -170,46 +149,42 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 	}
 
 	return (
-		<Card className="w-full max-w-md mx-auto shadow-lg border-border/50">
-			<CardHeader className="space-y-1 text-center">
-				<div className="flex items-center justify-center mb-4">
-					<div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-						<UserPlus className="h-6 w-6 text-primary-foreground" />
+		<Card className='w-full max-w-md mx-auto shadow-lg border-border/50'>
+			<CardHeader className='space-y-1 text-center'>
+				<div className='flex items-center justify-center mb-4'>
+					<div className='w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center'>
+						<UserPlus className='h-6 w-6 text-primary-foreground' />
 					</div>
 				</div>
-				<CardTitle className="text-2xl font-bold text-center">
-					Crear Cuenta
-				</CardTitle>
-				<CardDescription className="text-muted-foreground">
-					Completa el formulario para crear tu cuenta
-				</CardDescription>
+				<CardTitle className='text-2xl font-bold text-center'>Crear Cuenta</CardTitle>
+				<CardDescription className='text-muted-foreground'>Completa el formulario para crear tu cuenta</CardDescription>
 			</CardHeader>
 
-			<CardContent className="space-y-6">
+			<CardContent className='space-y-6'>
 				{error && (
-					<Alert variant="destructive">
-						<AlertCircle className="h-4 w-4" />
+					<Alert variant='destructive'>
+						<AlertCircle className='h-4 w-4' />
 						<AlertDescription>{error}</AlertDescription>
 					</Alert>
 				)}
 
 				<Form {...form}>
-					<form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-						<div className="grid grid-cols-2 gap-4">
+					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+						<div className='grid grid-cols-2 gap-4'>
 							<FormField
 								control={form.control}
-								name="name"
+								name='name'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel className="text-sm font-medium">Nombre</FormLabel>
+										<FormLabel className='text-sm font-medium'>Nombre</FormLabel>
 										<FormControl>
-											<div className="relative">
-												<User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+											<div className='relative'>
+												<User className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
 												<Input
 													{...field}
-													placeholder="Juan"
+													placeholder='Juan'
 													disabled={isLoading}
-													className="pl-10 border-border/50 focus:border-primary/50 transition-colors"
+													className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
 												/>
 											</div>
 										</FormControl>
@@ -220,18 +195,18 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 							<FormField
 								control={form.control}
-								name="lastName"
+								name='lastName'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel className="text-sm font-medium">Apellido</FormLabel>
+										<FormLabel className='text-sm font-medium'>Apellido</FormLabel>
 										<FormControl>
-											<div className="relative">
-												<User className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+											<div className='relative'>
+												<User className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
 												<Input
 													{...field}
-													placeholder="Pérez"
+													placeholder='Pérez'
 													disabled={isLoading}
-													className="pl-10 border-border/50 focus:border-primary/50 transition-colors"
+													className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
 												/>
 											</div>
 										</FormControl>
@@ -243,19 +218,19 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 						<FormField
 							control={form.control}
-							name="email"
+							name='email'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className="text-sm font-medium">Email</FormLabel>
+									<FormLabel className='text-sm font-medium'>Email</FormLabel>
 									<FormControl>
-										<div className="relative">
-											<Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+										<div className='relative'>
+											<Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
 											<Input
 												{...field}
-												type="email"
-												placeholder="ejemplo@correo.com"
+												type='email'
+												placeholder='ejemplo@correo.com'
 												disabled={isLoading}
-												className="pl-10 border-border/50 focus:border-primary/50 transition-colors"
+												className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
 											/>
 										</div>
 									</FormControl>
@@ -266,32 +241,32 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 						<FormField
 							control={form.control}
-							name="password"
+							name='password'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className="text-sm font-medium">Contraseña</FormLabel>
+									<FormLabel className='text-sm font-medium'>Contraseña</FormLabel>
 									<FormControl>
-										<div className="relative">
-											<Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+										<div className='relative'>
+											<Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
 											<Input
 												{...field}
 												type={showPassword ? 'text' : 'password'}
-												placeholder="••••••••"
+												placeholder='••••••••'
 												disabled={isLoading}
-												className="pl-10 pr-10 border-border/50 focus:border-primary/50 transition-colors"
+												className='pl-10 pr-10 border-border/50 focus:border-primary/50 transition-colors'
 											/>
 											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent"
+												type='button'
+												variant='ghost'
+												size='sm'
+												className='absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent'
 												onClick={() => setShowPassword(!showPassword)}
 												disabled={isLoading}
 											>
 												{showPassword ? (
-													<EyeOff className="h-4 w-4 text-muted-foreground" />
+													<EyeOff className='h-4 w-4 text-muted-foreground' />
 												) : (
-													<Eye className="h-4 w-4 text-muted-foreground" />
+													<Eye className='h-4 w-4 text-muted-foreground' />
 												)}
 											</Button>
 										</div>
@@ -299,22 +274,38 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 									{/* Indicadores de validación de contraseña */}
 									{passwordValue && (
-										<div className="mt-2 space-y-1">
-											<div className="grid grid-cols-2 gap-2 text-xs">
-												<div className={`flex items-center gap-1 ${passwordValidations.length ? 'text-green-600' : 'text-muted-foreground'}`}>
-													<div className={`w-2 h-2 rounded-full ${passwordValidations.length ? 'bg-green-600' : 'bg-muted-foreground'}`} />
+										<div className='mt-2 space-y-1'>
+											<div className='grid grid-cols-2 gap-2 text-xs'>
+												<div
+													className={`flex items-center gap-1 ${passwordValidations.length ? 'text-green-600' : 'text-muted-foreground'}`}
+												>
+													<div
+														className={`w-2 h-2 rounded-full ${passwordValidations.length ? 'bg-green-600' : 'bg-muted-foreground'}`}
+													/>
 													6+ caracteres
 												</div>
-												<div className={`flex items-center gap-1 ${passwordValidations.lowercase ? 'text-green-600' : 'text-muted-foreground'}`}>
-													<div className={`w-2 h-2 rounded-full ${passwordValidations.lowercase ? 'bg-green-600' : 'bg-muted-foreground'}`} />
+												<div
+													className={`flex items-center gap-1 ${passwordValidations.lowercase ? 'text-green-600' : 'text-muted-foreground'}`}
+												>
+													<div
+														className={`w-2 h-2 rounded-full ${passwordValidations.lowercase ? 'bg-green-600' : 'bg-muted-foreground'}`}
+													/>
 													Minúscula
 												</div>
-												<div className={`flex items-center gap-1 ${passwordValidations.uppercase ? 'text-green-600' : 'text-muted-foreground'}`}>
-													<div className={`w-2 h-2 rounded-full ${passwordValidations.uppercase ? 'bg-green-600' : 'bg-muted-foreground'}`} />
+												<div
+													className={`flex items-center gap-1 ${passwordValidations.uppercase ? 'text-green-600' : 'text-muted-foreground'}`}
+												>
+													<div
+														className={`w-2 h-2 rounded-full ${passwordValidations.uppercase ? 'bg-green-600' : 'bg-muted-foreground'}`}
+													/>
 													Mayúscula
 												</div>
-												<div className={`flex items-center gap-1 ${passwordValidations.number ? 'text-green-600' : 'text-muted-foreground'}`}>
-													<div className={`w-2 h-2 rounded-full ${passwordValidations.number ? 'bg-green-600' : 'bg-muted-foreground'}`} />
+												<div
+													className={`flex items-center gap-1 ${passwordValidations.number ? 'text-green-600' : 'text-muted-foreground'}`}
+												>
+													<div
+														className={`w-2 h-2 rounded-full ${passwordValidations.number ? 'bg-green-600' : 'bg-muted-foreground'}`}
+													/>
 													Número
 												</div>
 											</div>
@@ -328,32 +319,32 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 						<FormField
 							control={form.control}
-							name="confirmPassword"
+							name='confirmPassword'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className="text-sm font-medium">Confirmar Contraseña</FormLabel>
+									<FormLabel className='text-sm font-medium'>Confirmar Contraseña</FormLabel>
 									<FormControl>
-										<div className="relative">
-											<Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+										<div className='relative'>
+											<Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
 											<Input
 												{...field}
 												type={showConfirmPassword ? 'text' : 'password'}
-												placeholder="••••••••"
+												placeholder='••••••••'
 												disabled={isLoading}
-												className="pl-10 pr-10 border-border/50 focus:border-primary/50 transition-colors"
+												className='pl-10 pr-10 border-border/50 focus:border-primary/50 transition-colors'
 											/>
 											<Button
-												type="button"
-												variant="ghost"
-												size="sm"
-												className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent"
+												type='button'
+												variant='ghost'
+												size='sm'
+												className='absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent'
 												onClick={() => setShowConfirmPassword(!showConfirmPassword)}
 												disabled={isLoading}
 											>
 												{showConfirmPassword ? (
-													<EyeOff className="h-4 w-4 text-muted-foreground" />
+													<EyeOff className='h-4 w-4 text-muted-foreground' />
 												) : (
-													<Eye className="h-4 w-4 text-muted-foreground" />
+													<Eye className='h-4 w-4 text-muted-foreground' />
 												)}
 											</Button>
 										</div>
@@ -364,18 +355,18 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 						/>
 
 						<Button
-							type="submit"
-							className="w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-medium transition-all duration-200"
+							type='submit'
+							className='w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-medium transition-all duration-200'
 							disabled={isLoading}
 						>
 							{isLoading ? (
 								<>
-									<Loader2 className="mr-2 h-4 w-4 animate-spin" />
+									<Loader2 className='mr-2 h-4 w-4 animate-spin' />
 									Creando cuenta...
 								</>
 							) : (
 								<>
-									<UserPlus className="mr-2 h-4 w-4" />
+									<UserPlus className='mr-2 h-4 w-4' />
 									Crear Cuenta
 								</>
 							)}
@@ -384,29 +375,29 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 				</Form>
 
 				{/* Datos de prueba */}
-				<div className="text-center">
+				<div className='text-center'>
 					<Button
-						type="button"
-						variant="outline"
-						size="sm"
+						type='button'
+						variant='outline'
+						size='sm'
 						onClick={fillTestData}
 						disabled={isLoading}
-						className="text-xs border-border/50 hover:bg-muted/30"
+						className='text-xs border-border/50 hover:bg-muted/30'
 					>
-						<User className="mr-1 h-3 w-3" />
+						<User className='mr-1 h-3 w-3' />
 						Llenar datos de prueba
 					</Button>
 				</div>
 
 				{/* Toggle para login */}
 				{showToggle && onToggleForm && (
-					<div className="text-center">
-						<p className="text-sm text-muted-foreground">
+					<div className='text-center'>
+						<p className='text-sm text-muted-foreground'>
 							¿Ya tienes una cuenta?{' '}
 							<Button
-								type="button"
-								variant="link"
-								className="p-0 h-auto font-semibold text-primary hover:text-primary/80"
+								type='button'
+								variant='link'
+								className='p-0 h-auto font-semibold text-primary hover:text-primary/80'
 								onClick={onToggleForm}
 								disabled={isLoading}
 							>
@@ -418,4 +409,4 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 			</CardContent>
 		</Card>
 	)
-} 
+}

@@ -1,13 +1,13 @@
 import { BaseRepository } from '@/lib/base-repository'
 import {
+	CardBalance,
+	CardPayment,
+	CreateCreditCardDTO,
+	CreatePaymentDTO,
 	CreditCard,
 	CreditCardSummary,
-	CreateCreditCardDTO,
-	UpdateCreditCardDTO,
-	CreatePaymentDTO,
-	CardPayment,
 	UpdateBalanceDTO,
-	CardBalance,
+	UpdateCreditCardDTO,
 } from '@/types/creditcard'
 
 export class CreditCardRepository extends BaseRepository {

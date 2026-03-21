@@ -1,33 +1,20 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useCallback, useEffect, useState } from 'react'
+import { useForm } from 'react-hook-form'
 import * as z from 'zod'
-import { CreditCard, CreatePaymentDTO } from '@/types/creditcard'
-import { Account } from '@/types/account'
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-	Form,
-	FormControl,
-	FormField,
-	FormItem,
-	FormLabel,
-	FormMessage,
-} from '@/components/ui/form'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { accountRepository } from '@/lib/repositoryConfig'
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
+import { accountRepository } from '@/lib/repositoryConfig'
+import { Account } from '@/types/account'
+import { CreatePaymentDTO, CreditCard } from '@/types/creditcard'
 
 interface PaymentModalProps {
 	open: boolean
@@ -68,6 +55,15 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 	const watchedValues = form.watch()
 
+	const loadAccounts = useCallback(async () => {
+		try {
+			const data = await accountRepository.findAll()
+			setAccounts(data.filter((a: Account) => a.type === 'bank'))
+		} catch (error) {
+			console.error('Error loading accounts:', error)
+		}
+	}, [accountRepository])
+
 	useEffect(() => {
 		if (open) {
 			loadAccounts()
@@ -76,24 +72,15 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 				form.setValue('amount', Math.abs(card.balances[0].current_balance))
 			}
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [open, card])
-
-	const loadAccounts = async () => {
-		try {
-			const data = await accountRepository.findAll()
-			setAccounts(data.filter((a: Account) => a.type === 'bank'))
-		} catch (error) {
-			console.error('Error loading accounts:', error)
-		}
-	}
+	}, [open, card, form.setValue, loadAccounts])
 
 	const selectedBalance = card?.balances.find((b) => b.currency === watchedValues.currency)
 	const currentDebt = selectedBalance ? Math.max(0, -selectedBalance.current_balance) : 0
 	const selectedAccount = accounts.find((a) => a.id === watchedValues.fromAccountId)
 	const sourceCurrency = selectedAccount?.currency || 'DOP'
 	const needsExchangeRate = sourceCurrency !== watchedValues.currency
-	const recommendedRate = needsExchangeRate && watchedValues.currency === 'USD' && sourceCurrency === 'DOP' ? rateData?.usd_to_dop : undefined
+	const recommendedRate =
+		needsExchangeRate && watchedValues.currency === 'USD' && sourceCurrency === 'DOP' ? rateData?.usd_to_dop : undefined
 
 	useEffect(() => {
 		if (!needsExchangeRate) {
@@ -103,8 +90,8 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 		if (recommendedRate && !watchedValues.exchangeRate) {
 			form.setValue('exchangeRate', recommendedRate.toFixed(4))
 		}
-	// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [needsExchangeRate, recommendedRate])
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [needsExchangeRate, recommendedRate, form.setValue, watchedValues.exchangeRate])
 
 	const parsedRate = parseFloat(watchedValues.exchangeRate || '0')
 	const exchangeRateValid = !needsExchangeRate || (Number.isFinite(parsedRate) && parsedRate > 0)
@@ -146,22 +133,22 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 	return (
 		<Dialog open={open} onOpenChange={onClose}>
-			<DialogContent className="max-w-md">
+			<DialogContent className='max-w-md'>
 				<DialogHeader>
 					<DialogTitle>Pay Credit Card</DialogTitle>
 				</DialogHeader>
 				<Form {...form}>
-					<form onSubmit={form.handleSubmit(handleFormSubmit)} className="space-y-4">
+					<form onSubmit={form.handleSubmit(handleFormSubmit)} className='space-y-4'>
 						<FormField
 							control={form.control}
-							name="fromAccountId"
+							name='fromAccountId'
 							render={({ field }) => (
 								<FormItem>
 									<FormLabel>Pay From Account</FormLabel>
 									<Select value={field.value} onValueChange={field.onChange}>
 										<FormControl>
 											<SelectTrigger>
-												<SelectValue placeholder="Select account" />
+												<SelectValue placeholder='Select account' />
 											</SelectTrigger>
 										</FormControl>
 										<SelectContent>
@@ -179,7 +166,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 						<FormField
 							control={form.control}
-							name="currency"
+							name='currency'
 							render={({ field }) => (
 								<FormItem>
 									<FormLabel>Currency</FormLabel>
@@ -204,26 +191,24 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 						<FormField
 							control={form.control}
-							name="amount"
+							name='amount'
 							render={({ field }) => (
 								<FormItem>
 									<FormLabel>Amount to Pay</FormLabel>
 									<FormControl>
 										<Input
-											type="number"
-											step="0.01"
+											type='number'
+											step='0.01'
 											max={currentDebt > 0 ? currentDebt : undefined}
 											placeholder={currentDebt.toString()}
 											{...field}
 										/>
 									</FormControl>
-									<p className="text-xs text-muted-foreground">
+									<p className='text-xs text-muted-foreground'>
 										Current debt: {currentDebt.toLocaleString()} {watchedValues.currency}
 									</p>
 									{watchedValues.amount > currentDebt && currentDebt > 0 ? (
-										<p className="text-xs text-destructive">
-											Payment amount cannot exceed current debt.
-										</p>
+										<p className='text-xs text-destructive'>Payment amount cannot exceed current debt.</p>
 									) : null}
 									<FormMessage />
 								</FormItem>
@@ -233,29 +218,32 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 						{needsExchangeRate && (
 							<FormField
 								control={form.control}
-								name="exchangeRate"
+								name='exchangeRate'
 								render={({ field }) => (
-									<FormItem className="rounded-md border p-3">
-										<FormLabel>Exchange Rate ({watchedValues.currency} to {sourceCurrency})</FormLabel>
+									<FormItem className='rounded-md border p-3'>
+										<FormLabel>
+											Exchange Rate ({watchedValues.currency} to {sourceCurrency})
+										</FormLabel>
 										<FormControl>
 											<Input
-												type="number"
-												step="0.0001"
+												type='number'
+												step='0.0001'
 												placeholder={recommendedRate ? recommendedRate.toFixed(4) : 'Enter rate'}
 												{...field}
 											/>
 										</FormControl>
 										{recommendedRate ? (
-											<p className="text-xs text-muted-foreground">
+											<p className='text-xs text-muted-foreground'>
 												Recommended rate from API: {recommendedRate.toFixed(4)}
 											</p>
 										) : (
-											<p className="text-xs text-muted-foreground">
+											<p className='text-xs text-muted-foreground'>
 												Could not fetch recommended rate. Enter custom rate.
 											</p>
 										)}
-										<p className="text-xs text-muted-foreground">
-											Estimated debit from account: {debitPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })} {sourceCurrency}
+										<p className='text-xs text-muted-foreground'>
+											Estimated debit from account:{' '}
+											{debitPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })} {sourceCurrency}
 										</p>
 										<FormMessage />
 									</FormItem>
@@ -263,11 +251,11 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							/>
 						)}
 
-						<div className="space-y-2">
-							<div className="flex items-center justify-between">
-								<Label htmlFor="interest">Includes Interest</Label>
+						<div className='space-y-2'>
+							<div className='flex items-center justify-between'>
+								<Label htmlFor='interest'>Includes Interest</Label>
 								<Switch
-									id="interest"
+									id='interest'
 									checked={watchedValues.includesInterest}
 									onCheckedChange={(checked) => form.setValue('includesInterest', checked)}
 								/>
@@ -275,11 +263,11 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							{watchedValues.includesInterest && (
 								<FormField
 									control={form.control}
-									name="interestAmount"
+									name='interestAmount'
 									render={({ field }) => (
 										<FormItem>
 											<FormControl>
-												<Input type="number" step="0.01" placeholder="Interest amount" {...field} />
+												<Input type='number' step='0.01' placeholder='Interest amount' {...field} />
 											</FormControl>
 											<FormMessage />
 										</FormItem>
@@ -290,22 +278,30 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 						<FormField
 							control={form.control}
-							name="notes"
+							name='notes'
 							render={({ field }) => (
 								<FormItem>
 									<FormLabel>Notes (Optional)</FormLabel>
 									<FormControl>
-										<Input {...field} placeholder="Payment notes" />
+										<Input {...field} placeholder='Payment notes' />
 									</FormControl>
 								</FormItem>
 							)}
 						/>
 
 						<DialogFooter>
-							<Button type="button" variant="outline" onClick={onClose}>
+							<Button type='button' variant='outline' onClick={onClose}>
 								Cancel
 							</Button>
-							<Button type="submit" disabled={loading || !watchedValues.fromAccountId || !exchangeRateValid || (watchedValues.amount > currentDebt && currentDebt > 0)}>
+							<Button
+								type='submit'
+								disabled={
+									loading ||
+									!watchedValues.fromAccountId ||
+									!exchangeRateValid ||
+									(watchedValues.amount > currentDebt && currentDebt > 0)
+								}
+							>
 								{loading ? 'Processing…' : 'Make Payment'}
 							</Button>
 						</DialogFooter>

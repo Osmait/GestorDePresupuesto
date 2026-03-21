@@ -1,9 +1,9 @@
 export interface Budget {
-  id: string;
-  category_id: string;
-  user_id: string;
-  amount: number;
-  current_amount: number;
-  created_at: string;
-  category_name?: string;
+	id: string
+	category_id: string
+	user_id: string
+	amount: number
+	current_amount: number
+	created_at: string
+	category_name?: string
 }

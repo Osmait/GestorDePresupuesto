@@ -1,7 +1,7 @@
-import { Transaction } from "@/types/transaction";
-import { Category } from "@/types/category";
-import { Account } from "@/types/account";
-import { Budget } from "@/types/budget";
+import { Account } from '@/types/account'
+import { Budget } from '@/types/budget'
+import { Category } from '@/types/category'
+import { Transaction } from '@/types/transaction'
 
 export interface SearchLoanItem {
 	id: string
@@ -21,10 +21,10 @@ export interface SearchCertificateItem {
 }
 
 export interface SearchResponse {
-    transactions: Transaction[];
-    categories: Category[];
-    accounts: Account[];
-    budgets: Budget[];
-    loans: SearchLoanItem[];
-    certificates: SearchCertificateItem[];
+	transactions: Transaction[]
+	categories: Category[]
+	accounts: Account[]
+	budgets: Budget[]
+	loans: SearchLoanItem[]
+	certificates: SearchCertificateItem[]
 }

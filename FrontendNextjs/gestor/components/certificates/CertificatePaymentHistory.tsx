@@ -1,25 +1,19 @@
 'use client'
 
+import { zodResolver } from '@hookform/resolvers/zod'
+import { Pencil } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { zodResolver } from '@hookform/resolvers/zod'
 import * as z from 'zod'
-import { Pencil } from 'lucide-react'
-import { CertificatePayment, formatCurrency } from '@/types/certificate'
-import { useGetCertificate, useUpdateCertificatePaymentMutation } from '@/hooks/queries/useCertificatesQuery'
-import {
-	Dialog,
-	DialogContent,
-	DialogHeader,
-	DialogTitle,
-	DialogFooter,
-} from '@/components/ui/dialog'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useGetCertificate, useUpdateCertificatePaymentMutation } from '@/hooks/queries/useCertificatesQuery'
+import { CertificatePayment, formatCurrency } from '@/types/certificate'
 import { CertificateChart } from './CertificateChart'
 
 const editPaymentSchema = z.object({
@@ -87,69 +81,79 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 	return (
 		<>
 			<Dialog open={open} onOpenChange={onOpenChange}>
-				<DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+				<DialogContent className='sm:max-w-[800px] max-h-[90vh] overflow-y-auto'>
 					<DialogHeader>
 						<DialogTitle>Payment History - {certificate?.bank || 'Loading...'}</DialogTitle>
 					</DialogHeader>
 					{isLoading ? (
-						<div className="py-8 text-center text-muted-foreground">Loading...</div>
+						<div className='py-8 text-center text-muted-foreground'>Loading...</div>
 					) : certificate ? (
-						<div className="space-y-4">
-							<div className="grid grid-cols-3 gap-4 p-4 rounded-lg bg-muted/50">
+						<div className='space-y-4'>
+							<div className='grid grid-cols-3 gap-4 p-4 rounded-lg bg-muted/50'>
 								<div>
-									<p className="text-xs text-muted-foreground">Total Gross Interest</p>
-									<p className="text-lg font-semibold">{formatCurrency(certificate.summary?.total_gross_interest || 0)}</p>
+									<p className='text-xs text-muted-foreground'>Total Gross Interest</p>
+									<p className='text-lg font-semibold'>
+										{formatCurrency(certificate.summary?.total_gross_interest || 0)}
+									</p>
 								</div>
 								<div>
-									<p className="text-xs text-muted-foreground">Total Tax Withheld</p>
-									<p className="text-lg font-semibold text-orange-500">{formatCurrency(certificate.summary?.total_tax_withheld || 0)}</p>
+									<p className='text-xs text-muted-foreground'>Total Tax Withheld</p>
+									<p className='text-lg font-semibold text-orange-500'>
+										{formatCurrency(certificate.summary?.total_tax_withheld || 0)}
+									</p>
 								</div>
 								<div>
-									<p className="text-xs text-muted-foreground">Total Net Interest</p>
-									<p className="text-lg font-semibold text-green-500">{formatCurrency(certificate.summary?.total_net_interest || 0)}</p>
+									<p className='text-xs text-muted-foreground'>Total Net Interest</p>
+									<p className='text-lg font-semibold text-green-500'>
+										{formatCurrency(certificate.summary?.total_net_interest || 0)}
+									</p>
 								</div>
 							</div>
 
-							<Tabs defaultValue="history">
-								<TabsList className="grid w-full grid-cols-2">
-									<TabsTrigger value="history">History</TabsTrigger>
-									<TabsTrigger value="chart">Chart</TabsTrigger>
+							<Tabs defaultValue='history'>
+								<TabsList className='grid w-full grid-cols-2'>
+									<TabsTrigger value='history'>History</TabsTrigger>
+									<TabsTrigger value='chart'>Chart</TabsTrigger>
 								</TabsList>
-								<TabsContent value="history" className="mt-4">
+								<TabsContent value='history' className='mt-4'>
 									{payments.length === 0 ? (
-										<div className="py-8 text-center text-muted-foreground">No payments recorded yet.</div>
+										<div className='py-8 text-center text-muted-foreground'>No payments recorded yet.</div>
 									) : (
-										<ScrollArea className="h-[400px]">
+										<ScrollArea className='h-[400px]'>
 											<Table>
 												<TableHeader>
 													<TableRow>
 														<TableHead>Date</TableHead>
-														<TableHead className="text-right">Capital</TableHead>
-														<TableHead className="text-right">Rate</TableHead>
-														<TableHead className="text-right">Gross</TableHead>
-														<TableHead className="text-right">Tax</TableHead>
-														<TableHead className="text-right">Net</TableHead>
-														<TableHead className="w-[50px]">Actions</TableHead>
+														<TableHead className='text-right'>Capital</TableHead>
+														<TableHead className='text-right'>Rate</TableHead>
+														<TableHead className='text-right'>Gross</TableHead>
+														<TableHead className='text-right'>Tax</TableHead>
+														<TableHead className='text-right'>Net</TableHead>
+														<TableHead className='w-[50px]'>Actions</TableHead>
 													</TableRow>
 												</TableHeader>
 												<TableBody>
 													{payments.map((payment) => (
 														<TableRow key={payment.id}>
 															<TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
-															<TableCell className="text-right">{formatCurrency(payment.applied_capital)}</TableCell>
-															<TableCell className="text-right">{payment.applied_rate}%</TableCell>
-															<TableCell className="text-right">{formatCurrency(payment.gross_interest)}</TableCell>
-															<TableCell className="text-right text-orange-500">-{formatCurrency(payment.tax_withheld)}</TableCell>
-															<TableCell className="text-right text-green-500 font-medium">{formatCurrency(payment.net_interest)}</TableCell>
+															<TableCell className='text-right'>{formatCurrency(payment.applied_capital)}</TableCell>
+															<TableCell className='text-right'>{payment.applied_rate}%</TableCell>
+															<TableCell className='text-right'>{formatCurrency(payment.gross_interest)}</TableCell>
+															<TableCell className='text-right text-orange-500'>
+																-{formatCurrency(payment.tax_withheld)}
+															</TableCell>
+															<TableCell className='text-right text-green-500 font-medium'>
+																{formatCurrency(payment.net_interest)}
+															</TableCell>
 															<TableCell>
 																<Button
-																	variant="ghost"
-																	size="icon"
-																	className="h-7 w-7"
+																	variant='ghost'
+																	size='icon'
+																	className='h-7 w-7'
 																	onClick={() => openEditDialog(payment)}
-																	aria-label="Edit payment"
+																	aria-label='Edit payment'
 																>
-																	<Pencil className="h-4 w-4" />
+																	<Pencil className='h-4 w-4' />
 																</Button>
 															</TableCell>
 														</TableRow>
@@ -159,7 +163,7 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 										</ScrollArea>
 									)}
 								</TabsContent>
-								<TabsContent value="chart" className="mt-4">
+								<TabsContent value='chart' className='mt-4'>
 									<CertificateChart certificate={certificate} payments={payments} />
 								</TabsContent>
 							</Tabs>
@@ -168,47 +172,114 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 				</DialogContent>
 			</Dialog>
 
-			<Dialog open={!!editingPayment} onOpenChange={(open) => { if (!open) setEditingPayment(null) }}>
-				<DialogContent className="sm:max-w-[450px]">
+			<Dialog
+				open={!!editingPayment}
+				onOpenChange={(open) => {
+					if (!open) setEditingPayment(null)
+				}}
+			>
+				<DialogContent className='sm:max-w-[450px]'>
 					<DialogHeader>
 						<DialogTitle>Edit Payment</DialogTitle>
 					</DialogHeader>
-					<form onSubmit={handleSubmit(onEditSubmit)} className="space-y-4">
-						<div className="grid gap-4 py-4">
-							<div className="grid grid-cols-4 items-center gap-4">
-								<Label htmlFor="edit_gross_interest" className="text-right">Gross Interest</Label>
-								<Input id="edit_gross_interest" type="number" step="0.01" className="col-span-3" {...register('gross_interest')} />
-								{errors.gross_interest && <p className="col-span-4 text-right text-sm text-red-500">{errors.gross_interest.message}</p>}
+					<form onSubmit={handleSubmit(onEditSubmit)} className='space-y-4'>
+						<div className='grid gap-4 py-4'>
+							<div className='grid grid-cols-4 items-center gap-4'>
+								<Label htmlFor='edit_gross_interest' className='text-right'>
+									Gross Interest
+								</Label>
+								<Input
+									id='edit_gross_interest'
+									type='number'
+									step='0.01'
+									className='col-span-3'
+									{...register('gross_interest')}
+								/>
+								{errors.gross_interest && (
+									<p className='col-span-4 text-right text-sm text-red-500'>{errors.gross_interest.message}</p>
+								)}
 							</div>
-							<div className="grid grid-cols-4 items-center gap-4">
-								<Label htmlFor="edit_tax_withheld" className="text-right">Tax Withheld</Label>
-								<Input id="edit_tax_withheld" type="number" step="0.01" className="col-span-3" {...register('tax_withheld')} />
-								{errors.tax_withheld && <p className="col-span-4 text-right text-sm text-red-500">{errors.tax_withheld.message}</p>}
+							<div className='grid grid-cols-4 items-center gap-4'>
+								<Label htmlFor='edit_tax_withheld' className='text-right'>
+									Tax Withheld
+								</Label>
+								<Input
+									id='edit_tax_withheld'
+									type='number'
+									step='0.01'
+									className='col-span-3'
+									{...register('tax_withheld')}
+								/>
+								{errors.tax_withheld && (
+									<p className='col-span-4 text-right text-sm text-red-500'>{errors.tax_withheld.message}</p>
+								)}
 							</div>
-							<div className="grid grid-cols-4 items-center gap-4">
-								<Label htmlFor="edit_net_interest" className="text-right">Net Interest</Label>
-								<Input id="edit_net_interest" type="number" step="0.01" className="col-span-3" {...register('net_interest')} />
-								{errors.net_interest && <p className="col-span-4 text-right text-sm text-red-500">{errors.net_interest.message}</p>}
+							<div className='grid grid-cols-4 items-center gap-4'>
+								<Label htmlFor='edit_net_interest' className='text-right'>
+									Net Interest
+								</Label>
+								<Input
+									id='edit_net_interest'
+									type='number'
+									step='0.01'
+									className='col-span-3'
+									{...register('net_interest')}
+								/>
+								{errors.net_interest && (
+									<p className='col-span-4 text-right text-sm text-red-500'>{errors.net_interest.message}</p>
+								)}
 							</div>
-							<div className="grid grid-cols-4 items-center gap-4">
-								<Label htmlFor="edit_applied_rate" className="text-right">Rate (%)</Label>
-								<Input id="edit_applied_rate" type="number" step="0.01" className="col-span-3" {...register('applied_rate')} />
-								{errors.applied_rate && <p className="col-span-4 text-right text-sm text-red-500">{errors.applied_rate.message}</p>}
+							<div className='grid grid-cols-4 items-center gap-4'>
+								<Label htmlFor='edit_applied_rate' className='text-right'>
+									Rate (%)
+								</Label>
+								<Input
+									id='edit_applied_rate'
+									type='number'
+									step='0.01'
+									className='col-span-3'
+									{...register('applied_rate')}
+								/>
+								{errors.applied_rate && (
+									<p className='col-span-4 text-right text-sm text-red-500'>{errors.applied_rate.message}</p>
+								)}
 							</div>
-							<div className="grid grid-cols-4 items-center gap-4">
-								<Label htmlFor="edit_applied_tax_rate" className="text-right">Tax Rate (%)</Label>
-								<Input id="edit_applied_tax_rate" type="number" step="0.01" className="col-span-3" {...register('applied_tax_rate')} />
-								{errors.applied_tax_rate && <p className="col-span-4 text-right text-sm text-red-500">{errors.applied_tax_rate.message}</p>}
+							<div className='grid grid-cols-4 items-center gap-4'>
+								<Label htmlFor='edit_applied_tax_rate' className='text-right'>
+									Tax Rate (%)
+								</Label>
+								<Input
+									id='edit_applied_tax_rate'
+									type='number'
+									step='0.01'
+									className='col-span-3'
+									{...register('applied_tax_rate')}
+								/>
+								{errors.applied_tax_rate && (
+									<p className='col-span-4 text-right text-sm text-red-500'>{errors.applied_tax_rate.message}</p>
+								)}
 							</div>
-							<div className="grid grid-cols-4 items-center gap-4">
-								<Label htmlFor="edit_applied_capital" className="text-right">Capital</Label>
-								<Input id="edit_applied_capital" type="number" step="0.01" className="col-span-3" {...register('applied_capital')} />
-								{errors.applied_capital && <p className="col-span-4 text-right text-sm text-red-500">{errors.applied_capital.message}</p>}
+							<div className='grid grid-cols-4 items-center gap-4'>
+								<Label htmlFor='edit_applied_capital' className='text-right'>
+									Capital
+								</Label>
+								<Input
+									id='edit_applied_capital'
+									type='number'
+									step='0.01'
+									className='col-span-3'
+									{...register('applied_capital')}
+								/>
+								{errors.applied_capital && (
+									<p className='col-span-4 text-right text-sm text-red-500'>{errors.applied_capital.message}</p>
+								)}
 							</div>
 						</div>
-						<DialogFooter className="gap-2">
-							<Button type="button" variant="outline" onClick={() => setEditingPayment(null)}>Cancel</Button>
-							<Button type="submit" disabled={updatePaymentMutation.isPending}>
+						<DialogFooter className='gap-2'>
+							<Button type='button' variant='outline' onClick={() => setEditingPayment(null)}>
+								Cancel
+							</Button>
+							<Button type='submit' disabled={updatePaymentMutation.isPending}>
 								{updatePaymentMutation.isPending ? 'Saving...' : 'Save'}
 							</Button>
 						</DialogFooter>

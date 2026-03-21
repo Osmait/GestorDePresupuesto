@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { useSettings } from '../../contexts'
 
@@ -54,7 +54,7 @@ export function SidebarController({ children }: SidebarControllerProps) {
 		return cn(
 			'fixed left-0 top-0 z-50 h-full bg-sidebar border-r border-border/50 transition-all duration-300 lg:relative lg:translate-x-0',
 			isExpanded ? 'w-64' : 'w-16',
-			isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+			isMobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0',
 		)
 	}
 
@@ -70,8 +70,8 @@ export function SidebarController({ children }: SidebarControllerProps) {
 				toggleMobile,
 				handleMouseEnter,
 				handleMouseLeave,
-				getSidebarClassName
+				getSidebarClassName,
 			})}
 		</>
 	)
-} 
+}

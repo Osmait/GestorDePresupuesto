@@ -1,11 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
 import { ResponsiveLine } from '@nivo/line'
-import { Certificate, CertificatePayment, formatCurrency } from '@/types/certificate'
+import { useMemo, useState } from 'react'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Label } from '@/components/ui/label'
+import { Certificate, CertificatePayment, formatCurrency } from '@/types/certificate'
 
 interface ChartDataPoint {
 	x: string
@@ -50,7 +50,7 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 		if (projectionMonths === 'maturity') {
 			return getMonthsUntilMaturity(certificate.maturity_date)
 		}
-		return parseInt(projectionMonths)
+		return parseInt(projectionMonths, 10)
 	}, [projectionMonths, certificate.maturity_date])
 
 	const chartData = useMemo(() => {
@@ -81,9 +81,10 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 			}
 		})
 
-		const lastPaymentDate = historicalPayments.length > 0 
-			? new Date(historicalPayments[historicalPayments.length - 1].payment_date) 
-			: new Date(certificate.created_at)
+		const lastPaymentDate =
+			historicalPayments.length > 0
+				? new Date(historicalPayments[historicalPayments.length - 1].payment_date)
+				: new Date(certificate.created_at)
 
 		for (let i = 1; i <= monthsToShow; i++) {
 			const grossInterest = (currentCapital * (certificate.current_interest_rate / 100)) / 12
@@ -131,13 +132,15 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 	]
 
 	return (
-		<div className="space-y-4">
-			<div className="flex flex-wrap items-center justify-between gap-4">
-				<div className="flex items-center gap-4">
-					<div className="flex items-center gap-2">
-						<Label htmlFor="projection" className="text-sm">Proyección:</Label>
+		<div className='space-y-4'>
+			<div className='flex flex-wrap items-center justify-between gap-4'>
+				<div className='flex items-center gap-4'>
+					<div className='flex items-center gap-2'>
+						<Label htmlFor='projection' className='text-sm'>
+							Proyección:
+						</Label>
 						<Select value={projectionMonths} onValueChange={setProjectionMonths}>
-							<SelectTrigger className="w-[160px]">
+							<SelectTrigger className='w-[160px]'>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -150,19 +153,15 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 						</Select>
 					</div>
 				</div>
-				<div className="flex items-center gap-2">
-					<Switch
-						id="showCapitalBase"
-						checked={showCapitalBase}
-						onCheckedChange={setShowCapitalBase}
-					/>
-					<Label htmlFor="showCapitalBase" className="text-sm font-normal">
+				<div className='flex items-center gap-2'>
+					<Switch id='showCapitalBase' checked={showCapitalBase} onCheckedChange={setShowCapitalBase} />
+					<Label htmlFor='showCapitalBase' className='text-sm font-normal'>
 						Mostrar Capital Base
 					</Label>
 				</div>
 			</div>
 
-			<div className="h-[300px] w-full">
+			<div className='h-[300px] w-full'>
 				<ResponsiveLine
 					data={nivoData}
 					margin={{ top: 20, right: 30, bottom: 50, left: 70 }}
@@ -209,9 +208,9 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 						},
 					]}
 					tooltip={({ point }) => (
-						<div className="bg-background border rounded-md px-3 py-2 shadow-md">
-							<p className="text-xs text-muted-foreground">{point.data.xFormatted}</p>
-							<p className="text-sm font-semibold">{formatCurrency(point.data.y as number)}</p>
+						<div className='bg-background border rounded-md px-3 py-2 shadow-md'>
+							<p className='text-xs text-muted-foreground'>{point.data.xFormatted}</p>
+							<p className='text-sm font-semibold'>{formatCurrency(point.data.y as number)}</p>
 						</div>
 					)}
 					theme={{
@@ -233,14 +232,14 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 				/>
 			</div>
 
-			<div className="flex justify-center gap-6 text-xs text-muted-foreground">
-				<div className="flex items-center gap-2">
-					<div className="w-8 h-0.5 bg-green-600" />
+			<div className='flex justify-center gap-6 text-xs text-muted-foreground'>
+				<div className='flex items-center gap-2'>
+					<div className='w-8 h-0.5 bg-green-600' />
 					<span>Valor Total (Capital + Intereses)</span>
 				</div>
 				{showCapitalBase && (
-					<div className="flex items-center gap-2">
-						<div className="w-8 h-0.5 border-t-2 border-dashed border-slate-400" />
+					<div className='flex items-center gap-2'>
+						<div className='w-8 h-0.5 border-t-2 border-dashed border-slate-400' />
 						<span>Capital Base</span>
 					</div>
 				)}

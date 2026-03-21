@@ -1,5 +1,5 @@
 import { BaseRepository } from '@/lib/base-repository'
-import { ExchangeRateResponse, ConvertResponse } from '@/types/exchange'
+import { ConvertResponse, ExchangeRateResponse } from '@/types/exchange'
 
 export class ExchangeRateRepository extends BaseRepository {
 	async getRate(): Promise<ExchangeRateResponse> {
