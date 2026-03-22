@@ -166,8 +166,16 @@ func (s *Server) registerRoutes() {
 		s.Engine.Any("/.well-known/oauth-authorization-server", gin.WrapH(s.oauthServer.MetadataHandler()))
 		s.Engine.Any("/.well-known/oauth-protected-resource", gin.WrapH(s.oauthServer.ProtectedResourceMetadataHandler("/mcp")))
 		s.Engine.Any("/oauth/authorize", gin.WrapH(s.oauthServer.AuthorizationHandler()))
-		s.Engine.POST("/oauth/token", gin.WrapH(s.oauthServer.TokenHandler()))
-		s.Engine.POST("/oauth/register", gin.WrapH(s.oauthServer.RegistrationHandler()))
+		s.Engine.POST("/oauth/token", func(c *gin.Context) {
+			log.Printf("[OAuth] POST /oauth/token from %s, Content-Type: %s", c.ClientIP(), c.GetHeader("Content-Type"))
+			s.oauthServer.TokenHandler().ServeHTTP(c.Writer, c.Request)
+			log.Printf("[OAuth] POST /oauth/token responded with status %d", c.Writer.Status())
+		})
+		s.Engine.POST("/oauth/register", func(c *gin.Context) {
+			log.Printf("[OAuth] POST /oauth/register from %s", c.ClientIP())
+			s.oauthServer.RegistrationHandler().ServeHTTP(c.Writer, c.Request)
+			log.Printf("[OAuth] POST /oauth/register responded with status %d", c.Writer.Status())
+		})
 	}
 
 	// MCP endpoints — authenticated via OAuth token or API key, not JWT;
@@ -192,12 +200,19 @@ func (s *Server) registerRoutes() {
 		} else {
 			mcpGroup.Use(mcpPkg.APIKeyAuthMiddleware(s.apiKeyService))
 		}
+		// SSE transport (for Claude Desktop via mcp-remote)
 		sseHandler := mcpServer.NewSSEServer(s.mcpServer.GetServer(),
 			mcpServer.WithStaticBasePath("/mcp"),
 			mcpServer.WithBaseURL(baseURL),
 		)
 		mcpGroup.GET("/sse", gin.WrapH(sseHandler.SSEHandler()))
 		mcpGroup.POST("/message", gin.WrapH(sseHandler.MessageHandler()))
+
+		// Streamable HTTP transport (for Claude Web custom connectors)
+		streamHandler := mcpServer.NewStreamableHTTPServer(s.mcpServer.GetServer())
+		mcpGroup.POST("", gin.WrapH(streamHandler))
+		mcpGroup.GET("", gin.WrapH(streamHandler))
+		mcpGroup.DELETE("", gin.WrapH(streamHandler))
 	}
 
 	// Authentication middleware for protected routes
