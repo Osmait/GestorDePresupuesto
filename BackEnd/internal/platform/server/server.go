@@ -38,6 +38,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 	"github.com/osmait/gestorDePresupuesto/internal/version"
+	"github.com/plexusone/mcpkit/oauth2"
 
 	_ "github.com/osmait/gestorDePresupuesto/docs"
 
@@ -71,6 +72,7 @@ type Server struct {
 	exchangeService     *exchange.ExchangeRateService
 	apiKeyService       *apikey.APIKeyService
 	mcpServer           *mcpPkg.MCPServer
+	oauthServer         *oauth2.Server
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -104,6 +106,7 @@ func New(ctx context.Context,
 	exchangeSvc *exchange.ExchangeRateService,
 	apiKeySvc *apikey.APIKeyService,
 	mcpSrv *mcpPkg.MCPServer,
+	oauthSrv *oauth2.Server,
 ) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
@@ -130,6 +133,7 @@ func New(ctx context.Context,
 		exchangeService:     exchangeSvc,
 		apiKeyService:       apiKeySvc,
 		mcpServer:           mcpSrv,
+		oauthServer:         oauthSrv,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
@@ -156,14 +160,41 @@ func (s *Server) registerRoutes() {
 	routes.QuoteRoutes(s.Engine, s.quoteService)
 	routes.ExchangeRoutes(s.Engine, s.exchangeService)
 
-	// MCP endpoints — authenticated via API key, not JWT; must be registered
-	// BEFORE the JWT AuthMiddleware so they are not blocked by it.
+	// OAuth 2.1 endpoints — public, must be registered BEFORE any auth
+	// middleware so that clients can obtain tokens without authentication.
+	if s.oauthServer != nil {
+		s.Engine.Any("/.well-known/oauth-authorization-server", gin.WrapH(s.oauthServer.MetadataHandler()))
+		s.Engine.Any("/.well-known/oauth-protected-resource", gin.WrapH(s.oauthServer.ProtectedResourceMetadataHandler("/mcp")))
+		s.Engine.Any("/oauth/authorize", gin.WrapH(s.oauthServer.AuthorizationHandler()))
+		s.Engine.POST("/oauth/token", gin.WrapH(s.oauthServer.TokenHandler()))
+		s.Engine.POST("/oauth/register", gin.WrapH(s.oauthServer.RegistrationHandler()))
+	}
+
+	// MCP endpoints — authenticated via OAuth token or API key, not JWT;
+	// must be registered BEFORE the JWT AuthMiddleware so they are not
+	// blocked by it.
 	if s.mcpServer != nil {
+		baseURL := s.config.MCP.BaseURL
+		if baseURL == "" {
+			baseURL = fmt.Sprintf("http://127.0.0.1:%d", s.config.Server.Port)
+		}
 		mcpGroup := s.Engine.Group("/mcp")
-		mcpGroup.Use(mcpPkg.APIKeyAuthMiddleware(s.apiKeyService))
+		if s.oauthServer != nil {
+			// Resolve OAuth subject (email) to internal user ID
+			userResolver := func(ctx context.Context, email string) (string, error) {
+				u, err := s.servicesUser.FindByEmail(ctx, email)
+				if err != nil {
+					return "", err
+				}
+				return u.Id, nil
+			}
+			mcpGroup.Use(mcpPkg.MCPAuthMiddleware(s.apiKeyService, s.oauthServer.TokenVerifier(), baseURL, userResolver))
+		} else {
+			mcpGroup.Use(mcpPkg.APIKeyAuthMiddleware(s.apiKeyService))
+		}
 		sseHandler := mcpServer.NewSSEServer(s.mcpServer.GetServer(),
 			mcpServer.WithStaticBasePath("/mcp"),
-			mcpServer.WithBaseURL("http://127.0.0.1:"+fmt.Sprintf("%d", s.config.Server.Port)),
+			mcpServer.WithBaseURL(baseURL),
 		)
 		mcpGroup.GET("/sse", gin.WrapH(sseHandler.SSEHandler()))
 		mcpGroup.POST("/message", gin.WrapH(sseHandler.MessageHandler()))

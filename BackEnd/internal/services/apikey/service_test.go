@@ -86,13 +86,13 @@ func TestGenerateKey_Success(t *testing.T) {
 
 	// The stored hash must match the SHA-256 of the returned plaintext token.
 	expectedHash := hashToken(result.Token)
-	assert.Equal(t, expectedHash, result.APIKey.KeyHash)
+	assert.Equal(t, expectedHash, result.KeyHash)
 
 	// The key prefix stored in the record must be the first 12 chars of the token.
-	assert.Equal(t, result.Token[:12], result.APIKey.KeyPrefix)
+	assert.Equal(t, result.Token[:12], result.KeyPrefix)
 
 	// The key must be active after creation.
-	assert.True(t, result.APIKey.IsActive)
+	assert.True(t, result.IsActive)
 
 	mockRepo.AssertExpectations(t)
 }
@@ -144,13 +144,13 @@ func TestValidateKey(t *testing.T) {
 	}
 
 	tests := []struct {
-		name           string
-		rawToken       string
-		repoKey        *apikey.APIKey
-		repoErr        error
-		wantErr        error
-		wantKey        bool
-		setupLastUsed  bool
+		name          string
+		rawToken      string
+		repoKey       *apikey.APIKey
+		repoErr       error
+		wantErr       error
+		wantKey       bool
+		setupLastUsed bool
 	}{
 		{
 			name:          "valid active key",
