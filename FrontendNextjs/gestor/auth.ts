@@ -10,6 +10,9 @@ const loginSchema = z.object({
 
 const BASE_URL = process.env.BACKEND_URL || process.env.NEXT_PUBLIC_BACKEND_URL || "http://127.0.0.1:8080";
 
+// Buffer before token expiration to refresh proactively (5 minutes)
+const REFRESH_BUFFER_MS = 5 * 60 * 1000;
+
 // Refresh access token using the refresh token
 async function refreshAccessToken(token: JWT): Promise<JWT> {
   try {
@@ -63,10 +66,9 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           const creds = credentials as any;
           if (creds?.demoToken) {
             accessToken = creds.demoToken;
-            // Demo tokens don't have refresh tokens
             refreshToken = "";
           } else {
-            // 2. Normal Login Flow - Use new /auth/login endpoint
+            // 2. Normal Login Flow
             if (!credentials?.email || !credentials?.password) {
               return null
             }
@@ -79,25 +81,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
             })
 
             if (!response.ok) {
-              // Fallback to legacy endpoint if new one fails
-              const legacyResponse = await fetch(`${BASE_URL}/login`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email, password }),
-              })
-              
-              if (!legacyResponse.ok) return null
-              accessToken = await legacyResponse.json()
-              refreshToken = ""
-            } else {
-              const tokenResponse = await response.json()
-              accessToken = tokenResponse.access_token
-              refreshToken = tokenResponse.refresh_token || ""
-              expiresIn = tokenResponse.expires_in || expiresIn
+              return null
             }
+
+            const tokenResponse = await response.json()
+            accessToken = tokenResponse.access_token
+            refreshToken = tokenResponse.refresh_token || ""
+            expiresIn = tokenResponse.expires_in || expiresIn
           }
 
-          // 3. Get User Profile (Common for both flows)
+          // 3. Get User Profile
           const profileResponse = await fetch(`${BASE_URL}/profile`, {
             headers: {
               "Content-Type": "application/json",
@@ -145,18 +138,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       }
 
       // Return previous token if the access token has not expired yet
-      // Add 30 second buffer before expiration to refresh proactively
-      if (Date.now() < (token.accessTokenExpires as number) - 30000) {
+      // 5-minute buffer before expiration to refresh proactively
+      if (Date.now() < (token.accessTokenExpires as number) - REFRESH_BUFFER_MS) {
         return token
       }
 
       // Access token has expired (or will expire soon), try to refresh it
-      // Only refresh if we have a refresh token
       if (token.refreshToken) {
         return await refreshAccessToken(token)
       }
 
-      // No refresh token available, return current token
+      // No refresh token available (demo user), return token as-is
       return token
     },
     async session({ session, token }) {
@@ -165,8 +157,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
         session.user.lastName = token.lastName as string;
         session.accessToken = token.accessToken as string;
         session.user.role = token.role as string;
-        
-        // Pass error to client so it can handle sign out
+
         if (token.error) {
           session.error = token.error;
         }
@@ -179,7 +170,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   },
   session: {
     strategy: "jwt",
-    // Set maxAge to match refresh token expiration (7 days)
-    maxAge: 7 * 24 * 60 * 60,
+    maxAge: 7 * 24 * 60 * 60, // 7 days (matches refresh token)
   },
 })
