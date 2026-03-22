@@ -245,12 +245,11 @@ func (s *MCPServer) handleCreateTransaction(ctx context.Context, req mcp.CallToo
 		}
 	}
 
-	txCtx, commit, rollback, dbErr := s.withRLSTx(ctx, userID)
+	txCtx, _, rollback, dbErr := s.withRLSTx(ctx, userID)
 	if dbErr != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("database error: %s", dbErr)), nil
 	}
-	defer commit()
-	defer rollback()
+	defer rollback() // rollback is a no-op after a successful commit
 
 	if createErr := s.services.Transaction.CreateTransaction(
 		txCtx,
@@ -266,6 +265,12 @@ func (s *MCPServer) handleCreateTransaction(ctx context.Context, req mcp.CallToo
 		createdAt,
 	); createErr != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("failed to create transaction: %s", createErr)), nil
+	}
+
+	// Commit explicitly after successful create — defer rollback above
+	// becomes a no-op since the tx is already committed.
+	if commitErr := mcpcontext.TxFromContext(txCtx).Commit(); commitErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to commit transaction: %s", commitErr)), nil
 	}
 
 	resp := map[string]string{"status": "created"}
