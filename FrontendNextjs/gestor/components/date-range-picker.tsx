@@ -14,7 +14,7 @@ export function CalendarDateRangePicker({
 	className,
 	value,
 	onChange,
-}: React.HTMLAttributes<HTMLDivElement> & {
+}: Omit<React.HTMLAttributes<HTMLDivElement>, 'onChange'> & {
 	value?: DateRange | undefined
 	onChange?: (_range: DateRange | undefined) => void
 }) {

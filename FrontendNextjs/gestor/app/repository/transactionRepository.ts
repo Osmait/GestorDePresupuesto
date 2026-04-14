@@ -64,7 +64,7 @@ export class TransactionRepository extends BaseRepository {
 		}
 	}
 
-	async findAllSimple(): Promise<Transaction[]> {
+	async findAllSimple(filters?: TransactionFilters): Promise<Transaction[]> {
 		try {
 			const allTransactions: Transaction[] = []
 			const pageSize = 100
@@ -74,6 +74,7 @@ export class TransactionRepository extends BaseRepository {
 
 			while (hasNextPage && safetyCounter < 100) {
 				const response = await this.findAll({
+					...filters,
 					page,
 					limit: pageSize,
 					sort_by: 'created_at',

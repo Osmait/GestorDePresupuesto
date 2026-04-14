@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { getLocale, getTranslations } from 'next-intl/server'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
+import { DashboardDateFilter } from '@/components/dashboard/DashboardDateFilter'
 import { PatrimonyTab } from '@/components/dashboard/PatrimonyTab'
 import { DashboardCharts } from '@/components/transactions/DashboardCharts'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
@@ -263,7 +264,21 @@ function BudgetCard({ budget, category, t }: { budget: Budget; category?: Catego
 }
 
 // Server Component para el header
-function DashboardHeader({ user, t, locale }: { user: any; t: any; locale: string }) {
+function DashboardHeader({
+	user,
+	t,
+	locale,
+	dateFrom,
+	dateTo,
+	preset,
+}: {
+	user: any
+	t: any
+	locale: string
+	dateFrom?: string
+	dateTo?: string
+	preset: 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'all' | 'custom'
+}) {
 	return (
 		<div className='mb-8'>
 			<div className='flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4'>
@@ -273,7 +288,8 @@ function DashboardHeader({ user, t, locale }: { user: any; t: any; locale: strin
 						{t('welcome')}, {user?.name} {user?.lastName || user?.last_name} 👋
 					</p>
 				</div>
-				<div className='flex items-center gap-3'>
+				<div className='flex flex-wrap items-center gap-3'>
+					<DashboardDateFilter initialFrom={dateFrom} initialTo={dateTo} initialPreset={preset} />
 					<Badge
 						variant='outline'
 						className='bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400'
@@ -306,8 +322,36 @@ function StatsGrid({ summary, t }: { summary: DashboardSummary | null; t: any })
 	)
 }
 
+type DashboardPreset = 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'all' | 'custom'
+
+function resolveDateRange(searchParams: { date_from?: string; date_to?: string; preset?: string }): {
+	dateFrom?: string
+	dateTo?: string
+	preset: DashboardPreset
+} {
+	const presetParam = (searchParams.preset as DashboardPreset) || 'this_month'
+	if (presetParam === 'all') return { preset: 'all' }
+
+	if (searchParams.date_from && searchParams.date_to) {
+		return { dateFrom: searchParams.date_from, dateTo: searchParams.date_to, preset: presetParam }
+	}
+
+	// Default: current month
+	const now = new Date()
+	const from = new Date(now.getFullYear(), now.getMonth(), 1)
+	const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+	const fmt = (d: Date) =>
+		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
+	return { dateFrom: fmt(from), dateTo: fmt(to), preset: 'this_month' }
+}
+
 // Componente principal - Server Component que carga datos directamente
-export default async function DashboardPage() {
+export default async function DashboardPage({
+	searchParams,
+}: {
+	searchParams?: Promise<{ date_from?: string; date_to?: string; preset?: string }>
+}) {
+	const resolvedSearchParams = (await searchParams) ?? {}
 	const accountRepository = await getAccountRepository()
 	const transactionRepository = await getTransactionRepository()
 	const categoryRepository = await getCategoryRepository()
@@ -331,13 +375,17 @@ export default async function DashboardPage() {
 
 	const user = session.user
 
+	const { dateFrom, dateTo, preset } = resolveDateRange(resolvedSearchParams)
+	const transactionFilters = dateFrom && dateTo ? { date_from: dateFrom, date_to: dateTo } : undefined
+	const analyticsFilters = dateFrom && dateTo ? { date_from: dateFrom, date_to: dateTo } : undefined
+
 	const [accounts, transactionResponse, categories, budgets, exchangeRate, dashboardSummary] = await Promise.all([
 		accountRepository.findAll(),
-		transactionRepository.findAllSimple(),
+		transactionRepository.findAllSimple(transactionFilters),
 		categoryRepository.findAll(),
 		budgetRepository.findAll(),
 		exchangeRateRepository.getRate(),
-		analyticsRepository.getDashboardSummary(),
+		analyticsRepository.getDashboardSummary(analyticsFilters),
 	])
 
 	// Extract transactions from the response
@@ -361,7 +409,7 @@ export default async function DashboardPage() {
 		<div className='min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20'>
 			<div className='container mx-auto px-4 py-8'>
 				<div id='dashboard-header'>
-					<DashboardHeader user={user} t={t} locale={locale} />
+					<DashboardHeader user={user} t={t} locale={locale} dateFrom={dateFrom} dateTo={dateTo} preset={preset} />
 				</div>
 				<div id='dashboard-charts'>
 					<DashboardCharts
