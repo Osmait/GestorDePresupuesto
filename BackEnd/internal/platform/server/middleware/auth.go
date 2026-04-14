@@ -18,14 +18,16 @@ import (
 // "/account/login-history" would accidentally bypass auth if "login" were
 // matched as a substring.
 var publicRoutes = map[string]bool{
-	"/login":        true, // legacy single-token login
-	"/auth/login":   true,
-	"/auth/refresh": true,
-	"/auth/logout":  true,
-	"/auth/demo":    true,
-	"/health":       true,
-	"/ping":         true,
-	"/metrics":      true,
+	"/login":                     true, // legacy single-token login
+	"/auth/login":                true,
+	"/auth/refresh":              true,
+	"/auth/logout":               true,
+	"/auth/demo":                 true,
+	"/auth/passkey/login/begin":  true,
+	"/auth/passkey/login/finish": true,
+	"/health":                    true,
+	"/ping":                      true,
+	"/metrics":                   true,
 }
 
 // shouldCheckToken reports whether the given route path requires a valid JWT.

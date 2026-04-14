@@ -386,6 +386,14 @@ func (a *AuthService) CreateDemoUserWithTokens(ctx context.Context, ip, userAgen
 	}, nil
 }
 
+// IssueTokensForUser issues a new access + refresh token pair for a user that
+// has already been authenticated by an alternative flow (e.g. WebAuthn/passkey).
+// Delegates to createTokensForUser so the storage side effects (refresh token
+// persistence) are identical to the email/password login path.
+func (a *AuthService) IssueTokensForUser(ctx context.Context, userId, userAgent, ipAddress string) (*authDomain.AuthResponse, error) {
+	return a.createTokensForUser(ctx, userId, userAgent, ipAddress)
+}
+
 // createTokensForUser is a helper to create token pair for a user
 func (a *AuthService) createTokensForUser(ctx context.Context, userId, userAgent, ipAddress string) (*authDomain.AuthResponse, error) {
 	tokenPair, err := utils.CreateTokenPair(userId, a.config.JWT)

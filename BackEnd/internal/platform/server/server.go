@@ -32,6 +32,7 @@ import (
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
+	"github.com/osmait/gestorDePresupuesto/internal/services/passkey"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
@@ -71,6 +72,7 @@ type Server struct {
 	loanService         *loan.LoanService
 	exchangeService     *exchange.ExchangeRateService
 	apiKeyService       *apikey.APIKeyService
+	passkeyService      *passkey.PasskeyService
 	mcpServer           *mcpPkg.MCPServer
 	oauthServer         *oauth2.Server
 	shutdownTimeout     *time.Duration
@@ -105,6 +107,7 @@ func New(ctx context.Context,
 	loanSvc *loan.LoanService,
 	exchangeSvc *exchange.ExchangeRateService,
 	apiKeySvc *apikey.APIKeyService,
+	passkeySvc *passkey.PasskeyService,
 	mcpSrv *mcpPkg.MCPServer,
 	oauthSrv *oauth2.Server,
 ) (context.Context, *Server) {
@@ -132,6 +135,7 @@ func New(ctx context.Context,
 		loanService:         loanSvc,
 		exchangeService:     exchangeSvc,
 		apiKeyService:       apiKeySvc,
+		passkeyService:      passkeySvc,
 		mcpServer:           mcpSrv,
 		oauthServer:         oauthSrv,
 		shutdownTimeout:     shutdownTimeout,
@@ -254,6 +258,7 @@ func (s *Server) registerRoutes() {
 	routes.CertificateRoutes(s.Engine, s.certificateService, s.db)
 	routes.CreditCardRoutes(s.Engine, s.creditCardService, s.db)
 	routes.LoanRoutes(s.Engine, s.loanService, s.db)
+	routes.PasskeyRoutes(s.Engine, s.passkeyService, s.db)
 	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache)
 	routes.APIKeyRoutes(s.Engine, s.apiKeyService)
 }
