@@ -21,11 +21,11 @@ func NewPasskeyRepository(db *sql.DB) *PasskeyRepository {
 
 func (r *PasskeyRepository) Save(ctx context.Context, pk *passkey.Passkey) error {
 	query := `INSERT INTO passkeys
-		(id, user_id, credential_id, public_key, sign_count, aaguid, transports, name, last_used_at, created_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`
+		(id, user_id, credential_id, public_key, sign_count, aaguid, transports, name, credential_json, last_used_at, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query,
 		pk.Id, pk.UserId, pk.CredentialId, pk.PublicKey, pk.SignCount, pk.AAGUID,
-		pq.Array(pk.Transports), pk.Name, pk.LastUsedAt, pk.CreatedAt,
+		pq.Array(pk.Transports), pk.Name, pk.CredentialJSON, pk.LastUsedAt, pk.CreatedAt,
 	)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", pk.UserId).Msg("Failed to save passkey")
@@ -35,7 +35,7 @@ func (r *PasskeyRepository) Save(ctx context.Context, pk *passkey.Passkey) error
 
 func (r *PasskeyRepository) FindByCredentialId(ctx context.Context, credentialId []byte) (*passkey.Passkey, error) {
 	query := `SELECT id, user_id, credential_id, public_key, sign_count, COALESCE(aaguid, ''::bytea),
-			COALESCE(transports, '{}'::text[]), name, last_used_at, created_at
+			COALESCE(transports, '{}'::text[]), name, COALESCE(credential_json::text, ''), last_used_at, created_at
 		FROM passkeys WHERE credential_id = $1`
 	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, credentialId)
 	return scanPasskey(row)
@@ -43,7 +43,7 @@ func (r *PasskeyRepository) FindByCredentialId(ctx context.Context, credentialId
 
 func (r *PasskeyRepository) FindByUserId(ctx context.Context, userId string) ([]*passkey.Passkey, error) {
 	query := `SELECT id, user_id, credential_id, public_key, sign_count, COALESCE(aaguid, ''::bytea),
-			COALESCE(transports, '{}'::text[]), name, last_used_at, created_at
+			COALESCE(transports, '{}'::text[]), name, COALESCE(credential_json::text, ''), last_used_at, created_at
 		FROM passkeys WHERE user_id = $1 ORDER BY created_at DESC`
 	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, userId)
 	if err != nil {
@@ -107,12 +107,16 @@ type scannable interface {
 func scanPasskey(row scannable) (*passkey.Passkey, error) {
 	pk := &passkey.Passkey{}
 	var transports pq.StringArray
+	var credentialJSON string
 	var lastUsedAt sql.NullTime
 	if err := row.Scan(&pk.Id, &pk.UserId, &pk.CredentialId, &pk.PublicKey, &pk.SignCount,
-		&pk.AAGUID, &transports, &pk.Name, &lastUsedAt, &pk.CreatedAt); err != nil {
+		&pk.AAGUID, &transports, &pk.Name, &credentialJSON, &lastUsedAt, &pk.CreatedAt); err != nil {
 		return nil, err
 	}
 	pk.Transports = []string(transports)
+	if credentialJSON != "" {
+		pk.CredentialJSON = []byte(credentialJSON)
+	}
 	if lastUsedAt.Valid {
 		t := lastUsedAt.Time
 		pk.LastUsedAt = &t

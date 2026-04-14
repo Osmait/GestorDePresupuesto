@@ -10,24 +10,28 @@ import (
 )
 
 // PasskeyRoutes registers the WebAuthn/passkey endpoints. All routes are
-// behind the `passkeys_enabled` feature flag; the login ceremony endpoints
-// are also listed in the auth middleware's public route set.
+// behind the `passkeys_enabled` feature flag. The login ceremony endpoints
+// live in a public sub-group (listed in auth middleware's allowlist and
+// gated by RequirePublicFeature which does not require a user id).
 func PasskeyRoutes(s *gin.Engine, passkeyService *passkey.PasskeyService, db *sql.DB) {
 	if passkeyService == nil {
 		return
 	}
-	group := s.Group("/auth/passkey", middleware.RequireFeature(db, "passkeys_enabled"))
+
+	authed := s.Group("/auth/passkey", middleware.RequireFeature(db, "passkeys_enabled"))
 	{
 		// Authenticated ceremony — the user must already be logged in to enroll a passkey.
-		group.POST("/register/begin", handler.BeginRegistration(passkeyService))
-		group.POST("/register/finish", handler.FinishRegistration(passkeyService))
+		authed.POST("/register/begin", handler.BeginRegistration(passkeyService))
+		authed.POST("/register/finish", handler.FinishRegistration(passkeyService))
 
 		// Management endpoints (authenticated).
-		group.GET("", handler.ListPasskeys(passkeyService))
-		group.DELETE("/:id", handler.DeletePasskey(passkeyService))
+		authed.GET("", handler.ListPasskeys(passkeyService))
+		authed.DELETE("/:id", handler.DeletePasskey(passkeyService))
+	}
 
-		// Login ceremony — listed as public in auth middleware's allowlist.
-		group.POST("/login/begin", handler.BeginLogin(passkeyService))
-		group.POST("/login/finish", handler.FinishLogin(passkeyService))
+	public := s.Group("/auth/passkey", middleware.RequirePublicFeature(db, "passkeys_enabled"))
+	{
+		public.POST("/login/begin", handler.BeginLogin(passkeyService))
+		public.POST("/login/finish", handler.FinishLogin(passkeyService))
 	}
 }

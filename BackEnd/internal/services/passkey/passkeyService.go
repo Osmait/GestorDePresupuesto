@@ -109,6 +109,16 @@ func (s *PasskeyService) loadUserAdapter(ctx context.Context, userId string) (*u
 }
 
 func toWebAuthnCredential(pk *passkeyDomain.Passkey) webauthn.Credential {
+	// Prefer the round-trip JSON if we have it — it preserves flags,
+	// attestation type and every other field that the library checks on
+	// login. The individual columns are only used as a fallback (eg. for
+	// rows written before credential_json existed).
+	if len(pk.CredentialJSON) > 0 {
+		var cred webauthn.Credential
+		if err := json.Unmarshal(pk.CredentialJSON, &cred); err == nil {
+			return cred
+		}
+	}
 	transports := make([]protocol.AuthenticatorTransport, 0, len(pk.Transports))
 	for _, t := range pk.Transports {
 		transports = append(transports, protocol.AuthenticatorTransport(t))
@@ -222,16 +232,22 @@ func (s *PasskeyService) FinishRegistration(ctx context.Context, userId, session
 		name = "Passkey"
 	}
 
+	credentialJSON, err := json.Marshal(credential)
+	if err != nil {
+		return nil, fmt.Errorf("failed to serialize credential: %w", err)
+	}
+
 	pk := &passkeyDomain.Passkey{
-		Id:           ksuid.New().String(),
-		UserId:       userId,
-		CredentialId: credential.ID,
-		PublicKey:    credential.PublicKey,
-		SignCount:    credential.Authenticator.SignCount,
-		AAGUID:       credential.Authenticator.AAGUID,
-		Transports:   transportsToStrings(credential.Transport),
-		Name:         name,
-		CreatedAt:    time.Now(),
+		Id:             ksuid.New().String(),
+		UserId:         userId,
+		CredentialId:   credential.ID,
+		PublicKey:      credential.PublicKey,
+		SignCount:      credential.Authenticator.SignCount,
+		AAGUID:         credential.Authenticator.AAGUID,
+		Transports:     transportsToStrings(credential.Transport),
+		Name:           name,
+		CredentialJSON: credentialJSON,
+		CreatedAt:      time.Now(),
 	}
 	if err := s.repo.Save(ctx, pk); err != nil {
 		return nil, fmt.Errorf("failed to persist passkey: %w", err)
