@@ -9,6 +9,7 @@ import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
+import { PasskeyLoginButton } from '@/components/auth/PasskeyLoginButton'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -172,6 +173,17 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 						</Button>
 					</form>
 				</Form>
+
+				<div className='relative'>
+					<div className='absolute inset-0 flex items-center'>
+						<span className='w-full border-t border-border/50' />
+					</div>
+					<div className='relative flex justify-center text-xs uppercase'>
+						<span className='bg-card px-2 text-muted-foreground'>or</span>
+					</div>
+				</div>
+
+				<PasskeyLoginButton className='w-full' disabled={isLoading} />
 
 				{/* Toggle para registro */}
 				{showToggle && onToggleForm && (
