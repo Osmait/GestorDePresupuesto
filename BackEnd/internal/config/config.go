@@ -205,6 +205,14 @@ type MCPConfig struct {
 	BaseURL       string `json:"base_url"`
 }
 
+// WebAuthnConfig holds passkey / WebAuthn relying party configuration.
+type WebAuthnConfig struct {
+	RPDisplayName string        `json:"rp_display_name"`
+	RPID          string        `json:"rp_id"`
+	RPOrigins     []string      `json:"rp_origins"`
+	ChallengeTTL  time.Duration `json:"challenge_ttl"`
+}
+
 // Config holds all application configuration settings
 type Config struct {
 	Server        ServerConfig        `json:"server"`
@@ -221,6 +229,7 @@ type Config struct {
 	Admin         AdminConfig         `json:"admin"`
 	AI            AIConfig            `json:"ai"`
 	MCP           MCPConfig           `json:"mcp"`
+	WebAuthn      WebAuthnConfig      `json:"webauthn"`
 }
 
 // LoadConfig loads configuration from environment variables with comprehensive validation
@@ -400,6 +409,13 @@ func LoadConfig() (*Config, error) {
 			ServerName:    getEnvString("MCP_SERVER_NAME", "Gestor de Presupuesto"),
 			ServerVersion: getEnvString("MCP_SERVER_VERSION", "1.0.0"),
 			BaseURL:       getEnvString("MCP_BASE_URL", ""),
+		},
+
+		WebAuthn: WebAuthnConfig{
+			RPDisplayName: getEnvString("WEBAUTHN_RP_DISPLAY_NAME", "SBFinance"),
+			RPID:          getEnvString("WEBAUTHN_RP_ID", "localhost"),
+			RPOrigins:     getEnvStringSlice("WEBAUTHN_RP_ORIGINS", []string{"http://localhost:3000"}),
+			ChallengeTTL:  getDuration(getEnvString("WEBAUTHN_CHALLENGE_TTL", "5m")),
 		},
 	}
 

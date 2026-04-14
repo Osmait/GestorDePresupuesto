@@ -19,6 +19,7 @@ import { useLocale } from 'next-intl'
 import { useState } from 'react'
 import { ModeToggle } from '@/components/common/ToggleMode'
 import { APIKeysSection } from '@/components/settings/APIKeysSection'
+import { PasskeyManager } from '@/components/settings/PasskeyManager'
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -282,6 +283,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 												</Button>
 											</div>
 										</div>
+
+										<PasskeyManager />
 									</div>
 								)}
 

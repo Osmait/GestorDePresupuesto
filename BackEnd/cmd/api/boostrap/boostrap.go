@@ -33,6 +33,7 @@ import (
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
 	loanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/loan"
 	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
+	passkeyRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/passkey"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
@@ -44,6 +45,9 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/ai/tasks"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 	"github.com/osmait/gestorDePresupuesto/internal/services/apikey"
+	passkeySvc "github.com/osmait/gestorDePresupuesto/internal/services/passkey"
+
+	"github.com/go-webauthn/webauthn/webauthn"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
@@ -173,6 +177,7 @@ func Run() error {
 		services.loanService,
 		services.exchangeService,
 		services.apiKeyService,
+		services.passkeyService,
 		mcpServer,
 		oauthSrv,
 	)
@@ -278,6 +283,7 @@ type repositories struct {
 	creditCardRepository   creditcardRepo.CreditCardRepositoryInterface
 	loanRepository         loanRepo.LoanRepositoryInterface
 	apiKeyRepository       apikeyRepo.APIKeyRepositoryInterface
+	passkeyRepository      passkeyRepo.PasskeyRepositoryInterface
 }
 
 // initializeRepositories creates all repository instances
@@ -297,6 +303,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		creditCardRepository:   creditcardRepo.NewCreditCardRepository(db),
 		loanRepository:         loanRepo.NewLoanRepository(db),
 		apiKeyRepository:       apikeyRepo.NewAPIKeyRepository(db),
+		passkeyRepository:      passkeyRepo.NewPasskeyRepository(db),
 	}
 }
 
@@ -321,6 +328,7 @@ type services struct {
 	loanService         *loan.LoanService
 	exchangeService     *exchange.ExchangeRateService
 	apiKeyService       *apikey.APIKeyService
+	passkeyService      *passkeySvc.PasskeyService
 }
 
 // initializeServices creates all service instances
@@ -359,11 +367,27 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 	creditCardService := creditcard.NewCreditCardService(repos.creditCardRepository, repos.accountRepository, transactionService)
 	loanService := loan.NewLoanService(repos.loanRepository, transactionService, repos.accountRepository, repos.categoryRepository)
 
+	userService := user.NewUserService(repos.userRepository)
+	authService := auth.NewAuthServiceWithRefreshTokens(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, repos.refreshTokenRepository, cfg)
+
+	// WebAuthn / passkey service. The shared transactionCache doubles as the
+	// challenge session store — the entries live under passkey:session:* keys.
+	var passkeyService *passkeySvc.PasskeyService
+	if wa, waErr := webauthn.New(&webauthn.Config{
+		RPDisplayName: cfg.WebAuthn.RPDisplayName,
+		RPID:          cfg.WebAuthn.RPID,
+		RPOrigins:     cfg.WebAuthn.RPOrigins,
+	}); waErr == nil {
+		passkeyService = passkeySvc.NewPasskeyService(wa, repos.passkeyRepository, userService, authService, transactionCache, cfg.WebAuthn.ChallengeTTL)
+	} else {
+		log.Warn().Err(waErr).Msg("WebAuthn init failed, passkey endpoints will be disabled")
+	}
+
 	return &services{
 		accountService:      account.NewAccountService(repos.accountRepository),
 		transactionService:  transactionService,
-		userService:         user.NewUserService(repos.userRepository),
-		authService:         auth.NewAuthServiceWithRefreshTokens(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, repos.refreshTokenRepository, cfg),
+		userService:         userService,
+		authService:         authService,
 		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository, usdToDopRateFn),
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService, transactionService, repos.accountRepository, repos.categoryRepository),
@@ -379,6 +403,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		loanService:         loanService,
 		exchangeService:     exchangeService,
 		apiKeyService:       apikey.NewAPIKeyService(repos.apiKeyRepository),
+		passkeyService:      passkeyService,
 	}
 }
 

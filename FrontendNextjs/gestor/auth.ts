@@ -51,6 +51,47 @@ async function refreshAccessToken(token: JWT): Promise<JWT> {
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
+      id: "passkey",
+      name: "passkey",
+      credentials: {
+        accessToken: { type: "text" },
+        refreshToken: { type: "text" },
+        expiresIn: { type: "text" },
+      },
+      async authorize(credentials) {
+        try {
+          const creds = credentials as any
+          const accessToken: string = creds?.accessToken || ""
+          const refreshToken: string = creds?.refreshToken || ""
+          if (!accessToken) return null
+          const expiresIn = parseInt(creds?.expiresIn || "0", 10) || 72 * 60 * 60
+
+          const profileResponse = await fetch(`${BASE_URL}/profile`, {
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${accessToken}`,
+            },
+          })
+          if (!profileResponse.ok) return null
+          const user = await profileResponse.json()
+
+          return {
+            id: user.id.toString(),
+            email: user.email,
+            name: user.name,
+            lastName: user.last_name,
+            accessToken,
+            refreshToken,
+            expiresIn,
+            role: user.role ?? "USER",
+          }
+        } catch (error) {
+          console.error("Passkey auth error:", error)
+          return null
+        }
+      },
+    }),
+    Credentials({
       name: "credentials",
       credentials: {
         email: { label: "Email", type: "email" },
