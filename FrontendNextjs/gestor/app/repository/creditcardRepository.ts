@@ -46,6 +46,13 @@ export class CreditCardRepository extends BaseRepository {
 	async getPayments(cardId: string): Promise<CardPayment[]> {
 		return this.get<CardPayment[]>(`/credit-cards/${cardId}/payments`) as Promise<CardPayment[]>
 	}
+
+	async resetBalance(
+		cardId: string,
+		data: { balance_id?: string; currency?: string; notes?: string },
+	): Promise<unknown> {
+		return this.post(`/credit-cards/${cardId}/reset`, data)
+	}
 }
 
 let creditCardRepositoryInstance: CreditCardRepository | null = null

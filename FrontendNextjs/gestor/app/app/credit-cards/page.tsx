@@ -25,6 +25,7 @@ import {
 	useDeleteCreditCardMutation,
 	useGetCreditCardSummary,
 	useGetCreditCards,
+	useResetCardBalanceMutation,
 	useUpdateCreditCardMutation,
 } from '@/hooks/queries/useCreditCardsQuery'
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
@@ -37,6 +38,7 @@ export default function CreditCardsPage() {
 	const [historyOpen, setHistoryOpen] = useState(false)
 	const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null)
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
+	const [resetDialogOpen, setResetDialogOpen] = useState(false)
 	const router = useRouter()
 
 	const { data: exchangeRateData } = useExchangeRateQuery()
@@ -50,6 +52,7 @@ export default function CreditCardsPage() {
 	const updateMutation = useUpdateCreditCardMutation()
 	const deleteMutation = useDeleteCreditCardMutation()
 	const paymentMutation = useCreatePaymentMutation()
+	const resetBalanceMutation = useResetCardBalanceMutation()
 
 	const handleCreateCard = async (data: CreateCreditCardDTO) => {
 		await createMutation.mutateAsync(data)
@@ -99,6 +102,36 @@ export default function CreditCardsPage() {
 	const handleViewPayments = (card: CreditCard) => {
 		setSelectedCard(card)
 		setHistoryOpen(true)
+	}
+
+	const handleReset = (card: CreditCard) => {
+		setSelectedCard(card)
+		setResetDialogOpen(true)
+	}
+
+	const handleConfirmReset = async () => {
+		if (!selectedCard) return
+		try {
+			const balances = selectedCard.balances || []
+			if (balances.length === 0) {
+				toast.error('No balances to reset')
+				return
+			}
+			await Promise.all(
+				balances.map((balance) =>
+					resetBalanceMutation.mutateAsync({
+						cardId: selectedCard.id,
+						balanceId: balance.id,
+					}),
+				),
+			)
+			toast.success('Card balance reset successfully')
+		} catch {
+			toast.error('Failed to reset card balance')
+		} finally {
+			setResetDialogOpen(false)
+			setSelectedCard(null)
+		}
 	}
 
 	const handleFormClose = () => {
@@ -276,6 +309,7 @@ export default function CreditCardsPage() {
 							onDelete={handleDelete}
 							onPay={handlePay}
 							onViewPayments={handleViewPayments}
+							onReset={handleReset}
 						/>
 					))}
 				</div>
@@ -291,6 +325,26 @@ export default function CreditCardsPage() {
 			<PaymentModal open={paymentOpen} onClose={handlePaymentClose} onSubmit={handlePayment} card={selectedCard} />
 
 			<CreditCardPaymentHistory open={historyOpen} onClose={handleHistoryClose} card={selectedCard} />
+
+			<Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
+				<DialogContent>
+					<DialogHeader>
+						<DialogTitle>Reset Card Balance</DialogTitle>
+						<DialogDescription>
+							This will set {selectedCard?.name}&apos;s current balance to zero for all currencies. The previous balance
+							will be stored in history. Use this after paying off and closing the billing cycle.
+						</DialogDescription>
+					</DialogHeader>
+					<DialogFooter>
+						<Button variant='outline' onClick={() => setResetDialogOpen(false)}>
+							Cancel
+						</Button>
+						<Button onClick={handleConfirmReset} disabled={resetBalanceMutation.isPending}>
+							{resetBalanceMutation.isPending ? 'Resetting...' : 'Reset Balance'}
+						</Button>
+					</DialogFooter>
+				</DialogContent>
+			</Dialog>
 
 			<Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
 				<DialogContent>

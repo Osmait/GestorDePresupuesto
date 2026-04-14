@@ -72,6 +72,34 @@ func (r *CreatePaymentRequest) Validate() error {
 	return nil
 }
 
+type ResetBalanceRequest struct {
+	BalanceId string `json:"balance_id"`
+	Currency  string `json:"currency"`
+	Notes     string `json:"notes"`
+}
+
+type BalanceResetResponse struct {
+	Id              string    `json:"id"`
+	BalanceId       string    `json:"balance_id"`
+	CardId          string    `json:"card_id"`
+	Currency        string    `json:"currency"`
+	PreviousBalance float64   `json:"previous_balance"`
+	Notes           string    `json:"notes"`
+	CreatedAt       time.Time `json:"created_at"`
+}
+
+func NewBalanceResetResponse(r *creditcard.CardBalanceReset) *BalanceResetResponse {
+	return &BalanceResetResponse{
+		Id:              r.Id,
+		BalanceId:       r.BalanceId,
+		CardId:          r.CardId,
+		Currency:        r.Currency,
+		PreviousBalance: r.PreviousBalance,
+		Notes:           r.Notes,
+		CreatedAt:       r.CreatedAt,
+	}
+}
+
 type BalanceResponse struct {
 	Id                 string    `json:"id"`
 	Currency           string    `json:"currency"`

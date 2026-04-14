@@ -15,9 +15,10 @@ interface CreditCardItemProps {
 	onDelete: (card: CreditCard) => void
 	onPay: (card: CreditCard) => void
 	onViewPayments: (card: CreditCard) => void
+	onReset: (card: CreditCard) => void
 }
 
-export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }: CreditCardItemProps) {
+export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments, onReset }: CreditCardItemProps) {
 	const [isFlipped, setIsFlipped] = useState(false)
 
 	const totalDebtByCurrency = card.balances
@@ -87,6 +88,7 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments }
 										</DropdownMenuTrigger>
 										<DropdownMenuContent align='end'>
 											<DropdownMenuItem onClick={() => onEdit(card)}>Edit</DropdownMenuItem>
+											<DropdownMenuItem onClick={() => onReset(card)}>Reset Balance</DropdownMenuItem>
 											<DropdownMenuItem onClick={() => onDelete(card)} className='text-destructive'>
 												Delete
 											</DropdownMenuItem>

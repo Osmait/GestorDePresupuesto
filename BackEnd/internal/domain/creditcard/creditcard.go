@@ -31,6 +31,16 @@ type CardBalance struct {
 	UpdatedAt      time.Time
 }
 
+type CardBalanceReset struct {
+	Id              string
+	BalanceId       string
+	CardId          string
+	Currency        string
+	PreviousBalance float64
+	Notes           string
+	CreatedAt       time.Time
+}
+
 type CardPayment struct {
 	Id               string
 	CardId           string

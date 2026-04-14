@@ -22,6 +22,9 @@ type CreditCardRepositoryInterface interface {
 	UpdateBalanceByAmount(ctx context.Context, cardId string, currency string, amount float64) error
 	DeleteBalance(ctx context.Context, id string) error
 
+	SaveBalanceReset(ctx context.Context, reset *creditcard.CardBalanceReset) error
+	FindBalanceResetsByCard(ctx context.Context, cardId string) ([]*creditcard.CardBalanceReset, error)
+
 	SavePayment(ctx context.Context, payment *creditcard.CardPayment) error
 	DeletePayment(ctx context.Context, id string) error
 	FindPaymentById(ctx context.Context, id string) (*creditcard.CardPayment, error)

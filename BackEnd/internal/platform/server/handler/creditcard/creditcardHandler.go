@@ -106,6 +106,37 @@ func UpdateCardBalance(service *creditcard.CreditCardService) gin.HandlerFunc {
 	}
 }
 
+func ResetCardBalance(service *creditcard.CreditCardService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		cardId := ctx.Param("id")
+		var req dto.ResetBalanceRequest
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			req = dto.ResetBalanceRequest{}
+		}
+		response, err := service.ResetCardBalance(ctx, cardId, userId, &req)
+		if err != nil {
+			log.Error().Err(err).Str("user_id", userId).Str("card_id", cardId).Msg("Failed to reset card balance")
+			_ = ctx.Error(err)
+			return
+		}
+		ctx.JSON(http.StatusOK, response)
+	}
+}
+
+func FindCardBalanceResets(service *creditcard.CreditCardService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		cardId := ctx.Param("id")
+		resets, err := service.FindBalanceResetsByCard(ctx, cardId, userId)
+		if err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+		ctx.JSON(http.StatusOK, resets)
+	}
+}
+
 func CreateCardPayment(service *creditcard.CreditCardService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")

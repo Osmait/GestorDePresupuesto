@@ -21,5 +21,7 @@ func CreditCardRoutes(s *gin.Engine, creditCardService *creditcard.CreditCardSer
 		cardGroup.PUT("/:id/balances/:balanceId", handler.UpdateCardBalance(creditCardService))
 		cardGroup.POST("/:id/payments", handler.CreateCardPayment(creditCardService))
 		cardGroup.GET("/:id/payments", handler.FindCardPayments(creditCardService))
+		cardGroup.POST("/:id/reset", handler.ResetCardBalance(creditCardService))
+		cardGroup.GET("/:id/resets", handler.FindCardBalanceResets(creditCardService))
 	}
 }
