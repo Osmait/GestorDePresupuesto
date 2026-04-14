@@ -327,6 +327,7 @@ func UpdateTransaction(s *transaction.TransactionService) gin.HandlerFunc {
 			transactionObj.CreatedAt = transactionRequest.CreatedAt
 		}
 		transactionObj.UserId = userId
+		transactionObj.Currency = transactionRequest.Currency
 
 		if err := s.UpdateTransaction(ctx, id, transactionObj); err != nil {
 			ctx.JSON(http.StatusInternalServerError, err.Error())

@@ -131,7 +131,7 @@ describe('PaymentModal', () => {
 		expect(submitButton).toBeDisabled()
 	})
 
-	it('shows error when amount > current debt', async () => {
+	it('shows advisory when amount exceeds current debt but does not block submit', async () => {
 		const user = userEvent.setup()
 		renderModal()
 
@@ -144,7 +144,7 @@ describe('PaymentModal', () => {
 		await user.type(amountInput, '20000')
 
 		await waitFor(() => {
-			expect(screen.getByText('Payment amount cannot exceed current debt.')).toBeInTheDocument()
+			expect(screen.getByText(/Payment exceeds current debt by/i)).toBeInTheDocument()
 		})
 	})
 

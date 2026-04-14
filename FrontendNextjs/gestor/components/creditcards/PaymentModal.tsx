@@ -83,6 +83,12 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 		needsExchangeRate && watchedValues.currency === 'USD' && sourceCurrency === 'DOP' ? rateData?.usd_to_dop : undefined
 
 	useEffect(() => {
+		if (!open || !selectedBalance) return
+		form.setValue('amount', Math.max(0, -selectedBalance.current_balance))
+		// eslint-disable-next-line react-hooks/exhaustive-deps
+	}, [watchedValues.currency, open])
+
+	useEffect(() => {
 		if (!needsExchangeRate) {
 			form.setValue('exchangeRate', '')
 			return
@@ -95,19 +101,28 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 	const parsedRate = parseFloat(watchedValues.exchangeRate || '0')
 	const exchangeRateValid = !needsExchangeRate || (Number.isFinite(parsedRate) && parsedRate > 0)
+	const paymentAmountNumber = Number(watchedValues.amount)
+	const hasValidAmount = Number.isFinite(paymentAmountNumber) && paymentAmountNumber > 0
 	const debitPreview = (() => {
-		const paymentAmount = watchedValues.amount
-		if (!Number.isFinite(paymentAmount) || paymentAmount <= 0) return 0
-		if (!needsExchangeRate) return paymentAmount
+		if (!hasValidAmount) return 0
+		if (!needsExchangeRate) return paymentAmountNumber
 		if (!exchangeRateValid) return 0
-		if (watchedValues.currency === 'USD' && sourceCurrency === 'DOP') return paymentAmount * parsedRate
-		if (watchedValues.currency === 'DOP' && sourceCurrency === 'USD') return paymentAmount / parsedRate
+		if (watchedValues.currency === 'USD' && sourceCurrency === 'DOP') return paymentAmountNumber * parsedRate
+		if (watchedValues.currency === 'DOP' && sourceCurrency === 'USD') return paymentAmountNumber / parsedRate
 		return 0
 	})()
+	const dopEquivalent = (() => {
+		if (!hasValidAmount) return null
+		if (watchedValues.currency === 'DOP') return paymentAmountNumber
+		const rate = parsedRate > 0 ? parsedRate : rateData?.usd_to_dop
+		if (!rate || rate <= 0) return null
+		return paymentAmountNumber * rate
+	})()
+	const exceedsDebt = hasValidAmount && currentDebt > 0 && paymentAmountNumber > currentDebt
+	const overpayAmount = exceedsDebt ? paymentAmountNumber - currentDebt : 0
 
 	const handleFormSubmit = async (values: PaymentFormValues) => {
 		if (!card) return
-		if (values.amount > currentDebt && currentDebt > 0) return
 
 		const parsedExchangeRate = parseFloat(values.exchangeRate || '0')
 
@@ -196,24 +211,41 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 								<FormItem>
 									<FormLabel>Amount to Pay</FormLabel>
 									<FormControl>
-										<Input
-											type='number'
-											step='0.01'
-											max={currentDebt > 0 ? currentDebt : undefined}
-											placeholder={currentDebt.toString()}
-											{...field}
-										/>
+										<Input type='number' step='0.01' placeholder={currentDebt.toString()} {...field} />
 									</FormControl>
 									<p className='text-xs text-muted-foreground'>
 										Current debt: {currentDebt.toLocaleString()} {watchedValues.currency}
 									</p>
-									{watchedValues.amount > currentDebt && currentDebt > 0 ? (
-										<p className='text-xs text-destructive'>Payment amount cannot exceed current debt.</p>
+									{exceedsDebt ? (
+										<p className='text-xs text-amber-600'>
+											Payment exceeds current debt by{' '}
+											{overpayAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {watchedValues.currency}.
+											The extra will be credited to the card.
+										</p>
 									) : null}
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
+
+						{hasValidAmount && (
+							<div className='rounded-md border border-dashed p-3 space-y-1'>
+								<p className='text-xs text-muted-foreground'>
+									Debit from account:{' '}
+									<span className='font-medium text-foreground'>
+										{debitPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })} {sourceCurrency}
+									</span>
+								</p>
+								{watchedValues.currency === 'USD' && dopEquivalent !== null && (
+									<p className='text-xs text-muted-foreground'>
+										Equivalent in DOP:{' '}
+										<span className='font-medium text-foreground'>
+											{dopEquivalent.toLocaleString(undefined, { maximumFractionDigits: 2 })} DOP
+										</span>
+									</p>
+								)}
+							</div>
+						)}
 
 						{needsExchangeRate && (
 							<FormField
@@ -241,10 +273,6 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 												Could not fetch recommended rate. Enter custom rate.
 											</p>
 										)}
-										<p className='text-xs text-muted-foreground'>
-											Estimated debit from account:{' '}
-											{debitPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })} {sourceCurrency}
-										</p>
 										<FormMessage />
 									</FormItem>
 								)}
@@ -295,12 +323,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							</Button>
 							<Button
 								type='submit'
-								disabled={
-									loading ||
-									!watchedValues.fromAccountId ||
-									!exchangeRateValid ||
-									(watchedValues.amount > currentDebt && currentDebt > 0)
-								}
+								disabled={loading || !watchedValues.fromAccountId || !exchangeRateValid || !hasValidAmount}
 							>
 								{loading ? 'Processing…' : 'Make Payment'}
 							</Button>

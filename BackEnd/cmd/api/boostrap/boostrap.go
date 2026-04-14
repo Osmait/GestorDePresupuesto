@@ -131,6 +131,8 @@ func Run() error {
 			Category:    services.categoryService,
 			Budget:      services.budgetService,
 			Analytics:   services.analyticsService,
+			CreditCard:  services.creditCardService,
+			Loan:        services.loanService,
 		}, db)
 
 		issuer := cfg.MCP.BaseURL

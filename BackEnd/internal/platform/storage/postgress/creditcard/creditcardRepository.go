@@ -226,6 +226,44 @@ func (r *CreditCardRepository) UpdateBalanceByAmount(ctx context.Context, cardId
 	return nil
 }
 
+func (r *CreditCardRepository) SaveBalanceReset(ctx context.Context, reset *creditcard.CardBalanceReset) error {
+	query := `INSERT INTO card_balance_resets (id, balance_id, card_id, currency, previous_balance, notes, created_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, reset.Id, reset.BalanceId, reset.CardId,
+		reset.Currency, reset.PreviousBalance, reset.Notes, reset.CreatedAt)
+	if err != nil {
+		log.Error().Err(err).Str("card_id", reset.CardId).Str("balance_id", reset.BalanceId).Msg("Failed to save card balance reset")
+	}
+	return err
+}
+
+func (r *CreditCardRepository) FindBalanceResetsByCard(ctx context.Context, cardId string) ([]*creditcard.CardBalanceReset, error) {
+	query := `SELECT id, balance_id, card_id, currency, previous_balance, COALESCE(notes, ''), created_at
+		FROM card_balance_resets WHERE card_id = $1 ORDER BY created_at DESC`
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, cardId)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err = rows.Close(); err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	var resets []*creditcard.CardBalanceReset
+	for rows.Next() {
+		reset := &creditcard.CardBalanceReset{}
+		if err = rows.Scan(&reset.Id, &reset.BalanceId, &reset.CardId, &reset.Currency,
+			&reset.PreviousBalance, &reset.Notes, &reset.CreatedAt); err == nil {
+			resets = append(resets, reset)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return resets, nil
+}
+
 func (r *CreditCardRepository) SavePayment(ctx context.Context, payment *creditcard.CardPayment) error {
 	query := `INSERT INTO card_payments (id, card_id, from_account_id, currency, amount, source_currency, source_amount, exchange_rate, includes_interest, interest_amount, payment_date, status, notes, created_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`

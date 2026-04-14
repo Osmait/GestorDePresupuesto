@@ -85,6 +85,12 @@ func (m *mockCreditCardRepo) FindPaymentsByCardAndCurrency(context.Context, stri
 func (m *mockCreditCardRepo) GetTotalPaymentsByCardAndCurrency(context.Context, string, string) (float64, error) {
 	return 0, nil
 }
+func (m *mockCreditCardRepo) SaveBalanceReset(context.Context, *creditcardDomain.CardBalanceReset) error {
+	return nil
+}
+func (m *mockCreditCardRepo) FindBalanceResetsByCard(context.Context, string) ([]*creditcardDomain.CardBalanceReset, error) {
+	return nil, nil
+}
 
 type mockAccountRepo struct {
 	account *account.Account

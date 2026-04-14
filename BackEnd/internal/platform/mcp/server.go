@@ -8,6 +8,8 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 	"github.com/osmait/gestorDePresupuesto/internal/services/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
+	"github.com/osmait/gestorDePresupuesto/internal/services/creditcard"
+	"github.com/osmait/gestorDePresupuesto/internal/services/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 )
 
@@ -18,6 +20,8 @@ type Services struct {
 	Category    *category.CategoryServices
 	Budget      *budget.BudgetServices
 	Analytics   *analytics.AnalyticsService
+	CreditCard  *creditcard.CreditCardService
+	Loan        *loan.LoanService
 }
 
 // MCPServer wraps the mcp-go server and registers all tool handlers.

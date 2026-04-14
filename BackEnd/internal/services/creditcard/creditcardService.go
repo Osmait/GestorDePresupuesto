@@ -202,6 +202,74 @@ func (s *CreditCardService) UpdateBalance(ctx context.Context, balanceId string,
 	return dto.NewBalanceResponse(balance), nil
 }
 
+func (s *CreditCardService) ResetCardBalance(ctx context.Context, cardId string, userId string, req *dto.ResetBalanceRequest) (*dto.BalanceResetResponse, error) {
+	if _, err := s.cardRepo.FindCardById(ctx, cardId, userId); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("credit card not found")
+		}
+		return nil, err
+	}
+
+	var balance *creditcard.CardBalance
+	var err error
+	if req.BalanceId != "" {
+		balance, err = s.cardRepo.FindBalanceById(ctx, req.BalanceId)
+	} else if req.Currency != "" {
+		balance, err = s.cardRepo.FindBalanceByCardAndCurrency(ctx, cardId, req.Currency)
+	} else {
+		return nil, errors.New("balance_id or currency is required")
+	}
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.New("balance not found")
+		}
+		return nil, err
+	}
+	if balance.CardId != cardId {
+		return nil, errors.New("balance does not belong to this card")
+	}
+
+	previousBalance := balance.CurrentBalance
+
+	resetUuid, _ := ksuid.NewRandom()
+	reset := &creditcard.CardBalanceReset{
+		Id:              resetUuid.String(),
+		BalanceId:       balance.Id,
+		CardId:          cardId,
+		Currency:        balance.Currency,
+		PreviousBalance: previousBalance,
+		Notes:           req.Notes,
+		CreatedAt:       time.Now(),
+	}
+	if err := s.cardRepo.SaveBalanceReset(ctx, reset); err != nil {
+		return nil, err
+	}
+
+	balance.CurrentBalance = 0
+	balance.UpdatedAt = time.Now()
+	if err := s.cardRepo.UpdateBalance(ctx, balance); err != nil {
+		return nil, err
+	}
+
+	log.Info().Str("card_id", cardId).Str("balance_id", balance.Id).Float64("previous_balance", previousBalance).Msg("Card balance reset")
+	return dto.NewBalanceResetResponse(reset), nil
+}
+
+func (s *CreditCardService) FindBalanceResetsByCard(ctx context.Context, cardId string, userId string) ([]*dto.BalanceResetResponse, error) {
+	if _, err := s.cardRepo.FindCardById(ctx, cardId, userId); err != nil {
+		return nil, err
+	}
+	resets, err := s.cardRepo.FindBalanceResetsByCard(ctx, cardId)
+	if err != nil {
+		return nil, err
+	}
+	var responses []*dto.BalanceResetResponse
+	for _, r := range resets {
+		responses = append(responses, dto.NewBalanceResetResponse(r))
+	}
+	return responses, nil
+}
+
 func (s *CreditCardService) CreatePayment(ctx context.Context, cardId string, userId string, req *dto.CreatePaymentRequest) (*dto.PaymentResponse, error) {
 	if err := req.Validate(); err != nil {
 		return nil, err

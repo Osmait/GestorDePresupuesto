@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
+	transactionDomain "github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
 )
@@ -29,12 +30,52 @@ func (s *MCPServer) registerTools() {
 
 	s.server.AddTool(
 		mcp.NewTool("list_transactions",
-			mcp.WithDescription("List recent transactions across all accounts for the authenticated user"),
+			mcp.WithDescription("List transactions for the authenticated user. Supports filtering by date range, account, category and type."),
 			mcp.WithNumber("limit",
-				mcp.Description("Maximum number of transactions to return (default 20)"),
+				mcp.Description("Maximum number of transactions to return (default 20, max 100)"),
+			),
+			mcp.WithString("date_from",
+				mcp.Description("Filter: start date in YYYY-MM-DD or YYYY/MM/DD format"),
+			),
+			mcp.WithString("date_to",
+				mcp.Description("Filter: end date in YYYY-MM-DD or YYYY/MM/DD format"),
+			),
+			mcp.WithString("account_id",
+				mcp.Description("Filter by account ID"),
+			),
+			mcp.WithString("category_id",
+				mcp.Description("Filter by category ID"),
+			),
+			mcp.WithString("type",
+				mcp.Description("Filter by transaction type"),
+				mcp.Enum("income", "bill", "all"),
 			),
 		),
 		s.handleListTransactions,
+	)
+
+	s.server.AddTool(
+		mcp.NewTool("update_transaction",
+			mcp.WithDescription("Replace an existing transaction's core fields. Before calling, use list_transactions to fetch the current values and pass the full set of fields — any omitted required field will be rejected."),
+			mcp.WithString("id", mcp.Required(), mcp.Description("ID of the transaction to update")),
+			mcp.WithString("name", mcp.Required(), mcp.Description("Transaction name")),
+			mcp.WithNumber("amount", mcp.Required(), mcp.Description("Amount (positive number)")),
+			mcp.WithString("type", mcp.Required(), mcp.Description("Transaction type"), mcp.Enum("income", "bill")),
+			mcp.WithString("account_id", mcp.Required(), mcp.Description("Account ID")),
+			mcp.WithString("category_id", mcp.Required(), mcp.Description("Category ID")),
+			mcp.WithString("description", mcp.Description("Optional description")),
+			mcp.WithString("currency", mcp.Description("Currency code (e.g. USD, DOP). Defaults to USD")),
+			mcp.WithString("date", mcp.Description("Transaction date in RFC3339 (optional, preserves original if omitted — but if you need to preserve it, pass it explicitly)")),
+		),
+		s.handleUpdateTransaction,
+	)
+
+	s.server.AddTool(
+		mcp.NewTool("delete_transaction",
+			mcp.WithDescription("Delete a transaction owned by the authenticated user"),
+			mcp.WithString("id", mcp.Required(), mcp.Description("ID of the transaction to delete")),
+		),
+		s.handleDeleteTransaction,
 	)
 
 	s.server.AddTool(
@@ -87,6 +128,8 @@ func (s *MCPServer) registerTools() {
 		),
 		s.handleAnalyzeSpending,
 	)
+
+	s.registerExtraTools()
 }
 
 // withRLSTx opens a PostgreSQL transaction, sets the RLS user-id session variable,
@@ -184,11 +227,32 @@ func (s *MCPServer) handleListTransactions(ctx context.Context, req mcp.CallTool
 	filter.Limit = limit
 	filter.Page = 1
 	filter.Offset = 0
-	// Ensure date range is calculated for the default filter
+	filter.DateFrom = req.GetString("date_from", "")
+	filter.DateTo = req.GetString("date_to", "")
+	filter.AccountId = req.GetString("account_id", "")
+	filter.CategoryId = req.GetString("category_id", "")
+	if typeFilter := req.GetString("type", ""); typeFilter != "" {
+		filter.Type = typeFilter
+	}
+
+	// Parse date strings into CalculatedDateFrom/To (the repository relies on these).
+	// When empty, leave as zero so no date filter is applied.
+	if filter.DateFrom != "" {
+		parsed, perr := parseMCPDate(filter.DateFrom)
+		if perr != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid date_from: %s", perr)), nil
+		}
+		filter.CalculatedDateFrom = parsed
+	}
+	if filter.DateTo != "" {
+		parsed, perr := parseMCPDate(filter.DateTo)
+		if perr != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("invalid date_to: %s", perr)), nil
+		}
+		filter.CalculatedDateTo = parsed.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+	}
 	if calcErr := filter.Validate(); calcErr != nil {
-		// Non-fatal: proceed with defaults
-		filter = dto.NewTransactionFilter()
-		filter.Limit = limit
+		return mcp.NewToolResultError(fmt.Sprintf("invalid filter: %s", calcErr)), nil
 	}
 
 	result, err := s.services.Transaction.FindAllOfAllAccountsWithFilters(txCtx, userID, filter, false)
@@ -301,6 +365,118 @@ func (s *MCPServer) handleGetBalance(ctx context.Context, req mcp.CallToolReques
 	if err != nil {
 		return mcp.NewToolResultError("failed to serialize balances"), nil
 	}
+	return mcp.NewToolResultText(string(data)), nil
+}
+
+// parseMCPDate parses a date string accepting several common formats.
+func parseMCPDate(s string) (time.Time, error) {
+	layouts := []string{"2006-01-02", "2006/01/02", time.RFC3339}
+	for _, l := range layouts {
+		if t, err := time.Parse(l, s); err == nil {
+			return t, nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("unable to parse date: %s", s)
+}
+
+// handleUpdateTransaction updates an existing transaction owned by the authenticated user.
+func (s *MCPServer) handleUpdateTransaction(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID := mcpcontext.UserIDFromContext(ctx)
+	if userID == "" {
+		return mcp.NewToolResultError("missing user authentication"), nil
+	}
+
+	id, err := req.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+	name, err := req.RequireString("name")
+	if err != nil {
+		return mcp.NewToolResultError("name is required"), nil
+	}
+	amount := req.GetFloat("amount", 0)
+	if amount <= 0 {
+		return mcp.NewToolResultError("amount must be a positive number"), nil
+	}
+	txType, err := req.RequireString("type")
+	if err != nil {
+		return mcp.NewToolResultError("type is required"), nil
+	}
+	accountID, err := req.RequireString("account_id")
+	if err != nil {
+		return mcp.NewToolResultError("account_id is required"), nil
+	}
+	categoryID, err := req.RequireString("category_id")
+	if err != nil {
+		return mcp.NewToolResultError("category_id is required"), nil
+	}
+
+	txCtx, _, rollback, dbErr := s.withRLSTx(ctx, userID)
+	if dbErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("database error: %s", dbErr)), nil
+	}
+	defer rollback()
+
+	updated := transactionDomain.NewTransaction(
+		id,
+		name,
+		req.GetString("description", ""),
+		txType,
+		accountID,
+		categoryID,
+		amount,
+	)
+	updated.UserId = userID
+	updated.Currency = req.GetString("currency", "")
+	if dateStr := req.GetString("date", ""); dateStr != "" {
+		parsed, perr := time.Parse(time.RFC3339, dateStr)
+		if perr != nil {
+			return mcp.NewToolResultError("invalid date: expected RFC3339 format"), nil
+		}
+		updated.CreatedAt = parsed
+	}
+
+	if updateErr := s.services.Transaction.UpdateTransaction(txCtx, id, updated); updateErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to update transaction: %s", updateErr)), nil
+	}
+
+	if commitErr := mcpcontext.TxFromContext(txCtx).Commit(); commitErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to commit transaction: %s", commitErr)), nil
+	}
+
+	resp := map[string]string{"status": "updated", "id": id}
+	data, _ := json.Marshal(resp)
+	return mcp.NewToolResultText(string(data)), nil
+}
+
+// handleDeleteTransaction deletes a transaction owned by the authenticated user.
+func (s *MCPServer) handleDeleteTransaction(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID := mcpcontext.UserIDFromContext(ctx)
+	if userID == "" {
+		return mcp.NewToolResultError("missing user authentication"), nil
+	}
+
+	id, err := req.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+
+	txCtx, _, rollback, dbErr := s.withRLSTx(ctx, userID)
+	if dbErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("database error: %s", dbErr)), nil
+	}
+	defer rollback()
+
+	if delErr := s.services.Transaction.DeleteTransaction(txCtx, id, userID); delErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to delete transaction: %s", delErr)), nil
+	}
+
+	if commitErr := mcpcontext.TxFromContext(txCtx).Commit(); commitErr != nil {
+		return mcp.NewToolResultError(fmt.Sprintf("failed to commit transaction: %s", commitErr)), nil
+	}
+
+	resp := map[string]string{"status": "deleted", "id": id}
+	data, _ := json.Marshal(resp)
 	return mcp.NewToolResultText(string(data)), nil
 }
 

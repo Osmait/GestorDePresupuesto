@@ -98,6 +98,32 @@ export function useDeleteCreditCardMutation() {
 	})
 }
 
+export function useResetCardBalanceMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: async ({
+			cardId,
+			balanceId,
+			currency,
+			notes,
+		}: {
+			cardId: string
+			balanceId?: string
+			currency?: string
+			notes?: string
+		}) => {
+			const repo = await getCreditCardRepository()
+			return repo.resetBalance(cardId, { balance_id: balanceId, currency, notes })
+		},
+		onSuccess: (_, variables) => {
+			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.lists() })
+			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.summary() })
+			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.detail(variables.cardId) })
+		},
+	})
+}
+
 export function useCreatePaymentMutation() {
 	const queryClient = useQueryClient()
 
