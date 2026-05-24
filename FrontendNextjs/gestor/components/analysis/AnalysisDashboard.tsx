@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { CalendarRange, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -202,6 +202,13 @@ export function AnalysisDashboard() {
 			: 30
 
 	const avgDailySpend = totalExpenses / daysInRange
+
+	const monthsWithExpenses = monthlySummary.filter((m) => Math.abs(m.Gastos) > 0)
+	const avgMonthlyExpense =
+		monthsWithExpenses.length > 0
+			? monthsWithExpenses.reduce((sum, m) => sum + Math.abs(m.Gastos), 0) / monthsWithExpenses.length
+			: 0
+
 	const previousExpenses = previousSummary?.total_expenses || 0
 	const expenseDelta = previousExpenses > 0 ? ((totalExpenses - previousExpenses) / previousExpenses) * 100 : 0
 
@@ -386,7 +393,7 @@ export function AnalysisDashboard() {
 				</Card>
 			)}
 
-			<div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4'>
+			<div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5'>
 				<Card>
 					<CardHeader className='pb-1'>
 						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('income')}</CardTitle>
@@ -440,6 +447,23 @@ export function AnalysisDashboard() {
 							<p className='text-2xl font-semibold'>{formatDOP(avgDailySpend)}</p>
 						</div>
 						<p className='text-xs text-muted-foreground'>{t('daysAnalyzed', { days: daysInRange })}</p>
+					</CardContent>
+				</Card>
+
+				<Card>
+					<CardHeader className='pb-1'>
+						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('monthlyAvgExpense')}</CardTitle>
+					</CardHeader>
+					<CardContent className='pt-0'>
+						<div className='flex items-center gap-2'>
+							<CalendarRange className='h-4 w-4 text-muted-foreground' />
+							<p className='text-2xl font-semibold'>{formatDOP(avgMonthlyExpense)}</p>
+						</div>
+						<p className='text-xs text-muted-foreground'>
+							{monthsWithExpenses.length > 0
+								? t('monthsAnalyzed', { months: monthsWithExpenses.length })
+								: t('noMonthlyData')}
+						</p>
 					</CardContent>
 				</Card>
 			</div>
