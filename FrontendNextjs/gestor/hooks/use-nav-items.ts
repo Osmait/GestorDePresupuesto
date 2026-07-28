@@ -3,6 +3,7 @@
 import {
 	ArrowUpDown,
 	BarChart,
+	CalendarClock,
 	CreditCard,
 	CreditCard as CreditCardIcon,
 	FileCheck,
@@ -73,6 +74,13 @@ export function useNavItems() {
 			href: '/app/budget',
 			icon: PiggyBank,
 			description: t('budgetsDesc'),
+		},
+		{
+			title: t('monthlyPlan'),
+			href: '/app/monthly',
+			icon: CalendarClock,
+			badge: t('new'),
+			description: t('monthlyPlanDesc'),
 		},
 		...(isFeatureFlagsLoading || isEnabled('module_investments')
 			? [

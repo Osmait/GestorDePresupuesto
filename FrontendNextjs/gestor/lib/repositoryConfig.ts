@@ -14,6 +14,7 @@ import { CreditCardRepository } from '@/app/repository/creditcardRepository'
 import { ExchangeRateRepository } from '@/app/repository/exchangeRateRepository'
 import { InvestmentRepository } from '@/app/repository/investmentRepository'
 import { LoanRepository } from '@/app/repository/loanRepository'
+import { MonthlyPlanRepository } from '@/app/repository/monthlyPlanRepository'
 import { SearchRepository } from '@/app/repository/searchRepository'
 import { TransactionRepository } from '@/app/repository/transactionRepository'
 
@@ -31,6 +32,7 @@ let exchangeRateRepositoryInstance: ExchangeRateRepository | null = null
 let creditCardRepositoryInstance: CreditCardRepository | null = null
 let loanRepositoryInstance: LoanRepository | null = null
 let apiKeyRepositoryInstance: APIKeyRepository | null = null
+let monthlyPlanRepositoryInstance: MonthlyPlanRepository | null = null
 
 // Funciones para obtener repositorios (con singleton pattern)
 export const getAccountRepository = async () => {
@@ -124,6 +126,13 @@ export const getAPIKeyRepository = async () => {
 	return apiKeyRepositoryInstance
 }
 
+export const getMonthlyPlanRepository = async () => {
+	if (!monthlyPlanRepositoryInstance) {
+		monthlyPlanRepositoryInstance = new MonthlyPlanRepository()
+	}
+	return monthlyPlanRepositoryInstance
+}
+
 // Exportar instancias directas para compatibilidad
 export const accountRepository = new AccountRepository()
 export const authRepository = new AuthRepository()
@@ -138,6 +147,7 @@ export const exchangeRateRepository = new ExchangeRateRepository()
 export const creditCardRepository = new CreditCardRepository()
 export const loanRepository = new LoanRepository()
 export const apiKeyRepository = new APIKeyRepository()
+export const monthlyPlanRepository = new MonthlyPlanRepository()
 
 // Función para verificar si estamos en modo mock
 export const isMockMode = (): boolean => USE_MOCKS
@@ -162,3 +172,4 @@ export type IExchangeRateRepository = ExchangeRateRepository
 export type ICreditCardRepository = CreditCardRepository
 export type ILoanRepository = LoanRepository
 export type IAPIKeyRepository = APIKeyRepository
+export type IMonthlyPlanRepository = MonthlyPlanRepository
