@@ -31,6 +31,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/loan"
+	"github.com/osmait/gestorDePresupuesto/internal/services/monthly_plan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/passkey"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
@@ -59,6 +60,7 @@ type Server struct {
 	servicesCategory    *category.CategoryServices
 	analyticsService    *analytics.AnalyticsService
 	recurringService    *recurring_transaction.RecurringTransactionService
+	monthlyPlanService  *monthly_plan.MonthlyPlanService
 	searchService       *search.SearchService
 	investmentService   *investmentService.InvestmentService
 	quoteService        *quote.QuoteService
@@ -92,6 +94,7 @@ func New(ctx context.Context,
 	categoryServices *category.CategoryServices,
 	analyticsService *analytics.AnalyticsService,
 	recurringService *recurring_transaction.RecurringTransactionService,
+	monthlyPlanService *monthly_plan.MonthlyPlanService,
 	searchService *search.SearchService,
 	investmentService *investmentService.InvestmentService,
 	db *sql.DB,
@@ -122,6 +125,7 @@ func New(ctx context.Context,
 		servicesCategory:    categoryServices,
 		analyticsService:    analyticsService,
 		recurringService:    recurringService,
+		monthlyPlanService:  monthlyPlanService,
 		searchService:       searchService,
 		investmentService:   investmentService,
 		quoteService:        quoteService,
@@ -253,6 +257,7 @@ func (s *Server) registerRoutes() {
 	routes.BudgetRoutes(s.Engine, s.servicesBudget)
 	routes.AnalyticsRoutes(s.Engine, s.analyticsService)
 	routes.RecurringTransactionRoutes(s.Engine, s.recurringService)
+	routes.MonthlyPlanRoutes(s.Engine, s.monthlyPlanService)
 	routes.SearchRoutes(s.Engine, s.searchService)
 	routes.InvestmentRoutes(s.Engine, s.investmentService, s.db)
 	routes.CertificateRoutes(s.Engine, s.certificateService, s.db)

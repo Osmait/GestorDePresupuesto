@@ -10,6 +10,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/monthly_plan"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
 )
@@ -47,6 +48,25 @@ func GetNewRandomBudget() *budget.Budget {
 	balances, _ := faker.RandomInt(1, 10000000)
 	return budget.NewBudget(faker.UUIDDigit(), faker.UUIDDigit(), faker.UUIDDigit(),
 		float64(balances[0]))
+}
+
+// GetNewRandomMonthlyPlanItem builds a random active fixed expense in DOP with
+// no category, account or day set. Tests override whatever they care about.
+func GetNewRandomMonthlyPlanItem() *monthly_plan.MonthlyPlanItem {
+	amounts, _ := faker.RandomInt(1, 100000)
+	return monthly_plan.NewMonthlyPlanItem(
+		faker.UUIDDigit(),
+		faker.UUIDDigit(),
+		faker.Name(),
+		faker.Sentence(),
+		float64(amounts[0]),
+		monthly_plan.CurrencyDOP,
+		monthly_plan.TypeBill,
+		nil,
+		nil,
+		nil,
+		true,
+	)
 }
 
 func GetNewRandomInvestment() *investment.Investment {

@@ -32,6 +32,7 @@ import (
 	creditcardRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/creditcard"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
 	loanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/loan"
+	monthlyPlanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/monthly_plan"
 	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
 	passkeyRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/passkey"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
@@ -56,6 +57,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 	"github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/osmait/gestorDePresupuesto/internal/services/loan"
+	"github.com/osmait/gestorDePresupuesto/internal/services/monthly_plan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
 	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
@@ -162,6 +164,7 @@ func Run() error {
 		services.categoryService,
 		services.analyticsService,
 		services.recurringService,
+		services.monthlyPlanService,
 		services.searchService,
 		services.investmentService,
 		db,
@@ -277,6 +280,7 @@ type repositories struct {
 	investmentRepository   investmentRepo.InvestmentRepoInterface
 	analyticsRepository    *analyticsRepo.AnalyticsRepository
 	recurringRepository    *recurringRepo.RecurringTransactionRepository
+	monthlyPlanRepository  monthlyPlanRepo.MonthlyPlanRepoInterface
 	notificationRepository *notificationRepo.NotificationRepository
 	refreshTokenRepository authRepo.RefreshTokenRepositoryInterface
 	certificateRepository  certificateRepo.CertificateRepositoryInterface
@@ -297,6 +301,7 @@ func initializeRepositories(db *sql.DB) *repositories {
 		investmentRepository:   investmentRepo.NewInvestmentRepository(db),
 		analyticsRepository:    analyticsRepo.NewAnalyticsRepository(db),
 		recurringRepository:    recurringRepo.NewRecurringTransactionRepository(db),
+		monthlyPlanRepository:  monthlyPlanRepo.NewMonthlyPlanRepository(db),
 		notificationRepository: notificationRepo.NewNotificationRepository(db),
 		refreshTokenRepository: authRepo.NewRefreshTokenRepository(db),
 		certificateRepository:  certificateRepo.NewCertificateRepository(db),
@@ -318,6 +323,7 @@ type services struct {
 	investmentService   *investment.InvestmentService
 	analyticsService    *analytics.AnalyticsService
 	recurringService    *recurring_transaction.RecurringTransactionService
+	monthlyPlanService  *monthly_plan.MonthlyPlanService
 	searchService       *search.SearchService
 	quoteService        *quote.QuoteService
 	notificationService *notification.NotificationService
@@ -393,6 +399,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService, transactionService, repos.accountRepository, repos.categoryRepository),
 		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn),
 		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService),
+		monthlyPlanService:  monthly_plan.NewMonthlyPlanService(repos.monthlyPlanRepository, usdToDopRateFn),
 		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository, repos.loanRepository, repos.certificateRepository),
 		quoteService:        quoteService,
 		notificationService: notificationService,
