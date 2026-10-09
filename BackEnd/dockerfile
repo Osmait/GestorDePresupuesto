@@ -1,12 +1,22 @@
-FROM golang:alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
+
+COPY go.mod go.sum ./
+RUN go mod download
 
 COPY . .
 
-RUN go build -o gestorApp main.go
-RUN go install github.com/cosmtrek/air@latest
+# Migrations and tzdata are embedded in the binary, so the runtime image only needs the executable.
+RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/gestorApp .
 
-WORKDIR /app
+FROM alpine:3.20
 
-CMD ["air", "-c", "/app/.air.toml"]
+RUN apk add --no-cache ca-certificates \
+	&& adduser -D -H -u 10001 app
+
+COPY --from=builder /out/gestorApp /usr/local/bin/gestorApp
+
+USER app
+
+CMD ["gestorApp"]
