@@ -4,7 +4,8 @@ import * as http from 'http'
 import { mkdirSync, rmSync } from 'fs'
 import { PostgreSqlContainer, StartedPostgreSqlContainer } from '@testcontainers/postgresql'
 
-const BACKEND_URL = 'http://127.0.0.1:8080'
+const BACKEND_PORT = process.env.E2E_BACKEND_PORT || '8080'
+const BACKEND_URL = `http://127.0.0.1:${BACKEND_PORT}`
 const HEALTH_TIMEOUT_MS = 120_000
 const HEALTH_POLL_INTERVAL_MS = 1_000
 const HEALTH_REQUEST_TIMEOUT_MS = 2_000
@@ -121,7 +122,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
     DB_PASSWORD: 'e2e_pass',
     DB_SSL_MODE: 'disable',
     JWT_SECRET: 'e2e-playwright-jwt-secret-must-be-at-least-32-characters-long',
-    SERVER_PORT: '8080',
+    SERVER_PORT: BACKEND_PORT,
     SERVER_HOST: '0.0.0.0',
     GEMINI_API_KEY: '',
     ADMIN_ENABLED: 'false',

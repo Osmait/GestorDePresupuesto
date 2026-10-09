@@ -19,7 +19,7 @@ test.describe('Loans @prod-write', () => {
 		await expect(modal).toBeVisible()
 
 		await modal.locator('input').first().fill(borrowerName)
-		await modal.locator('input[type="number"]').first().fill('10000')
+		await modal.locator('input[type="number"]').first().fill('3000') // must fit the source account balance (overdrafts are blocked)
 		await modal.locator('input[type="number"]').nth(1).fill('5')
 
 		const sourceSelect = modal.locator('select').first()
@@ -32,7 +32,7 @@ test.describe('Loans @prod-write', () => {
 		await expect(loanRow).toBeVisible({ timeout: 20000 })
 		await expect(loanRow.getByText(/active|activo/i)).toBeVisible()
 
-		await loanRow.getByRole('button', { name: /^Cancel$|^Cancelar$/i }).click()
+		await loanRow.getByRole('button', { name: new RegExp(`^(Cancel loan for|Cancelar préstamo de) ${borrowerName}$`, 'i') }).click()
 
 		const cancelDialog = page.getByRole('dialog', { name: /Cancel Loan|Cancelar Préstamo/i })
 		await expect(cancelDialog).toBeVisible()
@@ -101,7 +101,7 @@ test.describe('Loans @prod-write', () => {
 		await expect(detailsDialog).not.toBeVisible({ timeout: 20000 })
 
 		// Cleanup — cancel the loan
-		await loanRow.getByRole('button', { name: /^Cancel$|^Cancelar$/i }).click()
+		await loanRow.getByRole('button', { name: new RegExp(`^(Cancel loan for|Cancelar préstamo de) ${borrowerName}$`, 'i') }).click()
 
 		const cancelDialog = page.getByRole('dialog', { name: /Cancel Loan|Cancelar Préstamo/i })
 		await expect(cancelDialog).toBeVisible()
