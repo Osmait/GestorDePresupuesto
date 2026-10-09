@@ -3,6 +3,7 @@
 import { AlertCircle } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
+import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
 import { CertificateActions } from '@/components/certificates/CertificateActions'
 import { CertificateProvider, useCertificates } from '@/components/certificates/CertificateContext'
@@ -16,9 +17,11 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { isFundingAccount } from '@/lib/accounts'
 import { Certificate, CreateCertificateDTO, UpdateCertificateDTO } from '@/types/certificate'
 
 function CertificatesContent() {
+	const t = useTranslations('certificates')
 	const { certificates, summary, isLoading, error, createCertificate, updateCertificate, deleteCertificate } =
 		useCertificates()
 	const { data: accountsData } = useGetAccounts()
@@ -33,8 +36,9 @@ function CertificatesContent() {
 	const selectedCertificateId = searchParams.get('selected') || ''
 	const openParam = searchParams.get('open') || ''
 
+	// Interest is paid out to a cash account: credit cards are not valid payout accounts.
 	const accounts =
-		accountsData?.map((a: any) => ({
+		accountsData?.filter(isFundingAccount).map((a) => ({
 			id: a.id,
 			name: a.name,
 			bank: a.bank,
@@ -51,7 +55,7 @@ function CertificatesContent() {
 	}
 
 	const handleDelete = async (id: string) => {
-		if (confirm('Are you sure you want to cancel this certificate?')) {
+		if (confirm(t('confirmCancel'))) {
 			await deleteCertificate(id)
 		}
 	}
@@ -103,7 +107,7 @@ function CertificatesContent() {
 	}) => {
 		const tempCertificate: Certificate = {
 			id: 'temp',
-			bank: 'Simulation',
+			bank: t('simulationBank'),
 			base_capital: data.capital,
 			interest_type: data.interestType as 'simple' | 'compound',
 			current_interest_rate: data.rate,
@@ -134,22 +138,22 @@ function CertificatesContent() {
 
 	if (error) {
 		return (
-			<div className='container mx-auto p-6'>
+			<div className='container mx-auto px-4 py-8'>
 				<Alert variant='destructive'>
 					<AlertCircle className='h-4 w-4' />
-					<AlertTitle>Error</AlertTitle>
-					<AlertDescription>Failed to load certificates. Please try again.</AlertDescription>
+					<AlertTitle>{t('loadErrorTitle')}</AlertTitle>
+					<AlertDescription>{t('loadError')}</AlertDescription>
 				</Alert>
 			</div>
 		)
 	}
 
 	return (
-		<div className='container mx-auto p-6 space-y-6'>
-			<div className='flex justify-between items-center'>
-				<div>
-					<h1 className='text-3xl font-bold'>Certificates</h1>
-					<p className='text-muted-foreground'>Manage your financial certificates and track interest payments</p>
+		<div className='container mx-auto px-4 py-8 space-y-6'>
+			<div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+				<div className='min-w-0'>
+					<h1 className='text-2xl font-bold sm:text-3xl'>{t('title')}</h1>
+					<p className='text-muted-foreground'>{t('subtitle')}</p>
 				</div>
 			</div>
 
@@ -187,6 +191,8 @@ function CertificatesContent() {
 }
 
 export default function CertificatesPage() {
+	const t = useTranslations('certificates')
+	const tCommon = useTranslations('common.moduleDisabled')
 	const { status } = useSession()
 	const router = useRouter()
 	const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
@@ -204,11 +210,11 @@ export default function CertificatesPage() {
 
 	if (!isCertificatesModuleEnabled) {
 		return (
-			<div className='container mx-auto p-6 space-y-4'>
-				<h1 className='text-2xl font-semibold'>Certificates</h1>
-				<p className='text-muted-foreground'>This module is currently disabled for your account.</p>
+			<div className='container mx-auto px-4 py-8 space-y-4'>
+				<h1 className='text-2xl font-semibold'>{t('title')}</h1>
+				<p className='text-muted-foreground'>{tCommon('message')}</p>
 				<Button variant='outline' onClick={() => router.push('/app')}>
-					Go to dashboard
+					{tCommon('goToDashboard')}
 				</Button>
 			</div>
 		)

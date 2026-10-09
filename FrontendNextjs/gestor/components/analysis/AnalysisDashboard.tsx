@@ -1,7 +1,7 @@
 'use client'
 
 import { motion } from 'framer-motion'
-import { CalendarRange, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { BarChart3, CalendarRange, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -15,6 +15,8 @@ import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetDashboardSummary } from '@/hooks/queries/useAnalyticsQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { formatCurrency } from '@/lib/utils'
 import { AnalyticsQueryFilters } from '@/types/analytics'
 import { useAnalysisContext } from './AnalysisContext'
 
@@ -39,6 +41,19 @@ const AnalysisHeatMap = dynamic(() => import('@/components/charts/AnalysisHeatMa
 	loading: () => <div className='h-full w-full bg-muted/20 animate-pulse rounded' />,
 })
 
+/** True when there is at least one finite, non-zero value: nivo renders `d="null"`/NaN paths otherwise. */
+export function hasPlottableValues(values: Array<number | null | undefined>): boolean {
+	return values.some((value) => typeof value === 'number' && Number.isFinite(value) && value !== 0)
+}
+
+function ChartEmptyState({ label }: { label: string }) {
+	return (
+		<div className='flex h-full items-center justify-center text-sm text-muted-foreground' role='status'>
+			{label}
+		</div>
+	)
+}
+
 const mockHeat = [
 	{
 		id: 'Lun',
@@ -53,6 +68,7 @@ export function AnalysisDashboard() {
 	const { theme } = useTheme()
 	const router = useRouter()
 	const t = useTranslations('analysis')
+	const locale = useAppLocale()
 	const { filters } = useAnalysisContext()
 	const categoryPalette = ['#22c55e', '#0ea5e9', '#f59e0b', '#f97316', '#eab308', '#14b8a6', '#ef4444', '#8b5cf6']
 	const { data: accounts = [] } = useGetAccounts()
@@ -192,7 +208,8 @@ export function AnalysisDashboard() {
 	const totalIncome = dashboardSummary?.total_income || 0
 	const totalExpenses = dashboardSummary?.total_expenses || 0
 	const netAmount = dashboardSummary?.net_amount || 0
-	const savingsRate = totalIncome > 0 ? (netAmount / totalIncome) * 100 : 0
+	// Without income there is no meaningful savings rate (avoid "Ahorro bajo 0.0%").
+	const savingsRate = totalIncome > 0 ? (netAmount / totalIncome) * 100 : null
 
 	const selectedFrom = activeFilters.date_from ? new Date(`${activeFilters.date_from}T00:00:00`) : null
 	const selectedTo = activeFilters.date_to ? new Date(`${activeFilters.date_to}T00:00:00`) : null
@@ -216,12 +233,8 @@ export function AnalysisDashboard() {
 	const normalizeAmount = (value: number) => Math.round(Math.abs(value) * 100) / 100
 	const topCategoryShare = totalExpenses > 0 && topCategory ? (topCategory.value / totalExpenses) * 100 : 0
 	const hasBudgetForTopCategory = topCategory ? budgets.some((budget) => budget.category_id === topCategory.id) : false
-	const formatDOP = (value: number) =>
-		new Intl.NumberFormat('es-DO', {
-			style: 'currency',
-			currency: 'DOP',
-			maximumFractionDigits: 2,
-		}).format(value)
+	// Analytics amounts come from the API converted to DOP.
+	const formatDOP = (value: number) => formatCurrency(value, 'DOP', { locale })
 
 	const accountName = accounts.find((a) => a.id === filters.account)?.name
 	const categoryName = categories.find((c) => c.id === filters.category)?.name
@@ -330,7 +343,10 @@ export function AnalysisDashboard() {
 		})
 	}
 
-	if (savingsRate < 10) {
+	const hasActivity =
+		totalIncome > 0 || totalExpenses > 0 || hasPlottableValues(categoryExpenses.map((item) => item.value))
+
+	if (savingsRate !== null && savingsRate < 10) {
 		insights.push({
 			title: t('insightSavingsLowTitle'),
 			detail: t('insightSavingsLowDetail', { rate: savingsRate.toFixed(1) }),
@@ -338,7 +354,7 @@ export function AnalysisDashboard() {
 			actionLabel: t('viewTransactions'),
 			onAction: openTransactionsForCurrentFilters,
 		})
-	} else if (savingsRate >= 20) {
+	} else if (savingsRate !== null && savingsRate >= 20) {
 		insights.push({
 			title: t('insightSavingsGoodTitle'),
 			detail: t('insightSavingsGoodDetail', { rate: savingsRate.toFixed(1) }),
@@ -361,7 +377,7 @@ export function AnalysisDashboard() {
 		})
 	}
 
-	if (insights.length === 0) {
+	if (insights.length === 0 && hasActivity) {
 		insights.push({
 			title: t('insightBalancedTitle'),
 			detail: t('insightBalancedDetail'),
@@ -427,11 +443,11 @@ export function AnalysisDashboard() {
 					</CardHeader>
 					<CardContent className='pt-0'>
 						<div className='flex items-center gap-2'>
-							<p className='text-2xl font-semibold'>{savingsRate.toFixed(1)}%</p>
-							{savingsRate >= 20 ? (
-								<TrendingUp className='h-4 w-4 text-success' />
+							<p className='text-2xl font-semibold'>{savingsRate === null ? '—' : `${savingsRate.toFixed(1)}%`}</p>
+							{savingsRate === null ? null : savingsRate >= 20 ? (
+								<TrendingUp className='h-4 w-4 text-success' aria-hidden='true' />
 							) : (
-								<TrendingDown className='h-4 w-4 text-destructive' />
+								<TrendingDown className='h-4 w-4 text-destructive' aria-hidden='true' />
 							)}
 						</div>
 					</CardContent>
@@ -467,6 +483,16 @@ export function AnalysisDashboard() {
 					</CardContent>
 				</Card>
 			</div>
+
+			{!hasActivity && (
+				<Card>
+					<CardContent className='flex flex-col items-center gap-2 py-10 text-center'>
+						<BarChart3 className='h-10 w-10 text-muted-foreground/60' aria-hidden='true' />
+						<p className='font-semibold text-foreground'>{t('emptyTitle')}</p>
+						<p className='max-w-md text-sm text-muted-foreground'>{t('emptyDescription')}</p>
+					</CardContent>
+				</Card>
+			)}
 
 			<div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
 				{insights.slice(0, 3).map((insight) => (
@@ -557,9 +583,9 @@ export function AnalysisDashboard() {
 
 									return (
 										<div key={row.id} className='rounded-lg border border-border/50 p-3'>
-											<div className='mb-1 flex items-center justify-between gap-3'>
-												<p className='text-sm font-medium text-foreground'>{row.categoryLabel}</p>
-												<div className='flex items-center gap-2'>
+											<div className='mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1'>
+												<p className='min-w-0 truncate text-sm font-medium text-foreground'>{row.categoryLabel}</p>
+												<div className='flex flex-wrap items-center gap-2'>
 													<p className='text-xs text-muted-foreground'>
 														{formatDOP(row.spent)} / {formatDOP(row.budgetAmount)}
 													</p>
@@ -603,32 +629,36 @@ export function AnalysisDashboard() {
 						<CardTitle>{t('incomeExpensesByMonth')}</CardTitle>
 					</CardHeader>
 					<CardContent style={{ height: 300 }}>
-						<AnalysisLineChart
-							data={
-								monthlySummary && monthlySummary.length > 0
-									? [
-											{
-												id: t('income'),
-												color: '#22c55e',
-												data: monthlySummary.map((m) => ({ x: m.month, y: m.Ingresos })),
-											},
-											{
-												id: t('expenses'),
-												color: '#f97316',
-												data: monthlySummary.map((m) => ({ x: m.month, y: Math.abs(m.Gastos) })),
-											},
-										]
-									: []
-							}
-							theme={theme}
-							nivoTheme={nivoTheme}
-							t={{
-								income: t('income'),
-								expenses: t('expenses'),
-								month: t('month'),
-								amount: t('amount'),
-							}}
-						/>
+						{!hasPlottableValues(monthlySummary.flatMap((m) => [m.Ingresos, m.Gastos])) ? (
+							<ChartEmptyState label={t('noData')} />
+						) : (
+							<AnalysisLineChart
+								data={
+									monthlySummary && monthlySummary.length > 0
+										? [
+												{
+													id: t('income'),
+													color: '#22c55e',
+													data: monthlySummary.map((m) => ({ x: m.month, y: m.Ingresos })),
+												},
+												{
+													id: t('expenses'),
+													color: '#f97316',
+													data: monthlySummary.map((m) => ({ x: m.month, y: Math.abs(m.Gastos) })),
+												},
+											]
+										: []
+								}
+								theme={theme}
+								nivoTheme={nivoTheme}
+								t={{
+									income: t('income'),
+									expenses: t('expenses'),
+									month: t('month'),
+									amount: t('amount'),
+								}}
+							/>
+						)}
 					</CardContent>
 				</Card>
 
@@ -637,18 +667,22 @@ export function AnalysisDashboard() {
 						<CardTitle>{t('expensesByCategory')}</CardTitle>
 					</CardHeader>
 					<CardContent style={{ height: 300 }}>
-						<AnalysisBarChart
-							data={
-								categoryExpenses && categoryExpenses.length > 0
-									? categoryExpenses.map((cat) => ({ categoria: cat.label, monto: normalizeAmount(cat.value) }))
-									: []
-							}
-							nivoTheme={nivoTheme}
-							t={{
-								category: t('category'),
-								amount: t('amount'),
-							}}
-						/>
+						{!hasPlottableValues(categoryExpenses.map((cat) => cat.value)) ? (
+							<ChartEmptyState label={t('noData')} />
+						) : (
+							<AnalysisBarChart
+								data={
+									categoryExpenses && categoryExpenses.length > 0
+										? categoryExpenses.map((cat) => ({ categoria: cat.label, monto: normalizeAmount(cat.value) }))
+										: []
+								}
+								nivoTheme={nivoTheme}
+								t={{
+									category: t('category'),
+									amount: t('amount'),
+								}}
+							/>
+						)}
 					</CardContent>
 				</Card>
 
@@ -657,20 +691,24 @@ export function AnalysisDashboard() {
 						<CardTitle>{t('categoryDistribution')}</CardTitle>
 					</CardHeader>
 					<CardContent style={{ height: 300 }}>
-						<AnalysisPieChart
-							data={
-								categoryExpenses && categoryExpenses.length > 0
-									? categoryExpenses.map((cat, index) => ({
-											id: cat.label || cat.id,
-											label: cat.label || cat.id,
-											value: normalizeAmount(cat.value),
-											color: cat.color || categoryPalette[index % categoryPalette.length],
-										}))
-									: []
-							}
-							theme={theme}
-							nivoTheme={nivoTheme}
-						/>
+						{!hasPlottableValues(categoryExpenses.map((cat) => cat.value)) ? (
+							<ChartEmptyState label={t('noData')} />
+						) : (
+							<AnalysisPieChart
+								data={
+									categoryExpenses && categoryExpenses.length > 0
+										? categoryExpenses.map((cat, index) => ({
+												id: cat.label || cat.id,
+												label: cat.label || cat.id,
+												value: normalizeAmount(cat.value),
+												color: cat.color || categoryPalette[index % categoryPalette.length],
+											}))
+										: []
+								}
+								theme={theme}
+								nivoTheme={nivoTheme}
+							/>
+						)}
 					</CardContent>
 				</Card>
 
@@ -679,20 +717,25 @@ export function AnalysisDashboard() {
 						<CardTitle>{t('categoryRadar')}</CardTitle>
 					</CardHeader>
 					<CardContent style={{ height: 300 }}>
-						<AnalysisRadarChart
-							data={
-								categoryExpenses && categoryExpenses.length > 0
-									? categoryExpenses.map((cat) => ({
-											categoria: cat.label,
-											[t('expenses')]: normalizeAmount(cat.value),
-										}))
-									: []
-							}
-							nivoTheme={nivoTheme}
-							t={{
-								expenses: t('expenses'),
-							}}
-						/>
+						{/* A radar needs at least 3 axes to draw a polygon. */}
+						{categoryExpenses.length < 3 || !hasPlottableValues(categoryExpenses.map((cat) => cat.value)) ? (
+							<ChartEmptyState label={t('noData')} />
+						) : (
+							<AnalysisRadarChart
+								data={
+									categoryExpenses && categoryExpenses.length > 0
+										? categoryExpenses.map((cat) => ({
+												categoria: cat.label,
+												[t('expenses')]: normalizeAmount(cat.value),
+											}))
+										: []
+								}
+								nivoTheme={nivoTheme}
+								t={{
+									expenses: t('expenses'),
+								}}
+							/>
+						)}
 					</CardContent>
 				</Card>
 

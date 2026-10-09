@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCreditCardRepository } from '@/lib/repositoryConfig'
 import { CreateCreditCardDTO, CreatePaymentDTO } from '@/types/creditcard'
+import { invalidateFinancialData } from './invalidateFinancialData'
 import { ACCOUNT_KEYS } from './useAccountsQuery'
 
 export const CREDIT_CARD_KEYS = {
@@ -117,6 +118,7 @@ export function useResetCardBalanceMutation() {
 			return repo.resetBalance(cardId, { balance_id: balanceId, currency, notes })
 		},
 		onSuccess: (_, variables) => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.summary() })
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.detail(variables.cardId) })
@@ -133,6 +135,7 @@ export function useCreatePaymentMutation() {
 			return repo.createPayment(cardId, data)
 		},
 		onSuccess: (_, variables) => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.summary() })
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.payments(variables.cardId) })

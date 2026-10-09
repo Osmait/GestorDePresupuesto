@@ -1,6 +1,7 @@
 'use client'
 
 import { Check, Copy, Key, Loader2, Plus, Trash2 } from 'lucide-react'
+import { useLocale, useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -19,9 +20,8 @@ import { Separator } from '@/components/ui/separator'
 import { useCreateAPIKeyMutation, useGetAPIKeys, useRevokeAPIKeyMutation } from '@/hooks/queries/useAPIKeysQuery'
 import { CreateAPIKeyResponse } from '@/types/apikey'
 
-function formatDate(dateStr: string | null): string {
-	if (!dateStr) return 'Nunca'
-	return new Date(dateStr).toLocaleDateString('es-ES', {
+function formatDate(dateStr: string, locale: string): string {
+	return new Date(dateStr).toLocaleDateString(locale, {
 		year: 'numeric',
 		month: 'short',
 		day: 'numeric',
@@ -29,6 +29,8 @@ function formatDate(dateStr: string | null): string {
 }
 
 export function APIKeysSection() {
+	const t = useTranslations('settingsModal.apiKeys')
+	const locale = useLocale()
 	const { data: apiKeys = [], isLoading } = useGetAPIKeys()
 	const createMutation = useCreateAPIKeyMutation()
 	const revokeMutation = useRevokeAPIKeyMutation()
@@ -47,7 +49,7 @@ export function APIKeysSection() {
 			setCreatedKey(result)
 			setNewKeyName('')
 		} catch {
-			toast.error('Error al crear la clave API')
+			toast.error(t('createError'))
 		}
 	}
 
@@ -62,7 +64,7 @@ export function APIKeysSection() {
 		if (!createdKey) return
 		await navigator.clipboard.writeText(createdKey.token)
 		setCopiedToken(true)
-		toast.success('Token copiado al portapapeles')
+		toast.success(t('tokenCopied'))
 		setTimeout(() => setCopiedToken(false), 2000)
 	}
 
@@ -70,10 +72,10 @@ export function APIKeysSection() {
 		if (!revokeDialogId) return
 		try {
 			await revokeMutation.mutateAsync(revokeDialogId)
-			toast.success('Clave API revocada')
+			toast.success(t('revoked'))
 			setRevokeDialogId(null)
 		} catch {
-			toast.error('Error al revocar la clave API')
+			toast.error(t('revokeError'))
 		}
 	}
 
@@ -92,7 +94,7 @@ export function APIKeysSection() {
 	const handleCopyConfig = async () => {
 		await navigator.clipboard.writeText(claudeConfig)
 		setCopiedConfig(true)
-		toast.success('Configuración copiada al portapapeles')
+		toast.success(t('configCopied'))
 		setTimeout(() => setCopiedConfig(false), 2000)
 	}
 
@@ -100,8 +102,8 @@ export function APIKeysSection() {
 		<div className='space-y-8 animate-in fade-in-50 duration-300'>
 			{/* Header */}
 			<div>
-				<h3 className='text-lg font-medium'>Claves API</h3>
-				<p className='text-sm text-muted-foreground'>Administra las claves API para integraciones con servidores MCP</p>
+				<h3 className='text-lg font-medium'>{t('title')}</h3>
+				<p className='text-sm text-muted-foreground'>{t('description')}</p>
 				<Separator className='my-4' />
 			</div>
 
@@ -109,7 +111,7 @@ export function APIKeysSection() {
 			<div className='flex justify-end'>
 				<Button onClick={() => setCreateDialogOpen(true)} size='sm' className='gap-2'>
 					<Plus className='h-4 w-4' />
-					Nueva clave
+					{t('newKey')}
 				</Button>
 			</div>
 
@@ -121,8 +123,8 @@ export function APIKeysSection() {
 			) : apiKeys.length === 0 ? (
 				<div className='flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-muted/20'>
 					<Key className='h-8 w-8 text-muted-foreground mb-3' />
-					<p className='text-sm font-medium'>No hay claves API</p>
-					<p className='text-xs text-muted-foreground mt-1'>Crea una clave para conectar clientes MCP</p>
+					<p className='text-sm font-medium'>{t('emptyTitle')}</p>
+					<p className='text-xs text-muted-foreground mt-1'>{t('emptyDescription')}</p>
 				</div>
 			) : (
 				<div className='space-y-3'>
@@ -133,18 +135,22 @@ export function APIKeysSection() {
 									<span className='font-medium text-sm truncate'>{key.name}</span>
 									{key.is_active ? (
 										<Badge variant='outline' className='text-green-500 border-green-500 shrink-0'>
-											Activa
+											{t('active')}
 										</Badge>
 									) : (
 										<Badge variant='outline' className='text-muted-foreground shrink-0'>
-											Inactiva
+											{t('inactive')}
 										</Badge>
 									)}
 								</div>
 								<p className='text-xs text-muted-foreground font-mono'>{key.key_prefix}...</p>
 								<div className='flex gap-4 text-xs text-muted-foreground'>
-									<span>Creada: {formatDate(key.created_at)}</span>
-									<span>Último uso: {formatDate(key.last_used_at)}</span>
+									<span>{t('createdAt', { date: formatDate(key.created_at, locale) })}</span>
+									<span>
+										{t('lastUsedAt', {
+											date: key.last_used_at ? formatDate(key.last_used_at, locale) : t('never'),
+										})}
+									</span>
 								</div>
 							</div>
 							<Button
@@ -152,6 +158,7 @@ export function APIKeysSection() {
 								size='sm'
 								className='text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0'
 								onClick={() => setRevokeDialogId(key.id)}
+								aria-label={t('revokeAria', { name: key.name })}
 							>
 								<Trash2 className='h-4 w-4' />
 							</Button>
@@ -162,9 +169,9 @@ export function APIKeysSection() {
 
 			{/* Claude Desktop configuration */}
 			<div>
-				<h3 className='text-lg font-medium'>Configuración de Claude Desktop</h3>
+				<h3 className='text-lg font-medium'>{t('configTitle')}</h3>
 				<p className='text-sm text-muted-foreground'>
-					Añade esta configuración a tu archivo{' '}
+					{t('configDescription')}{' '}
 					<code className='text-xs bg-muted px-1 py-0.5 rounded'>claude_desktop_config.json</code>
 				</p>
 				<Separator className='my-4' />
@@ -172,7 +179,7 @@ export function APIKeysSection() {
 					<pre className='text-xs bg-muted rounded-lg p-4 overflow-x-auto border'>{claudeConfig}</pre>
 					<Button variant='outline' size='sm' className='absolute top-2 right-2 gap-1.5' onClick={handleCopyConfig}>
 						{copiedConfig ? <Check className='h-3.5 w-3.5' /> : <Copy className='h-3.5 w-3.5' />}
-						{copiedConfig ? 'Copiado' : 'Copiar'}
+						{copiedConfig ? t('copied') : t('copy')}
 					</Button>
 				</div>
 			</div>
@@ -181,20 +188,18 @@ export function APIKeysSection() {
 			<Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseCreateDialog()}>
 				<DialogContent className='sm:max-w-md'>
 					<DialogHeader>
-						<DialogTitle>Crear nueva clave API</DialogTitle>
-						<DialogDescription>Dale un nombre descriptivo a la clave para identificarla fácilmente.</DialogDescription>
+						<DialogTitle>{t('createTitle')}</DialogTitle>
+						<DialogDescription>{t('createDescription')}</DialogDescription>
 					</DialogHeader>
 
 					{createdKey ? (
 						<div className='space-y-4'>
 							<div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/50 p-4'>
-								<p className='text-sm font-medium text-amber-700 dark:text-amber-400'>Guarda este token ahora</p>
-								<p className='text-xs text-amber-600/80 dark:text-amber-400/80 mt-1'>
-									Este token no se volverá a mostrar. Cópialo y guárdalo en un lugar seguro.
-								</p>
+								<p className='text-sm font-medium text-amber-700 dark:text-amber-400'>{t('saveTokenTitle')}</p>
+								<p className='text-xs text-amber-600/80 dark:text-amber-400/80 mt-1'>{t('saveTokenDescription')}</p>
 							</div>
 							<div className='space-y-2'>
-								<Label>Token</Label>
+								<Label>{t('token')}</Label>
 								<div className='flex gap-2'>
 									<code className='flex-1 text-xs bg-muted rounded-md px-3 py-2 border font-mono break-all'>
 										{createdKey.token}
@@ -206,17 +211,17 @@ export function APIKeysSection() {
 							</div>
 							<DialogFooter>
 								<Button onClick={handleCloseCreateDialog} className='w-full'>
-									Ya lo guardé, cerrar
+									{t('savedClose')}
 								</Button>
 							</DialogFooter>
 						</div>
 					) : (
 						<>
 							<div className='space-y-2'>
-								<Label htmlFor='key-name'>Nombre</Label>
+								<Label htmlFor='key-name'>{t('name')}</Label>
 								<Input
 									id='key-name'
-									placeholder='ej. Claude Desktop'
+									placeholder={t('namePlaceholder')}
 									value={newKeyName}
 									onChange={(e) => setNewKeyName(e.target.value)}
 									onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
@@ -224,7 +229,7 @@ export function APIKeysSection() {
 							</div>
 							<DialogFooter>
 								<Button variant='outline' onClick={handleCloseCreateDialog}>
-									Cancelar
+									{t('cancel')}
 								</Button>
 								<Button
 									onClick={handleCreateKey}
@@ -232,7 +237,7 @@ export function APIKeysSection() {
 									className='gap-2'
 								>
 									{createMutation.isPending && <Loader2 className='h-4 w-4 animate-spin' />}
-									Crear clave
+									{t('create')}
 								</Button>
 							</DialogFooter>
 						</>
@@ -244,14 +249,12 @@ export function APIKeysSection() {
 			<Dialog open={!!revokeDialogId} onOpenChange={(open) => !open && setRevokeDialogId(null)}>
 				<DialogContent className='sm:max-w-md'>
 					<DialogHeader>
-						<DialogTitle>Revocar clave API</DialogTitle>
-						<DialogDescription>
-							Esta acción es irreversible. La clave dejará de funcionar inmediatamente y no podrás recuperarla.
-						</DialogDescription>
+						<DialogTitle>{t('revokeTitle')}</DialogTitle>
+						<DialogDescription>{t('revokeDescription')}</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
 						<Button variant='outline' onClick={() => setRevokeDialogId(null)}>
-							Cancelar
+							{t('cancel')}
 						</Button>
 						<Button
 							variant='destructive'
@@ -260,7 +263,7 @@ export function APIKeysSection() {
 							className='gap-2'
 						>
 							{revokeMutation.isPending && <Loader2 className='h-4 w-4 animate-spin' />}
-							Revocar clave
+							{t('revoke')}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

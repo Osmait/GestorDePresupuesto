@@ -4,6 +4,8 @@ import { DollarSign, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { AnimatedFlashNumber } from '@/components/common/AnimatedFlashNumber'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { formatCurrency } from '@/lib/utils'
 import { Transaction, TransactionSummary } from '@/types/transaction'
 
 export default function TransactionSummaryCard({
@@ -14,6 +16,10 @@ export default function TransactionSummaryCard({
 	summary?: TransactionSummary | null
 }) {
 	const t = useTranslations('transactions')
+	const locale = useAppLocale()
+	// Totals come from the API already converted to DOP.
+	const formatDOP = (value: number) => formatCurrency(value, 'DOP', { locale })
+	const formatUSD = (value: number) => formatCurrency(value, 'USD', { locale })
 	const totalIncome = summary?.total_income ?? 0
 	const totalExpenses = summary?.total_expenses ?? 0
 	const incomeDOP = summary?.income_dop ?? 0
@@ -35,48 +41,40 @@ export default function TransactionSummaryCard({
 					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5'>
 						<TrendingUp className='h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400' />
 						<p className='text-sm font-medium text-muted-foreground'>{t('totalIncome')}</p>
-						<p className='text-2xl font-bold'>
+						<p className='text-xl sm:text-2xl font-bold break-words'>
 							<AnimatedFlashNumber
 								value={totalIncome}
 								className='text-green-600 dark:text-green-400'
 								duration={1}
-								separator=','
-								prefix='$'
+								decimals={2}
+								formattingFn={formatDOP}
 								preserveValue={true}
 							/>
 						</p>
-						<p className='text-xs text-muted-foreground'>
-							DOP: {incomeDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
-						</p>
-						<p className='text-xs text-muted-foreground'>
-							USD: {incomeUSD.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-						</p>
+						<p className='text-xs text-muted-foreground'>DOP: {formatDOP(incomeDOP)}</p>
+						<p className='text-xs text-muted-foreground'>USD: {formatUSD(incomeUSD)}</p>
 					</div>
 					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-red-500/10 to-rose-500/10 dark:from-red-500/5 dark:to-rose-500/5'>
 						<TrendingDown className='h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400' />
 						<p className='text-sm font-medium text-muted-foreground'>{t('totalExpenses')}</p>
-						<p className='text-2xl font-bold'>
+						<p className='text-xl sm:text-2xl font-bold break-words'>
 							<AnimatedFlashNumber
 								value={totalExpenses}
 								className='text-red-600 dark:text-red-400'
 								inverse={true}
 								duration={1}
-								separator=','
-								prefix='$'
+								decimals={2}
+								formattingFn={formatDOP}
 								preserveValue={true}
 							/>
 						</p>
-						<p className='text-xs text-muted-foreground'>
-							DOP: {expensesDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
-						</p>
-						<p className='text-xs text-muted-foreground'>
-							USD: {expensesUSD.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}
-						</p>
+						<p className='text-xs text-muted-foreground'>DOP: {formatDOP(expensesDOP)}</p>
+						<p className='text-xs text-muted-foreground'>USD: {formatUSD(expensesUSD)}</p>
 					</div>
 					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5'>
 						<DollarSign className='h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400' />
 						<p className='text-sm font-medium text-muted-foreground'>{t('totalTransactions')}</p>
-						<p className='text-2xl font-bold'>
+						<p className='text-xl sm:text-2xl font-bold break-words'>
 							<AnimatedFlashNumber
 								value={totalTransactions}
 								className='text-blue-600 dark:text-blue-400'

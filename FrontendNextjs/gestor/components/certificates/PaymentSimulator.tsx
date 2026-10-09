@@ -2,7 +2,8 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Calculator, ChevronDown, ChevronUp } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import * as z from 'zod'
@@ -12,18 +13,22 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Certificate, formatCurrency, InterestType } from '@/types/certificate'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { formatCurrency } from '@/lib/utils'
+import { Certificate, InterestType } from '@/types/certificate'
 
-const simulatorSchema = z.object({
-	capital: z.coerce.number().min(0.01, 'Capital must be greater than 0'),
-	interestRate: z.coerce.number().min(0.01).max(100),
-	taxRate: z.coerce.number().min(0).max(100),
-	months: z.coerce.number().min(1).max(120),
-	interestType: z.enum(['simple', 'compound']),
-	reinvestInterest: z.boolean(),
-})
+function createSimulatorSchema(t: (key: string) => string) {
+	return z.object({
+		capital: z.coerce.number().min(0.01, t('errors.capitalMin')),
+		interestRate: z.coerce.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
+		taxRate: z.coerce.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+		months: z.coerce.number().min(1, t('errors.monthsRange')).max(120, t('errors.monthsRange')),
+		interestType: z.enum(['simple', 'compound']),
+		reinvestInterest: z.boolean(),
+	})
+}
 
-type FormData = z.infer<typeof simulatorSchema>
+type FormData = z.infer<ReturnType<typeof createSimulatorSchema>>
 
 interface SimulationResult {
 	month: number
@@ -41,6 +46,12 @@ interface PaymentSimulatorProps {
 }
 
 export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSimulatorProps) {
+	const t = useTranslations('certificates.simulator')
+	const tType = useTranslations('certificates.interestType')
+	const simulatorSchema = useMemo(() => createSimulatorSchema(t), [t])
+	const locale = useAppLocale()
+	const currency = certificate?.currency || 'DOP'
+	const money = (value: number) => formatCurrency(value, currency, { locale })
 	const [results, setResults] = useState<SimulationResult[]>([])
 	const [showDetail, setShowDetail] = useState(false)
 
@@ -149,46 +160,46 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 				<DialogHeader>
 					<DialogTitle className='flex items-center gap-2'>
 						<Calculator className='h-5 w-5' />
-						Simulador de Certificado
+						{t('title')}
 					</DialogTitle>
 				</DialogHeader>
 
 				<form onSubmit={handleSubmit(onFormSubmit)} className='space-y-4'>
 					<div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
 						<div className='space-y-2'>
-							<Label htmlFor='capital'>Capital Base</Label>
+							<Label htmlFor='capital'>{t('capital')}</Label>
 							<Input id='capital' type='number' step='0.01' {...register('capital')} />
 							{errors.capital && <p className='text-sm text-red-500'>{errors.capital.message}</p>}
 						</div>
 
 						<div className='space-y-2'>
-							<Label htmlFor='interestRate'>Tasa de Interés (%)</Label>
+							<Label htmlFor='interestRate'>{t('interestRate')}</Label>
 							<Input id='interestRate' type='number' step='0.01' {...register('interestRate')} />
 							{errors.interestRate && <p className='text-sm text-red-500'>{errors.interestRate.message}</p>}
 						</div>
 
 						<div className='space-y-2'>
-							<Label htmlFor='taxRate'>Tasa de Impuesto (%)</Label>
+							<Label htmlFor='taxRate'>{t('taxRate')}</Label>
 							<Input id='taxRate' type='number' step='0.01' {...register('taxRate')} />
 							{errors.taxRate && <p className='text-sm text-red-500'>{errors.taxRate.message}</p>}
 						</div>
 
 						<div className='space-y-2'>
-							<Label htmlFor='months'>Meses a Proyectar</Label>
+							<Label htmlFor='months'>{t('months')}</Label>
 							<Input id='months' type='number' min={1} max={120} {...register('months')} />
 							{errors.months && <p className='text-sm text-red-500'>{errors.months.message}</p>}
 						</div>
 					</div>
 
 					<div className='space-y-2'>
-						<Label>Tipo de Interés</Label>
+						<Label>{t('interestType')}</Label>
 						<Select value={interestType} onValueChange={(value: InterestType) => setValue('interestType', value)}>
 							<SelectTrigger>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
-								<SelectItem value='simple'>Simple</SelectItem>
-								<SelectItem value='compound'>Compuesto</SelectItem>
+								<SelectItem value='simple'>{tType('simple')}</SelectItem>
+								<SelectItem value='compound'>{tType('compound')}</SelectItem>
 							</SelectContent>
 						</Select>
 					</div>
@@ -201,14 +212,14 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 								onCheckedChange={(checked) => setValue('reinvestInterest', checked)}
 							/>
 							<Label htmlFor='reinvestInterest' className='font-normal'>
-								Reinvertir intereses netos
+								{t('reinvest')}
 							</Label>
 						</div>
 					)}
 
 					<Button type='submit' className='w-full'>
 						<Calculator className='h-4 w-4 mr-2' />
-						Calcular Proyección
+						{t('calculate')}
 					</Button>
 				</form>
 
@@ -216,21 +227,21 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 					<div className='space-y-4 mt-4 pt-4 border-t'>
 						<div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
 							<div className='p-3 rounded-lg bg-muted'>
-								<p className='text-xs text-muted-foreground'>Total Interés Bruto</p>
-								<p className='text-lg font-semibold'>{formatCurrency(totals.totalGross)}</p>
+								<p className='text-xs text-muted-foreground'>{t('totalGross')}</p>
+								<p className='text-lg font-semibold'>{money(totals.totalGross)}</p>
 							</div>
 							<div className='p-3 rounded-lg bg-orange-500/10'>
-								<p className='text-xs text-muted-foreground'>Total Impuestos</p>
-								<p className='text-lg font-semibold text-orange-500'>{formatCurrency(totals.totalTax)}</p>
+								<p className='text-xs text-muted-foreground'>{t('totalTax')}</p>
+								<p className='text-lg font-semibold text-orange-500'>{money(totals.totalTax)}</p>
 							</div>
 							<div className='p-3 rounded-lg bg-green-500/10'>
-								<p className='text-xs text-muted-foreground'>Total Interés Neto</p>
-								<p className='text-lg font-semibold text-green-500'>{formatCurrency(totals.totalNet)}</p>
+								<p className='text-xs text-muted-foreground'>{t('totalNet')}</p>
+								<p className='text-lg font-semibold text-green-500'>{money(totals.totalNet)}</p>
 							</div>
 						</div>
 
 						<div className='rounded-lg border p-3'>
-							<p className='mb-3 text-xs text-muted-foreground'>Evolución Mensual</p>
+							<p className='mb-3 text-xs text-muted-foreground'>{t('monthlyEvolution')}</p>
 							<div className='h-56 w-full'>
 								<ResponsiveContainer width='100%' height='100%'>
 									<LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
@@ -255,11 +266,11 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 											}}
 											formatter={(value: number | string | undefined, name: string | undefined) => {
 												const numericValue = typeof value === 'number' ? value : Number(value || 0)
-												if (name === 'capital') return [formatCurrency(numericValue), 'Capital']
-												if (name === 'totalWithNet') return [formatCurrency(numericValue), 'Capital + Neto']
+												if (name === 'capital') return [money(numericValue), t('capitalSeries')]
+												if (name === 'totalWithNet') return [money(numericValue), t('capitalPlusNet')]
 												return [String(value ?? ''), name || '']
 											}}
-											labelFormatter={(label) => `Mes ${label}`}
+											labelFormatter={(label) => t('monthLabel', { month: String(label) })}
 										/>
 										<Line
 											type='monotone'
@@ -286,12 +297,12 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 							{showDetail ? (
 								<>
 									<ChevronUp className='h-4 w-4 mr-2' />
-									Ocultar Detalle Mensual
+									{t('hideDetail')}
 								</>
 							) : (
 								<>
 									<ChevronDown className='h-4 w-4 mr-2' />
-									Ver Detalle Mensual
+									{t('showDetail')}
 								</>
 							)}
 						</Button>
@@ -299,33 +310,31 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 						{showDetail && (
 							<div className='rounded-lg border overflow-hidden'>
 								<div className='w-full max-w-full overflow-x-auto'>
-									<table className='w-full min-w-[820px] table-auto text-sm'>
+									<table className='w-full min-w-[640px] table-auto text-sm'>
 										<thead className='bg-muted'>
 											<tr>
-												<th className='px-3 py-2 text-left whitespace-nowrap'>Mes</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>Capital</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>Bruto</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>Impuesto</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>Neto</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>Acumulado</th>
+												<th className='px-3 py-2 text-left whitespace-nowrap'>{t('month')}</th>
+												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('capitalSeries')}</th>
+												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('gross')}</th>
+												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('tax')}</th>
+												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('net')}</th>
+												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('accumulated')}</th>
 											</tr>
 										</thead>
 										<tbody>
 											{results.map((row) => (
 												<tr key={row.month} className='border-t'>
 													<td className='px-3 py-2 whitespace-nowrap'>{row.month}</td>
-													<td className='px-3 py-2 text-right whitespace-nowrap'>{formatCurrency(row.capital)}</td>
-													<td className='px-3 py-2 text-right whitespace-nowrap'>
-														{formatCurrency(row.grossInterest)}
-													</td>
+													<td className='px-3 py-2 text-right whitespace-nowrap'>{money(row.capital)}</td>
+													<td className='px-3 py-2 text-right whitespace-nowrap'>{money(row.grossInterest)}</td>
 													<td className='px-3 py-2 text-right text-orange-500 whitespace-nowrap'>
-														-{formatCurrency(row.taxWithheld)}
+														-{money(row.taxWithheld)}
 													</td>
 													<td className='px-3 py-2 text-right text-green-500 whitespace-nowrap'>
-														{formatCurrency(row.netInterest)}
+														{money(row.netInterest)}
 													</td>
 													<td className='px-3 py-2 text-right font-medium whitespace-nowrap'>
-														{formatCurrency(row.accumulatedNet)}
+														{money(row.accumulatedNet)}
 													</td>
 												</tr>
 											))}

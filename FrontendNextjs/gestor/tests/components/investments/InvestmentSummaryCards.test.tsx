@@ -1,5 +1,6 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import { InvestmentSummaryCards } from '@/components/investments/InvestmentSummaryCards'
+import { renderWithIntl } from '@/tests/utils/intl'
 
 describe('InvestmentSummaryCards', () => {
 	const mockMetrics = {
@@ -10,7 +11,7 @@ describe('InvestmentSummaryCards', () => {
 	}
 
 	it('renders metrics correctly', () => {
-		render(<InvestmentSummaryCards metrics={mockMetrics} />)
+		renderWithIntl(<InvestmentSummaryCards metrics={mockMetrics} />)
 
 		expect(screen.getByText('Total Value')).toBeInTheDocument()
 		expect(screen.getByText((content) => content.includes('5,000'))).toBeInTheDocument()
@@ -19,9 +20,7 @@ describe('InvestmentSummaryCards', () => {
 		expect(screen.getByText((content) => content.includes('4,000'))).toBeInTheDocument()
 
 		expect(screen.getByText('Total Profit/Loss')).toBeInTheDocument()
-		expect(screen.getByText((content) => content.includes('+') && content.includes('1,000'))).toHaveClass(
-			'text-green-600',
-		)
+		expect(screen.getByText('+US$1,000.00')).toHaveClass('text-green-600')
 
 		expect(screen.getByText('ROI')).toBeInTheDocument()
 		expect(screen.getByText('25.00%')).toHaveClass('text-green-600')
@@ -34,11 +33,9 @@ describe('InvestmentSummaryCards', () => {
 			totalProfit: -1000,
 			roi: -25.0,
 		}
-		render(<InvestmentSummaryCards metrics={negativeMetrics} />)
+		renderWithIntl(<InvestmentSummaryCards metrics={negativeMetrics} />)
 
-		expect(screen.getByText((content) => content.includes('1,000') && !content.includes('+'))).toHaveClass(
-			'text-red-600',
-		)
+		expect(screen.getByText('-US$1,000.00')).toHaveClass('text-red-600')
 		expect(screen.getByText('-25.00%')).toHaveClass('text-red-600')
 	})
 })

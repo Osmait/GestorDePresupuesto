@@ -12,13 +12,15 @@ import {
 	X,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import * as React from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { useSearchQuery } from '@/hooks/queries/useSearchQuery'
-import { cn } from '@/lib/utils'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { cn, formatCurrency } from '@/lib/utils'
 
 // Component for search results (shared between mobile and desktop)
 function SearchResults({
@@ -30,6 +32,10 @@ function SearchResults({
 	isLoading: boolean
 	onSelect: (_path: string) => void
 }) {
+	const t = useTranslations('search')
+	const locale = useAppLocale()
+	const money = (value: number | undefined | null, currency?: string | null) =>
+		formatCurrency(Number(value ?? 0), currency, { locale })
 	const hasResults =
 		data &&
 		((data.transactions && data.transactions.length > 0) ||
@@ -42,13 +48,13 @@ function SearchResults({
 	if (isLoading) {
 		return (
 			<div className='p-4 flex justify-center items-center text-sm text-muted-foreground'>
-				<Loader2 className='mr-2 h-4 w-4 animate-spin' /> Buscando...
+				<Loader2 className='mr-2 h-4 w-4 animate-spin' /> {t('searching')}
 			</div>
 		)
 	}
 
 	if (!hasResults) {
-		return <div className='p-4 text-center text-sm text-muted-foreground'>No se encontraron resultados.</div>
+		return <div className='p-4 text-center text-sm text-muted-foreground'>{t('noResults')}</div>
 	}
 
 	return (
@@ -57,7 +63,7 @@ function SearchResults({
 			{data?.transactions && data.transactions.length > 0 && (
 				<div className='px-2 py-1'>
 					<h4 className='flex items-center text-xs font-semibold text-muted-foreground mb-1 px-2'>
-						<ArrowUpDown className='mr-2 h-3 w-3' /> Transacciones
+						<ArrowUpDown className='mr-2 h-3 w-3' /> {t('transactions')}
 					</h4>
 					{data.transactions.map((tx: any) => (
 						<div
@@ -75,8 +81,8 @@ function SearchResults({
 											: 'text-red-500',
 									)}
 								>
-									{tx.type_transation === 'income' || tx.type_transation === 'loan_collection' ? '+' : '-'}$
-									{Math.abs(tx.amount).toLocaleString()}
+									{tx.type_transation === 'income' || tx.type_transation === 'loan_collection' ? '+' : '-'}
+									{money(Math.abs(tx.amount), tx.currency)}
 								</span>
 							)}
 						</div>
@@ -90,7 +96,7 @@ function SearchResults({
 					{data.transactions && data.transactions.length > 0 && <div className='h-px bg-border my-1 mx-2' />}
 					<div className='px-2 py-1'>
 						<h4 className='flex items-center text-xs font-semibold text-muted-foreground mb-1 px-2'>
-							<CreditCard className='mr-2 h-3 w-3' /> Cuentas
+							<CreditCard className='mr-2 h-3 w-3' /> {t('accounts')}
 						</h4>
 						{data.accounts.map((acc: any) => (
 							<div
@@ -114,7 +120,7 @@ function SearchResults({
 					{(data.transactions?.length > 0 || data.accounts?.length > 0) && <div className='h-px bg-border my-1 mx-2' />}
 					<div className='px-2 py-1'>
 						<h4 className='flex items-center text-xs font-semibold text-muted-foreground mb-1 px-2'>
-							<Tags className='mr-2 h-3 w-3' /> Categorías
+							<Tags className='mr-2 h-3 w-3' /> {t('categories')}
 						</h4>
 						{data.categories.map((cat: any) => (
 							<div
@@ -138,7 +144,7 @@ function SearchResults({
 					)}
 					<div className='px-2 py-1'>
 						<h4 className='flex items-center text-xs font-semibold text-muted-foreground mb-1 px-2'>
-							<PiggyBank className='mr-2 h-3 w-3' /> Presupuestos
+							<PiggyBank className='mr-2 h-3 w-3' /> {t('budgets')}
 						</h4>
 						{data.budgets.map((bud: any) => (
 							<div
@@ -146,8 +152,8 @@ function SearchResults({
 								className='flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors'
 								onClick={() => onSelect(`/app/budget?selected=${bud.id}`)}
 							>
-								<span>{bud.category_name || 'Presupuesto'}</span>
-								<span className='font-mono text-xs'>${bud.amount}</span>
+								<span>{bud.category_name || t('budget')}</span>
+								<span className='font-mono text-xs'>{money(bud.amount)}</span>
 							</div>
 						))}
 					</div>
@@ -163,7 +169,7 @@ function SearchResults({
 						data.budgets?.length > 0) && <div className='h-px bg-border my-1 mx-2' />}
 					<div className='px-2 py-1'>
 						<h4 className='flex items-center text-xs font-semibold text-muted-foreground mb-1 px-2'>
-							<HandCoins className='mr-2 h-3 w-3' /> Préstamos
+							<HandCoins className='mr-2 h-3 w-3' /> {t('loans')}
 						</h4>
 						{data.loans.map((loan: any) => (
 							<div
@@ -171,13 +177,12 @@ function SearchResults({
 								className='flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors'
 								onClick={() => onSelect(`/app/loans?selected=${loan.id || loan.Id}&open=details`)}
 							>
-								<span>{loan.borrower_name || loan.BorrowerName || 'Préstamo'}</span>
+								<span>{loan.borrower_name || loan.BorrowerName || t('loan')}</span>
 								<span className='font-mono text-xs'>
-									$
-									{loan.pending_amount?.toLocaleString?.() ??
-										loan.PendingAmount?.toLocaleString?.() ??
-										loan.total_amount ??
-										loan.TotalAmount}
+									{money(
+										loan.pending_amount ?? loan.PendingAmount ?? loan.total_amount ?? loan.TotalAmount,
+										loan.currency,
+									)}
 								</span>
 							</div>
 						))}
@@ -195,7 +200,7 @@ function SearchResults({
 						data.loans?.length > 0) && <div className='h-px bg-border my-1 mx-2' />}
 					<div className='px-2 py-1'>
 						<h4 className='flex items-center text-xs font-semibold text-muted-foreground mb-1 px-2'>
-							<Building2 className='mr-2 h-3 w-3' /> Certificados
+							<Building2 className='mr-2 h-3 w-3' /> {t('certificates')}
 						</h4>
 						{data.certificates.map((certificate: any) => (
 							<div
@@ -203,8 +208,8 @@ function SearchResults({
 								className='flex items-center justify-between px-2 py-2 text-sm rounded-md hover:bg-accent hover:text-accent-foreground cursor-pointer transition-colors'
 								onClick={() => onSelect(`/app/certificates?selected=${certificate.id}&open=history`)}
 							>
-								<span>{certificate.bank || 'Certificado'}</span>
-								<span className='font-mono text-xs'>${certificate.base_capital?.toLocaleString?.() ?? 0}</span>
+								<span>{certificate.bank || t('certificate')}</span>
+								<span className='font-mono text-xs'>{money(certificate.base_capital, certificate.currency)}</span>
 							</div>
 						))}
 					</div>
@@ -215,6 +220,7 @@ function SearchResults({
 }
 
 export function Search() {
+	const t = useTranslations('search')
 	const [query, setQuery] = React.useState('')
 	const [debouncedQuery, setDebouncedQuery] = React.useState('')
 	const [open, setOpen] = React.useState(false)
@@ -269,7 +275,13 @@ export function Search() {
 	return (
 		<>
 			{/* Mobile: Icon button that opens fullscreen modal */}
-			<Button variant='ghost' size='sm' className='md:hidden' onClick={() => setMobileOpen(true)}>
+			<Button
+				variant='ghost'
+				size='sm'
+				className='md:hidden'
+				aria-label={t('open')}
+				onClick={() => setMobileOpen(true)}
+			>
 				<SearchIcon className='h-4 w-4' />
 			</Button>
 
@@ -284,14 +296,20 @@ export function Search() {
 								<Input
 									ref={mobileInputRef}
 									type='search'
-									placeholder='Buscar transacciones, cuentas...'
+									placeholder={t('placeholderLong')}
 									className='pl-9 h-10'
 									value={query}
 									onChange={(e) => setQuery(e.target.value)}
 									autoFocus
 								/>
 							</div>
-							<Button variant='ghost' size='sm' onClick={handleMobileClose} className='flex-shrink-0'>
+							<Button
+								variant='ghost'
+								size='sm'
+								onClick={handleMobileClose}
+								className='flex-shrink-0'
+								aria-label={t('close')}
+							>
 								<X className='h-4 w-4' />
 							</Button>
 						</div>
@@ -303,9 +321,7 @@ export function Search() {
 							) : (
 								<div className='p-8 text-center text-muted-foreground'>
 									<SearchIcon className='h-12 w-12 mx-auto mb-4 opacity-20' />
-									<p className='text-sm'>
-										Escribe para buscar en tus transacciones, cuentas, categorías y presupuestos.
-									</p>
+									<p className='text-sm'>{t('hint')}</p>
 								</div>
 							)}
 						</div>
@@ -318,7 +334,7 @@ export function Search() {
 				<SearchIcon className='absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none' />
 				<Input
 					type='search'
-					placeholder='Buscar...'
+					placeholder={t('placeholder')}
 					className='w-full pl-8 pr-4'
 					value={query}
 					onChange={(e) => {

@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { ArrowRightLeft, Loader2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
@@ -18,6 +19,10 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useFundBrokerMutation, useGetInvestmentFundingBalances } from '@/hooks/queries/useInvestmentsQuery'
+import { isFundingAccount } from '@/lib/accounts'
+import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { formatCurrency } from '@/lib/utils'
 
 interface InvestmentFundingModalProps {
 	isOpen: boolean
@@ -26,22 +31,30 @@ interface InvestmentFundingModalProps {
 
 const SUPPORTED_CURRENCIES = ['USD', 'DOP']
 
-const fundingSchema = z.object({
-	sourceAccountID: z.string().min(1, 'Select a source account'),
-	sourceAmount: z.coerce.number().positive('Source amount must be greater than 0'),
-	targetCurrency: z.string().min(1),
-	exchangeRate: z.coerce.number().min(0),
-	feeAmount: z.coerce.number().min(0),
-	notes: z.string().optional().default(''),
-})
+function createFundingSchema(t: (key: string) => string) {
+	return z.object({
+		sourceAccountID: z.string().min(1, t('errors.sourceRequired')),
+		sourceAmount: z.coerce.number().positive(t('errors.amountPositive')),
+		targetCurrency: z.string().min(1),
+		exchangeRate: z.coerce.number().min(0),
+		feeAmount: z.coerce.number().min(0),
+		notes: z.string().optional().default(''),
+	})
+}
 
-type FundingFormValues = z.infer<typeof fundingSchema>
+type FundingFormValues = z.infer<ReturnType<typeof createFundingSchema>>
 
 export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingModalProps) {
-	const { data: accounts = [] } = useGetAccounts()
+	const t = useTranslations('investments.funding')
+	const tForms = useTranslations('forms')
+	const fundingSchema = useMemo(() => createFundingSchema(t), [t])
+	const locale = useAppLocale()
+	const { data: allAccounts = [] } = useGetAccounts()
+	// A credit card is debt, not cash: it cannot fund the broker wallet.
+	const accounts = useMemo(() => allAccounts.filter(isFundingAccount), [allAccounts])
 	const { data: balances = [] } = useGetInvestmentFundingBalances()
 	const fundMutation = useFundBrokerMutation()
-	const [error, setError] = useState<string | null>(null)
+	const [error, setError] = useState<{ message: string; detail?: string | null } | null>(null)
 
 	const form = useForm<FundingFormValues>({
 		resolver: zodResolver(fundingSchema),
@@ -86,7 +99,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 		setError(null)
 
 		if (requiresExchangeRate && values.exchangeRate <= 0) {
-			setError('Exchange rate is required when currencies differ')
+			setError({ message: t('errors.exchangeRateRequired') })
 			return
 		}
 
@@ -101,25 +114,28 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 			})
 			onClose()
 		} catch (submitError: unknown) {
-			setError(submitError instanceof Error ? submitError.message : 'Failed to fund broker balance')
+			setError({
+				message: t('errors.failed'),
+				detail: getInsufficientFundsMessage(submitError, tForms, locale) ?? getSafeErrorDetail(submitError),
+			})
 		}
 	}
 
 	return (
 		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className='sm:max-w-[560px]'>
+			<DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-[560px]'>
 				<DialogHeader>
-					<DialogTitle>Fund broker balance</DialogTitle>
-					<DialogDescription>Move funds from a bank account into your investment wallet.</DialogDescription>
+					<DialogTitle>{t('title')}</DialogTitle>
+					<DialogDescription>{t('description')}</DialogDescription>
 				</DialogHeader>
 
 				<div className='rounded-md border p-3 text-sm'>
-					<p className='font-medium'>Current wallet balances</p>
+					<p className='font-medium'>{t('walletBalances')}</p>
 					<div className='mt-1 space-y-1 text-muted-foreground'>
-						{balances.length === 0 && <p>No funding yet.</p>}
+						{balances.length === 0 && <p>{t('noFunding')}</p>}
 						{balances.map((balance) => (
 							<p key={balance.currency}>
-								{balance.currency}: {balance.available.toFixed(2)}
+								{balance.currency}: {formatCurrency(balance.available, balance.currency, { locale })}
 							</p>
 						))}
 					</div>
@@ -127,7 +143,10 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 
 				{error && (
 					<Alert variant='destructive'>
-						<AlertDescription>{error}</AlertDescription>
+						<AlertDescription>
+							<p>{error.message}</p>
+							{error.detail && <p className='text-xs opacity-90'>{error.detail}</p>}
+						</AlertDescription>
 					</Alert>
 				)}
 
@@ -138,11 +157,11 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 							name='sourceAccountID'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Source account</FormLabel>
+									<FormLabel>{t('sourceAccount')}</FormLabel>
 									<Select value={field.value} onValueChange={field.onChange}>
 										<FormControl>
 											<SelectTrigger>
-												<SelectValue placeholder='Select account' />
+												<SelectValue placeholder={t('selectAccount')} />
 											</SelectTrigger>
 										</FormControl>
 										<SelectContent>
@@ -153,6 +172,13 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 											))}
 										</SelectContent>
 									</Select>
+									{selectedAccount?.current_balance !== undefined && (
+										<p className='text-xs text-muted-foreground'>
+											{tForms('availableBalance', {
+												amount: formatCurrency(selectedAccount.current_balance, sourceCurrency, { locale }),
+											})}
+										</p>
+									)}
 									<FormMessage />
 								</FormItem>
 							)}
@@ -164,7 +190,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 								name='sourceAmount'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Amount from account ({sourceCurrency})</FormLabel>
+										<FormLabel>{t('amountFromAccount', { currency: sourceCurrency })}</FormLabel>
 										<FormControl>
 											<Input type='number' step='any' {...field} />
 										</FormControl>
@@ -178,7 +204,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 								name='targetCurrency'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Target wallet currency</FormLabel>
+										<FormLabel>{t('targetCurrency')}</FormLabel>
 										<Select value={field.value} onValueChange={field.onChange}>
 											<FormControl>
 												<SelectTrigger>
@@ -204,7 +230,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 								render={({ field }) => (
 									<FormItem>
 										<FormLabel>
-											Exchange rate ({sourceCurrency} per {watchedValues.targetCurrency})
+											{t('exchangeRate', { source: sourceCurrency, target: watchedValues.targetCurrency })}
 										</FormLabel>
 										<FormControl>
 											<Input type='number' step='any' {...field} disabled={!requiresExchangeRate} />
@@ -219,7 +245,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 								name='feeAmount'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Bank/FX fees ({sourceCurrency})</FormLabel>
+										<FormLabel>{t('fees', { currency: sourceCurrency })}</FormLabel>
 										<FormControl>
 											<Input type='number' step='any' {...field} />
 										</FormControl>
@@ -230,15 +256,11 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 						</div>
 
 						<div className='rounded-md border p-3 text-sm text-muted-foreground'>
-							<p className='font-medium text-foreground'>Estimated credit</p>
-							<div className='mt-1 flex items-center gap-2'>
-								<span>
-									{(Number(watchedValues.sourceAmount) || 0).toFixed(2)} {sourceCurrency}
-								</span>
+							<p className='font-medium text-foreground'>{t('estimatedCredit')}</p>
+							<div className='mt-1 flex flex-wrap items-center gap-2'>
+								<span>{formatCurrency(Number(watchedValues.sourceAmount) || 0, sourceCurrency, { locale })}</span>
 								<ArrowRightLeft className='h-4 w-4' />
-								<span>
-									{estimatedTargetAmount.toFixed(2)} {watchedValues.targetCurrency}
-								</span>
+								<span>{formatCurrency(estimatedTargetAmount, watchedValues.targetCurrency, { locale })}</span>
 							</div>
 						</div>
 
@@ -247,9 +269,9 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 							name='notes'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Notes (optional)</FormLabel>
+									<FormLabel>{t('notes')}</FormLabel>
 									<FormControl>
-										<Input {...field} placeholder='Transfer to broker account' />
+										<Input {...field} placeholder={t('notesPlaceholder')} />
 									</FormControl>
 								</FormItem>
 							)}
@@ -258,7 +280,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 						<DialogFooter>
 							<Button type='submit' disabled={fundMutation.isPending}>
 								{fundMutation.isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-								Fund broker
+								{t('submit')}
 							</Button>
 						</DialogFooter>
 					</form>

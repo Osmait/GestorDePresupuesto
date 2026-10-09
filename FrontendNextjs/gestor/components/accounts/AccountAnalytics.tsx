@@ -1,7 +1,7 @@
 'use client'
 
 import { ArrowDownCircle, ArrowUpCircle, TrendingUp } from 'lucide-react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
 import {
 	Area,
@@ -19,6 +19,9 @@ import {
 	YAxis,
 } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { isInflowTransaction } from '@/lib/transaction-utils'
+import { DEFAULT_CURRENCY, formatCurrency } from '@/lib/utils'
 import { Category } from '@/types/category'
 import { Transaction } from '@/types/transaction'
 
@@ -26,14 +29,29 @@ interface AccountAnalyticsProps {
 	transactions: Transaction[]
 	categories: Category[]
 	currentBalance: number
+	/** Currency of the account; all its transactions are shown in it. */
+	currency?: string
 }
 
 const COLORS = ['#10b981', '#ef4444'] // Green for Income, Red for Expense
 const TOP_CATEGORIES_COUNT = 5
 
-export function AccountAnalytics({ transactions, categories, currentBalance }: AccountAnalyticsProps) {
+// Recharts measures its parent: a fixed numeric height (instead of "100%")
+// gives it a definite size from the first render and avoids the
+// "width(-1) and height(-1)" warning; min-w-0 lets grid items shrink.
+const CHART_HEIGHT = 200
+const HISTORY_CHART_HEIGHT = 250
+
+export function AccountAnalytics({
+	transactions,
+	categories,
+	currentBalance,
+	currency = DEFAULT_CURRENCY,
+}: AccountAnalyticsProps) {
 	const t = useTranslations('analysis')
-	const locale = useLocale()
+	const locale = useAppLocale()
+	const formatMoney = (value: number, signDisplay?: 'exceptZero') =>
+		formatCurrency(value, currency, { locale, signDisplay })
 
 	const stats = useMemo(() => {
 		let income = 0
@@ -79,9 +97,8 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 
 		const historyPoints: { date: string; fullDate: Date; balance: number }[] = []
 		// Push current state
-		const dateLocale = locale === 'es' ? 'es-ES' : 'en-US'
 		historyPoints.push({
-			date: new Date().toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+			date: formatLocalDate(new Date(), locale, { month: 'short', day: 'numeric' }),
 			fullDate: new Date(),
 			balance: balanceTracker,
 		})
@@ -90,15 +107,14 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 			// To go back in time:
 			// If transaction was Income (+), we SUBTRACT it to get previous balance.
 			// If transaction was Expense (-), we ADD it (using abs amount) to get previous balance.
-			const INCOME_TYPES = ['income', 'loan_collection', 'loan_cancellation_refund']
-			if (INCOME_TYPES.includes(t.type_transation)) {
+			if (isInflowTransaction(t.type_transation)) {
 				balanceTracker -= t.amount // going back in time: undo income = subtract
 			} else {
 				balanceTracker += t.amount // going back in time: undo expense = add back
 			}
 
 			historyPoints.push({
-				date: new Date(t.created_at).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
+				date: formatLocalDate(t.created_at, locale, { month: 'short', day: 'numeric' }),
 				fullDate: new Date(t.created_at),
 				balance: balanceTracker,
 			})
@@ -150,7 +166,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 			return (
 				<div className='bg-popover border border-border p-2 rounded shadow-md text-sm'>
 					<p className='font-semibold mb-1'>{payload[0].name === 'balance' ? label : payload[0].payload.name}</p>
-					<p className=''>${payload[0].value.toLocaleString()}</p>
+					<p className='tabular-nums'>{formatMoney(payload[0].value)}</p>
 				</div>
 			)
 		}
@@ -158,32 +174,36 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 	}
 
 	return (
-		<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8'>
-			<Card>
+		<div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8'>
+			<Card className='min-w-0'>
 				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
 					<CardTitle className='text-sm font-medium'>{t('totalIncome')}</CardTitle>
 					<ArrowUpCircle className='h-4 w-4 text-green-500' />
 				</CardHeader>
 				<CardContent>
-					<div className='text-2xl font-bold text-green-500'>+${stats.income.toLocaleString()}</div>
+					<div className='text-xl sm:text-2xl font-bold text-green-500 tabular-nums break-words'>
+						{formatMoney(stats.income, 'exceptZero')}
+					</div>
 				</CardContent>
 			</Card>
-			<Card>
+			<Card className='min-w-0'>
 				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
 					<CardTitle className='text-sm font-medium'>{t('totalExpenses')}</CardTitle>
 					<ArrowDownCircle className='h-4 w-4 text-red-500' />
 				</CardHeader>
 				<CardContent>
-					<div className='text-2xl font-bold text-red-500'>-${stats.expense.toLocaleString()}</div>
+					<div className='text-xl sm:text-2xl font-bold text-red-500 tabular-nums break-words'>
+						{formatMoney(-stats.expense, 'exceptZero')}
+					</div>
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-2 row-span-2'>
+			<Card className='min-w-0 md:col-span-2 lg:row-span-2'>
 				<CardHeader>
 					<CardTitle>{t('financialSummary')}</CardTitle>
 				</CardHeader>
-				<CardContent className='h-[200px]'>
-					<ResponsiveContainer width='100%' height='100%'>
+				<CardContent className='h-[200px] min-w-0'>
+					<ResponsiveContainer width='100%' height={CHART_HEIGHT}>
 						<BarChart data={pieData} layout='vertical' margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
 							<XAxis type='number' hide />
 							<YAxis dataKey='name' type='category' width={80} tick={{ fontSize: 12 }} />
@@ -198,13 +218,13 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-2'>
+			<Card className='min-w-0 md:col-span-2'>
 				<CardHeader>
 					<CardTitle>{t('expensesByCategory')}</CardTitle>
 				</CardHeader>
-				<CardContent className='h-[200px]'>
+				<CardContent className='h-[200px] min-w-0'>
 					{stats.expenseByCategory.length > 0 ? (
-						<ResponsiveContainer width='100%' height='100%'>
+						<ResponsiveContainer width='100%' height={CHART_HEIGHT}>
 							<PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
 								<Pie
 									data={stats.expenseByCategory}
@@ -229,13 +249,13 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-2'>
+			<Card className='min-w-0 md:col-span-2'>
 				<CardHeader>
 					<CardTitle>{t('incomeByCategory')}</CardTitle>
 				</CardHeader>
-				<CardContent className='h-[200px]'>
+				<CardContent className='h-[200px] min-w-0'>
 					{stats.incomeByCategory.length > 0 ? (
-						<ResponsiveContainer width='100%' height='100%'>
+						<ResponsiveContainer width='100%' height={CHART_HEIGHT}>
 							<PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
 								<Pie
 									data={stats.incomeByCategory}
@@ -260,13 +280,13 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-2'>
+			<Card className='min-w-0 md:col-span-2'>
 				<CardHeader>
 					<CardTitle>{t('topExpenses')}</CardTitle>
 				</CardHeader>
-				<CardContent className='h-[200px]'>
+				<CardContent className='h-[200px] min-w-0'>
 					{stats.topExpenses.length > 0 ? (
-						<ResponsiveContainer width='100%' height='100%'>
+						<ResponsiveContainer width='100%' height={CHART_HEIGHT}>
 							<BarChart data={stats.topExpenses} layout='vertical' margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
 								<XAxis type='number' hide />
 								<YAxis dataKey='name' type='category' width={90} tick={{ fontSize: 11 }} interval={0} />
@@ -280,13 +300,13 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-4 mt-4'>
+			<Card className='min-w-0 md:col-span-2 lg:col-span-4 lg:mt-4'>
 				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
 					<CardTitle>{t('balanceHistory')}</CardTitle>
 					<TrendingUp className='h-4 w-4 text-muted-foreground' />
 				</CardHeader>
-				<CardContent className='h-[250px]'>
-					<ResponsiveContainer width='100%' height='100%'>
+				<CardContent className='h-[250px] min-w-0'>
+					<ResponsiveContainer width='100%' height={HISTORY_CHART_HEIGHT}>
 						<AreaChart data={stats.balanceHistory} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
 							<defs>
 								<linearGradient id='colorBalance' x1='0' y1='0' x2='0' y2='1'>
@@ -306,7 +326,7 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 							<Tooltip
 								contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
 								labelStyle={{ fontWeight: 'bold', color: '#374151' }}
-								formatter={(value) => [`$${Number(value).toLocaleString()}`, t('balance')]}
+								formatter={(value) => [formatMoney(Number(value)), t('balance')]}
 							/>
 							<Area
 								type='monotone'

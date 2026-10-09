@@ -1,6 +1,9 @@
 import '@testing-library/jest-dom'
 import { vi } from 'vitest'
 
+// `server-only` throws outside the react-server condition; tests import server modules directly.
+vi.mock('server-only', () => ({}))
+
 // Mock next-auth globally to avoid issues with next/server imports in JSDOM
 vi.mock('next-auth', () => ({
     default: vi.fn(),

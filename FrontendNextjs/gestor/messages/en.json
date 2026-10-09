@@ -18,11 +18,49 @@
       "createAccount": "Create account",
       "testData": "Test data:",
       "testSimple": "Simple Test",
-      "debug": "Debug"
+      "debug": "Debug",
+      "or": "or",
+      "passwordTooLong": "Password cannot be longer than 100 characters",
+      "sessionExpired": "Your session expired, please sign in again"
     },
     "register": {
       "title": "Create Account",
-      "subtitle": "Complete your details to register"
+      "subtitle": "Complete your details to register",
+      "name": "First name",
+      "namePlaceholder": "John",
+      "lastName": "Last name",
+      "lastNamePlaceholder": "Doe",
+      "email": "Email",
+      "emailPlaceholder": "example@email.com",
+      "password": "Password",
+      "confirmPassword": "Confirm password",
+      "nameMin": "First name must be at least 2 characters",
+      "nameMax": "First name cannot be longer than 50 characters",
+      "nameLetters": "First name can only contain letters",
+      "lastNameMin": "Last name must be at least 2 characters",
+      "lastNameMax": "Last name cannot be longer than 50 characters",
+      "lastNameLetters": "Last name can only contain letters",
+      "emailRequired": "Email is required",
+      "emailInvalid": "Must be a valid email",
+      "passwordMinLength": "Password must be at least {min} characters",
+      "passwordMax": "Password cannot be longer than 100 characters",
+      "passwordLowercase": "Must contain at least one lowercase letter",
+      "passwordUppercase": "Must contain at least one uppercase letter",
+      "passwordNumber": "Must contain at least one number",
+      "confirmRequired": "Confirm your password",
+      "passwordsMismatch": "Passwords do not match",
+      "ruleLength": "{min}+ characters",
+      "ruleLowercase": "Lowercase",
+      "ruleUppercase": "Uppercase",
+      "ruleNumber": "Number",
+      "submit": "Create Account",
+      "submitting": "Creating account...",
+      "error": "Error creating the account",
+      "successTitle": "Account created successfully!",
+      "successAutoLogin": "Signing you in automatically...",
+      "fillTestData": "Fill test data",
+      "haveAccount": "Already have an account?",
+      "signIn": "Sign in"
     },
     "demo": {
       "tryDemo": "Try Interactive Demo",
@@ -36,6 +74,17 @@
       "devMode": "Development Mode",
       "description": "Personal finance management system",
       "tech": "Built with Next.js, TypeScript and Tailwind CSS"
+    },
+    "passkey": {
+      "signIn": "Sign in with passkey",
+      "success": "Signed in with passkey",
+      "failed": "Passkey sign-in failed"
+    },
+    "session": {
+      "expired": "Your session expired, please sign in again",
+      "draftSaved": "We saved your draft; it will be restored when you reopen the form.",
+      "draftRestored": "We restored the draft that could not be saved when your session expired.",
+      "discardDraft": "Discard"
     }
   },
   "nav": {
@@ -119,7 +168,9 @@
     "investmentsValue": "Investments Value",
     "certificatesValue": "Certificates Value",
     "totalPatrimony": "Total Wealth",
-    "activeItems": "active"
+    "activeItems": "active",
+    "exchangeRate": "Exchange rate (1 US$)",
+    "distribution": "Distribution"
   },
   "accounts": {
     "title": "Account Management",
@@ -155,9 +206,24 @@
     "delete": "Delete account",
     "high": "High",
     "medium": "Medium",
-    "low": "Low"
+    "low": "Low",
+    "options": "Options for account {name}",
+    "detail": {
+      "back": "Back to Accounts",
+      "notFoundTitle": "Account not found",
+      "notFoundDescription": "We couldn't find the account you're looking for.",
+      "recentTransactions": "Latest transactions",
+      "noTransactions": "No transactions recorded in this account besides the initial balance.",
+      "details": "Details",
+      "accountType": "Account type",
+      "typeBank": "Bank account",
+      "typeCreditCard": "Credit card",
+      "currency": "Currency",
+      "createdAt": "Created on"
+    }
   },
   "transactions": {
+    "noDescription": "No description",
     "title": "Transaction Management",
     "subtitle": "Monitor and analyze all your financial transactions",
     "summary": "Transaction Summary",
@@ -215,7 +281,19 @@
     "deleteTitle": "Delete Transaction",
     "deleteDescription": "This action cannot be undone. The transaction \"{name}\" will be permanently deleted.",
     "deleting": "Deleting…",
-    "cancel": "Cancel"
+    "cancel": "Cancel",
+    "type": "Type",
+    "options": "Transaction options",
+    "types": {
+      "income": "Income",
+      "bill": "Expense",
+      "loan_disbursement": "Loan disbursement",
+      "loan_collection": "Loan collection",
+      "investment_purchase": "Investment purchase",
+      "investment_funding": "Investment funding",
+      "loan_cancellation_refund": "Loan cancellation refund",
+      "unknown": "Other"
+    }
   },
   "loans": {
     "title": "Loans",
@@ -278,7 +356,21 @@
     "loanCancelled": "Loan cancelled successfully",
     "cancelLoanError": "Could not cancel loan",
     "cancelling": "Cancelling...",
-    "confirmCancel": "Confirm cancellation"
+    "confirmCancel": "Confirm cancellation",
+    "statuses": {
+      "active": "Active",
+      "paid": "Paid",
+      "defaulted": "Defaulted",
+      "cancelled": "Cancelled"
+    },
+    "installmentStatuses": {
+      "pending": "Pending",
+      "partial": "Partial",
+      "paid": "Paid",
+      "overdue": "Overdue"
+    },
+    "cancelLoanFor": "Cancel loan for {name}",
+    "installmentNumber": "Installment number"
   },
   "categories": {
     "title": "Category Management",
@@ -353,7 +445,8 @@
     "deleteDescription": "Are you sure you want to delete this budget? This action cannot be undone.",
     "deleting": "Deleting...",
     "errorLoading": "Error loading budgets",
-    "tryAgain": "Try again"
+    "tryAgain": "Try again",
+    "spentHint": "Only this month's expenses assigned to this budget count as spent (US$ expenses are converted to RD$)."
   },
   "monthlyPlan": {
     "title": "Monthly Plan",
@@ -382,7 +475,7 @@
     "paused": "Paused",
     "noFixedDay": "No fixed day",
     "dayOfMonth": "Day {day}",
-    "originalAmount": "${amount} USD",
+    "originalAmount": "Original: {amount}",
     "openMenu": "Open menu",
     "actions": "Actions",
     "edit": "Edit",
@@ -522,7 +615,9 @@
     "toolDownload": "Download",
     "toolCopied": "Snapshot copied",
     "toolCopyError": "Could not copy",
-    "toolDownloaded": "Snapshot downloaded"
+    "toolDownloaded": "Snapshot downloaded",
+    "emptyTitle": "No activity in this period yet",
+    "emptyDescription": "Record income or expenses, or change the filters, to see metrics, trends and insights."
   },
   "settings": {
     "title": "Settings",
@@ -537,6 +632,7 @@
     "saved": "Changes saved"
   },
   "common": {
+    "appTagline": "Personal finance manager",
     "theme": {
       "light": "Light",
       "dark": "Dark",
@@ -569,9 +665,17 @@
       "confirmDelete": "Are you sure you want to delete?",
       "noResults": "No results found",
       "required": "Required field"
+    },
+    "moduleDisabled": {
+      "message": "This module is currently disabled for your account.",
+      "goToDashboard": "Go to dashboard"
     }
   },
   "forms": {
+    "cardCurrencyUnavailable": "The card has no balance in that currency.",
+    "currencyMustMatchAccount": "The transaction currency must match the bank account currency.",
+    "cardWithoutBalances": "This card has no balances set up to record transactions.",
+    "bankCurrencyFixed": "Bank account currency is fixed: {currency}",
     "name": "Name",
     "namePlaceholder": "Ex: Electricity bill",
     "nameRequired": "Name is required",
@@ -625,7 +729,11 @@
       "low": "low"
     },
     "delete": "Delete",
-    "deleting": "Deleting..."
+    "deleting": "Deleting...",
+    "maxTwoDecimals": "Use at most 2 decimal places",
+    "insufficientFunds": "The source account doesn't have enough funds for this operation.",
+    "insufficientFundsAvailable": "The source account doesn't have enough funds: only {amount} available.",
+    "availableBalance": "Available: {amount}"
   },
   "charts": {
     "expensesByCategory": "Expenses by Category",
@@ -827,5 +935,707 @@
       "recommendations": "Recommendations",
       "potentialSavings": "potential savings"
     }
+  },
+  "certificates": {
+    "title": "Certificates",
+    "subtitle": "Manage your financial certificates and track interest payments",
+    "loadErrorTitle": "Error",
+    "loadError": "Failed to load certificates. Please try again.",
+    "confirmCancel": "Are you sure you want to cancel this certificate?",
+    "simulationBank": "Simulation",
+    "empty": "No certificates found. Create your first certificate to get started.",
+    "status": {
+      "active": "Active",
+      "matured": "Matured",
+      "cancelled": "Cancelled"
+    },
+    "interestType": {
+      "simple": "Simple",
+      "compound": "Compound"
+    },
+    "actions": {
+      "simulator": "Simulator",
+      "newCertificate": "New certificate"
+    },
+    "summary": {
+      "totalCapital": "Total capital",
+      "netInterestEarned": "Net interest earned",
+      "taxesWithheld": "Taxes withheld",
+      "portfolioValue": "Portfolio value",
+      "activeCertificates": "{count, plural, one {# active certificate} other {# active certificates}}"
+    },
+    "card": {
+      "effectiveCapital": "Effective capital",
+      "interestType": "Interest type",
+      "rate": "Rate",
+      "cutDay": "Cut day",
+      "dayValue": "Day {day}",
+      "taxRate": "Tax rate",
+      "nextPaymentProjection": "Next payment projection",
+      "netInterest": "Net interest:",
+      "expected": "Expected: {date}",
+      "simulate": "Simulate",
+      "edit": "Edit",
+      "history": "History",
+      "cancel": "Cancel"
+    },
+    "form": {
+      "editTitle": "Edit certificate",
+      "newTitle": "New certificate",
+      "bank": "Bank",
+      "bankPlaceholder": "Bank name",
+      "capital": "Capital",
+      "type": "Type",
+      "simpleInterest": "Simple interest",
+      "compoundInterest": "Compound interest",
+      "reinvest": "Reinvest",
+      "reinvestHelp": "Reinvest net interest",
+      "payoutAccount": "Payout account *",
+      "selectAccount": "Select account",
+      "rate": "Rate (%)",
+      "tax": "Tax (%)",
+      "cutDay": "Cut day",
+      "maturity": "Maturity",
+      "cancel": "Cancel",
+      "simulate": "Simulate",
+      "saving": "Saving...",
+      "update": "Update",
+      "create": "Create",
+      "errors": {
+        "saveFailed": "The certificate could not be saved. Please try again.",
+        "bankMin": "Bank name must be at least 2 characters",
+        "capitalMin": "Capital must be greater than 0",
+        "rateRange": "Rate must be between 0.01 and 100",
+        "taxRange": "Tax must be between 0 and 100",
+        "cutDayRange": "Cut day must be between 1 and 28",
+        "payoutRequired": "Payout account is required for simple interest"
+      }
+    },
+    "history": {
+      "title": "Payment history - {bank}",
+      "loading": "Loading...",
+      "totalGrossInterest": "Total gross interest",
+      "totalTaxWithheld": "Total tax withheld",
+      "totalNetInterest": "Total net interest",
+      "historyTab": "History",
+      "chartTab": "Chart",
+      "empty": "No payments recorded yet.",
+      "date": "Date",
+      "capital": "Capital",
+      "rate": "Rate",
+      "gross": "Gross",
+      "tax": "Tax",
+      "net": "Net",
+      "actions": "Actions",
+      "editPayment": "Edit payment",
+      "grossInterest": "Gross interest",
+      "taxWithheld": "Tax withheld",
+      "netInterest": "Net interest",
+      "ratePercent": "Rate (%)",
+      "taxRatePercent": "Tax rate (%)",
+      "cancel": "Cancel",
+      "saving": "Saving...",
+      "save": "Save",
+      "errors": {
+        "nonNegative": "Must be greater than or equal to 0",
+        "positive": "Must be greater than 0",
+        "rateRange": "Must be between 0.01 and 100",
+        "taxRange": "Must be between 0 and 100"
+      }
+    },
+    "simulator": {
+      "title": "Certificate simulator",
+      "capital": "Base capital",
+      "interestRate": "Interest rate (%)",
+      "taxRate": "Tax rate (%)",
+      "months": "Months to project",
+      "interestType": "Interest type",
+      "reinvest": "Reinvest net interest",
+      "calculate": "Calculate projection",
+      "totalGross": "Total gross interest",
+      "totalTax": "Total taxes",
+      "totalNet": "Total net interest",
+      "monthlyEvolution": "Monthly evolution",
+      "capitalSeries": "Capital",
+      "capitalPlusNet": "Capital + net",
+      "monthLabel": "Month {month}",
+      "showDetail": "Show monthly detail",
+      "hideDetail": "Hide monthly detail",
+      "month": "Month",
+      "gross": "Gross",
+      "tax": "Tax",
+      "net": "Net",
+      "accumulated": "Accumulated",
+      "errors": {
+        "capitalMin": "Capital must be greater than 0",
+        "rateRange": "Rate must be between 0.01 and 100",
+        "taxRange": "Tax must be between 0 and 100",
+        "monthsRange": "Months must be between 1 and 120"
+      }
+    },
+    "chart": {
+      "projection": "Projection:",
+      "sixMonths": "6 months",
+      "twelveMonths": "12 months",
+      "untilMaturity": "Until maturity",
+      "showCapitalBase": "Show base capital",
+      "totalValue": "Total value",
+      "capitalBase": "Base capital",
+      "totalValueLegend": "Total value (capital + interest)"
+    }
+  },
+  "creditCards": {
+    "title": "Credit Cards",
+    "subtitle": "Manage your credit cards and payments",
+    "addCard": "Add Card",
+    "addCreditCard": "Add Credit Card",
+    "generalSummary": "General Summary",
+    "activeCards": "{count, plural, =1 {# active card} other {# active cards}}",
+    "exchangeRate": "Rate: 1 USD = {rate} DOP",
+    "creditHealth": "Credit Health",
+    "utilizationTarget": "Target: below 30%",
+    "utilizationStatus": {
+      "highRisk": "High Risk",
+      "watch": "Watch",
+      "healthy": "Healthy"
+    },
+    "emptyTitle": "No credit cards yet",
+    "emptyDescription": "Add your first credit card to start tracking your debt",
+    "cancel": "Cancel",
+    "toasts": {
+      "created": "Credit card created successfully",
+      "updated": "Credit card updated successfully",
+      "deleted": "Credit card deleted successfully",
+      "deleteError": "Failed to delete credit card",
+      "paymentProcessed": "Payment processed successfully",
+      "noBalancesToReset": "No balances to reset",
+      "resetSuccess": "Card balance reset successfully",
+      "resetError": "Failed to reset card balance"
+    },
+    "resetDialog": {
+      "title": "Reset Card Balance",
+      "description": "This will set {name}'s current balance to zero for all currencies. The previous balance will be stored in history. Use this after paying off and closing the billing cycle.",
+      "confirm": "Reset Balance",
+      "resetting": "Resetting..."
+    },
+    "deleteDialog": {
+      "title": "Delete Credit Card",
+      "description": "Are you sure you want to delete {name}? This action cannot be undone.",
+      "confirm": "Delete",
+      "deleting": "Deleting..."
+    },
+    "item": {
+      "back": "Back",
+      "cardOptions": "Card options",
+      "edit": "Edit",
+      "resetBalance": "Reset Balance",
+      "delete": "Delete",
+      "payCard": "Pay Card",
+      "viewPayments": "View Payments",
+      "used": "{percent}% used",
+      "debt": "Debt: {amount}",
+      "available": "Available: {amount}",
+      "viewDetails": "View details",
+      "outstanding": "Outstanding",
+      "status": "Status",
+      "noDebt": "No debt",
+      "cutDay": "Cut Day",
+      "dueDay": "Due Day"
+    },
+    "form": {
+      "addTitle": "Add Credit Card",
+      "editTitle": "Edit Credit Card",
+      "cardName": "Card Name",
+      "cardNamePlaceholder": "My Credit Card",
+      "bank": "Bank",
+      "bankPlaceholder": "Banco Popular",
+      "lastFourDigits": "Last 4 Digits",
+      "cutDay": "Cut Day (1-28)",
+      "dueDay": "Due Day (1-28)",
+      "balances": "Balances",
+      "addCurrency": "Add Currency",
+      "currency": "Currency",
+      "removeCurrency": "Remove currency",
+      "creditLimit": "Credit Limit",
+      "initialDebt": "Initial Debt",
+      "saving": "Saving…",
+      "create": "Create",
+      "update": "Update",
+      "errors": {
+        "nameRequired": "Card name is required",
+        "bankRequired": "Bank is required",
+        "digitsOnly": "Only digits allowed",
+        "dayMin": "Min {min}",
+        "dayMax": "Max {max}"
+      }
+    },
+    "payment": {
+      "title": "Pay Credit Card",
+      "fromAccount": "Pay From Account",
+      "selectAccount": "Select account",
+      "currency": "Currency",
+      "currencyOption": "{currency} (Debt: {debt})",
+      "amount": "Amount to Pay",
+      "currentDebt": "Current debt: {amount}",
+      "exceedsDebt": "Payment exceeds current debt by {amount}. The extra will be credited to the card.",
+      "debitFromAccount": "Debit from account:",
+      "equivalentInDop": "Equivalent in DOP:",
+      "exchangeRate": "Exchange Rate ({from} to {to})",
+      "enterRate": "Enter rate",
+      "recommendedRate": "Recommended rate from API: {rate}",
+      "noRecommendedRate": "Could not fetch recommended rate. Enter custom rate.",
+      "includesInterest": "Includes Interest",
+      "interestAmount": "Interest amount",
+      "notes": "Notes (Optional)",
+      "notesPlaceholder": "Payment notes",
+      "processing": "Processing…",
+      "submit": "Make Payment",
+      "errors": {
+        "failed": "The payment could not be processed. Please try again.",
+        "selectAccount": "Select an account",
+        "amountPositive": "Amount must be greater than 0"
+      }
+    },
+    "history": {
+      "title": "Payment History",
+      "allCurrencies": "All currencies",
+      "empty": "No payments registered yet.",
+      "date": "Date",
+      "cardAmount": "Card Amount",
+      "fromAccount": "From Account",
+      "accountDebit": "Account Debit",
+      "rate": "Rate",
+      "interest": "Interest",
+      "notes": "Notes"
+    }
+  },
+  "investments": {
+    "title": "Investments",
+    "loading": "Loading investments...",
+    "fundBroker": "Fund broker",
+    "addInvestment": "Add investment",
+    "types": {
+      "stock": "Stocks",
+      "crypto": "Crypto",
+      "fixed_income": "Fixed income"
+    },
+    "typeSingular": {
+      "stock": "Stock",
+      "crypto": "Crypto",
+      "fixed_income": "Fixed income"
+    },
+    "summary": {
+      "totalValue": "Total Value",
+      "totalValueHint": "Current portfolio value",
+      "totalCost": "Total Cost",
+      "totalCostHint": "Initial investment",
+      "totalProfit": "Total Profit/Loss",
+      "totalProfitHint": "Realized + unrealized",
+      "roi": "ROI",
+      "roiHint": "Return on investment"
+    },
+    "dashboard": {
+      "allocation": "Asset Allocation",
+      "growth": "Portfolio Growth (Cost Basis)",
+      "noData": "No data to display",
+      "noHistory": "No history data",
+      "value": "Value"
+    },
+    "list": {
+      "empty": "No investments found for this category.",
+      "confirmDelete": "Are you sure you want to delete this investment?"
+    },
+    "card": {
+      "holding": "{quantity} shares @ {price}",
+      "edit": "Edit {name}",
+      "delete": "Delete {name}"
+    },
+    "form": {
+      "addTitle": "Add investment",
+      "editTitle": "Edit investment",
+      "addDescription": "Use your broker funding balance to add a new investment.",
+      "editDescription": "Update the details of your investment.",
+      "brokerBalance": "Broker balance",
+      "requiredForPurchase": "Required for this purchase: {amount}",
+      "name": "Name",
+      "symbol": "Symbol",
+      "symbolPlaceholder": "e.g. AAPL, BTC-USD",
+      "fetchPrice": "Fetch current price",
+      "type": "Type",
+      "selectType": "Select type",
+      "purchaseCurrency": "Purchase currency",
+      "quantity": "Quantity",
+      "purchasePrice": "Purchase price",
+      "currentPrice": "Current price",
+      "create": "Create",
+      "update": "Update",
+      "errors": {
+        "nameRequired": "Name is required",
+        "symbolRequired": "Symbol is required",
+        "currencyRequired": "Currency is required",
+        "minZero": "Must be greater than or equal to 0",
+        "quoteNotFound": "Could not fetch price for this symbol",
+        "quoteFailed": "Failed to fetch price",
+        "insufficientBalance": "Insufficient broker balance in {currency}. Required: {required}, available: {available}",
+        "saveFailed": "Failed to save investment. Please try again."
+      }
+    },
+    "funding": {
+      "title": "Fund broker balance",
+      "description": "Move funds from a bank account into your investment wallet.",
+      "walletBalances": "Current wallet balances",
+      "noFunding": "No funding yet.",
+      "sourceAccount": "Source account",
+      "selectAccount": "Select account",
+      "amountFromAccount": "Amount from account ({currency})",
+      "targetCurrency": "Target wallet currency",
+      "exchangeRate": "Exchange rate ({source} per {target})",
+      "fees": "Bank/FX fees ({currency})",
+      "estimatedCredit": "Estimated credit",
+      "notes": "Notes (optional)",
+      "notesPlaceholder": "Transfer to broker account",
+      "submit": "Fund broker",
+      "errors": {
+        "sourceRequired": "Select a source account",
+        "amountPositive": "Source amount must be greater than 0",
+        "exchangeRateRequired": "Exchange rate is required when currencies differ",
+        "failed": "Failed to fund broker balance"
+      }
+    }
+  },
+  "admin": {
+    "meta": {
+      "title": "Admin - Budget Manager",
+      "description": "Administration backoffice"
+    },
+    "title": "Admin Backoffice",
+    "subtitle": "Manage users and system state.",
+    "checkingAccess": "Checking admin access...",
+    "refresh": "Refresh",
+    "cleanDemos": "Clean demos",
+    "cleaning": "Cleaning...",
+    "confirmCleanup": "Are you sure? This will delete ALL demo users immediately.",
+    "toasts": {
+      "loadUsersError": "Error loading users: {message}",
+      "saveSuccess": "{count, plural, one {# user} other {# users}} updated successfully",
+      "saveError": "Error saving changes: {message}",
+      "disableSuccess": "User disabled successfully",
+      "disableError": "Error disabling user: {message}",
+      "cleanupSuccess": "All demo users have been deleted.",
+      "cleanupError": "Error cleaning demos: {message}"
+    },
+    "roles": {
+      "USER": "User",
+      "ADMIN": "Admin"
+    },
+    "users": {
+      "title": "Registered Users",
+      "description": "Edit user details directly in the table.",
+      "total": "{count} total",
+      "searchPlaceholder": "Search users...",
+      "filterByRole": "Filter by role",
+      "allRoles": "All roles",
+      "roleUsers": "Users",
+      "roleAdmins": "Admins",
+      "cancel": "Cancel",
+      "saveChanges": "Save {count, plural, one {# change} other {# changes}}",
+      "columns": {
+        "name": "Name",
+        "lastName": "Last name",
+        "email": "Email",
+        "role": "Role",
+        "created": "Created",
+        "id": "ID",
+        "actions": "Actions"
+      },
+      "loading": "Loading users...",
+      "empty": "No users found matching your criteria.",
+      "disableUser": "Disable {name}",
+      "deleteTitle": "Delete user",
+      "deleteDescription": "Are you sure you want to disable <strong>{name}</strong>? This will prevent them from logging in.",
+      "deleteConfirm": "Delete user",
+      "confirmTitle": "Confirm changes",
+      "confirmDescription": "You are about to modify {count, plural, one {# user} other {# users}}. Review the summary below before proceeding.",
+      "back": "Back",
+      "confirmSave": "Confirm and save"
+    },
+    "createUser": {
+      "trigger": "Add User",
+      "title": "Create New User",
+      "description": "Fill in the details below to create a new user account.",
+      "firstName": "First Name",
+      "lastName": "Last Name",
+      "email": "Email",
+      "password": "Password",
+      "role": "Role",
+      "selectRole": "Select a role",
+      "firstNamePlaceholder": "John",
+      "lastNamePlaceholder": "Doe",
+      "emailPlaceholder": "john.doe@example.com",
+      "passwordPlaceholder": "Minimum 8 characters",
+      "showPassword": "Show password",
+      "hidePassword": "Hide password",
+      "cancel": "Cancel",
+      "creating": "Creating...",
+      "submit": "Create User",
+      "success": "User \"{name}\" created successfully",
+      "error": "Error creating user: {message}",
+      "errors": {
+        "name": "Name must be at least 2 characters",
+        "lastName": "Last name must be at least 2 characters",
+        "email": "Please enter a valid email address",
+        "password": "Password must be at least 8 characters"
+      }
+    },
+    "flags": {
+      "title": "Feature Flags by User",
+      "description": "Enable or disable features per user account.",
+      "globalOverrides": "Global overrides",
+      "globalMeta": "Default: {defaultState} | Global override: {overrideState}",
+      "userMeta": "Default: {defaultState} | User override: {overrideState} | Source: {source}",
+      "on": "ON",
+      "off": "OFF",
+      "yes": "YES",
+      "no": "NO",
+      "sources": {
+        "default": "default",
+        "global": "global",
+        "user": "user"
+      },
+      "resetGlobal": "Reset global",
+      "saveGlobal": "Save {count, plural, one {# global change} other {# global changes}}",
+      "saving": "Saving...",
+      "searchPlaceholder": "Search users by name or email",
+      "columns": {
+        "name": "Name",
+        "email": "Email",
+        "select": "Select"
+      },
+      "selected": "Selected",
+      "choose": "Choose",
+      "noUsers": "No users found",
+      "searchingUsers": "Searching users...",
+      "managingFor": "Managing flags for:",
+      "loadingFlags": "Loading feature flags...",
+      "noFlags": "No feature flags found.",
+      "blockedByGlobal": "Overridden by global setting",
+      "reset": "Reset",
+      "saveChanges": "Save {count, plural, one {# change} other {# changes}}",
+      "toasts": {
+        "catalogError": "Error loading feature catalog: {message}",
+        "flagsError": "Error loading feature flags: {message}",
+        "searchError": "Error searching users: {message}",
+        "saveSuccess": "Feature flags updated",
+        "saveError": "Error saving feature flags: {message}",
+        "globalSuccess": "Global feature overrides updated",
+        "globalError": "Error saving global feature overrides: {message}",
+        "resetGlobalSuccess": "Reset global override for {key}",
+        "resetGlobalError": "Error resetting global override: {message}",
+        "resetSuccess": "Reset {key} to default",
+        "resetError": "Error resetting override: {message}"
+      }
+    }
+  },
+  "datePicker": {
+    "pickDate": "Pick a date"
+  },
+  "settingsModal": {
+    "title": "Settings",
+    "tabs": {
+      "general": "General",
+      "security": "Security",
+      "notifications": "Notifications",
+      "data": "Data & Privacy",
+      "apikeys": "API Keys"
+    },
+    "actions": {
+      "edit": "Edit",
+      "change": "Change",
+      "manage": "Manage",
+      "exportCsv": "Export CSV",
+      "deleteAccount": "Delete Account"
+    },
+    "profile": {
+      "title": "Profile",
+      "description": "Personal and contact information",
+      "fullName": "Full name",
+      "email": "Email"
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Customize how the app looks",
+      "theme": "Theme",
+      "themeDescription": "Switch between light and dark mode",
+      "language": "Language",
+      "languageDescription": "Select your preferred language"
+    },
+    "navigation": {
+      "title": "Navigation",
+      "description": "User interface preferences",
+      "sidebarHover": "Expandable sidebar",
+      "sidebarHoverDescription": "Automatically expand the side menu when hovering over it"
+    },
+    "security": {
+      "title": "Security",
+      "description": "Protect your account and devices",
+      "password": "Password",
+      "passwordUpdated": "Updated 3 months ago",
+      "twoFactor": "Two-factor authentication",
+      "twoFactorDescription": "Add an extra layer of security",
+      "enabled": "Enabled"
+    },
+    "devices": {
+      "title": "Devices",
+      "description": "Manage where you're signed in",
+      "activeSessions": "Active sessions",
+      "activeSessionsDescription": "3 devices currently connected"
+    },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Choose how you want to receive alerts",
+      "email": "Email",
+      "emailDescription": "Weekly summary and security alerts",
+      "push": "Push",
+      "pushDescription": "Real-time notifications in the browser",
+      "sms": "SMS",
+      "smsDescription": "Critical security alerts"
+    },
+    "data": {
+      "title": "Data Management",
+      "description": "Control your data and privacy",
+      "export": "Export data",
+      "exportDescription": "Download a copy of all your transactions",
+      "dangerZone": "Danger Zone",
+      "dangerZoneDescription": "Permanently delete your account and data"
+    },
+    "apiKeys": {
+      "title": "API Keys",
+      "description": "Manage API keys for MCP server integrations",
+      "newKey": "New key",
+      "emptyTitle": "No API keys",
+      "emptyDescription": "Create a key to connect MCP clients",
+      "active": "Active",
+      "inactive": "Inactive",
+      "createdAt": "Created: {date}",
+      "lastUsedAt": "Last used: {date}",
+      "never": "Never",
+      "revokeAria": "Revoke key {name}",
+      "configTitle": "Claude Desktop configuration",
+      "configDescription": "Add this configuration to your file",
+      "copy": "Copy",
+      "copied": "Copied",
+      "createTitle": "Create new API key",
+      "createDescription": "Give the key a descriptive name so you can identify it easily.",
+      "saveTokenTitle": "Save this token now",
+      "saveTokenDescription": "This token will not be shown again. Copy it and store it somewhere safe.",
+      "token": "Token",
+      "savedClose": "I saved it, close",
+      "name": "Name",
+      "namePlaceholder": "e.g. Claude Desktop",
+      "cancel": "Cancel",
+      "create": "Create key",
+      "revokeTitle": "Revoke API key",
+      "revokeDescription": "This action cannot be undone. The key will stop working immediately and cannot be recovered.",
+      "revoke": "Revoke key",
+      "createError": "Error creating the API key",
+      "tokenCopied": "Token copied to clipboard",
+      "revoked": "API key revoked",
+      "revokeError": "Error revoking the API key",
+      "configCopied": "Configuration copied to clipboard"
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "description": "Sign in with your fingerprint or face instead of your password. Add one per device.",
+      "add": "Add passkey",
+      "loading": "Loading…",
+      "empty": "No passkeys registered yet.",
+      "added": "Added {date}",
+      "lastUsed": "last used {date}",
+      "deleteAria": "Delete passkey {name}",
+      "addTitle": "Add a passkey",
+      "addDescription": "Your device will prompt you to authenticate with your fingerprint, face, or device PIN.",
+      "deviceName": "Device name",
+      "deviceNamePlaceholder": "e.g. MacBook Pro, iPhone",
+      "cancel": "Cancel",
+      "enroll": "Enroll",
+      "loadError": "Failed to load passkeys",
+      "nameRequired": "Give this passkey a name",
+      "registered": "Passkey registered",
+      "registerError": "Passkey registration failed",
+      "removed": "Passkey removed",
+      "removeError": "Failed to remove passkey"
+    }
+  },
+  "dateFilter": {
+    "label": "Period",
+    "thisMonth": "This month",
+    "lastMonth": "Last month",
+    "last3Months": "Last 3 months",
+    "thisYear": "This year",
+    "allTime": "All time",
+    "customRange": "Custom range",
+    "reset": "Reset"
+  },
+  "recurring": {
+    "emptyTitle": "No recurring transactions",
+    "emptyDescription": "Set up your fixed expenses or income so they are generated automatically.",
+    "confirmDelete": "Are you sure you want to delete the recurring transaction \"{name}\"?",
+    "openMenu": "Open menu for {name}",
+    "actions": "Actions",
+    "edit": "Edit",
+    "delete": "Delete",
+    "dayOfEveryMonth": "Day {day} of every month",
+    "lastRun": "Last run: {date}",
+    "runNow": "Run now",
+    "newRecurring": "New recurring",
+    "runTitle": "Run recurring transactions",
+    "runDescription": "Are you sure you want to process all pending recurring transactions up to today? This will automatically generate the scheduled expenses and income.",
+    "cancel": "Cancel",
+    "confirmRun": "Confirm run",
+    "processSuccess": "Transactions processed successfully",
+    "processSuccessDescription": "Pending transactions have been generated.",
+    "processError": "Processing failed",
+    "processErrorDescription": "There was a problem generating the transactions.",
+    "editTitle": "Edit recurring",
+    "createTitle": "New recurring transaction",
+    "fieldName": "Name",
+    "namePlaceholder": "e.g. Netflix",
+    "fieldAmount": "Amount",
+    "fieldDayOfMonth": "Day of month",
+    "fieldType": "Type",
+    "typeBill": "Expense",
+    "typeIncome": "Income",
+    "fieldCategory": "Category",
+    "fieldAccount": "Account",
+    "fieldDescription": "Description (optional)",
+    "selectPlaceholder": "Select",
+    "saveChanges": "Save changes",
+    "create": "Create",
+    "validation": {
+      "nameRequired": "Name is required",
+      "amountPositive": "Amount must be greater than 0",
+      "typeRequired": "Select a type",
+      "accountRequired": "Select an account",
+      "categoryRequired": "Select a category",
+      "dayRange": "Day must be between 1 and 31"
+    }
+  },
+  "search": {
+    "placeholder": "Search...",
+    "placeholderLong": "Search transactions, accounts...",
+    "hint": "Type to search your transactions, accounts, categories and budgets.",
+    "searching": "Searching...",
+    "noResults": "No results found.",
+    "transactions": "Transactions",
+    "accounts": "Accounts",
+    "categories": "Categories",
+    "budgets": "Budgets",
+    "budget": "Budget",
+    "loans": "Loans",
+    "loan": "Loan",
+    "certificates": "Certificates",
+    "certificate": "Certificate",
+    "open": "Open search",
+    "close": "Close search"
   }
 }

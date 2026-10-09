@@ -21,19 +21,22 @@ import { DashboardCharts } from '@/components/transactions/DashboardCharts'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatLocalDate } from '@/lib/i18n/date-locale'
 import {
-	getAccountRepository,
-	getAnalyticsRepository,
-	getBudgetRepository,
-	getCategoryRepository,
-	getExchangeRateRepository,
-	getTransactionRepository,
-} from '@/lib/repositoryConfig'
+	serverAccountRepository as accountRepository,
+	serverAnalyticsRepository as analyticsRepository,
+	serverBudgetRepository as budgetRepository,
+	serverCategoryRepository as categoryRepository,
+	serverExchangeRateRepository as exchangeRateRepository,
+	serverTransactionRepository as transactionRepository,
+} from '@/lib/server/repositories'
+import { getSignedAmount, isInflowTransaction } from '@/lib/transaction-utils'
+import { DEFAULT_CURRENCY, formatCurrency } from '@/lib/utils'
 import { Account } from '@/types/account'
 import { DashboardSummary } from '@/types/analytics'
 import { Budget } from '@/types/budget'
 import { Category } from '@/types/category'
-import { Transaction, TypeTransaction } from '@/types/transaction'
+import { Transaction } from '@/types/transaction'
 
 interface StatCardProps {
 	title: string
@@ -42,10 +45,11 @@ interface StatCardProps {
 	trend?: 'up' | 'down'
 	trendValue?: string
 	color?: 'blue' | 'green' | 'red' | 'purple' | 'orange'
+	locale: string
 }
 
 // Server Component para StatCard (renders Client Component leaf)
-function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' }: StatCardProps) {
+function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue', locale }: StatCardProps) {
 	const colorClasses = {
 		blue: 'from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5 text-blue-600 dark:text-blue-400',
 		green:
@@ -75,8 +79,9 @@ function StatCard({ title, value, icon: Icon, trend, trendValue, color = 'blue' 
 						)}
 					</div>
 					<p className='text-sm font-medium text-muted-foreground mb-1'>{title}</p>
-					<p className='text-2xl font-bold text-foreground'>
-						<AnimatedCounter value={value} prefix='$' />
+					<p className='text-xl sm:text-2xl font-bold text-foreground tabular-nums break-words'>
+						{/* Dashboard totals come from the API converted to DOP. */}
+						<AnimatedCounter value={value} currency='DOP' locale={locale} />
 					</p>
 				</div>
 			</CardContent>
@@ -94,36 +99,33 @@ function TransactionItem({
 	category?: Category
 	locale?: string
 }) {
-	const isIncome =
-		transaction.type_transation === TypeTransaction.INCOME ||
-		transaction.type_transation === TypeTransaction.LOAN_COLLECTION
-	const transactionCurrency = transaction.currency || 'DOP'
+	const isIncome = isInflowTransaction(transaction.type_transation)
 
 	return (
-		<div className='flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors'>
-			<div className='flex items-center gap-3'>
+		<div className='flex items-center justify-between gap-3 p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors'>
+			<div className='flex min-w-0 items-center gap-3'>
 				<div
-					className='w-10 h-10 rounded-full flex items-center justify-center text-lg'
+					className='w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-lg'
 					style={{ backgroundColor: category?.color || '#6B7280' }}
 				>
 					{category?.icon || '💳'}
 				</div>
-				<div>
-					<p className='font-medium text-foreground'>{transaction.name}</p>
-					<p className='text-sm text-muted-foreground'>{transaction.description}</p>
-					<p className='text-xs text-muted-foreground'>
-						{new Date(transaction.created_at).toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US')}
-					</p>
+				<div className='min-w-0'>
+					<p className='font-medium text-foreground truncate'>{transaction.name}</p>
+					<p className='text-sm text-muted-foreground truncate'>{transaction.description}</p>
+					<p className='text-xs text-muted-foreground'>{formatLocalDate(transaction.created_at, locale ?? 'es')}</p>
 				</div>
 			</div>
-			<div className='text-right'>
+			<div className='shrink-0 text-right'>
 				<p
-					className={`font-bold ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+					className={`font-bold tabular-nums whitespace-nowrap ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
 				>
-					{isIncome ? '+' : ''}
-					{transactionCurrency} {transaction.amount.toLocaleString()}
+					{formatCurrency(getSignedAmount(transaction), transaction.currency, {
+						locale,
+						signDisplay: 'exceptZero',
+					})}
 				</p>
-				<p className='text-xs text-muted-foreground'>{category?.name}</p>
+				<p className='text-xs text-muted-foreground truncate max-w-[8rem]'>{category?.name}</p>
 			</div>
 		</div>
 	)
@@ -137,6 +139,7 @@ function CategoryCard({
 	dopTotal,
 	usdTotal,
 	t,
+	locale,
 }: {
 	category: Category
 	transactionCount: number
@@ -144,73 +147,62 @@ function CategoryCard({
 	dopTotal: number
 	usdTotal: number
 	t: any
+	locale: string
 }) {
 	return (
-		<div className='flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors'>
-			<div className='flex items-center gap-3'>
+		<div className='flex items-center justify-between gap-3 p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors'>
+			<div className='flex min-w-0 items-center gap-3'>
 				<div
-					className='w-8 h-8 rounded-full flex items-center justify-center text-sm'
+					className='w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm'
 					style={{ backgroundColor: category.color }}
 				>
 					{category.icon}
 				</div>
-				<div>
-					<p className='font-medium text-foreground'>{category.name}</p>
+				<div className='min-w-0'>
+					<p className='font-medium text-foreground truncate'>{category.name}</p>
 					<p className='text-xs text-muted-foreground'>
 						{transactionCount} {t('transactionsCount')}
 					</p>
 				</div>
 			</div>
-			<div className='text-right'>
-				<p className='font-bold text-foreground'>
-					{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totalAmountDOP)}
-				</p>
-				<p className='text-[11px] text-muted-foreground'>
-					DOP: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(dopTotal)}
-				</p>
-				<p className='text-[11px] text-muted-foreground'>
-					USD: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(usdTotal)}
-				</p>
+			<div className='shrink-0 text-right tabular-nums'>
+				<p className='font-bold text-foreground'>{formatCurrency(totalAmountDOP, 'DOP', { locale })}</p>
+				<p className='text-[11px] text-muted-foreground'>DOP: {formatCurrency(dopTotal, 'DOP', { locale })}</p>
+				<p className='text-[11px] text-muted-foreground'>USD: {formatCurrency(usdTotal, 'USD', { locale })}</p>
 			</div>
 		</div>
 	)
 }
 
 // Server Component para AccountCard
-function AccountCard({ account, t }: { account: Account; t: any }) {
+function AccountCard({ account, t, locale }: { account: Account; t: any; locale: string }) {
 	const currentBalance = account.current_balance ?? account.initial_balance ?? 0
 	const isPositive = currentBalance > 0
+	const currency = account.currency || DEFAULT_CURRENCY
 
 	return (
 		<Card className='border-border/50 dark:border-border/20 hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-200'>
 			<CardContent className='p-6'>
-				<div className='flex items-center justify-between mb-4'>
-					<div>
-						<h3 className='font-semibold text-foreground'>{account.name}</h3>
-						<p className='text-sm text-muted-foreground'>{account.bank}</p>
+				<div className='flex items-center justify-between gap-2 mb-4'>
+					<div className='min-w-0'>
+						<h3 className='font-semibold text-foreground truncate'>{account.name}</h3>
+						<p className='text-sm text-muted-foreground truncate'>{account.bank}</p>
 					</div>
-					<CreditCard className='h-5 w-5 text-muted-foreground' />
+					<CreditCard className='h-5 w-5 shrink-0 text-muted-foreground' aria-hidden='true' />
 				</div>
 				<div className='space-y-2'>
 					<p
-						className={`text-2xl font-bold ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+						className={`text-xl sm:text-2xl font-bold tabular-nums break-words ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
 					>
-						{new Intl.NumberFormat(account.currency === 'DOP' ? 'es-DO' : 'en-US', {
-							style: 'currency',
-							currency: account.currency || 'USD',
-						}).format(currentBalance)}
+						{formatCurrency(currentBalance, currency, { locale })}
 					</p>
-					<div className='flex gap-2'>
+					<div className='flex flex-wrap gap-2'>
 						<Badge variant='outline' className='text-xs'>
 							{currentBalance > 10000 ? t('high') : currentBalance > 5000 ? t('medium') : t('low')}
 						</Badge>
 						{account.current_balance !== account.initial_balance && (
 							<Badge variant='secondary' className='text-xs'>
-								{t('initial')}:{' '}
-								{new Intl.NumberFormat(account.currency === 'DOP' ? 'es-DO' : 'en-US', {
-									style: 'currency',
-									currency: account.currency || 'USD',
-								}).format(account.initial_balance)}
+								{t('initial')}: {formatCurrency(account.initial_balance, currency, { locale })}
 							</Badge>
 						)}
 					</div>
@@ -221,26 +213,27 @@ function AccountCard({ account, t }: { account: Account; t: any }) {
 }
 
 // Server Component para BudgetCard
-function BudgetCard({ budget, category, t }: { budget: Budget; category?: Category; t: any }) {
+function BudgetCard({ budget, category, t, locale }: { budget: Budget; category?: Category; t: any; locale: string }) {
 	const spentAmount = budget.current_amount
-	const percentage = (spentAmount / budget.amount) * 100
+	const percentage = budget.amount > 0 ? (spentAmount / budget.amount) * 100 : 0
 	const isOverBudget = spentAmount > budget.amount
 
 	return (
 		<Card className='border-border/50 dark:border-border/20'>
 			<CardContent className='p-6'>
-				<div className='flex items-center justify-between mb-4'>
-					<div className='flex items-center gap-3'>
+				<div className='flex items-center justify-between gap-2 mb-4'>
+					<div className='flex min-w-0 items-center gap-3'>
 						<div
-							className='w-8 h-8 rounded-full flex items-center justify-center text-sm'
+							className='w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm'
 							style={{ backgroundColor: category?.color || '#6B7280' }}
 						>
 							{category?.icon || '📊'}
 						</div>
-						<div>
-							<h3 className='font-medium text-foreground'>{category?.name || t('noCategory')}</h3>
-							<p className='text-sm text-muted-foreground'>
-								${spentAmount.toLocaleString()} {t('of')} ${budget.amount.toLocaleString()}
+						<div className='min-w-0'>
+							<h3 className='font-medium text-foreground truncate'>{category?.name || t('noCategory')}</h3>
+							<p className='text-sm text-muted-foreground tabular-nums'>
+								{formatCurrency(spentAmount, 'DOP', { locale })} {t('of')}{' '}
+								{formatCurrency(budget.amount, 'DOP', { locale })}
 							</p>
 						</div>
 					</div>
@@ -295,7 +288,7 @@ function DashboardHeader({
 						className='bg-blue-50 dark:bg-blue-900/30 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-400'
 					>
 						<Calendar className='h-3 w-3 mr-1' />
-						{new Date().toLocaleDateString(locale === 'es' ? 'es-ES' : 'en-US', {
+						{formatLocalDate(new Date(), locale, {
 							day: 'numeric',
 							month: 'long',
 							year: 'numeric',
@@ -308,16 +301,16 @@ function DashboardHeader({
 }
 
 // Server Component para las estadísticas
-function StatsGrid({ summary, t }: { summary: DashboardSummary | null; t: any }) {
+function StatsGrid({ summary, t, locale }: { summary: DashboardSummary | null; t: any; locale: string }) {
 	const totalBalance = summary?.accounts_total || 0
 	const totalIncome = summary?.total_income || 0
 	const totalExpenses = summary?.total_expenses || 0
 
 	return (
 		<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8'>
-			<StatCard title={t('balance')} value={totalBalance} icon={DollarSign} color='blue' />
-			<StatCard title={t('income')} value={totalIncome} icon={TrendingUp} color='green' />
-			<StatCard title={t('expenses')} value={totalExpenses} icon={TrendingDown} color='red' />
+			<StatCard title={t('balance')} value={totalBalance} icon={DollarSign} color='blue' locale={locale} />
+			<StatCard title={t('income')} value={totalIncome} icon={TrendingUp} color='green' locale={locale} />
+			<StatCard title={t('expenses')} value={totalExpenses} icon={TrendingDown} color='red' locale={locale} />
 		</div>
 	)
 }
@@ -352,12 +345,6 @@ export default async function DashboardPage({
 	searchParams?: Promise<{ date_from?: string; date_to?: string; preset?: string }>
 }) {
 	const resolvedSearchParams = (await searchParams) ?? {}
-	const accountRepository = await getAccountRepository()
-	const transactionRepository = await getTransactionRepository()
-	const categoryRepository = await getCategoryRepository()
-	const budgetRepository = await getBudgetRepository()
-	const exchangeRateRepository = await getExchangeRateRepository()
-	const analyticsRepository = await getAnalyticsRepository()
 
 	// Get translations
 	const t = await getTranslations('dashboard')
@@ -367,9 +354,16 @@ export default async function DashboardPage({
 	const { auth } = await import('@/auth')
 	const session = await auth()
 
-	if (!session) {
+	if (!session || session.error) {
 		const { redirect } = await import('next/navigation')
-		redirect('/login')
+		const { buildLoginUrl, SESSION_EXPIRED_REASON } = await import('@/lib/auth/callback-url')
+		const query = new URLSearchParams()
+		for (const [key, value] of Object.entries(resolvedSearchParams)) {
+			if (typeof value === 'string') query.set(key, value)
+		}
+		const queryString = query.toString()
+		const returnTo = queryString ? `/app?${queryString}` : '/app'
+		redirect(buildLoginUrl(returnTo, session?.error ? SESSION_EXPIRED_REASON : undefined))
 		return
 	}
 
@@ -420,7 +414,7 @@ export default async function DashboardPage({
 					/>
 				</div>
 				<div id='stats-grid'>
-					<StatsGrid summary={dashboardSummary} t={t} />
+					<StatsGrid summary={dashboardSummary} t={t} locale={locale} />
 				</div>
 
 				<AnimatedTabs
@@ -481,6 +475,7 @@ export default async function DashboardPage({
 																		dopTotal={stats?.dop_total || 0}
 																		usdTotal={stats?.usd_total || 0}
 																		t={t}
+																		locale={locale}
 																	/>
 																)
 															})
@@ -505,36 +500,27 @@ export default async function DashboardPage({
 																	? categories.find((c) => c.id === budget.category_id)
 																	: undefined
 																const spentAmount = budget.current_amount
-																const percentage = (spentAmount / budget.amount) * 100
+																const percentage = budget.amount > 0 ? (spentAmount / budget.amount) * 100 : 0
 
 																return (
 																	<div
 																		key={budget.id}
-																		className='flex items-center justify-between p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors'
+																		className='flex items-center justify-between gap-3 p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors'
 																	>
-																		<div className='flex items-center gap-3'>
+																		<div className='flex min-w-0 items-center gap-3'>
 																			<div
-																				className='w-8 h-8 rounded-full flex items-center justify-center text-sm'
+																				className='w-8 h-8 shrink-0 rounded-full flex items-center justify-center text-sm'
 																				style={{ backgroundColor: category?.color || '#6B7280' }}
 																			>
 																				{category?.icon || '📊'}
 																			</div>
-																			<div>
-																				<p className='font-medium text-foreground'>
-																					{category?.name || 'Sin categoría'}
+																			<div className='min-w-0'>
+																				<p className='font-medium text-foreground truncate'>
+																					{category?.name || t('noCategory')}
 																				</p>
-																				<p className='text-xs text-muted-foreground'>
-																					{new Intl.NumberFormat('es-DO', {
-																						style: 'currency',
-																						currency: 'DOP',
-																						maximumFractionDigits: 0,
-																					}).format(spentAmount)}{' '}
-																					/{' '}
-																					{new Intl.NumberFormat('es-DO', {
-																						style: 'currency',
-																						currency: 'DOP',
-																						maximumFractionDigits: 0,
-																					}).format(budget.amount)}
+																				<p className='text-xs text-muted-foreground tabular-nums'>
+																					{formatCurrency(spentAmount, 'DOP', { locale })} /{' '}
+																					{formatCurrency(budget.amount, 'DOP', { locale })}
 																				</p>
 																			</div>
 																		</div>
@@ -581,7 +567,7 @@ export default async function DashboardPage({
 							content: (
 								<div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
 									{Array.isArray(accounts) &&
-										accounts.map((account) => <AccountCard key={account.id} account={account} t={t} />)}
+										accounts.map((account) => <AccountCard key={account.id} account={account} t={t} locale={locale} />)}
 								</div>
 							),
 						},
@@ -618,7 +604,7 @@ export default async function DashboardPage({
 											const category = Array.isArray(categories)
 												? categories.find((c) => c.id === budget.category_id)
 												: undefined
-											return <BudgetCard key={budget.id} budget={budget} category={category} t={t} />
+											return <BudgetCard key={budget.id} budget={budget} category={category} t={t} locale={locale} />
 										})
 									) : (
 										<div className='col-span-full text-center py-12 text-muted-foreground'>
@@ -644,6 +630,7 @@ export default async function DashboardPage({
 									investmentsCount={investmentsCount}
 									certificatesCount={certificatesCount}
 									exchangeRate={usdToDop}
+									locale={locale}
 									labels={{
 										title: t('patrimony'),
 										accounts: t('accountsBalance'),
@@ -651,6 +638,9 @@ export default async function DashboardPage({
 										certificates: t('certificatesValue'),
 										total: t('totalPatrimony'),
 										activeItems: t('activeItems'),
+										exchangeRate: t('exchangeRate'),
+										distribution: t('distribution'),
+										noData: t('noData'),
 									}}
 								/>
 							),

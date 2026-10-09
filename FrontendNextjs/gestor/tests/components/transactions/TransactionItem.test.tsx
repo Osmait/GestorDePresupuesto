@@ -1,10 +1,12 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import TransactionItem from '@/components/transactions/TransactionItem'
 import { TypeTransaction } from '@/types/transaction'
 
 vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string) => key,
+	useTranslations: () => (key: string, values?: Record<string, unknown>) =>
+		values ? `${key}(${Object.values(values).join(',')})` : key,
 }))
 
 // Mock dependencies
@@ -77,5 +79,96 @@ describe('TransactionItem', () => {
 		expect(amountText).toBeInTheDocument()
 		expect(amountText).toHaveClass('text-green-600')
 		expect(amountText).toHaveTextContent('+')
+	})
+
+	it('formats the amount with the account currency, sign and 2 decimals', () => {
+		render(<TransactionItem transaction={{ ...mockTransaction, amount: 1500.5, currency: 'DOP' }} />)
+		expect(screen.getByText('-RD$1,500.50')).toBeInTheDocument()
+
+		render(
+			<TransactionItem
+				transaction={{
+					...mockTransaction,
+					id: 't2',
+					amount: 20,
+					currency: 'USD',
+					type_transation: TypeTransaction.INCOME,
+				}}
+			/>,
+		)
+		expect(screen.getByText('+US$20.00')).toBeInTheDocument()
+	})
+
+	it('opens the details when the card is clicked', async () => {
+		const user = userEvent.setup()
+		const onOpenDetails = vi.fn()
+		render(<TransactionItem transaction={mockTransaction} onOpenDetails={onOpenDetails} />)
+
+		await user.click(screen.getByTestId('transaction-card'))
+		expect(onOpenDetails).toHaveBeenCalledWith(mockTransaction)
+	})
+
+	it('opens the details from the keyboard through the name button', async () => {
+		const user = userEvent.setup()
+		const onOpenDetails = vi.fn()
+		render(<TransactionItem transaction={mockTransaction} onOpenDetails={onOpenDetails} />)
+
+		screen.getByRole('button', { name: 'Netflix Subscription' }).focus()
+		await user.keyboard('{Enter}')
+		expect(onOpenDetails).toHaveBeenCalledTimes(1)
+	})
+
+	it('confirming delete does not open the details of the deleted transaction', async () => {
+		const user = userEvent.setup()
+		const onOpenDetails = vi.fn()
+		const onTransactionDeleted = vi.fn().mockResolvedValue(undefined)
+		render(
+			<TransactionItem
+				transaction={mockTransaction}
+				onOpenDetails={onOpenDetails}
+				onTransactionDeleted={onTransactionDeleted}
+			/>,
+		)
+
+		await user.click(screen.getByRole('button', { name: 'options' }))
+		await user.click(await screen.findByRole('menuitem', { name: 'delete' }))
+
+		const dialog = await screen.findByRole('dialog')
+		expect(dialog).toHaveTextContent('deleteTitle')
+		// The confirm button is the one inside the dialog footer labelled "delete"
+		const confirm = Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'delete')
+		expect(confirm).toBeDefined()
+		await user.click(confirm!)
+
+		await waitFor(() => expect(onTransactionDeleted).toHaveBeenCalledTimes(1))
+		await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+		expect(onOpenDetails).not.toHaveBeenCalled()
+	})
+
+	it('cancelling the delete dialog does not open the details either', async () => {
+		const user = userEvent.setup()
+		const onOpenDetails = vi.fn()
+		render(
+			<TransactionItem transaction={mockTransaction} onOpenDetails={onOpenDetails} onTransactionDeleted={vi.fn()} />,
+		)
+
+		await user.click(screen.getByRole('button', { name: 'options' }))
+		await user.click(await screen.findByRole('menuitem', { name: 'delete' }))
+		await user.click(await screen.findByRole('button', { name: 'cancel' }))
+
+		await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+		expect(onOpenDetails).not.toHaveBeenCalled()
+	})
+
+	it('names the transaction (not its description) in the delete confirmation', async () => {
+		const user = userEvent.setup()
+		render(<TransactionItem transaction={mockTransaction} onTransactionDeleted={vi.fn()} />)
+
+		await user.click(screen.getByRole('button', { name: 'options' }))
+		await user.click(await screen.findByRole('menuitem', { name: 'delete' }))
+
+		const dialog = await screen.findByRole('dialog')
+		expect(dialog).toHaveTextContent('deleteDescription(Netflix Subscription)')
+		expect(dialog).not.toHaveTextContent('Monthly payment')
 	})
 })

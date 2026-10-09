@@ -62,6 +62,13 @@ export const metadata: Metadata = {
 	manifest: '/site.webmanifest',
 }
 
+/**
+ * Vercel Analytics/Speed Insights load scripts from `/_vercel/*`, which only exist
+ * on Vercel deployments: elsewhere (Docker, `next start`, dev) they 404 on every page.
+ * `VERCEL` is set by the platform; NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS forces it on.
+ */
+const vercelAnalyticsEnabled = process.env.VERCEL === '1' || process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === 'true'
+
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
 	const locale = await getLocale()
 	const messages = await getMessages()
@@ -79,8 +86,12 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 					</ThemeProvider>
 				</AuthSessionProvider>
 				<Toaster />
-				<Analytics />
-				<SpeedInsights />
+				{vercelAnalyticsEnabled && (
+					<>
+						<Analytics />
+						<SpeedInsights />
+					</>
+				)}
 			</body>
 		</html>
 	)

@@ -4,10 +4,12 @@ import { startAuthentication } from '@simplewebauthn/browser'
 import { Fingerprint, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { passkeyRepository } from '@/app/repository/passkeyRepository'
 import { Button } from '@/components/ui/button'
+import { getCallbackUrlFromLocation } from '@/lib/auth/callback-url'
 
 interface Props {
 	className?: string
@@ -15,6 +17,7 @@ interface Props {
 }
 
 export function PasskeyLoginButton({ className, disabled }: Props) {
+	const t = useTranslations('auth.passkey')
 	const [loading, setLoading] = useState(false)
 	const router = useRouter()
 
@@ -32,26 +35,24 @@ export function PasskeyLoginButton({ className, disabled }: Props) {
 			const result = await signIn('passkey', {
 				accessToken: tokens.access_token,
 				refreshToken: tokens.refresh_token,
-				expiresIn: String(tokens.expires_in),
 				redirect: false,
 			})
 
 			if (result?.error) {
-				toast.error('Passkey login failed')
+				toast.error(t('failed'))
 				return
 			}
 
-			toast.success('Signed in with passkey')
-			router.push('/app')
+			toast.success(t('success'))
+			router.push(getCallbackUrlFromLocation())
 			router.refresh()
 		} catch (err) {
-			const msg = err instanceof Error ? err.message : 'Passkey login failed'
+			const msg = err instanceof Error ? err.message : ''
 			if (msg.toLowerCase().includes('abort') || msg.toLowerCase().includes('cancelled')) {
 				// User cancelled — stay silent.
 				return
 			}
-			console.error('Passkey login error:', err)
-			toast.error(msg)
+			toast.error(msg || t('failed'))
 		} finally {
 			setLoading(false)
 		}
@@ -60,7 +61,7 @@ export function PasskeyLoginButton({ className, disabled }: Props) {
 	return (
 		<Button type='button' variant='outline' className={className} onClick={handleClick} disabled={disabled || loading}>
 			{loading ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Fingerprint className='mr-2 h-4 w-4' />}
-			Sign in with passkey
+			{t('signIn')}
 		</Button>
 	)
 }

@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { InvestmentFormModal } from '@/components/investments/InvestmentFormModal'
+import { renderWithIntl } from '@/tests/utils/intl'
 import { Investment, InvestmentType } from '@/types/investment'
 
 // Polyfill for Radix UI
@@ -35,9 +36,9 @@ vi.mock('@/hooks/queries/useInvestmentsQuery', () => ({
 }))
 
 vi.mock('@/lib/repositoryConfig', () => ({
-	investmentRepository: {
+	getInvestmentRepository: () => ({
 		getQuote: (...args: unknown[]) => mockGetQuote(...args),
-	},
+	}),
 }))
 
 describe('InvestmentFormModal', () => {
@@ -52,7 +53,7 @@ describe('InvestmentFormModal', () => {
 	})
 
 	function renderModal(investmentToEdit?: Investment | null) {
-		return render(
+		return renderWithIntl(
 			<QueryClientProvider client={queryClient}>
 				<InvestmentFormModal isOpen={true} onClose={mockOnClose} investmentToEdit={investmentToEdit} />
 			</QueryClientProvider>,
@@ -142,7 +143,7 @@ describe('InvestmentFormModal', () => {
 		await user.type(symbolInput, 'AAPL')
 
 		// Click the search/fetch button (the icon button next to symbol)
-		const fetchButton = screen.getByRole('button', { name: '' })
+		const fetchButton = screen.getByRole('button', { name: 'Fetch current price' })
 		await user.click(fetchButton)
 
 		await waitFor(() => {
@@ -176,7 +177,9 @@ describe('InvestmentFormModal', () => {
 		await user.click(submitButton)
 
 		await waitFor(() => {
-			expect(screen.getByText(/Insufficient broker balance/)).toBeInTheDocument()
+			expect(
+				screen.getByText('Insufficient broker balance in USD. Required: US$100,000.00, available: US$10,000.00'),
+			).toBeInTheDocument()
 		})
 	})
 

@@ -1,8 +1,9 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APIKeysSection } from '@/components/settings/APIKeysSection'
+import { renderWithIntl } from '@/tests/utils/intl'
 import type { APIKey } from '@/types/apikey'
 
 // Polyfill for Radix UI
@@ -15,10 +16,6 @@ beforeAll(() => {
 		disconnect() {}
 	} as unknown as typeof globalThis.ResizeObserver
 })
-
-vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string) => key,
-}))
 
 // Module-level state so individual tests can override the returned keys
 let mockAPIKeys: APIKey[] = []
@@ -60,10 +57,11 @@ describe('APIKeysSection', () => {
 	})
 
 	function renderSection() {
-		return render(
+		return renderWithIntl(
 			<QueryClientProvider client={queryClient}>
 				<APIKeysSection />
 			</QueryClientProvider>,
+			{ locale: 'es' },
 		)
 	}
 
@@ -107,6 +105,8 @@ describe('APIKeysSection', () => {
 		expect(screen.getByText('My Integration')).toBeInTheDocument()
 		expect(screen.getByText('sk-xyz789...')).toBeInTheDocument()
 		expect(screen.getByText('Inactiva')).toBeInTheDocument()
+		expect(screen.getByText('Último uso: Nunca')).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'Revocar clave Claude Desktop' })).toBeInTheDocument()
 	})
 
 	it('shows create dialog when clicking "Nueva clave" button', async () => {
@@ -128,5 +128,20 @@ describe('APIKeysSection', () => {
 		expect(screen.getByText('claude_desktop_config.json')).toBeInTheDocument()
 		// The config JSON is rendered inside a <pre> block; match against the raw text content
 		expect(screen.getByText((content) => content.includes('gestor-presupuesto'))).toBeInTheDocument()
+	})
+})
+
+describe('APIKeysSection (en)', () => {
+	it('renders English copy for the en locale', () => {
+		mockAPIKeys = []
+		renderWithIntl(
+			<QueryClientProvider client={new QueryClient()}>
+				<APIKeysSection />
+			</QueryClientProvider>,
+			{ locale: 'en' },
+		)
+
+		expect(screen.getByText('No API keys')).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: /New key/ })).toBeInTheDocument()
 	})
 })

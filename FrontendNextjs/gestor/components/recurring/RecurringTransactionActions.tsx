@@ -1,6 +1,7 @@
 'use client'
 
 import { Loader2, Play, Plus } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -17,6 +18,7 @@ import { useProcessRecurringTransactionsMutation } from '@/hooks/queries/useRecu
 import { useRecurringTransactionContext } from './RecurringTransactionContext'
 
 export function RecurringTransactionActions() {
+	const t = useTranslations('recurring')
 	const { setModalOpen, setEditingTransaction } = useRecurringTransactionContext()
 	const processMutation = useProcessRecurringTransactionsMutation()
 	const [isConfirmOpen, setConfirmOpen] = useState(false)
@@ -26,22 +28,18 @@ export function RecurringTransactionActions() {
 		setModalOpen(true)
 	}
 
-	const unconfirmedProcess = () => {
-		setConfirmOpen(true)
-	}
-
 	const handleConfirmProcess = async () => {
 		processMutation.mutate(undefined, {
-			onSuccess: (_data) => {
-				toast.success('Transacciones procesadas correctamente', {
-					description: 'Se han generado las transacciones pendientes.',
+			onSuccess: () => {
+				toast.success(t('processSuccess'), {
+					description: t('processSuccessDescription'),
 				})
 				setConfirmOpen(false)
 			},
 			onError: (error) => {
 				console.error(error)
-				toast.error('Error al procesar', {
-					description: 'Hubo un problema al generar las transacciones.',
+				toast.error(t('processError'), {
+					description: t('processErrorDescription'),
 				})
 				setConfirmOpen(false)
 			},
@@ -50,33 +48,30 @@ export function RecurringTransactionActions() {
 
 	return (
 		<>
-			<div className='flex justify-end mb-4 space-x-2'>
-				<Button variant='outline' onClick={unconfirmedProcess} disabled={processMutation.isPending}>
+			<div className='mb-4 flex flex-col gap-2 sm:flex-row sm:justify-end'>
+				<Button variant='outline' onClick={() => setConfirmOpen(true)} disabled={processMutation.isPending}>
 					<Play className='mr-2 h-4 w-4' />
-					Ejecutar Ahora
+					{t('runNow')}
 				</Button>
 				<Button onClick={handleNew}>
 					<Plus className='mr-2 h-4 w-4' />
-					Nueva Recurrente
+					{t('newRecurring')}
 				</Button>
 			</div>
 
 			<Dialog open={isConfirmOpen} onOpenChange={setConfirmOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Ejecutar Transacciones Recurrentes</DialogTitle>
-						<DialogDescription>
-							¿Estás seguro de que deseas procesar todas las transacciones recurrentes pendientes hasta la fecha de hoy?
-							Esto generará automáticamente los gastos e ingresos programados.
-						</DialogDescription>
+						<DialogTitle>{t('runTitle')}</DialogTitle>
+						<DialogDescription>{t('runDescription')}</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
 						<DialogClose asChild>
-							<Button variant='outline'>Cancelar</Button>
+							<Button variant='outline'>{t('cancel')}</Button>
 						</DialogClose>
 						<Button onClick={handleConfirmProcess} disabled={processMutation.isPending}>
 							{processMutation.isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-							Confirmar Ejecución
+							{t('confirmRun')}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

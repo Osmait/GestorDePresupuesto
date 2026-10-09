@@ -1,5 +1,6 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { Certificate } from '@/types/certificate'
 import { CertificateCard } from './CertificateCard'
 
@@ -20,10 +21,12 @@ export function CertificatesList({
 	onSimulate,
 	selectedId,
 }: CertificatesListProps) {
+	const t = useTranslations('certificates')
+
 	if (certificates.length === 0) {
 		return (
 			<div className='text-center py-12'>
-				<p className='text-muted-foreground'>No certificates found. Create your first certificate to get started.</p>
+				<p className='text-muted-foreground'>{t('empty')}</p>
 			</div>
 		)
 	}

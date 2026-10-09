@@ -1,10 +1,13 @@
 'use client'
 
 import { Calculator, Calendar, DollarSign, Landmark, Percent, TrendingUp } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Certificate, formatCurrency, getInterestTypeLabel, getStatusLabel } from '@/types/certificate'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { formatCurrency } from '@/lib/utils'
+import { Certificate } from '@/types/certificate'
 
 interface CertificateCardProps {
 	certificate: Certificate
@@ -15,6 +18,8 @@ interface CertificateCardProps {
 }
 
 export function CertificateCard({ certificate, onEdit, onDelete, onViewHistory, onSimulate }: CertificateCardProps) {
+	const t = useTranslations('certificates')
+	const locale = useAppLocale()
 	const statusColors = {
 		active: 'bg-green-500/10 text-green-500',
 		matured: 'bg-blue-500/10 text-blue-500',
@@ -24,17 +29,19 @@ export function CertificateCard({ certificate, onEdit, onDelete, onViewHistory, 
 	return (
 		<Card className='hover:border-primary/50 transition-colors'>
 			<CardHeader className='pb-3'>
-				<div className='flex items-start justify-between'>
-					<div className='space-y-1'>
+				<div className='flex flex-wrap items-start justify-between gap-2'>
+					<div className='min-w-0 space-y-1'>
 						<CardTitle className='text-lg font-semibold flex items-center gap-2'>
 							<Landmark className='h-5 w-5 text-primary' />
 							{certificate.bank}
 						</CardTitle>
-						<Badge className={statusColors[certificate.status]}>{getStatusLabel(certificate.status)}</Badge>
+						<Badge className={statusColors[certificate.status]}>{t(`status.${certificate.status}`)}</Badge>
 					</div>
 					<div className='text-right'>
-						<p className='text-2xl font-bold'>{formatCurrency(certificate.effective_capital, certificate.currency)}</p>
-						<p className='text-xs text-muted-foreground'>Effective Capital</p>
+						<p className='text-2xl font-bold'>
+							{formatCurrency(certificate.effective_capital, certificate.currency, { locale })}
+						</p>
+						<p className='text-xs text-muted-foreground'>{t('card.effectiveCapital')}</p>
 					</div>
 				</div>
 			</CardHeader>
@@ -43,28 +50,28 @@ export function CertificateCard({ certificate, onEdit, onDelete, onViewHistory, 
 					<div className='flex items-center gap-2'>
 						<TrendingUp className='h-4 w-4 text-muted-foreground' />
 						<div>
-							<p className='text-muted-foreground'>Interest Type</p>
-							<p className='font-medium'>{getInterestTypeLabel(certificate.interest_type)}</p>
+							<p className='text-muted-foreground'>{t('card.interestType')}</p>
+							<p className='font-medium'>{t(`interestType.${certificate.interest_type}`)}</p>
 						</div>
 					</div>
 					<div className='flex items-center gap-2'>
 						<Percent className='h-4 w-4 text-muted-foreground' />
 						<div>
-							<p className='text-muted-foreground'>Rate</p>
+							<p className='text-muted-foreground'>{t('card.rate')}</p>
 							<p className='font-medium'>{certificate.current_interest_rate}%</p>
 						</div>
 					</div>
 					<div className='flex items-center gap-2'>
 						<Calendar className='h-4 w-4 text-muted-foreground' />
 						<div>
-							<p className='text-muted-foreground'>Cut Day</p>
-							<p className='font-medium'>Day {certificate.cut_day}</p>
+							<p className='text-muted-foreground'>{t('card.cutDay')}</p>
+							<p className='font-medium'>{t('card.dayValue', { day: certificate.cut_day })}</p>
 						</div>
 					</div>
 					<div className='flex items-center gap-2'>
 						<DollarSign className='h-4 w-4 text-muted-foreground' />
 						<div>
-							<p className='text-muted-foreground'>Tax Rate</p>
+							<p className='text-muted-foreground'>{t('card.taxRate')}</p>
 							<p className='font-medium'>{certificate.current_tax_rate}%</p>
 						</div>
 					</div>
@@ -72,16 +79,16 @@ export function CertificateCard({ certificate, onEdit, onDelete, onViewHistory, 
 
 				{certificate.projected_payment && certificate.status === 'active' && (
 					<div className='p-3 rounded-lg bg-primary/5 border border-primary/10'>
-						<p className='text-xs text-muted-foreground mb-1'>Next Payment Projection</p>
+						<p className='text-xs text-muted-foreground mb-1'>{t('card.nextPaymentProjection')}</p>
 						<div className='flex justify-between items-center'>
-							<span className='text-sm'>Net Interest:</span>
+							<span className='text-sm'>{t('card.netInterest')}</span>
 							<span className='font-semibold text-green-500'>
-								{formatCurrency(certificate.projected_payment.net_interest, certificate.currency)}
+								{formatCurrency(certificate.projected_payment.net_interest, certificate.currency, { locale })}
 							</span>
 						</div>
 						{certificate.next_payment_date && (
 							<p className='text-xs text-muted-foreground mt-1'>
-								Expected: {new Date(certificate.next_payment_date).toLocaleDateString()}
+								{t('card.expected', { date: formatLocalDate(certificate.next_payment_date, locale) })}
 							</p>
 						)}
 					</div>
@@ -90,7 +97,7 @@ export function CertificateCard({ certificate, onEdit, onDelete, onViewHistory, 
 				<div className='flex gap-2 pt-2 flex-wrap'>
 					<Button variant='outline' size='sm' onClick={() => onSimulate(certificate)}>
 						<Calculator className='h-3 w-3 mr-1' />
-						Simulate
+						{t('card.simulate')}
 					</Button>
 					<Button
 						variant='outline'
@@ -98,10 +105,10 @@ export function CertificateCard({ certificate, onEdit, onDelete, onViewHistory, 
 						onClick={() => onEdit(certificate)}
 						disabled={certificate.status === 'cancelled'}
 					>
-						Edit
+						{t('card.edit')}
 					</Button>
 					<Button variant='outline' size='sm' onClick={() => onViewHistory(certificate.id)}>
-						History
+						{t('card.history')}
 					</Button>
 					<Button
 						variant='destructive'
@@ -109,7 +116,7 @@ export function CertificateCard({ certificate, onEdit, onDelete, onViewHistory, 
 						onClick={() => onDelete(certificate.id)}
 						disabled={certificate.status === 'cancelled'}
 					>
-						Cancel
+						{t('card.cancel')}
 					</Button>
 				</div>
 			</CardContent>

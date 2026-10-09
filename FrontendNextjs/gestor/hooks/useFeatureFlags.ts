@@ -2,29 +2,28 @@
 
 import { useSession } from 'next-auth/react'
 import { useCallback, useEffect, useState } from 'react'
-
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080'
+import { getFeatureFlagRepository } from '@/lib/repositoryConfig'
 
 let cachedFlags: Record<string, boolean> = {}
 let hasLoadedFlags = false
 let inFlightFlagsRequest: Promise<Record<string, boolean>> | null = null
-let cachedToken = ''
+let cachedUserId = ''
 
 export function useFeatureFlags() {
 	const { data: session, status } = useSession()
-	const accessToken = ((session as any)?.accessToken as string | undefined) || ''
+	const userId = status === 'authenticated' ? session?.user?.id || '' : ''
 	const [flags, setFlags] = useState<Record<string, boolean>>(cachedFlags)
 	const [isLoading, setIsLoading] = useState(!hasLoadedFlags)
 
 	const loadFlags = useCallback(async () => {
-		if (accessToken !== cachedToken) {
-			cachedToken = accessToken
+		if (userId !== cachedUserId) {
+			cachedUserId = userId
 			cachedFlags = {}
 			hasLoadedFlags = false
 			inFlightFlagsRequest = null
 		}
 
-		if (!accessToken) {
+		if (!userId) {
 			cachedFlags = {}
 			hasLoadedFlags = true
 			return cachedFlags
@@ -35,16 +34,7 @@ export function useFeatureFlags() {
 		}
 
 		inFlightFlagsRequest = (async () => {
-			const response = await fetch(`${BASE_URL}/me/features`, {
-				headers: { Authorization: `Bearer ${accessToken}` },
-			})
-
-			if (!response.ok) {
-				throw new Error(`failed to load feature flags: ${response.status}`)
-			}
-
-			const data = await response.json()
-			cachedFlags = data?.map || {}
+			cachedFlags = await getFeatureFlagRepository().getMyFeatures()
 			hasLoadedFlags = true
 			return cachedFlags
 		})()
@@ -54,7 +44,7 @@ export function useFeatureFlags() {
 		} finally {
 			inFlightFlagsRequest = null
 		}
-	}, [accessToken])
+	}, [userId])
 
 	const refresh = useCallback(async () => {
 		if (status !== 'authenticated') {

@@ -13,6 +13,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { getSignedAmount, getTransactionTypeKey, isInflowTransaction } from '@/lib/transaction-utils'
+import { formatCurrency } from '@/lib/utils'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { useTransactionContext } from './TransactionContext'
 import { TransactionSort } from './TransactionSort'
@@ -20,6 +23,7 @@ import { TransactionSort } from './TransactionSort'
 export default function TransactionsList() {
 	const t = useTranslations('transactions')
 	const tCommon = useTranslations('common')
+	const locale = useAppLocale()
 	const {
 		transactions,
 		pagination,
@@ -27,7 +31,6 @@ export default function TransactionsList() {
 		isLoading: isLoadingTx,
 		deleteTransaction,
 		clearFilters,
-		reloadCurrentView,
 	} = useTransactionContext()
 
 	const { data: categories = [], isLoading: isLoadingCat } = useGetCategories()
@@ -94,8 +97,9 @@ export default function TransactionsList() {
 								category={category}
 								onOpenDetails={(item) => setSelectedTransaction(item)}
 								onTransactionDeleted={async () => {
+									// The delete mutation invalidates every list/balance query.
 									await deleteTransaction(transaction.id!)
-									reloadCurrentView()
+									setSelectedTransaction((current) => (current?.id === transaction.id ? null : current))
 								}}
 							/>
 						</motion.li>
@@ -175,41 +179,52 @@ export default function TransactionsList() {
 				<DialogContent>
 					<DialogHeader>
 						<DialogTitle>{selectedTransaction?.name}</DialogTitle>
-						<DialogDescription>{selectedTransaction?.description || t('description')}</DialogDescription>
+						<DialogDescription className={selectedTransaction?.description?.trim() ? undefined : 'italic'}>
+							{selectedTransaction?.description?.trim() || t('noDescription')}
+						</DialogDescription>
 					</DialogHeader>
 					{selectedTransaction && (
 						<div className='space-y-3 text-sm'>
 							<div className='grid grid-cols-2 gap-3'>
-								<div>
+								<div className='min-w-0'>
 									<p className='text-xs text-muted-foreground'>{t('amount')}</p>
-									<p className='font-semibold'>
-										{selectedTransaction.amount >= 0 ? '+' : '-'}$
-										{Math.abs(selectedTransaction.amount).toLocaleString()}
+									<p
+										className={`font-semibold tabular-nums break-words ${isInflowTransaction(selectedTransaction.type_transation) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
+									>
+										{formatCurrency(getSignedAmount(selectedTransaction), selectedTransaction.currency, {
+											locale,
+											signDisplay: 'exceptZero',
+										})}
 									</p>
 								</div>
-								<div>
+								<div className='min-w-0'>
 									<p className='text-xs text-muted-foreground'>{t('type')}</p>
-									<p className='font-semibold'>{selectedTransaction.type_transation}</p>
+									<p className='font-semibold'>{t(getTransactionTypeKey(selectedTransaction.type_transation))}</p>
 								</div>
 							</div>
 							<div className='grid grid-cols-2 gap-3'>
-								<div>
+								<div className='min-w-0'>
 									<p className='text-xs text-muted-foreground'>{t('account')}</p>
-									<p className='font-semibold'>
+									<p className='font-semibold break-words'>
 										{accounts.find((acc) => acc.id === selectedTransaction.account_id)?.name ||
 											selectedTransaction.account_id}
 									</p>
 								</div>
-								<div>
+								<div className='min-w-0'>
 									<p className='text-xs text-muted-foreground'>{t('category')}</p>
-									<p className='font-semibold'>
+									<p className='font-semibold break-words'>
 										{categories.find((cat) => cat.id === selectedTransaction.category_id)?.name || '-'}
 									</p>
 								</div>
 							</div>
 							<div>
 								<p className='text-xs text-muted-foreground'>{t('date')}</p>
-								<p className='font-semibold'>{new Date(selectedTransaction.created_at).toLocaleString()}</p>
+								<p className='font-semibold'>
+									{formatLocalDate(selectedTransaction.created_at, locale, {
+										dateStyle: 'long',
+										timeStyle: 'short',
+									})}
+								</p>
 							</div>
 						</div>
 					)}

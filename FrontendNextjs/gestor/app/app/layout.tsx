@@ -3,7 +3,6 @@ import '../../styles/globals.css'
 import { DemoTour } from '@/components/common/DemoTour'
 import PageTransition from '@/components/common/page-transition'
 import { Sidebar } from '@/components/common/sidebar'
-import { Toaster } from '@/components/ui/sonner'
 import { GlobalActionProvider } from '@/contexts/GlobalActionContext'
 import { NotificationProvider } from '@/contexts/NotificationContext'
 import { SettingsProvider } from '../../contexts'
@@ -29,7 +28,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
 							{children}
 						</PageTransition>
 					</Sidebar>
-					<Toaster />
 				</NotificationProvider>
 			</GlobalActionProvider>
 		</SettingsProvider>

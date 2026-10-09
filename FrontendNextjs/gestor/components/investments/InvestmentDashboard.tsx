@@ -1,16 +1,25 @@
 'use client'
 
 import { ResponsivePie } from '@nivo/pie'
+import { useTranslations } from 'next-intl'
 import { useTheme } from 'next-themes'
 import { useMemo } from 'react'
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useGetInvestments } from '@/hooks/queries/useInvestmentsQuery'
+import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
 import { formatCurrency } from '@/lib/utils'
+import { InvestmentType } from '@/types/investment'
 import { InvestmentSummaryCards } from './InvestmentSummaryCards'
 
+const KNOWN_TYPES = new Set<string>(Object.values(InvestmentType))
+
 export function InvestmentDashboard() {
+	const t = useTranslations('investments')
+	const locale = useAppLocale()
+	const intlLocale = getIntlLocale(locale)
+	const money = (value: number) => formatCurrency(value, 'USD', { locale })
 	const { data: investments, isLoading } = useGetInvestments()
 	const { theme } = useTheme()
 
@@ -36,7 +45,7 @@ export function InvestmentDashboard() {
 
 		const allocation = Array.from(allocationMap.entries()).map(([id, value]) => ({
 			id,
-			label: id.charAt(0).toUpperCase() + id.slice(1).replace('_', ' '),
+			label: KNOWN_TYPES.has(id) ? t(`types.${id as InvestmentType}`) : id,
 			value,
 			color: id === 'stock' ? '#3b82f6' : id === 'crypto' ? '#f59e0b' : '#10b981',
 		}))
@@ -74,7 +83,7 @@ export function InvestmentDashboard() {
 		}
 
 		return { totalValue, totalCost, totalProfit, roi, allocation, history }
-	}, [investments])
+	}, [investments, t])
 
 	const nivoTheme = useMemo(
 		() => ({
@@ -117,7 +126,7 @@ export function InvestmentDashboard() {
 			<div className='grid gap-4 md:grid-cols-2'>
 				<Card className='col-span-1'>
 					<CardHeader>
-						<CardTitle>Asset Allocation</CardTitle>
+						<CardTitle>{t('dashboard.allocation')}</CardTitle>
 					</CardHeader>
 					<CardContent className='h-[300px]'>
 						{metrics.allocation.length > 0 ? (
@@ -148,20 +157,22 @@ export function InvestmentDashboard() {
 											borderRadius: '4px',
 										}}
 									>
-										<strong>{datum.label}</strong>: {formatCurrency(datum.value)} (
+										<strong>{datum.label}</strong>: {money(datum.value)} (
 										{((datum.value / metrics.totalValue) * 100).toFixed(1)}%)
 									</div>
 								)}
 							/>
 						) : (
-							<div className='h-full flex items-center justify-center text-muted-foreground'>No data to display</div>
+							<div className='h-full flex items-center justify-center text-muted-foreground'>
+								{t('dashboard.noData')}
+							</div>
 						)}
 					</CardContent>
 				</Card>
 
 				<Card className='col-span-1'>
 					<CardHeader>
-						<CardTitle>Portfolio Growth (Cost Basis)</CardTitle>
+						<CardTitle>{t('dashboard.growth')}</CardTitle>
 					</CardHeader>
 					<CardContent className='h-[300px]'>
 						{metrics.history.length > 0 ? (
@@ -187,7 +198,7 @@ export function InvestmentDashboard() {
 										minTickGap={30}
 										tickFormatter={(value) => {
 											const date = new Date(value)
-											return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+											return date.toLocaleDateString(intlLocale, { month: 'short', day: 'numeric', timeZone: 'UTC' })
 										}}
 									/>
 									<YAxis hide domain={['auto', 'auto']} />
@@ -199,13 +210,14 @@ export function InvestmentDashboard() {
 											color: theme === 'dark' ? '#fff' : '#000',
 										}}
 										labelStyle={{ fontWeight: 'bold', color: theme === 'dark' ? '#fff' : '#374151' }}
-										formatter={(value: any) => [formatCurrency(Number(value)), 'Value']}
+										formatter={(value: any) => [money(Number(value)), t('dashboard.value')]}
 										labelFormatter={(label) =>
-											new Date(label).toLocaleDateString(undefined, {
+											new Date(label).toLocaleDateString(intlLocale, {
 												weekday: 'short',
 												year: 'numeric',
 												month: 'short',
 												day: 'numeric',
+												timeZone: 'UTC',
 											})
 										}
 									/>
@@ -220,7 +232,9 @@ export function InvestmentDashboard() {
 								</AreaChart>
 							</ResponsiveContainer>
 						) : (
-							<div className='h-full flex items-center justify-center text-muted-foreground'>No history data</div>
+							<div className='h-full flex items-center justify-center text-muted-foreground'>
+								{t('dashboard.noHistory')}
+							</div>
 						)}
 					</CardContent>
 				</Card>

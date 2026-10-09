@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { RecurringTransactionRepository } from '@/app/repository/recurringTransactionRepository'
 import { RecurringTransactionRequest } from '@/types/recurringTransaction'
+import { invalidateFinancialData } from './invalidateFinancialData'
 
 const recurringRepo = new RecurringTransactionRepository()
 
@@ -48,7 +49,7 @@ export const useProcessRecurringTransactionsMutation = () => {
 		mutationFn: () => recurringRepo.process(),
 		onSuccess: () => {
 			queryClient.invalidateQueries({ queryKey: ['recurring-transactions'] })
-			queryClient.invalidateQueries({ queryKey: ['transactions'] })
+			void invalidateFinancialData(queryClient)
 		},
 	})
 }

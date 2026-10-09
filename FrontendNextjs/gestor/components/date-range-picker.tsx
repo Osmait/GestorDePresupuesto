@@ -2,9 +2,10 @@
 
 import { CalendarIcon } from '@radix-ui/react-icons'
 import { addDays, format } from 'date-fns'
+import { useTranslations } from 'next-intl'
 import * as React from 'react'
 import { DateRange } from 'react-day-picker'
-
+import { useDateFnsLocale } from '@/lib/i18n/date-locale'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
 import { Calendar } from './ui/calendar'
@@ -18,6 +19,8 @@ export function CalendarDateRangePicker({
 	value?: DateRange | undefined
 	onChange?: (_range: DateRange | undefined) => void
 }) {
+	const t = useTranslations('datePicker')
+	const locale = useDateFnsLocale()
 	const [isDesktop, setIsDesktop] = React.useState(false)
 	const [internalDate, setInternalDate] = React.useState<DateRange | undefined>({
 		from: new Date(2023, 0, 20),
@@ -55,19 +58,20 @@ export function CalendarDateRangePicker({
 						{date?.from ? (
 							date.to ? (
 								<>
-									{format(date.from, 'LLL dd, y')} - {format(date.to, 'LLL dd, y')}
+									{format(date.from, 'PP', { locale })} - {format(date.to, 'PP', { locale })}
 								</>
 							) : (
-								format(date.from, 'LLL dd, y')
+								format(date.from, 'PP', { locale })
 							)
 						) : (
-							<span>Pick a date</span>
+							<span>{t('pickDate')}</span>
 						)}
 					</Button>
 				</PopoverTrigger>
 				<PopoverContent className='w-auto p-0' align='start'>
 					<Calendar
 						initialFocus
+						locale={locale}
 						mode='range'
 						defaultMonth={date?.from}
 						selected={date}

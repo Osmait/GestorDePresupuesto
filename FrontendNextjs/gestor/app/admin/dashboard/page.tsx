@@ -2,23 +2,22 @@
 
 import { RefreshCw, Trash2, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useSession } from 'next-auth/react'
+import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAdmin } from '@/hooks/useAdmin'
+import { getAdminRepository } from '@/lib/repositoryConfig'
 import { UserResponse } from '@/types/user'
 import { CreateUserModal } from './create-user-modal'
 import { FeatureFlagsPanel } from './feature-flags-panel'
 import { EditableUserTable } from './user-table'
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080'
-
 export default function AdminDashboard() {
+	const t = useTranslations('admin')
 	const { isAdmin, isLoading: isAdminLoading } = useAdmin()
-	const { data: session } = useSession()
 	const router = useRouter()
 	const [users, setUsers] = useState<UserResponse[]>([])
 	const [isLoadingUsers, setIsLoadingUsers] = useState(true)
@@ -28,25 +27,13 @@ export default function AdminDashboard() {
 	const fetchUsers = useCallback(async () => {
 		setIsLoadingUsers(true)
 		try {
-			const token = (session as any)?.accessToken
-			const response = await fetch(`${BASE_URL}/users`, {
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			})
-
-			if (!response.ok) {
-				throw new Error(`Failed to fetch users: ${response.status}`)
-			}
-
-			const data = await response.json()
-			setUsers(data)
+			setUsers(await getAdminRepository().listUsers())
 		} catch (error: any) {
-			toast.error(`Error loading users: ${error.message}`)
+			toast.error(t('toasts.loadUsersError', { message: error.message }))
 		} finally {
 			setIsLoadingUsers(false)
 		}
-	}, [session])
+	}, [t])
 
 	useEffect(() => {
 		if (!isAdminLoading && !isAdmin) {
@@ -59,25 +46,12 @@ export default function AdminDashboard() {
 	const handleSave = async (updatedUsers: UserResponse[]) => {
 		setIsSaving(true)
 		try {
-			const token = (session as any)?.accessToken
-			const response = await fetch(`${BASE_URL}/users`, {
-				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
-				},
-				body: JSON.stringify(updatedUsers),
-			})
+			await getAdminRepository().updateUsers(updatedUsers)
 
-			if (!response.ok) {
-				const errorText = await response.text()
-				throw new Error(`Failed to save changes: ${response.status} - ${errorText}`)
-			}
-
-			toast.success(`${updatedUsers.length} users updated successfully`)
+			toast.success(t('toasts.saveSuccess', { count: updatedUsers.length }))
 			fetchUsers()
 		} catch (error: any) {
-			toast.error(`Error saving changes: ${error.message}`)
+			toast.error(t('toasts.saveError', { message: error.message }))
 		} finally {
 			setIsSaving(false)
 		}
@@ -85,46 +59,26 @@ export default function AdminDashboard() {
 
 	const handleDelete = async (userId: string) => {
 		try {
-			const token = (session as any)?.accessToken
-			const response = await fetch(`${BASE_URL}/users/${userId}`, {
-				method: 'DELETE',
-				headers: { Authorization: `Bearer ${token}` },
-			})
+			await getAdminRepository().deleteUser(userId)
 
-			if (!response.ok) {
-				const errorText = await response.text()
-				throw new Error(`Failed to delete user: ${response.status} - ${errorText}`)
-			}
-
-			toast.success('User disabled successfully')
+			toast.success(t('toasts.disableSuccess'))
 			fetchUsers()
 		} catch (error: any) {
-			toast.error(`Error deleting user: ${error.message}`)
+			toast.error(t('toasts.disableError', { message: error.message }))
 		}
 	}
 
 	const handleCleanup = async () => {
-		if (!confirm('Are you sure? This will delete ALL demo users immediately.')) return
+		if (!confirm(t('confirmCleanup'))) return
 
 		setIsCleaning(true)
 		try {
-			const token = (session as any)?.accessToken
-			const response = await fetch(`${BASE_URL}/users/demos`, {
-				method: 'DELETE',
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			})
+			await getAdminRepository().cleanupDemoUsers()
 
-			if (!response.ok) {
-				const errorText = await response.text()
-				throw new Error(`Failed: ${response.status} - ${errorText}`)
-			}
-
-			toast.success('Success: All demo users have been deleted.')
+			toast.success(t('toasts.cleanupSuccess'))
 			fetchUsers() // Refresh the list
 		} catch (error: any) {
-			toast.error(`Error: ${error.message}`)
+			toast.error(t('toasts.cleanupError', { message: error.message }))
 		} finally {
 			setIsCleaning(false)
 		}
@@ -135,7 +89,7 @@ export default function AdminDashboard() {
 			<div className='flex h-[calc(100vh-4rem)] items-center justify-center'>
 				<div className='text-center'>
 					<RefreshCw className='h-8 w-8 animate-spin mx-auto mb-4 text-primary' />
-					<p className='text-muted-foreground'>Checking admin access...</p>
+					<p className='text-muted-foreground'>{t('checkingAccess')}</p>
 				</div>
 			</div>
 		)
@@ -146,9 +100,9 @@ export default function AdminDashboard() {
 			<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
 				<div className='min-w-0'>
 					<h2 className='text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent truncate'>
-						Admin Backoffice
+						{t('title')}
 					</h2>
-					<p className='text-sm text-muted-foreground'>Manage users and system state.</p>
+					<p className='text-sm text-muted-foreground'>{t('subtitle')}</p>
 				</div>
 				<div className='flex items-center gap-2 w-full sm:w-auto'>
 					<CreateUserModal onUserCreated={fetchUsers} />
@@ -158,9 +112,10 @@ export default function AdminDashboard() {
 						onClick={fetchUsers}
 						disabled={isLoadingUsers || isSaving}
 						className='gap-2 flex-1 sm:flex-none'
+						aria-label={t('refresh')}
 					>
 						<RefreshCw className={`h-4 w-4 ${isLoadingUsers || isSaving ? 'animate-spin' : ''}`} />
-						<span className='hidden sm:inline'>Refresh</span>
+						<span className='hidden sm:inline'>{t('refresh')}</span>
 					</Button>
 					<Button
 						variant='destructive'
@@ -168,9 +123,10 @@ export default function AdminDashboard() {
 						onClick={handleCleanup}
 						disabled={isCleaning || isSaving}
 						className='gap-2 flex-1 sm:flex-none'
+						aria-label={t('cleanDemos')}
 					>
 						<Trash2 className='h-4 w-4' />
-						<span className='hidden sm:inline'>{isCleaning ? 'Cleaning...' : 'Clean Demos'}</span>
+						<span className='hidden sm:inline'>{isCleaning ? t('cleaning') : t('cleanDemos')}</span>
 					</Button>
 				</div>
 			</div>
@@ -181,12 +137,12 @@ export default function AdminDashboard() {
 						<div className='min-w-0'>
 							<CardTitle className='flex items-center gap-2 text-base sm:text-lg'>
 								<Users className='h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0' />
-								Registered Users
+								{t('users.title')}
 							</CardTitle>
-							<CardDescription className='text-xs sm:text-sm'>Edit user details directly in the table.</CardDescription>
+							<CardDescription className='text-xs sm:text-sm'>{t('users.description')}</CardDescription>
 						</div>
 						<Badge variant='secondary' className='font-mono self-start sm:self-auto'>
-							{users.length} Total
+							{t('users.total', { count: users.length })}
 						</Badge>
 					</CardHeader>
 					<CardContent className='p-4 sm:p-6 pt-0'>
@@ -194,7 +150,7 @@ export default function AdminDashboard() {
 					</CardContent>
 				</Card>
 
-				<FeatureFlagsPanel users={users} token={(session as any)?.accessToken || ''} />
+				<FeatureFlagsPanel users={users} />
 			</div>
 		</div>
 	)

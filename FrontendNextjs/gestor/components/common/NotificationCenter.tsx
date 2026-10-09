@@ -2,8 +2,7 @@
 
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
-import { Bell, Check, Trash2, Zap } from 'lucide-react'
-import { useSession } from 'next-auth/react'
+import { Bell, Check, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import {
 	DropdownMenu,
@@ -18,27 +17,8 @@ import { NotificationItem, useNotificationContext } from '@/contexts/Notificatio
 import { cn } from '@/lib/utils'
 
 export function NotificationCenter() {
-	const { data: session } = useSession()
 	const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications } =
 		useNotificationContext()
-
-	const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8080'
-
-	const handleTestNotification = async () => {
-		const token = session?.accessToken || (session?.user as any)?.accessToken
-		if (!token) return
-
-		try {
-			await fetch(`${BASE_URL}/notifications/test`, {
-				method: 'POST',
-				headers: {
-					Authorization: `Bearer ${token}`,
-				},
-			})
-		} catch (error) {
-			console.error('Failed to trigger test notification', error)
-		}
-	}
 
 	return (
 		<DropdownMenu>
@@ -107,21 +87,6 @@ export function NotificationCenter() {
 						</div>
 					)}
 				</ScrollArea>
-				<DropdownMenuSeparator />
-				<div className='p-2'>
-					<Button
-						variant='outline'
-						size='sm'
-						className='w-full text-xs'
-						onClick={(e) => {
-							e.preventDefault()
-							handleTestNotification()
-						}}
-					>
-						<Zap className='mr-2 h-3 w-3' />
-						Probar Notificación
-					</Button>
-				</div>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	)

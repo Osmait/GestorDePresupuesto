@@ -1,3 +1,5 @@
+import { formatCurrency as formatMoney } from '@/lib/utils'
+
 export type InterestType = 'simple' | 'compound'
 export type CertificateStatus = 'active' | 'matured' | 'cancelled'
 
@@ -122,26 +124,7 @@ export function calculateMonthlyPayment(capital: number, rate: number, taxRate: 
 	}
 }
 
+/** @deprecated Use `formatCurrency` from '@/lib/utils' with the active locale. */
 export function formatCurrency(amount: number, currency: string = 'DOP'): string {
-	return new Intl.NumberFormat('es-DO', {
-		style: 'currency',
-		currency,
-	}).format(amount)
-}
-
-export function getInterestTypeLabel(type: InterestType): string {
-	return type === 'simple' ? 'Simple' : 'Compound'
-}
-
-export function getStatusLabel(status: CertificateStatus): string {
-	switch (status) {
-		case 'active':
-			return 'Active'
-		case 'matured':
-			return 'Matured'
-		case 'cancelled':
-			return 'Cancelled'
-		default:
-			return status
-	}
+	return formatMoney(amount, currency)
 }

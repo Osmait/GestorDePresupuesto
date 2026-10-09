@@ -26,7 +26,7 @@ vi.mock('next-intl', () => ({
 			delete: 'Delete',
 		}
 		if (key === 'dayOfMonth') return `Day ${values?.day}`
-		if (key === 'originalAmount') return `$${values?.amount} USD`
+		if (key === 'originalAmount') return `Original: ${values?.amount}`
 		return translations[key] || key
 	},
 }))
@@ -109,7 +109,7 @@ describe('MonthlyPlanColumn', () => {
 		renderColumn([makeItem({ id: '1', name: 'Netflix', currency: 'USD', amount: 15, amount_dop: 937.5 })])
 
 		expect(screen.getByText('USD')).toBeInTheDocument()
-		expect(screen.getByText('$15.00 USD')).toBeInTheDocument()
+		expect(screen.getByText('Original: US$15.00')).toBeInTheDocument()
 	})
 
 	it('resolves the category name', () => {

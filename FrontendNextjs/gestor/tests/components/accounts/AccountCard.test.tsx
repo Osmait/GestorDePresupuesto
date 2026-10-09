@@ -49,15 +49,14 @@ describe('AccountCard', () => {
 		expect(screen.getByText('Main Checking')).toBeInTheDocument()
 		expect(screen.getByText('Chase')).toBeInTheDocument()
 		// Use custom matcher for currency to handle potential formatting differences
-		expect(screen.getByText((content) => content.includes('$5,000'))).toBeInTheDocument()
+		expect(screen.getByText('US$5,000.00')).toBeInTheDocument()
 		expect(screen.getByText('Balance Actual')).toBeInTheDocument()
 	})
 
 	it('displays growth indicator positive', () => {
 		render(<AccountCard account={mockAccount} />)
 		// Use custom matcher for growth
-		expect(screen.getByText((content) => content.includes('+1,000'))).toBeInTheDocument()
-		expect(screen.getByText((content) => content.includes('+1,000'))).toHaveClass('text-green-600')
+		expect(screen.getByText('+US$1,000.00')).toHaveClass('text-green-600')
 	})
 
 	it('calls onAccountEdit when edit option is clicked', async () => {
@@ -66,7 +65,7 @@ describe('AccountCard', () => {
 		render(<AccountCard account={mockAccount} onAccountEdit={onEdit} />)
 
 		// Open dropdown
-		const trigger = screen.getByRole('button', { name: 'Editar' })
+		const trigger = screen.getByRole('button', { name: 'options' })
 		await user.click(trigger)
 
 		// Click edit - use findByText to wait for it to appear
@@ -74,5 +73,16 @@ describe('AccountCard', () => {
 		await user.click(editOption)
 
 		expect(onEdit).toHaveBeenCalledWith(mockAccount)
+	})
+
+	it('is keyboard accessible: the account name is a link to the detail page', () => {
+		render(<AccountCard account={mockAccount} />)
+		const link = screen.getByRole('link', { name: 'Main Checking' })
+		expect(link).toHaveAttribute('href', '/app/accounts/1')
+	})
+
+	it('shows a decrease with its sign in red', () => {
+		render(<AccountCard account={{ ...mockAccount, current_balance: 3500.25 }} />)
+		expect(screen.getByText('-US$499.75')).toHaveClass('text-red-600')
 	})
 })

@@ -14,6 +14,8 @@ import { TransactionFilters, TransactionSummary } from '@/types/transaction'
 const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
 
 function getDatePartsInTimeZone(date: Date, timeZone: string): { year: number; month: number; day: number } {
+	// 'en-US' is only used to read numeric year/month/day parts (never displayed),
+	// so it is intentionally independent of the UI locale.
 	const parts = new Intl.DateTimeFormat('en-US', {
 		timeZone,
 		year: 'numeric',
@@ -103,7 +105,18 @@ interface TransactionContextType {
 
 export const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
 
-export function TransactionProvider({ children }: { children: ReactNode }) {
+export function TransactionProvider({
+	children,
+	syncUrl = true,
+}: {
+	children: ReactNode
+	/**
+	 * Mirror the filters into the URL query string. Disable it when the provider
+	 * is mounted outside the transactions page (e.g. the global "+" modal), or it
+	 * would rewrite the URL of whatever page the user is on.
+	 */
+	syncUrl?: boolean
+}) {
 	const router = useRouter()
 	const searchParams = useSearchParams()
 
@@ -159,8 +172,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 		if (filters.search) apiFilters.search = filters.search
 
 		setActiveFilters(apiFilters)
-		updateURLWithFilters(filters)
-	}, [filters, updateURLWithFilters])
+		if (syncUrl) updateURLWithFilters(filters)
+	}, [filters, updateURLWithFilters, syncUrl])
 
 	// Query Data
 	const { data, isLoading: isLoadingTx, error: errorTx, refetch } = useGetTransactions(activeFilters)
@@ -231,8 +244,8 @@ export function TransactionProvider({ children }: { children: ReactNode }) {
 			sortOrder: 'desc' as 'asc' | 'desc',
 		}
 		setFilters(clearedFilters)
-		router.replace(window.location.pathname)
-	}, [router])
+		if (syncUrl) router.replace(window.location.pathname)
+	}, [router, syncUrl])
 
 	const reloadCurrentView = useCallback(() => {
 		loadAllTransactions()

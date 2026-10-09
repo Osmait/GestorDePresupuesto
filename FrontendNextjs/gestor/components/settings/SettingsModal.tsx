@@ -15,7 +15,7 @@ import {
 	User,
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import { useLocale } from 'next-intl'
+import { useLocale, useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { ModeToggle } from '@/components/common/ToggleMode'
 import { APIKeysSection } from '@/components/settings/APIKeysSection'
@@ -41,38 +41,20 @@ interface SettingsModalProps {
 
 type SettingsTab = 'general' | 'security' | 'notifications' | 'data' | 'apikeys'
 
-const sidebarNavItems = [
-	{
-		title: 'General',
-		id: 'general',
-		icon: User,
-	},
-	{
-		title: 'Seguridad',
-		id: 'security',
-		icon: Shield,
-	},
-	{
-		title: 'Notificaciones',
-		id: 'notifications',
-		icon: Bell,
-	},
-	{
-		title: 'Datos y Privacidad',
-		id: 'data',
-		icon: Database,
-	},
-	{
-		title: 'API Keys',
-		id: 'apikeys',
-		icon: Key,
-	},
+const sidebarNavItems: { id: SettingsTab; icon: typeof User }[] = [
+	{ id: 'general', icon: User },
+	{ id: 'security', icon: Shield },
+	{ id: 'notifications', icon: Bell },
+	{ id: 'data', icon: Database },
+	{ id: 'apikeys', icon: Key },
 ]
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 	const [activeTab, setActiveTab] = useState<SettingsTab>('general')
 	const { data: session } = useSession()
 	const locale = useLocale()
+	const t = useTranslations('settingsModal')
+	const tCommon = useTranslations('common')
 	const {
 		sidebarHoverEnabled,
 		setSidebarHoverEnabled,
@@ -98,7 +80,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 					{/* Sidebar */}
 					<div className='w-64 border-r bg-muted/30 flex flex-col'>
 						<DialogHeader className='p-6 pb-4 border-b'>
-							<DialogTitle>Configuración</DialogTitle>
+							<DialogTitle>{t('title')}</DialogTitle>
 						</DialogHeader>
 						<ScrollArea className='flex-1 py-4'>
 							<nav className='grid gap-1 px-4'>
@@ -107,10 +89,10 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 										key={item.id}
 										variant={activeTab === item.id ? 'secondary' : 'ghost'}
 										className={cn('justify-start gap-3', activeTab === item.id && 'bg-muted')}
-										onClick={() => setActiveTab(item.id as SettingsTab)}
+										onClick={() => setActiveTab(item.id)}
 									>
 										<item.icon className='h-4 w-4' />
-										{item.title}
+										{t(`tabs.${item.id}`)}
 									</Button>
 								))}
 							</nav>
@@ -138,45 +120,45 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 								{activeTab === 'general' && (
 									<div className='space-y-8 animate-in fade-in-50 duration-300'>
 										<div>
-											<h3 className='text-lg font-medium'>Perfil</h3>
-											<p className='text-sm text-muted-foreground'>Información personal y de contacto</p>
+											<h3 className='text-lg font-medium'>{t('profile.title')}</h3>
+											<p className='text-sm text-muted-foreground'>{t('profile.description')}</p>
 											<Separator className='my-4' />
 											<div className='space-y-4'>
 												<div className='flex items-center justify-between p-4 border rounded-lg'>
 													<div className='space-y-1'>
-														<Label>Nombre completo</Label>
+														<Label>{t('profile.fullName')}</Label>
 														<p className='text-sm text-muted-foreground'>
 															{session?.user.name} {session?.user.lastName}
 														</p>
 													</div>
 													<Button variant='outline' size='sm'>
-														Editar
+														{t('actions.edit')}
 													</Button>
 												</div>
 												<div className='flex items-center justify-between p-4 border rounded-lg'>
 													<div className='space-y-1'>
-														<Label>Email</Label>
+														<Label>{t('profile.email')}</Label>
 														<p className='text-sm text-muted-foreground'>{session?.user.email}</p>
 													</div>
 													<Button variant='outline' size='sm'>
-														Cambiar
+														{t('actions.change')}
 													</Button>
 												</div>
 											</div>
 										</div>
 
 										<div>
-											<h3 className='text-lg font-medium'>Apariencia</h3>
-											<p className='text-sm text-muted-foreground'>Personaliza cómo se ve la aplicación</p>
+											<h3 className='text-lg font-medium'>{t('appearance.title')}</h3>
+											<p className='text-sm text-muted-foreground'>{t('appearance.description')}</p>
 											<Separator className='my-4' />
 											<div className='space-y-4'>
 												<div className='flex items-center justify-between p-4 border rounded-lg'>
 													<div className='space-y-1'>
 														<div className='flex items-center gap-2'>
 															<Palette className='h-4 w-4' />
-															<Label>Tema</Label>
+															<Label>{t('appearance.theme')}</Label>
 														</div>
-														<p className='text-sm text-muted-foreground'>Cambiar entre modo claro y oscuro</p>
+														<p className='text-sm text-muted-foreground'>{t('appearance.themeDescription')}</p>
 													</div>
 													<ModeToggle />
 												</div>
@@ -184,9 +166,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 													<div className='space-y-1'>
 														<div className='flex items-center gap-2'>
 															<Globe className='h-4 w-4' />
-															<Label>Idioma</Label>
+															<Label>{t('appearance.language')}</Label>
 														</div>
-														<p className='text-sm text-muted-foreground'>Selecciona tu idioma preferido</p>
+														<p className='text-sm text-muted-foreground'>{t('appearance.languageDescription')}</p>
 													</div>
 													<div className='flex gap-2'>
 														<Button
@@ -194,14 +176,14 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 															size='sm'
 															onClick={() => switchLocale('es')}
 														>
-															Español
+															{tCommon('language.es')}
 														</Button>
 														<Button
 															variant={locale === 'en' ? 'default' : 'outline'}
 															size='sm'
 															onClick={() => switchLocale('en')}
 														>
-															English
+															{tCommon('language.en')}
 														</Button>
 													</div>
 												</div>
@@ -209,17 +191,17 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 										</div>
 
 										<div>
-											<h3 className='text-lg font-medium'>Navegación</h3>
-											<p className='text-sm text-muted-foreground'>Preferencias de la interfaz de usuario</p>
+											<h3 className='text-lg font-medium'>{t('navigation.title')}</h3>
+											<p className='text-sm text-muted-foreground'>{t('navigation.description')}</p>
 											<Separator className='my-4' />
 											<div className='flex items-center justify-between p-4 border rounded-lg'>
 												<div className='space-y-1'>
 													<div className='flex items-center gap-2'>
 														<Layout className='h-4 w-4' />
-														<Label htmlFor='sidebar-hover'>Sidebar expandible</Label>
+														<Label htmlFor='sidebar-hover'>{t('navigation.sidebarHover')}</Label>
 													</div>
 													<p className='text-sm text-muted-foreground max-w-[300px]'>
-														Expandir automáticamente el menú lateral al pasar el mouse por encima
+														{t('navigation.sidebarHoverDescription')}
 													</p>
 												</div>
 												<Switch
@@ -235,51 +217,51 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 								{activeTab === 'security' && (
 									<div className='space-y-8 animate-in fade-in-50 duration-300'>
 										<div>
-											<h3 className='text-lg font-medium'>Seguridad</h3>
-											<p className='text-sm text-muted-foreground'>Protección de tu cuenta y dispositivos</p>
+											<h3 className='text-lg font-medium'>{t('security.title')}</h3>
+											<p className='text-sm text-muted-foreground'>{t('security.description')}</p>
 											<Separator className='my-4' />
 											<div className='space-y-4'>
 												<div className='flex items-center justify-between p-4 border rounded-lg'>
 													<div className='space-y-1'>
 														<div className='flex items-center gap-2'>
 															<Lock className='h-4 w-4' />
-															<Label>Contraseña</Label>
+															<Label>{t('security.password')}</Label>
 														</div>
-														<p className='text-sm text-muted-foreground'>Actualizada hace 3 meses</p>
+														<p className='text-sm text-muted-foreground'>{t('security.passwordUpdated')}</p>
 													</div>
 													<Button variant='outline' size='sm'>
-														Cambiar
+														{t('actions.change')}
 													</Button>
 												</div>
 												<div className='flex items-center justify-between p-4 border rounded-lg'>
 													<div className='space-y-1'>
 														<div className='flex items-center gap-2'>
 															<Shield className='h-4 w-4' />
-															<Label>Autenticación de dos pasos</Label>
+															<Label>{t('security.twoFactor')}</Label>
 														</div>
-														<p className='text-sm text-muted-foreground'>Añade una capa extra de seguridad</p>
+														<p className='text-sm text-muted-foreground'>{t('security.twoFactorDescription')}</p>
 													</div>
 													<Badge variant='outline' className='text-green-500 border-green-500'>
-														Activada
+														{t('security.enabled')}
 													</Badge>
 												</div>
 											</div>
 										</div>
 
 										<div>
-											<h3 className='text-lg font-medium'>Dispositivos</h3>
-											<p className='text-sm text-muted-foreground'>Gestiona dónde has iniciado sesión</p>
+											<h3 className='text-lg font-medium'>{t('devices.title')}</h3>
+											<p className='text-sm text-muted-foreground'>{t('devices.description')}</p>
 											<Separator className='my-4' />
 											<div className='flex items-center justify-between p-4 border rounded-lg'>
 												<div className='space-y-1'>
 													<div className='flex items-center gap-2'>
 														<Smartphone className='h-4 w-4' />
-														<Label>Sesiones activas</Label>
+														<Label>{t('devices.activeSessions')}</Label>
 													</div>
-													<p className='text-sm text-muted-foreground'>3 dispositivos conectados actualmente</p>
+													<p className='text-sm text-muted-foreground'>{t('devices.activeSessionsDescription')}</p>
 												</div>
 												<Button variant='outline' size='sm'>
-													Gestionar
+													{t('actions.manage')}
 												</Button>
 											</div>
 										</div>
@@ -291,17 +273,17 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 								{activeTab === 'notifications' && (
 									<div className='space-y-8 animate-in fade-in-50 duration-300'>
 										<div>
-											<h3 className='text-lg font-medium'>Notificaciones</h3>
-											<p className='text-sm text-muted-foreground'>Elige cómo quieres recibir las alertas</p>
+											<h3 className='text-lg font-medium'>{t('notifications.title')}</h3>
+											<p className='text-sm text-muted-foreground'>{t('notifications.description')}</p>
 											<Separator className='my-4' />
 											<div className='grid gap-4'>
 												<div className='flex items-center justify-between p-4 border rounded-lg'>
 													<div className='space-y-1'>
 														<div className='flex items-center gap-2'>
 															<Mail className='h-4 w-4' />
-															<Label htmlFor='email-notif'>Email</Label>
+															<Label htmlFor='email-notif'>{t('notifications.email')}</Label>
 														</div>
-														<p className='text-sm text-muted-foreground'>Resumen semanal y alertas de seguridad</p>
+														<p className='text-sm text-muted-foreground'>{t('notifications.emailDescription')}</p>
 													</div>
 													<Switch
 														id='email-notif'
@@ -313,11 +295,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 													<div className='space-y-1'>
 														<div className='flex items-center gap-2'>
 															<Bell className='h-4 w-4' />
-															<Label htmlFor='push-notif'>Push</Label>
+															<Label htmlFor='push-notif'>{t('notifications.push')}</Label>
 														</div>
-														<p className='text-sm text-muted-foreground'>
-															Notificaciones en tiempo real en el navegador
-														</p>
+														<p className='text-sm text-muted-foreground'>{t('notifications.pushDescription')}</p>
 													</div>
 													<Switch
 														id='push-notif'
@@ -329,9 +309,9 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 													<div className='space-y-1'>
 														<div className='flex items-center gap-2'>
 															<Smartphone className='h-4 w-4' />
-															<Label htmlFor='sms-notif'>SMS</Label>
+															<Label htmlFor='sms-notif'>{t('notifications.sms')}</Label>
 														</div>
-														<p className='text-sm text-muted-foreground'>Alertas críticas de seguridad</p>
+														<p className='text-sm text-muted-foreground'>{t('notifications.smsDescription')}</p>
 													</div>
 													<Switch
 														id='sms-notif'
@@ -347,33 +327,31 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 								{activeTab === 'data' && (
 									<div className='space-y-8 animate-in fade-in-50 duration-300'>
 										<div>
-											<h3 className='text-lg font-medium'>Gestión de Datos</h3>
-											<p className='text-sm text-muted-foreground'>Controla tus datos y privacidad</p>
+											<h3 className='text-lg font-medium'>{t('data.title')}</h3>
+											<p className='text-sm text-muted-foreground'>{t('data.description')}</p>
 											<Separator className='my-4' />
 											<div className='space-y-4'>
 												<div className='flex items-center justify-between p-4 border rounded-lg'>
 													<div className='space-y-1'>
 														<div className='flex items-center gap-2'>
 															<Download className='h-4 w-4' />
-															<Label>Exportar datos</Label>
+															<Label>{t('data.export')}</Label>
 														</div>
-														<p className='text-sm text-muted-foreground'>
-															Descarga una copia de todas tus transacciones
-														</p>
+														<p className='text-sm text-muted-foreground'>{t('data.exportDescription')}</p>
 													</div>
 													<Button variant='outline' size='sm'>
-														Exportar CSV
+														{t('actions.exportCsv')}
 													</Button>
 												</div>
 												<div className='flex items-center justify-between p-4 border rounded-lg border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900/50'>
 													<div className='space-y-1'>
-														<Label className='text-red-600 dark:text-red-400'>Zona de Peligro</Label>
+														<Label className='text-red-600 dark:text-red-400'>{t('data.dangerZone')}</Label>
 														<p className='text-sm text-red-600/80 dark:text-red-400/80'>
-															Eliminar permanentemente tu cuenta y datos
+															{t('data.dangerZoneDescription')}
 														</p>
 													</div>
 													<Button variant='destructive' size='sm'>
-														Eliminar Cuenta
+														{t('actions.deleteAccount')}
 													</Button>
 												</div>
 											</div>

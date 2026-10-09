@@ -1,9 +1,10 @@
 'use client'
 
-import { Pie } from '@nivo/pie'
+import { ResponsivePie } from '@nivo/pie'
 import { CreditCard, DollarSign, FileCheck, LucideIcon, PiggyBank, TrendingUp } from 'lucide-react'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatCurrency } from '@/lib/utils'
 
 interface PatrimonyData {
 	label: string
@@ -21,6 +22,8 @@ interface PatrimonyTabProps {
 	investmentsCount: number
 	certificatesCount: number
 	exchangeRate?: number
+	/** App locale (`es` | `en`); totals are DOP amounts from the dashboard summary. */
+	locale: string
 	labels: {
 		title: string
 		accounts: string
@@ -28,6 +31,9 @@ interface PatrimonyTabProps {
 		certificates: string
 		total: string
 		activeItems: string
+		exchangeRate: string
+		distribution: string
+		noData: string
 	}
 }
 
@@ -39,9 +45,10 @@ interface CategoryCardProps {
 	icon: LucideIcon
 	color: string
 	subtitle?: string
+	locale: string
 }
 
-function CategoryCard({ title, value, count, countLabel, icon: Icon, color, subtitle }: CategoryCardProps) {
+function CategoryCard({ title, value, count, countLabel, icon: Icon, color, subtitle, locale }: CategoryCardProps) {
 	return (
 		<Card className='border-border/50 dark:border-border/20'>
 			<CardContent className='p-6'>
@@ -50,8 +57,8 @@ function CategoryCard({ title, value, count, countLabel, icon: Icon, color, subt
 						<Icon className='h-6 w-6' />
 					</div>
 					<p className='text-sm font-medium text-muted-foreground mb-1'>{title}</p>
-					<p className='text-2xl font-bold text-foreground'>
-						<AnimatedCounter value={value} prefix='$' />
+					<p className='text-xl sm:text-2xl font-bold text-foreground tabular-nums break-words'>
+						<AnimatedCounter value={value} currency='DOP' locale={locale} />
 					</p>
 					{subtitle && <p className='text-xs text-muted-foreground mt-1'>{subtitle}</p>}
 					<p className='text-xs text-muted-foreground mt-1'>
@@ -72,8 +79,10 @@ export function PatrimonyTab({
 	investmentsCount,
 	certificatesCount,
 	exchangeRate,
+	locale,
 	labels,
 }: PatrimonyTabProps) {
+	const formatDOP = (value: number) => formatCurrency(value, 'DOP', { locale })
 	const totalPatrimony = accountsTotal + investmentsTotal + certificatesTotal
 
 	const pieData: PatrimonyData[] = [
@@ -101,21 +110,19 @@ export function PatrimonyTab({
 
 	// Format USD value for subtitle
 	const investmentsSubtitle =
-		investmentsTotalUSD !== undefined
-			? `USD ${investmentsTotalUSD.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-			: undefined
+		investmentsTotalUSD !== undefined ? formatCurrency(investmentsTotalUSD, 'USD', { locale }) : undefined
 
 	return (
 		<div className='space-y-6'>
 			{exchangeRate && (
 				<Card className='border-border/50 dark:border-border/20'>
 					<CardContent className='py-4'>
-						<div className='flex items-center justify-between'>
+						<div className='flex flex-wrap items-center justify-between gap-2'>
 							<div className='flex items-center gap-2'>
-								<DollarSign className='h-5 w-5 text-muted-foreground' />
-								<span className='text-sm text-muted-foreground'>Exchange Rate (USD → DOP):</span>
+								<DollarSign className='h-5 w-5 text-muted-foreground' aria-hidden='true' />
+								<span className='text-sm text-muted-foreground'>{labels.exchangeRate}</span>
 							</div>
-							<span className='text-lg font-bold'>{exchangeRate.toFixed(2)}</span>
+							<span className='text-lg font-bold tabular-nums'>{formatDOP(exchangeRate)}</span>
 						</div>
 					</CardContent>
 				</Card>
@@ -129,6 +136,7 @@ export function PatrimonyTab({
 					countLabel={labels.activeItems}
 					icon={CreditCard}
 					color='from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5 text-blue-600 dark:text-blue-400'
+					locale={locale}
 				/>
 				<CategoryCard
 					title={labels.investments}
@@ -138,6 +146,7 @@ export function PatrimonyTab({
 					icon={TrendingUp}
 					color='from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5 text-green-600 dark:text-green-400'
 					subtitle={investmentsSubtitle}
+					locale={locale}
 				/>
 				<CategoryCard
 					title={labels.certificates}
@@ -146,6 +155,7 @@ export function PatrimonyTab({
 					countLabel={labels.activeItems}
 					icon={FileCheck}
 					color='from-purple-500/10 to-violet-500/10 dark:from-purple-500/5 dark:to-violet-500/5 text-purple-600 dark:text-purple-400'
+					locale={locale}
 				/>
 			</div>
 
@@ -159,16 +169,16 @@ export function PatrimonyTab({
 					</CardHeader>
 					<CardContent>
 						<div className='text-center py-6'>
-							<p className='text-5xl font-bold text-foreground mb-2'>
-								<AnimatedCounter value={totalPatrimony} prefix='$' />
+							<p className='text-3xl sm:text-5xl font-bold text-foreground mb-2 tabular-nums break-words'>
+								<AnimatedCounter value={totalPatrimony} currency='DOP' locale={locale} />
 							</p>
 							<p className='text-muted-foreground'>{labels.total}</p>
 						</div>
-						<div className='grid grid-cols-3 gap-4 mt-4 pt-4 border-t'>
+						<div className='grid grid-cols-3 gap-2 sm:gap-4 mt-4 pt-4 border-t'>
 							{pieData.map((item) => (
-								<div key={item.label} className='text-center'>
+								<div key={item.label} className='min-w-0 text-center'>
 									<div className='w-3 h-3 rounded-full mx-auto mb-1' style={{ backgroundColor: item.color }} />
-									<p className='text-xs text-muted-foreground'>{item.label}</p>
+									<p className='text-xs text-muted-foreground break-words'>{item.label}</p>
 									<p className='text-sm font-semibold'>
 										{totalPatrimony > 0 ? ((item.value / totalPatrimony) * 100).toFixed(1) : 0}%
 									</p>
@@ -180,15 +190,13 @@ export function PatrimonyTab({
 
 				<Card className='border-border/50 dark:border-border/20'>
 					<CardHeader>
-						<CardTitle className='text-foreground'>Distribución</CardTitle>
+						<CardTitle className='text-foreground'>{labels.distribution}</CardTitle>
 					</CardHeader>
 					<CardContent>
 						{hasData ? (
-							<div className='h-[250px] w-full'>
-								<Pie
+							<div className='h-[250px] w-full min-w-0'>
+								<ResponsivePie
 									data={pieData}
-									width={400}
-									height={250}
 									margin={{ top: 20, right: 20, bottom: 40, left: 20 }}
 									innerRadius={0.5}
 									padAngle={2}
@@ -198,7 +206,7 @@ export function PatrimonyTab({
 									borderWidth={1}
 									borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
 									enableArcLabels={true}
-									arcLabel={(d) => `$${(d.value as number).toLocaleString()}`}
+									arcLabel={(d) => formatDOP(d.value as number)}
 									arcLabelsSkipAngle={10}
 									arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
 									legends={[
@@ -221,7 +229,7 @@ export function PatrimonyTab({
 									tooltip={({ datum }) => (
 										<div className='bg-background border rounded-md px-3 py-2 shadow-md'>
 											<p className='text-xs font-medium'>{datum.label}</p>
-											<p className='text-sm font-bold'>${(datum.value as number).toLocaleString()}</p>
+											<p className='text-sm font-bold'>{formatDOP(datum.value as number)}</p>
 											<p className='text-xs text-muted-foreground'>
 												{totalPatrimony > 0 ? (((datum.value as number) / totalPatrimony) * 100).toFixed(1) : 0}%
 											</p>
@@ -238,9 +246,7 @@ export function PatrimonyTab({
 								/>
 							</div>
 						) : (
-							<div className='h-[250px] flex items-center justify-center text-muted-foreground'>
-								No hay datos para mostrar
-							</div>
+							<div className='h-[250px] flex items-center justify-center text-muted-foreground'>{labels.noData}</div>
 						)}
 					</CardContent>
 				</Card>

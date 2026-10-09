@@ -4,6 +4,7 @@ import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, PieChart, Wallet } from 
 import { useTranslations } from 'next-intl'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAppLocale } from '@/lib/i18n/date-locale'
 import { MonthlyPlanSummary } from '@/types/monthlyPlan'
 
 /**
@@ -12,6 +13,7 @@ import { MonthlyPlanSummary } from '@/types/monthlyPlan'
  */
 export function MonthlyPlanSummaryCard({ summary }: { summary: MonthlyPlanSummary }) {
 	const t = useTranslations('monthlyPlan')
+	const locale = useAppLocale()
 
 	const isOvercommitted = summary.available < 0
 	// Only the bar is capped at 100%; the printed percentage still tells the truth.
@@ -40,7 +42,7 @@ export function MonthlyPlanSummaryCard({ summary }: { summary: MonthlyPlanSummar
 						<ArrowUpCircle className='h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400' />
 						<p className='text-sm font-medium text-muted-foreground'>{t('totalIncome')}</p>
 						<p className='text-xl font-bold text-green-600 dark:text-green-400'>
-							<AnimatedCounter value={summary.total_income} prefix='$' decimals={2} />
+							<AnimatedCounter value={summary.total_income} currency='DOP' locale={locale} />
 						</p>
 						<p className='text-xs text-muted-foreground mt-1'>{t('itemsCount', { count: summary.income_count })}</p>
 					</div>
@@ -52,7 +54,7 @@ export function MonthlyPlanSummaryCard({ summary }: { summary: MonthlyPlanSummar
 						<ArrowDownCircle className='h-6 w-6 mx-auto mb-2 text-orange-600 dark:text-orange-400' />
 						<p className='text-sm font-medium text-muted-foreground'>{t('totalExpenses')}</p>
 						<p className='text-xl font-bold text-orange-600 dark:text-orange-400'>
-							<AnimatedCounter value={summary.total_expenses} prefix='$' decimals={2} />
+							<AnimatedCounter value={summary.total_expenses} currency='DOP' locale={locale} />
 						</p>
 						<p className='text-xs text-muted-foreground mt-1'>{t('itemsCount', { count: summary.expenses_count })}</p>
 					</div>
@@ -66,7 +68,7 @@ export function MonthlyPlanSummaryCard({ summary }: { summary: MonthlyPlanSummar
 						<p
 							className={`text-xl font-bold ${isOvercommitted ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}
 						>
-							<AnimatedCounter value={summary.available} prefix='$' decimals={2} />
+							<AnimatedCounter value={summary.available} currency='DOP' locale={locale} />
 						</p>
 						{isOvercommitted && (
 							<p className='text-xs text-red-600 dark:text-red-400 mt-1 flex items-center justify-center gap-1'>

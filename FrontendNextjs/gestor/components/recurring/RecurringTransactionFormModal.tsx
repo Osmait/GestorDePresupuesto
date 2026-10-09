@@ -2,7 +2,8 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, Edit, Loader2, PlusCircle } from 'lucide-react'
-import { useEffect } from 'react'
+import { useTranslations } from 'next-intl'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -17,21 +18,31 @@ import {
 	useCreateRecurringTransactionMutation,
 	useUpdateRecurringTransactionMutation,
 } from '@/hooks/queries/useRecurringTransactionsQuery'
+import { hasAtMostDecimals } from '@/lib/money-validation'
 import { useRecurringTransactionContext } from './RecurringTransactionContext'
 
-const recurringSchema = z.object({
-	name: z.string().min(1, 'El nombre es requerido'),
-	description: z.string().optional(),
-	amount: z.coerce.number().min(0.01, 'El monto debe ser mayor a 0'),
-	type: z.enum(['income', 'bill'], { required_error: 'Selecciona un tipo' }),
-	account_id: z.string().min(1, 'Selecciona una cuenta'),
-	category_id: z.string().min(1, 'Selecciona una categoría'),
-	day_of_month: z.coerce.number().min(1).max(31),
-})
+function createRecurringSchema(t: (key: string) => string, tForms: (key: string) => string) {
+	return z.object({
+		name: z.string().min(1, t('validation.nameRequired')),
+		description: z.string().optional(),
+		// recurring_transactions.amount is NUMERIC(15,2): the API rejects sub-cent amounts.
+		amount: z.coerce
+			.number()
+			.min(0.01, t('validation.amountPositive'))
+			.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals')),
+		type: z.enum(['income', 'bill'], { required_error: t('validation.typeRequired') }),
+		account_id: z.string().min(1, t('validation.accountRequired')),
+		category_id: z.string().min(1, t('validation.categoryRequired')),
+		day_of_month: z.coerce.number().min(1, t('validation.dayRange')).max(31, t('validation.dayRange')),
+	})
+}
 
-type RecurringFormValues = z.infer<typeof recurringSchema>
+type RecurringFormValues = z.infer<ReturnType<typeof createRecurringSchema>>
 
 export function RecurringTransactionFormModal() {
+	const t = useTranslations('recurring')
+	const tForms = useTranslations('forms')
+	const recurringSchema = useMemo(() => createRecurringSchema(t, tForms), [t, tForms])
 	const { isModalOpen, setModalOpen, editingTransaction, setEditingTransaction } = useRecurringTransactionContext()
 	const { data: categories = [] } = useGetCategories()
 	const { data: accounts = [] } = useGetAccounts()
@@ -106,9 +117,9 @@ export function RecurringTransactionFormModal() {
 
 	return (
 		<Dialog open={isModalOpen} onOpenChange={handleOpenChange}>
-			<DialogContent className='sm:max-w-[425px]'>
+			<DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-[425px]'>
 				<DialogHeader>
-					<DialogTitle>{isEditing ? 'Editar Recurrente' : 'Nueva Transacción Recurrente'}</DialogTitle>
+					<DialogTitle>{isEditing ? t('editTitle') : t('createTitle')}</DialogTitle>
 				</DialogHeader>
 				<Form {...form}>
 					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
@@ -117,22 +128,22 @@ export function RecurringTransactionFormModal() {
 							name='name'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Nombre</FormLabel>
+									<FormLabel>{t('fieldName')}</FormLabel>
 									<FormControl>
-										<Input placeholder='Ej: Netflix' {...field} />
+										<Input placeholder={t('namePlaceholder')} {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
 
-						<div className='grid grid-cols-2 gap-4'>
+						<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
 							<FormField
 								control={form.control}
 								name='amount'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Monto</FormLabel>
+										<FormLabel>{t('fieldAmount')}</FormLabel>
 										<FormControl>
 											<Input type='number' step='0.01' {...field} />
 										</FormControl>
@@ -145,7 +156,7 @@ export function RecurringTransactionFormModal() {
 								name='day_of_month'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Día del Mes</FormLabel>
+										<FormLabel>{t('fieldDayOfMonth')}</FormLabel>
 										<FormControl>
 											<Input type='number' min={1} max={31} {...field} />
 										</FormControl>
@@ -160,15 +171,15 @@ export function RecurringTransactionFormModal() {
 							name='type'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Tipo</FormLabel>
+									<FormLabel>{t('fieldType')}</FormLabel>
 									<FormControl>
 										<Select value={field.value} onValueChange={field.onChange}>
 											<SelectTrigger>
 												<SelectValue />
 											</SelectTrigger>
 											<SelectContent>
-												<SelectItem value='bill'>Gasto</SelectItem>
-												<SelectItem value='income'>Ingreso</SelectItem>
+												<SelectItem value='bill'>{t('typeBill')}</SelectItem>
+												<SelectItem value='income'>{t('typeIncome')}</SelectItem>
 											</SelectContent>
 										</Select>
 									</FormControl>
@@ -177,17 +188,17 @@ export function RecurringTransactionFormModal() {
 							)}
 						/>
 
-						<div className='grid grid-cols-2 gap-4'>
+						<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
 							<FormField
 								control={form.control}
 								name='category_id'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Categoría</FormLabel>
+										<FormLabel>{t('fieldCategory')}</FormLabel>
 										<FormControl>
 											<Select value={field.value} onValueChange={field.onChange}>
 												<SelectTrigger>
-													<SelectValue placeholder='Seleccionar' />
+													<SelectValue placeholder={t('selectPlaceholder')} />
 												</SelectTrigger>
 												<SelectContent>
 													{categories.map((c) => (
@@ -207,11 +218,11 @@ export function RecurringTransactionFormModal() {
 								name='account_id'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Cuenta</FormLabel>
+										<FormLabel>{t('fieldAccount')}</FormLabel>
 										<FormControl>
 											<Select value={field.value} onValueChange={field.onChange}>
 												<SelectTrigger>
-													<SelectValue placeholder='Seleccionar' />
+													<SelectValue placeholder={t('selectPlaceholder')} />
 												</SelectTrigger>
 												<SelectContent>
 													{accounts.map((a) => (
@@ -233,7 +244,7 @@ export function RecurringTransactionFormModal() {
 							name='description'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Descripción (Opcional)</FormLabel>
+									<FormLabel>{t('fieldDescription')}</FormLabel>
 									<FormControl>
 										<Input {...field} />
 									</FormControl>
@@ -251,7 +262,7 @@ export function RecurringTransactionFormModal() {
 								) : (
 									<PlusCircle className='h-4 w-4 mr-2' />
 								)}
-								{isEditing ? 'Guardar Cambios' : 'Crear'}
+								{isEditing ? t('saveChanges') : t('create')}
 							</Button>
 						</DialogFooter>
 					</form>

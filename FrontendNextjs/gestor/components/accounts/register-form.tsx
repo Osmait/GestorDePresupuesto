@@ -3,7 +3,9 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, Check, Eye, EyeOff, Loader2, Lock, Mail, User, UserPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useEffect, useRef, useState } from 'react'
+import { signIn } from 'next-auth/react'
+import { useTranslations } from 'next-intl'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -13,35 +15,33 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { getAuthRepository } from '@/lib/repositoryConfig'
 
-// Schema de validación con Zod más robusto
-const registerSchema = z
-	.object({
-		name: z
-			.string()
-			.min(2, 'El nombre debe tener al menos 2 caracteres')
-			.max(50, 'El nombre no puede tener más de 50 caracteres')
-			.regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'El nombre solo puede contener letras'),
-		lastName: z
-			.string()
-			.min(2, 'El apellido debe tener al menos 2 caracteres')
-			.max(50, 'El apellido no puede tener más de 50 caracteres')
-			.regex(/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'El apellido solo puede contener letras'),
-		email: z.string().min(1, 'El email es requerido').email('Debe ser un email válido').toLowerCase(),
-		password: z
-			.string()
-			.min(6, 'La contraseña debe tener al menos 6 caracteres')
-			.max(100, 'La contraseña no puede tener más de 100 caracteres')
-			.regex(/(?=.*[a-z])/, 'Debe contener al menos una letra minúscula')
-			.regex(/(?=.*[A-Z])/, 'Debe contener al menos una letra mayúscula')
-			.regex(/(?=.*\d)/, 'Debe contener al menos un número'),
-		confirmPassword: z.string().min(6, 'Confirma tu contraseña'),
-	})
-	.refine((data) => data.password === data.confirmPassword, {
-		path: ['confirmPassword'],
-		message: 'Las contraseñas no coinciden',
-	})
+/** Must match the backend password policy (min 8 characters). */
+export const PASSWORD_MIN_LENGTH = 8
 
-type RegisterFormValues = z.infer<typeof registerSchema>
+const NAME_PATTERN = /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/
+
+function buildRegisterSchema(t: (key: string, values?: Record<string, string | number>) => string) {
+	return z
+		.object({
+			name: z.string().min(2, t('nameMin')).max(50, t('nameMax')).regex(NAME_PATTERN, t('nameLetters')),
+			lastName: z.string().min(2, t('lastNameMin')).max(50, t('lastNameMax')).regex(NAME_PATTERN, t('lastNameLetters')),
+			email: z.string().min(1, t('emailRequired')).email(t('emailInvalid')).toLowerCase(),
+			password: z
+				.string()
+				.min(PASSWORD_MIN_LENGTH, t('passwordMinLength', { min: PASSWORD_MIN_LENGTH }))
+				.max(100, t('passwordMax'))
+				.regex(/(?=.*[a-z])/, t('passwordLowercase'))
+				.regex(/(?=.*[A-Z])/, t('passwordUppercase'))
+				.regex(/(?=.*\d)/, t('passwordNumber')),
+			confirmPassword: z.string().min(1, t('confirmRequired')),
+		})
+		.refine((data) => data.password === data.confirmPassword, {
+			path: ['confirmPassword'],
+			message: t('passwordsMismatch'),
+		})
+}
+
+type RegisterFormValues = z.infer<ReturnType<typeof buildRegisterSchema>>
 
 interface RegisterFormProps {
 	onToggleForm?: () => void
@@ -49,6 +49,9 @@ interface RegisterFormProps {
 }
 
 export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormProps) {
+	const t = useTranslations('auth.register')
+	const registerSchema = useMemo(() => buildRegisterSchema(t), [t])
+	const isDevelopment = process.env.NODE_ENV === 'development'
 	const [isLoading, setIsLoading] = useState(false)
 	const [showPassword, setShowPassword] = useState(false)
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -80,7 +83,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 	// Validaciones de contraseña en tiempo real
 	const passwordValidations = {
-		length: passwordValue?.length >= 6,
+		length: passwordValue?.length >= PASSWORD_MIN_LENGTH,
 		lowercase: /(?=.*[a-z])/.test(passwordValue || ''),
 		uppercase: /(?=.*[A-Z])/.test(passwordValue || ''),
 		number: /(?=.*\d)/.test(passwordValue || ''),
@@ -92,19 +95,25 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 			setError(null)
 			setSuccess(false)
 
-			console.log('📝 Iniciando registro...')
 			const authRepository = await getAuthRepository()
 
 			// Crear cuenta
 			await authRepository.signUp(values.name, values.lastName, values.email, values.password)
 
-			console.log('✅ Registro exitoso')
 			setSuccess(true)
 
 			// Auto-login después del registro
 			autoLoginTimerRef.current = setTimeout(async () => {
 				try {
-					await authRepository.login(values.email, values.password)
+					const result = await signIn('credentials', {
+						email: values.email,
+						password: values.password,
+						redirect: false,
+					})
+					if (result?.error) {
+						router.push('/login')
+						return
+					}
 					router.push('/app')
 					router.refresh()
 				} catch {
@@ -112,8 +121,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 				}
 			}, 1500)
 		} catch (err) {
-			console.error('❌ Error en registro:', err)
-			setError(err instanceof Error ? err.message : 'Error al crear la cuenta')
+			setError(err instanceof Error ? err.message : t('error'))
 		} finally {
 			setIsLoading(false)
 		}
@@ -137,8 +145,8 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 						</div>
 					</div>
 					<div className='space-y-2'>
-						<h3 className='text-xl font-bold text-foreground'>¡Cuenta creada exitosamente!</h3>
-						<p className='text-muted-foreground'>Iniciando sesión automáticamente...</p>
+						<h3 className='text-xl font-bold text-foreground'>{t('successTitle')}</h3>
+						<p className='text-muted-foreground'>{t('successAutoLogin')}</p>
 					</div>
 					<div className='flex justify-center'>
 						<Loader2 className='h-6 w-6 animate-spin text-primary' />
@@ -156,8 +164,8 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 						<UserPlus className='h-6 w-6 text-primary-foreground' />
 					</div>
 				</div>
-				<CardTitle className='text-2xl font-bold text-center'>Crear Cuenta</CardTitle>
-				<CardDescription className='text-muted-foreground'>Completa el formulario para crear tu cuenta</CardDescription>
+				<CardTitle className='text-2xl font-bold text-center'>{t('title')}</CardTitle>
+				<CardDescription className='text-muted-foreground'>{t('subtitle')}</CardDescription>
 			</CardHeader>
 
 			<CardContent className='space-y-6'>
@@ -176,13 +184,13 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 								name='name'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel className='text-sm font-medium'>Nombre</FormLabel>
+										<FormLabel className='text-sm font-medium'>{t('name')}</FormLabel>
 										<FormControl>
 											<div className='relative'>
 												<User className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
 												<Input
 													{...field}
-													placeholder='Juan'
+													placeholder={t('namePlaceholder')}
 													disabled={isLoading}
 													className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
 												/>
@@ -198,13 +206,13 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 								name='lastName'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel className='text-sm font-medium'>Apellido</FormLabel>
+										<FormLabel className='text-sm font-medium'>{t('lastName')}</FormLabel>
 										<FormControl>
 											<div className='relative'>
 												<User className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
 												<Input
 													{...field}
-													placeholder='Pérez'
+													placeholder={t('lastNamePlaceholder')}
 													disabled={isLoading}
 													className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
 												/>
@@ -221,14 +229,14 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							name='email'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className='text-sm font-medium'>Email</FormLabel>
+									<FormLabel className='text-sm font-medium'>{t('email')}</FormLabel>
 									<FormControl>
 										<div className='relative'>
 											<Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
 											<Input
 												{...field}
 												type='email'
-												placeholder='ejemplo@correo.com'
+												placeholder={t('emailPlaceholder')}
 												disabled={isLoading}
 												className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
 											/>
@@ -244,7 +252,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							name='password'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className='text-sm font-medium'>Contraseña</FormLabel>
+									<FormLabel className='text-sm font-medium'>{t('password')}</FormLabel>
 									<FormControl>
 										<div className='relative'>
 											<Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
@@ -282,7 +290,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 													<div
 														className={`w-2 h-2 rounded-full ${passwordValidations.length ? 'bg-green-600' : 'bg-muted-foreground'}`}
 													/>
-													6+ caracteres
+													{t('ruleLength', { min: PASSWORD_MIN_LENGTH })}
 												</div>
 												<div
 													className={`flex items-center gap-1 ${passwordValidations.lowercase ? 'text-green-600' : 'text-muted-foreground'}`}
@@ -290,7 +298,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 													<div
 														className={`w-2 h-2 rounded-full ${passwordValidations.lowercase ? 'bg-green-600' : 'bg-muted-foreground'}`}
 													/>
-													Minúscula
+													{t('ruleLowercase')}
 												</div>
 												<div
 													className={`flex items-center gap-1 ${passwordValidations.uppercase ? 'text-green-600' : 'text-muted-foreground'}`}
@@ -298,7 +306,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 													<div
 														className={`w-2 h-2 rounded-full ${passwordValidations.uppercase ? 'bg-green-600' : 'bg-muted-foreground'}`}
 													/>
-													Mayúscula
+													{t('ruleUppercase')}
 												</div>
 												<div
 													className={`flex items-center gap-1 ${passwordValidations.number ? 'text-green-600' : 'text-muted-foreground'}`}
@@ -306,7 +314,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 													<div
 														className={`w-2 h-2 rounded-full ${passwordValidations.number ? 'bg-green-600' : 'bg-muted-foreground'}`}
 													/>
-													Número
+													{t('ruleNumber')}
 												</div>
 											</div>
 										</div>
@@ -322,7 +330,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							name='confirmPassword'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className='text-sm font-medium'>Confirmar Contraseña</FormLabel>
+									<FormLabel className='text-sm font-medium'>{t('confirmPassword')}</FormLabel>
 									<FormControl>
 										<div className='relative'>
 											<Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
@@ -362,38 +370,40 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							{isLoading ? (
 								<>
 									<Loader2 className='mr-2 h-4 w-4 animate-spin' />
-									Creando cuenta...
+									{t('submitting')}
 								</>
 							) : (
 								<>
 									<UserPlus className='mr-2 h-4 w-4' />
-									Crear Cuenta
+									{t('submit')}
 								</>
 							)}
 						</Button>
 					</form>
 				</Form>
 
-				{/* Datos de prueba */}
-				<div className='text-center'>
-					<Button
-						type='button'
-						variant='outline'
-						size='sm'
-						onClick={fillTestData}
-						disabled={isLoading}
-						className='text-xs border-border/50 hover:bg-muted/30'
-					>
-						<User className='mr-1 h-3 w-3' />
-						Llenar datos de prueba
-					</Button>
-				</div>
+				{/* Datos de prueba: solo en desarrollo */}
+				{isDevelopment && (
+					<div className='text-center'>
+						<Button
+							type='button'
+							variant='outline'
+							size='sm'
+							onClick={fillTestData}
+							disabled={isLoading}
+							className='text-xs border-border/50 hover:bg-muted/30'
+						>
+							<User className='mr-1 h-3 w-3' />
+							{t('fillTestData')}
+						</Button>
+					</div>
+				)}
 
 				{/* Toggle para login */}
 				{showToggle && onToggleForm && (
 					<div className='text-center'>
 						<p className='text-sm text-muted-foreground'>
-							¿Ya tienes una cuenta?{' '}
+							{t('haveAccount')}{' '}
 							<Button
 								type='button'
 								variant='link'
@@ -401,7 +411,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 								onClick={onToggleForm}
 								disabled={isLoading}
 							>
-								Iniciar sesión
+								{t('signIn')}
 							</Button>
 						</p>
 					</div>

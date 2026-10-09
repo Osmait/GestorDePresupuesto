@@ -1,9 +1,9 @@
 'use client'
 
 import { startRegistration } from '@simplewebauthn/browser'
-import { format } from 'date-fns'
 import { Fingerprint, Loader2, Plus, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { useLocale, useTranslations } from 'next-intl'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { type PasskeySummary, passkeyRepository } from '@/app/repository/passkeyRepository'
 import { Button } from '@/components/ui/button'
@@ -19,7 +19,16 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
+function formatDate(dateStr: string, locale: string): string {
+	return new Date(dateStr).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: '2-digit' })
+}
+
 export function PasskeyManager() {
+	const t = useTranslations('settingsModal.passkeys')
+	const locale = useLocale()
+	// Keep `load` stable: `t` may change identity between renders.
+	const tRef = useRef(t)
+	tRef.current = t
 	const [passkeys, setPasskeys] = useState<PasskeySummary[]>([])
 	const [loading, setLoading] = useState(true)
 	const [addOpen, setAddOpen] = useState(false)
@@ -34,7 +43,7 @@ export function PasskeyManager() {
 			setPasskeys(list)
 		} catch (err) {
 			console.error('Failed to load passkeys:', err)
-			toast.error('Failed to load passkeys')
+			toast.error(tRef.current('loadError'))
 		} finally {
 			setLoading(false)
 		}
@@ -46,7 +55,7 @@ export function PasskeyManager() {
 
 	const handleRegister = async () => {
 		if (!newName.trim()) {
-			toast.error('Give this passkey a name')
+			toast.error(t('nameRequired'))
 			return
 		}
 		setRegistering(true)
@@ -55,12 +64,12 @@ export function PasskeyManager() {
 			const options = (begin.options as any)?.publicKey ?? begin.options
 			const attestation = await startRegistration(options)
 			await passkeyRepository.finishRegistration(begin.session_id, newName.trim(), attestation)
-			toast.success('Passkey registered')
+			toast.success(t('registered'))
 			setAddOpen(false)
 			setNewName('')
 			await load()
 		} catch (err) {
-			const msg = err instanceof Error ? err.message : 'Passkey registration failed'
+			const msg = err instanceof Error ? err.message : t('registerError')
 			if (msg.toLowerCase().includes('abort') || msg.toLowerCase().includes('cancelled')) {
 				return
 			}
@@ -75,11 +84,11 @@ export function PasskeyManager() {
 		setDeletingId(id)
 		try {
 			await passkeyRepository.delete(id)
-			toast.success('Passkey removed')
+			toast.success(t('removed'))
 			setPasskeys((prev) => prev.filter((p) => p.id !== id))
 		} catch (err) {
 			console.error('Passkey delete error:', err)
-			toast.error('Failed to remove passkey')
+			toast.error(t('removeError'))
 		} finally {
 			setDeletingId(null)
 		}
@@ -91,25 +100,23 @@ export function PasskeyManager() {
 				<div>
 					<CardTitle className='flex items-center gap-2'>
 						<Fingerprint className='h-5 w-5' />
-						Passkeys
+						{t('title')}
 					</CardTitle>
-					<CardDescription>
-						Sign in with your fingerprint or face instead of your password. Add one per device.
-					</CardDescription>
+					<CardDescription>{t('description')}</CardDescription>
 				</div>
 				<Button onClick={() => setAddOpen(true)}>
 					<Plus className='mr-2 h-4 w-4' />
-					Add passkey
+					{t('add')}
 				</Button>
 			</CardHeader>
 			<CardContent>
 				{loading ? (
 					<div className='flex items-center gap-2 text-sm text-muted-foreground'>
 						<Loader2 className='h-4 w-4 animate-spin' />
-						Loading…
+						{t('loading')}
 					</div>
 				) : passkeys.length === 0 ? (
-					<p className='text-sm text-muted-foreground'>No passkeys registered yet.</p>
+					<p className='text-sm text-muted-foreground'>{t('empty')}</p>
 				) : (
 					<div className='space-y-2'>
 						{passkeys.map((pk) => (
@@ -117,8 +124,8 @@ export function PasskeyManager() {
 								<div className='space-y-0.5'>
 									<p className='font-medium'>{pk.name}</p>
 									<p className='text-xs text-muted-foreground'>
-										Added {format(new Date(pk.created_at), 'LLL dd, yyyy')}
-										{pk.last_used_at ? ` • last used ${format(new Date(pk.last_used_at), 'LLL dd, yyyy')}` : ''}
+										{t('added', { date: formatDate(pk.created_at, locale) })}
+										{pk.last_used_at ? ` • ${t('lastUsed', { date: formatDate(pk.last_used_at, locale) })}` : ''}
 									</p>
 								</div>
 								<Button
@@ -126,6 +133,7 @@ export function PasskeyManager() {
 									size='sm'
 									onClick={() => handleDelete(pk.id)}
 									disabled={deletingId === pk.id}
+									aria-label={t('deleteAria', { name: pk.name })}
 									className='text-destructive hover:text-destructive'
 								>
 									{deletingId === pk.id ? <Loader2 className='h-4 w-4 animate-spin' /> : <Trash2 className='h-4 w-4' />}
@@ -139,16 +147,14 @@ export function PasskeyManager() {
 			<Dialog open={addOpen} onOpenChange={setAddOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Add a passkey</DialogTitle>
-						<DialogDescription>
-							Your device will prompt you to authenticate with your fingerprint, face, or device PIN.
-						</DialogDescription>
+						<DialogTitle>{t('addTitle')}</DialogTitle>
+						<DialogDescription>{t('addDescription')}</DialogDescription>
 					</DialogHeader>
 					<div className='space-y-2 py-4'>
-						<Label htmlFor='passkey-name'>Device name</Label>
+						<Label htmlFor='passkey-name'>{t('deviceName')}</Label>
 						<Input
 							id='passkey-name'
-							placeholder='e.g. MacBook Pro, iPhone'
+							placeholder={t('deviceNamePlaceholder')}
 							value={newName}
 							onChange={(e) => setNewName(e.target.value)}
 							disabled={registering}
@@ -156,11 +162,11 @@ export function PasskeyManager() {
 					</div>
 					<DialogFooter>
 						<Button variant='outline' onClick={() => setAddOpen(false)} disabled={registering}>
-							Cancel
+							{t('cancel')}
 						</Button>
 						<Button onClick={handleRegister} disabled={registering}>
 							{registering ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
-							Enroll
+							{t('enroll')}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

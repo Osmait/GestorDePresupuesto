@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { useGlobalAction } from '@/contexts/GlobalActionContext'
 import { useNavItems } from '@/hooks/use-nav-items'
+import { getRouteTitleKeys } from '@/lib/navigation/route-title'
 
 interface SidebarProps {
 	children: React.ReactNode
@@ -49,6 +50,7 @@ interface NavItem {
 
 // Server Component para el header del sidebar
 function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
+	const tCommon = useTranslations('common')
 	return (
 		<div className={`flex items-center gap-3 p-4 border-b border-border/50 ${!isExpanded && 'justify-center'}`}>
 			{isExpanded && (
@@ -64,7 +66,7 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 					</div>
 					<div>
 						<h2 className='text-lg font-semibold text-foreground'>SBFinance</h2>
-						<p className='text-xs text-muted-foreground'>Gestor Personal</p>
+						<p className='text-xs text-muted-foreground'>{tCommon('appTagline')}</p>
 					</div>
 				</div>
 			)}
@@ -147,7 +149,8 @@ function SidebarFooter({
 function MainHeader({ isExpanded, toggleMobile }: { isExpanded: boolean; toggleMobile: () => void }) {
 	const { openModal } = useGlobalAction()
 	const t = useTranslations('nav')
-	const tDash = useTranslations('dashboard')
+	// The title follows the current section instead of always saying "Dashboard".
+	const routeTitle = getRouteTitleKeys(usePathname())
 	return (
 		<header className='sticky top-0 z-40 w-full border-b border-border/50 bg-background/80 backdrop-blur-lg'>
 			<div className='flex h-14 sm:h-16 items-center justify-between px-2 sm:px-4 lg:px-6 gap-2'>
@@ -157,15 +160,15 @@ function MainHeader({ isExpanded, toggleMobile }: { isExpanded: boolean; toggleM
 						size='sm'
 						onClick={toggleMobile}
 						className='lg:hidden flex-shrink-0'
-						aria-label={t('dashboard')}
+						aria-label={t('menu')}
 					>
 						<Menu className='h-4 w-4' aria-hidden='true' />
 					</Button>
 
 					{isExpanded && (
 						<div className='hidden sm:block min-w-0'>
-							<h1 className='text-lg sm:text-xl font-semibold text-foreground truncate'>{tDash('title')}</h1>
-							<p className='text-xs sm:text-sm text-muted-foreground truncate'>{t('dashboardDesc')}</p>
+							<p className='text-lg sm:text-xl font-semibold text-foreground truncate'>{t(routeTitle.title)}</p>
+							<p className='text-xs sm:text-sm text-muted-foreground truncate'>{t(routeTitle.description)}</p>
 						</div>
 					)}
 				</div>

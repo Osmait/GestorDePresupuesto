@@ -1,7 +1,8 @@
-import { render, screen } from '@testing-library/react'
+import { screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { Search } from '@/components/common/search'
+import { renderWithIntl } from '@/tests/utils/intl'
 
 // Mock hooks and router
 vi.mock('next/navigation', () => ({
@@ -23,22 +24,28 @@ vi.mock('@/hooks/queries/useSearchQuery', () => ({
 }))
 
 describe('Search', () => {
-	it('renders search input', () => {
-		render(<Search />)
+	it('renders search input in Spanish', () => {
+		renderWithIntl(<Search />, { locale: 'es' })
 		expect(screen.getByPlaceholderText('Buscar...')).toBeInTheDocument()
+	})
+
+	it('renders search input in English', () => {
+		renderWithIntl(<Search />)
+		expect(screen.getByPlaceholderText('Search...')).toBeInTheDocument()
 	})
 
 	it('shows results when typing', async () => {
 		const user = userEvent.setup()
-		render(<Search />)
+		renderWithIntl(<Search />)
 
-		const input = screen.getByPlaceholderText('Buscar...')
+		const input = screen.getByPlaceholderText('Search...')
 		await user.type(input, 'test')
 
 		// Wait for debounce and results
 		await vi.waitFor(
 			() => {
 				expect(screen.getByText('Test Transaction')).toBeInTheDocument()
+				expect(screen.getByText('Transactions')).toBeInTheDocument()
 			},
 			{ timeout: 1000 },
 		)

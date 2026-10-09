@@ -18,11 +18,49 @@
       "createAccount": "Crear cuenta",
       "testData": "Datos de prueba:",
       "testSimple": "Test Simple",
-      "debug": "Debug"
+      "debug": "Debug",
+      "or": "o",
+      "passwordTooLong": "La contraseña no puede tener más de 100 caracteres",
+      "sessionExpired": "Tu sesión expiró, vuelve a iniciar sesión"
     },
     "register": {
       "title": "Crear Cuenta",
-      "subtitle": "Completa tus datos para registrarte"
+      "subtitle": "Completa tus datos para registrarte",
+      "name": "Nombre",
+      "namePlaceholder": "Juan",
+      "lastName": "Apellido",
+      "lastNamePlaceholder": "Pérez",
+      "email": "Email",
+      "emailPlaceholder": "ejemplo@correo.com",
+      "password": "Contraseña",
+      "confirmPassword": "Confirmar contraseña",
+      "nameMin": "El nombre debe tener al menos 2 caracteres",
+      "nameMax": "El nombre no puede tener más de 50 caracteres",
+      "nameLetters": "El nombre solo puede contener letras",
+      "lastNameMin": "El apellido debe tener al menos 2 caracteres",
+      "lastNameMax": "El apellido no puede tener más de 50 caracteres",
+      "lastNameLetters": "El apellido solo puede contener letras",
+      "emailRequired": "El email es requerido",
+      "emailInvalid": "Debe ser un email válido",
+      "passwordMinLength": "La contraseña debe tener al menos {min} caracteres",
+      "passwordMax": "La contraseña no puede tener más de 100 caracteres",
+      "passwordLowercase": "Debe contener al menos una letra minúscula",
+      "passwordUppercase": "Debe contener al menos una letra mayúscula",
+      "passwordNumber": "Debe contener al menos un número",
+      "confirmRequired": "Confirma tu contraseña",
+      "passwordsMismatch": "Las contraseñas no coinciden",
+      "ruleLength": "{min}+ caracteres",
+      "ruleLowercase": "Minúscula",
+      "ruleUppercase": "Mayúscula",
+      "ruleNumber": "Número",
+      "submit": "Crear Cuenta",
+      "submitting": "Creando cuenta...",
+      "error": "Error al crear la cuenta",
+      "successTitle": "¡Cuenta creada exitosamente!",
+      "successAutoLogin": "Iniciando sesión automáticamente...",
+      "fillTestData": "Llenar datos de prueba",
+      "haveAccount": "¿Ya tienes una cuenta?",
+      "signIn": "Iniciar sesión"
     },
     "demo": {
       "tryDemo": "Probar Demo Interactiva",
@@ -36,6 +74,17 @@
       "devMode": "Modo Desarrollo",
       "description": "Sistema de gestión financiera personal",
       "tech": "Desarrollado con Next.js, TypeScript y Tailwind CSS"
+    },
+    "passkey": {
+      "signIn": "Iniciar sesión con passkey",
+      "success": "Sesión iniciada con passkey",
+      "failed": "No se pudo iniciar sesión con passkey"
+    },
+    "session": {
+      "expired": "Tu sesión expiró, vuelve a iniciar sesión",
+      "draftSaved": "Guardamos tu borrador; lo recuperarás al volver a abrir el formulario.",
+      "draftRestored": "Recuperamos el borrador que no se pudo guardar cuando expiró tu sesión.",
+      "discardDraft": "Descartar"
     }
   },
   "nav": {
@@ -119,7 +168,9 @@
     "investmentsValue": "Valor Inversiones",
     "certificatesValue": "Valor Certificados",
     "totalPatrimony": "Patrimonio Total",
-    "activeItems": "activos"
+    "activeItems": "activos",
+    "exchangeRate": "Tasa de cambio (1 US$)",
+    "distribution": "Distribución"
   },
   "accounts": {
     "title": "Gestión de Cuentas",
@@ -155,9 +206,24 @@
     "delete": "Eliminar cuenta",
     "high": "Alto",
     "medium": "Medio",
-    "low": "Bajo"
+    "low": "Bajo",
+    "options": "Opciones de la cuenta {name}",
+    "detail": {
+      "back": "Volver a Cuentas",
+      "notFoundTitle": "Cuenta no encontrada",
+      "notFoundDescription": "No pudimos encontrar la cuenta que estás buscando.",
+      "recentTransactions": "Últimas transacciones",
+      "noTransactions": "No hay transacciones registradas en esta cuenta además del saldo inicial.",
+      "details": "Detalles",
+      "accountType": "Tipo de cuenta",
+      "typeBank": "Cuenta bancaria",
+      "typeCreditCard": "Tarjeta de crédito",
+      "currency": "Moneda",
+      "createdAt": "Creada el"
+    }
   },
   "transactions": {
+    "noDescription": "Sin descripción",
     "title": "Gestión de Transacciones",
     "subtitle": "Supervisa y analiza todas tus transacciones financieras",
     "summary": "Resumen de Transacciones",
@@ -215,7 +281,19 @@
     "deleteTitle": "Eliminar Transacción",
     "deleteDescription": "Esta acción no se puede deshacer. Se eliminará permanentemente la transacción \"{name}\" y sus datos.",
     "deleting": "Eliminando…",
-    "cancel": "Cancelar"
+    "cancel": "Cancelar",
+    "type": "Tipo",
+    "options": "Opciones de la transacción",
+    "types": {
+      "income": "Ingreso",
+      "bill": "Gasto",
+      "loan_disbursement": "Desembolso de préstamo",
+      "loan_collection": "Cobro de préstamo",
+      "investment_purchase": "Compra de inversión",
+      "investment_funding": "Fondeo de inversión",
+      "loan_cancellation_refund": "Reembolso por cancelación de préstamo",
+      "unknown": "Otro"
+    }
   },
   "loans": {
     "title": "Préstamos",
@@ -278,7 +356,21 @@
     "loanCancelled": "Préstamo cancelado correctamente",
     "cancelLoanError": "No se pudo cancelar el préstamo",
     "cancelling": "Cancelando...",
-    "confirmCancel": "Confirmar cancelación"
+    "confirmCancel": "Confirmar cancelación",
+    "statuses": {
+      "active": "Activo",
+      "paid": "Pagado",
+      "defaulted": "En mora",
+      "cancelled": "Cancelado"
+    },
+    "installmentStatuses": {
+      "pending": "Pendiente",
+      "partial": "Parcial",
+      "paid": "Pagada",
+      "overdue": "Vencida"
+    },
+    "cancelLoanFor": "Cancelar préstamo de {name}",
+    "installmentNumber": "Número de cuota"
   },
   "categories": {
     "title": "Gestión de Categorías",
@@ -353,7 +445,8 @@
     "deleteDescription": "¿Estás seguro de que quieres eliminar este presupuesto? Esta acción no se puede deshacer.",
     "deleting": "Eliminando...",
     "errorLoading": "Error al cargar presupuestos",
-    "tryAgain": "Intentar de nuevo"
+    "tryAgain": "Intentar de nuevo",
+    "spentHint": "Solo cuentan los gastos de este mes asignados a este presupuesto (los gastos en US$ se convierten a RD$)."
   },
   "monthlyPlan": {
     "title": "Plan Mensual",
@@ -382,7 +475,7 @@
     "paused": "Pausado",
     "noFixedDay": "Sin día fijo",
     "dayOfMonth": "Día {day}",
-    "originalAmount": "${amount} USD",
+    "originalAmount": "Original: {amount}",
     "openMenu": "Abrir menú",
     "actions": "Acciones",
     "edit": "Editar",
@@ -522,7 +615,9 @@
     "toolDownload": "Descargar",
     "toolCopied": "Snapshot copiado",
     "toolCopyError": "No se pudo copiar",
-    "toolDownloaded": "Snapshot descargado"
+    "toolDownloaded": "Snapshot descargado",
+    "emptyTitle": "Aún no hay movimientos en este periodo",
+    "emptyDescription": "Registra ingresos o gastos, o cambia los filtros, para ver métricas, tendencias y recomendaciones."
   },
   "settings": {
     "title": "Configuración",
@@ -537,6 +632,7 @@
     "saved": "Cambios guardados"
   },
   "common": {
+    "appTagline": "Gestor Personal",
     "theme": {
       "light": "Claro",
       "dark": "Oscuro",
@@ -569,9 +665,17 @@
       "confirmDelete": "¿Estás seguro de que deseas eliminar?",
       "noResults": "No se encontraron resultados",
       "required": "Campo requerido"
+    },
+    "moduleDisabled": {
+      "message": "Este módulo está desactivado para tu cuenta.",
+      "goToDashboard": "Ir al panel"
     }
   },
   "forms": {
+    "cardCurrencyUnavailable": "La tarjeta no tiene un balance disponible en esa moneda.",
+    "currencyMustMatchAccount": "La moneda de la transacción debe coincidir con la moneda de la cuenta bancaria.",
+    "cardWithoutBalances": "Esta tarjeta no tiene balances configurados para registrar transacciones.",
+    "bankCurrencyFixed": "La moneda en cuentas bancarias es fija: {currency}",
     "name": "Nombre",
     "namePlaceholder": "Ej: Pago de luz",
     "nameRequired": "El nombre es requerido",
@@ -625,7 +729,11 @@
       "low": "baja"
     },
     "delete": "Eliminar",
-    "deleting": "Eliminando..."
+    "deleting": "Eliminando...",
+    "maxTwoDecimals": "Usa como máximo 2 decimales",
+    "insufficientFunds": "La cuenta de origen no tiene fondos suficientes para esta operación.",
+    "insufficientFundsAvailable": "La cuenta de origen no tiene fondos suficientes: solo hay {amount} disponibles.",
+    "availableBalance": "Disponible: {amount}"
   },
   "charts": {
     "expensesByCategory": "Gastos por Categoría",
@@ -827,5 +935,707 @@
       "recommendations": "Recomendaciones",
       "potentialSavings": "ahorro potencial"
     }
+  },
+  "certificates": {
+    "title": "Certificados",
+    "subtitle": "Gestiona tus certificados financieros y da seguimiento a los pagos de intereses",
+    "loadErrorTitle": "Error",
+    "loadError": "No se pudieron cargar los certificados. Inténtalo de nuevo.",
+    "confirmCancel": "¿Estás seguro de que deseas cancelar este certificado?",
+    "simulationBank": "Simulación",
+    "empty": "No se encontraron certificados. Crea tu primer certificado para comenzar.",
+    "status": {
+      "active": "Activo",
+      "matured": "Vencido",
+      "cancelled": "Cancelado"
+    },
+    "interestType": {
+      "simple": "Simple",
+      "compound": "Compuesto"
+    },
+    "actions": {
+      "simulator": "Simulador",
+      "newCertificate": "Nuevo certificado"
+    },
+    "summary": {
+      "totalCapital": "Capital total",
+      "netInterestEarned": "Interés neto ganado",
+      "taxesWithheld": "Impuestos retenidos",
+      "portfolioValue": "Valor del portafolio",
+      "activeCertificates": "{count, plural, one {# certificado activo} other {# certificados activos}}"
+    },
+    "card": {
+      "effectiveCapital": "Capital efectivo",
+      "interestType": "Tipo de interés",
+      "rate": "Tasa",
+      "cutDay": "Día de corte",
+      "dayValue": "Día {day}",
+      "taxRate": "Tasa de impuesto",
+      "nextPaymentProjection": "Proyección del próximo pago",
+      "netInterest": "Interés neto:",
+      "expected": "Esperado: {date}",
+      "simulate": "Simular",
+      "edit": "Editar",
+      "history": "Historial",
+      "cancel": "Cancelar"
+    },
+    "form": {
+      "editTitle": "Editar certificado",
+      "newTitle": "Nuevo certificado",
+      "bank": "Banco",
+      "bankPlaceholder": "Nombre del banco",
+      "capital": "Capital",
+      "type": "Tipo",
+      "simpleInterest": "Interés simple",
+      "compoundInterest": "Interés compuesto",
+      "reinvest": "Reinvertir",
+      "reinvestHelp": "Reinvertir el interés neto",
+      "payoutAccount": "Cuenta de pago *",
+      "selectAccount": "Seleccionar cuenta",
+      "rate": "Tasa (%)",
+      "tax": "Impuesto (%)",
+      "cutDay": "Día de corte",
+      "maturity": "Vencimiento",
+      "cancel": "Cancelar",
+      "simulate": "Simular",
+      "saving": "Guardando...",
+      "update": "Actualizar",
+      "create": "Crear",
+      "errors": {
+        "saveFailed": "No se pudo guardar el certificado. Inténtalo de nuevo.",
+        "bankMin": "El nombre del banco debe tener al menos 2 caracteres",
+        "capitalMin": "El capital debe ser mayor que 0",
+        "rateRange": "La tasa debe estar entre 0.01 y 100",
+        "taxRange": "El impuesto debe estar entre 0 y 100",
+        "cutDayRange": "El día de corte debe estar entre 1 y 28",
+        "payoutRequired": "La cuenta de pago es obligatoria para interés simple"
+      }
+    },
+    "history": {
+      "title": "Historial de pagos - {bank}",
+      "loading": "Cargando...",
+      "totalGrossInterest": "Interés bruto total",
+      "totalTaxWithheld": "Impuesto retenido total",
+      "totalNetInterest": "Interés neto total",
+      "historyTab": "Historial",
+      "chartTab": "Gráfico",
+      "empty": "Aún no hay pagos registrados.",
+      "date": "Fecha",
+      "capital": "Capital",
+      "rate": "Tasa",
+      "gross": "Bruto",
+      "tax": "Impuesto",
+      "net": "Neto",
+      "actions": "Acciones",
+      "editPayment": "Editar pago",
+      "grossInterest": "Interés bruto",
+      "taxWithheld": "Impuesto retenido",
+      "netInterest": "Interés neto",
+      "ratePercent": "Tasa (%)",
+      "taxRatePercent": "Tasa de impuesto (%)",
+      "cancel": "Cancelar",
+      "saving": "Guardando...",
+      "save": "Guardar",
+      "errors": {
+        "nonNegative": "Debe ser mayor o igual a 0",
+        "positive": "Debe ser mayor que 0",
+        "rateRange": "Debe estar entre 0.01 y 100",
+        "taxRange": "Debe estar entre 0 y 100"
+      }
+    },
+    "simulator": {
+      "title": "Simulador de certificado",
+      "capital": "Capital base",
+      "interestRate": "Tasa de interés (%)",
+      "taxRate": "Tasa de impuesto (%)",
+      "months": "Meses a proyectar",
+      "interestType": "Tipo de interés",
+      "reinvest": "Reinvertir intereses netos",
+      "calculate": "Calcular proyección",
+      "totalGross": "Total interés bruto",
+      "totalTax": "Total impuestos",
+      "totalNet": "Total interés neto",
+      "monthlyEvolution": "Evolución mensual",
+      "capitalSeries": "Capital",
+      "capitalPlusNet": "Capital + neto",
+      "monthLabel": "Mes {month}",
+      "showDetail": "Ver detalle mensual",
+      "hideDetail": "Ocultar detalle mensual",
+      "month": "Mes",
+      "gross": "Bruto",
+      "tax": "Impuesto",
+      "net": "Neto",
+      "accumulated": "Acumulado",
+      "errors": {
+        "capitalMin": "El capital debe ser mayor que 0",
+        "rateRange": "La tasa debe estar entre 0.01 y 100",
+        "taxRange": "El impuesto debe estar entre 0 y 100",
+        "monthsRange": "Los meses deben estar entre 1 y 120"
+      }
+    },
+    "chart": {
+      "projection": "Proyección:",
+      "sixMonths": "6 meses",
+      "twelveMonths": "12 meses",
+      "untilMaturity": "Hasta vencimiento",
+      "showCapitalBase": "Mostrar capital base",
+      "totalValue": "Valor total",
+      "capitalBase": "Capital base",
+      "totalValueLegend": "Valor total (capital + intereses)"
+    }
+  },
+  "creditCards": {
+    "title": "Tarjetas de crédito",
+    "subtitle": "Gestiona tus tarjetas de crédito y pagos",
+    "addCard": "Agregar tarjeta",
+    "addCreditCard": "Agregar tarjeta de crédito",
+    "generalSummary": "Resumen general",
+    "activeCards": "{count, plural, =1 {# tarjeta activa} other {# tarjetas activas}}",
+    "exchangeRate": "Tasa: 1 USD = {rate} DOP",
+    "creditHealth": "Salud crediticia",
+    "utilizationTarget": "Meta: menos de 30%",
+    "utilizationStatus": {
+      "highRisk": "Riesgo alto",
+      "watch": "Vigilar",
+      "healthy": "Saludable"
+    },
+    "emptyTitle": "Aún no tienes tarjetas de crédito",
+    "emptyDescription": "Agrega tu primera tarjeta de crédito para empezar a controlar tu deuda",
+    "cancel": "Cancelar",
+    "toasts": {
+      "created": "Tarjeta de crédito creada correctamente",
+      "updated": "Tarjeta de crédito actualizada correctamente",
+      "deleted": "Tarjeta de crédito eliminada correctamente",
+      "deleteError": "No se pudo eliminar la tarjeta de crédito",
+      "paymentProcessed": "Pago procesado correctamente",
+      "noBalancesToReset": "No hay saldos para reiniciar",
+      "resetSuccess": "Saldo de la tarjeta reiniciado correctamente",
+      "resetError": "No se pudo reiniciar el saldo de la tarjeta"
+    },
+    "resetDialog": {
+      "title": "Reiniciar saldo de la tarjeta",
+      "description": "Esto pondrá en cero el saldo actual de {name} en todas las monedas. El saldo anterior quedará guardado en el historial. Úsalo después de pagar y cerrar el ciclo de facturación.",
+      "confirm": "Reiniciar saldo",
+      "resetting": "Reiniciando..."
+    },
+    "deleteDialog": {
+      "title": "Eliminar tarjeta de crédito",
+      "description": "¿Estás seguro de que deseas eliminar {name}? Esta acción no se puede deshacer.",
+      "confirm": "Eliminar",
+      "deleting": "Eliminando..."
+    },
+    "item": {
+      "back": "Volver",
+      "cardOptions": "Opciones de la tarjeta",
+      "edit": "Editar",
+      "resetBalance": "Reiniciar saldo",
+      "delete": "Eliminar",
+      "payCard": "Pagar tarjeta",
+      "viewPayments": "Ver pagos",
+      "used": "{percent}% usado",
+      "debt": "Deuda: {amount}",
+      "available": "Disponible: {amount}",
+      "viewDetails": "Ver detalles",
+      "outstanding": "Saldo pendiente",
+      "status": "Estado",
+      "noDebt": "Sin deuda",
+      "cutDay": "Día de corte",
+      "dueDay": "Día de pago"
+    },
+    "form": {
+      "addTitle": "Agregar tarjeta de crédito",
+      "editTitle": "Editar tarjeta de crédito",
+      "cardName": "Nombre de la tarjeta",
+      "cardNamePlaceholder": "Mi tarjeta de crédito",
+      "bank": "Banco",
+      "bankPlaceholder": "Banco Popular",
+      "lastFourDigits": "Últimos 4 dígitos",
+      "cutDay": "Día de corte (1-28)",
+      "dueDay": "Día de pago (1-28)",
+      "balances": "Saldos",
+      "addCurrency": "Agregar moneda",
+      "currency": "Moneda",
+      "removeCurrency": "Quitar moneda",
+      "creditLimit": "Límite de crédito",
+      "initialDebt": "Deuda inicial",
+      "saving": "Guardando…",
+      "create": "Crear",
+      "update": "Actualizar",
+      "errors": {
+        "nameRequired": "El nombre de la tarjeta es obligatorio",
+        "bankRequired": "El banco es obligatorio",
+        "digitsOnly": "Solo se permiten dígitos",
+        "dayMin": "Mínimo {min}",
+        "dayMax": "Máximo {max}"
+      }
+    },
+    "payment": {
+      "title": "Pagar tarjeta de crédito",
+      "fromAccount": "Pagar desde la cuenta",
+      "selectAccount": "Selecciona una cuenta",
+      "currency": "Moneda",
+      "currencyOption": "{currency} (Deuda: {debt})",
+      "amount": "Monto a pagar",
+      "currentDebt": "Deuda actual: {amount}",
+      "exceedsDebt": "El pago supera la deuda actual por {amount}. El excedente se acreditará a la tarjeta.",
+      "debitFromAccount": "Débito de la cuenta:",
+      "equivalentInDop": "Equivalente en DOP:",
+      "exchangeRate": "Tasa de cambio ({from} a {to})",
+      "enterRate": "Ingresa la tasa",
+      "recommendedRate": "Tasa recomendada por la API: {rate}",
+      "noRecommendedRate": "No se pudo obtener la tasa recomendada. Ingresa una tasa personalizada.",
+      "includesInterest": "Incluye intereses",
+      "interestAmount": "Monto de intereses",
+      "notes": "Notas (opcional)",
+      "notesPlaceholder": "Notas del pago",
+      "processing": "Procesando…",
+      "submit": "Realizar pago",
+      "errors": {
+        "failed": "No se pudo procesar el pago. Inténtalo de nuevo.",
+        "selectAccount": "Selecciona una cuenta",
+        "amountPositive": "El monto debe ser mayor que 0"
+      }
+    },
+    "history": {
+      "title": "Historial de pagos",
+      "allCurrencies": "Todas las monedas",
+      "empty": "Aún no hay pagos registrados.",
+      "date": "Fecha",
+      "cardAmount": "Monto en tarjeta",
+      "fromAccount": "Cuenta de origen",
+      "accountDebit": "Débito de la cuenta",
+      "rate": "Tasa",
+      "interest": "Intereses",
+      "notes": "Notas"
+    }
+  },
+  "investments": {
+    "title": "Inversiones",
+    "loading": "Cargando inversiones...",
+    "fundBroker": "Fondear bróker",
+    "addInvestment": "Agregar inversión",
+    "types": {
+      "stock": "Acciones",
+      "crypto": "Cripto",
+      "fixed_income": "Renta fija"
+    },
+    "typeSingular": {
+      "stock": "Acción",
+      "crypto": "Cripto",
+      "fixed_income": "Renta fija"
+    },
+    "summary": {
+      "totalValue": "Valor total",
+      "totalValueHint": "Valor actual del portafolio",
+      "totalCost": "Costo total",
+      "totalCostHint": "Inversión inicial",
+      "totalProfit": "Ganancia/pérdida total",
+      "totalProfitHint": "Realizada + no realizada",
+      "roi": "ROI",
+      "roiHint": "Retorno sobre la inversión"
+    },
+    "dashboard": {
+      "allocation": "Distribución de activos",
+      "growth": "Crecimiento del portafolio (costo base)",
+      "noData": "No hay datos para mostrar",
+      "noHistory": "Aún no hay historial",
+      "value": "Valor"
+    },
+    "list": {
+      "empty": "No se encontraron inversiones en esta categoría.",
+      "confirmDelete": "¿Seguro que deseas eliminar esta inversión?"
+    },
+    "card": {
+      "holding": "{quantity} unidades a {price}",
+      "edit": "Editar {name}",
+      "delete": "Eliminar {name}"
+    },
+    "form": {
+      "addTitle": "Agregar inversión",
+      "editTitle": "Editar inversión",
+      "addDescription": "Usa el saldo fondeado en tu bróker para agregar una nueva inversión.",
+      "editDescription": "Actualiza los datos de tu inversión.",
+      "brokerBalance": "Saldo en el bróker",
+      "requiredForPurchase": "Requerido para esta compra: {amount}",
+      "name": "Nombre",
+      "symbol": "Símbolo",
+      "symbolPlaceholder": "p. ej. AAPL, BTC-USD",
+      "fetchPrice": "Obtener precio actual",
+      "type": "Tipo",
+      "selectType": "Selecciona un tipo",
+      "purchaseCurrency": "Moneda de compra",
+      "quantity": "Cantidad",
+      "purchasePrice": "Precio de compra",
+      "currentPrice": "Precio actual",
+      "create": "Crear",
+      "update": "Actualizar",
+      "errors": {
+        "nameRequired": "El nombre es obligatorio",
+        "symbolRequired": "El símbolo es obligatorio",
+        "currencyRequired": "La moneda es obligatoria",
+        "minZero": "Debe ser mayor o igual a 0",
+        "quoteNotFound": "No se pudo obtener el precio de este símbolo",
+        "quoteFailed": "Error al obtener el precio",
+        "insufficientBalance": "Saldo insuficiente en el bróker ({currency}). Requerido: {required}, disponible: {available}",
+        "saveFailed": "No se pudo guardar la inversión. Inténtalo de nuevo."
+      }
+    },
+    "funding": {
+      "title": "Fondear saldo del bróker",
+      "description": "Mueve fondos de una cuenta bancaria a tu billetera de inversión.",
+      "walletBalances": "Saldos actuales de la billetera",
+      "noFunding": "Aún no hay fondeos.",
+      "sourceAccount": "Cuenta de origen",
+      "selectAccount": "Selecciona una cuenta",
+      "amountFromAccount": "Monto desde la cuenta ({currency})",
+      "targetCurrency": "Moneda de la billetera destino",
+      "exchangeRate": "Tasa de cambio ({source} por {target})",
+      "fees": "Comisiones bancarias/cambiarias ({currency})",
+      "estimatedCredit": "Crédito estimado",
+      "notes": "Notas (opcional)",
+      "notesPlaceholder": "Transferencia a la cuenta del bróker",
+      "submit": "Fondear bróker",
+      "errors": {
+        "sourceRequired": "Selecciona una cuenta de origen",
+        "amountPositive": "El monto debe ser mayor que 0",
+        "exchangeRateRequired": "La tasa de cambio es obligatoria cuando las monedas son distintas",
+        "failed": "No se pudo fondear el saldo del bróker"
+      }
+    }
+  },
+  "admin": {
+    "meta": {
+      "title": "Administración - Gestor de Presupuesto",
+      "description": "Backoffice de administración"
+    },
+    "title": "Panel de administración",
+    "subtitle": "Gestiona usuarios y el estado del sistema.",
+    "checkingAccess": "Verificando acceso de administrador...",
+    "refresh": "Actualizar",
+    "cleanDemos": "Limpiar demos",
+    "cleaning": "Limpiando...",
+    "confirmCleanup": "¿Estás seguro? Esto eliminará TODOS los usuarios demo de inmediato.",
+    "toasts": {
+      "loadUsersError": "Error al cargar usuarios: {message}",
+      "saveSuccess": "{count, plural, one {# usuario actualizado} other {# usuarios actualizados}} correctamente",
+      "saveError": "Error al guardar los cambios: {message}",
+      "disableSuccess": "Usuario desactivado correctamente",
+      "disableError": "Error al desactivar el usuario: {message}",
+      "cleanupSuccess": "Se eliminaron todos los usuarios demo.",
+      "cleanupError": "Error al limpiar demos: {message}"
+    },
+    "roles": {
+      "USER": "Usuario",
+      "ADMIN": "Administrador"
+    },
+    "users": {
+      "title": "Usuarios registrados",
+      "description": "Edita los datos de los usuarios directamente en la tabla.",
+      "total": "{count} en total",
+      "searchPlaceholder": "Buscar usuarios...",
+      "filterByRole": "Filtrar por rol",
+      "allRoles": "Todos los roles",
+      "roleUsers": "Usuarios",
+      "roleAdmins": "Administradores",
+      "cancel": "Cancelar",
+      "saveChanges": "Guardar {count, plural, one {# cambio} other {# cambios}}",
+      "columns": {
+        "name": "Nombre",
+        "lastName": "Apellido",
+        "email": "Correo",
+        "role": "Rol",
+        "created": "Creado",
+        "id": "ID",
+        "actions": "Acciones"
+      },
+      "loading": "Cargando usuarios...",
+      "empty": "No hay usuarios que coincidan con tus criterios.",
+      "disableUser": "Desactivar a {name}",
+      "deleteTitle": "Eliminar usuario",
+      "deleteDescription": "¿Seguro que deseas desactivar a <strong>{name}</strong>? Ya no podrá iniciar sesión.",
+      "deleteConfirm": "Eliminar usuario",
+      "confirmTitle": "Confirmar cambios",
+      "confirmDescription": "Vas a modificar {count, plural, one {# usuario} other {# usuarios}}. Revisa el resumen antes de continuar.",
+      "back": "Volver",
+      "confirmSave": "Confirmar y guardar"
+    },
+    "createUser": {
+      "trigger": "Agregar usuario",
+      "title": "Crear nuevo usuario",
+      "description": "Completa los datos para crear una nueva cuenta de usuario.",
+      "firstName": "Nombre",
+      "lastName": "Apellido",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "role": "Rol",
+      "selectRole": "Selecciona un rol",
+      "firstNamePlaceholder": "Juan",
+      "lastNamePlaceholder": "Pérez",
+      "emailPlaceholder": "juan.perez@ejemplo.com",
+      "passwordPlaceholder": "Mínimo 8 caracteres",
+      "showPassword": "Mostrar contraseña",
+      "hidePassword": "Ocultar contraseña",
+      "cancel": "Cancelar",
+      "creating": "Creando...",
+      "submit": "Crear usuario",
+      "success": "Usuario \"{name}\" creado correctamente",
+      "error": "Error al crear el usuario: {message}",
+      "errors": {
+        "name": "El nombre debe tener al menos 2 caracteres",
+        "lastName": "El apellido debe tener al menos 2 caracteres",
+        "email": "Ingresa un correo electrónico válido",
+        "password": "La contraseña debe tener al menos 8 caracteres"
+      }
+    },
+    "flags": {
+      "title": "Funcionalidades por usuario",
+      "description": "Activa o desactiva funcionalidades para cada cuenta de usuario.",
+      "globalOverrides": "Ajustes globales",
+      "globalMeta": "Predeterminado: {defaultState} | Ajuste global: {overrideState}",
+      "userMeta": "Predeterminado: {defaultState} | Ajuste de usuario: {overrideState} | Origen: {source}",
+      "on": "ACTIVADO",
+      "off": "DESACTIVADO",
+      "yes": "SÍ",
+      "no": "NO",
+      "sources": {
+        "default": "predeterminado",
+        "global": "global",
+        "user": "usuario"
+      },
+      "resetGlobal": "Restablecer global",
+      "saveGlobal": "Guardar {count, plural, one {# cambio global} other {# cambios globales}}",
+      "saving": "Guardando...",
+      "searchPlaceholder": "Buscar usuario por nombre o correo",
+      "columns": {
+        "name": "Nombre",
+        "email": "Correo",
+        "select": "Seleccionar"
+      },
+      "selected": "Activo",
+      "choose": "Elegir",
+      "noUsers": "No se encontraron usuarios",
+      "searchingUsers": "Buscando usuarios...",
+      "managingFor": "Gestionando funcionalidades de:",
+      "loadingFlags": "Cargando funcionalidades...",
+      "noFlags": "No se encontraron funcionalidades.",
+      "blockedByGlobal": "Anulado por el ajuste global",
+      "reset": "Restablecer",
+      "saveChanges": "Guardar {count, plural, one {# cambio} other {# cambios}}",
+      "toasts": {
+        "catalogError": "Error al cargar el catálogo de funcionalidades: {message}",
+        "flagsError": "Error al cargar las funcionalidades: {message}",
+        "searchError": "Error al buscar usuarios: {message}",
+        "saveSuccess": "Funcionalidades actualizadas",
+        "saveError": "Error al guardar las funcionalidades: {message}",
+        "globalSuccess": "Ajustes globales actualizados",
+        "globalError": "Error al guardar los ajustes globales: {message}",
+        "resetGlobalSuccess": "Se restableció el ajuste global de {key}",
+        "resetGlobalError": "Error al restablecer el ajuste global: {message}",
+        "resetSuccess": "{key} restablecido a su valor predeterminado",
+        "resetError": "Error al restablecer el ajuste: {message}"
+      }
+    }
+  },
+  "datePicker": {
+    "pickDate": "Selecciona una fecha"
+  },
+  "settingsModal": {
+    "title": "Configuración",
+    "tabs": {
+      "general": "General",
+      "security": "Seguridad",
+      "notifications": "Notificaciones",
+      "data": "Datos y Privacidad",
+      "apikeys": "API Keys"
+    },
+    "actions": {
+      "edit": "Editar",
+      "change": "Cambiar",
+      "manage": "Gestionar",
+      "exportCsv": "Exportar CSV",
+      "deleteAccount": "Eliminar Cuenta"
+    },
+    "profile": {
+      "title": "Perfil",
+      "description": "Información personal y de contacto",
+      "fullName": "Nombre completo",
+      "email": "Email"
+    },
+    "appearance": {
+      "title": "Apariencia",
+      "description": "Personaliza cómo se ve la aplicación",
+      "theme": "Tema",
+      "themeDescription": "Cambiar entre modo claro y oscuro",
+      "language": "Idioma",
+      "languageDescription": "Selecciona tu idioma preferido"
+    },
+    "navigation": {
+      "title": "Navegación",
+      "description": "Preferencias de la interfaz de usuario",
+      "sidebarHover": "Sidebar expandible",
+      "sidebarHoverDescription": "Expandir automáticamente el menú lateral al pasar el mouse por encima"
+    },
+    "security": {
+      "title": "Seguridad",
+      "description": "Protección de tu cuenta y dispositivos",
+      "password": "Contraseña",
+      "passwordUpdated": "Actualizada hace 3 meses",
+      "twoFactor": "Autenticación de dos pasos",
+      "twoFactorDescription": "Añade una capa extra de seguridad",
+      "enabled": "Activada"
+    },
+    "devices": {
+      "title": "Dispositivos",
+      "description": "Gestiona dónde has iniciado sesión",
+      "activeSessions": "Sesiones activas",
+      "activeSessionsDescription": "3 dispositivos conectados actualmente"
+    },
+    "notifications": {
+      "title": "Notificaciones",
+      "description": "Elige cómo quieres recibir las alertas",
+      "email": "Email",
+      "emailDescription": "Resumen semanal y alertas de seguridad",
+      "push": "Push",
+      "pushDescription": "Notificaciones en tiempo real en el navegador",
+      "sms": "SMS",
+      "smsDescription": "Alertas críticas de seguridad"
+    },
+    "data": {
+      "title": "Gestión de Datos",
+      "description": "Controla tus datos y privacidad",
+      "export": "Exportar datos",
+      "exportDescription": "Descarga una copia de todas tus transacciones",
+      "dangerZone": "Zona de Peligro",
+      "dangerZoneDescription": "Eliminar permanentemente tu cuenta y datos"
+    },
+    "apiKeys": {
+      "title": "Claves API",
+      "description": "Administra las claves API para integraciones con servidores MCP",
+      "newKey": "Nueva clave",
+      "emptyTitle": "No hay claves API",
+      "emptyDescription": "Crea una clave para conectar clientes MCP",
+      "active": "Activa",
+      "inactive": "Inactiva",
+      "createdAt": "Creada: {date}",
+      "lastUsedAt": "Último uso: {date}",
+      "never": "Nunca",
+      "revokeAria": "Revocar clave {name}",
+      "configTitle": "Configuración de Claude Desktop",
+      "configDescription": "Añade esta configuración a tu archivo",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "createTitle": "Crear nueva clave API",
+      "createDescription": "Dale un nombre descriptivo a la clave para identificarla fácilmente.",
+      "saveTokenTitle": "Guarda este token ahora",
+      "saveTokenDescription": "Este token no se volverá a mostrar. Cópialo y guárdalo en un lugar seguro.",
+      "token": "Token",
+      "savedClose": "Ya lo guardé, cerrar",
+      "name": "Nombre",
+      "namePlaceholder": "ej. Claude Desktop",
+      "cancel": "Cancelar",
+      "create": "Crear clave",
+      "revokeTitle": "Revocar clave API",
+      "revokeDescription": "Esta acción es irreversible. La clave dejará de funcionar inmediatamente y no podrás recuperarla.",
+      "revoke": "Revocar clave",
+      "createError": "Error al crear la clave API",
+      "tokenCopied": "Token copiado al portapapeles",
+      "revoked": "Clave API revocada",
+      "revokeError": "Error al revocar la clave API",
+      "configCopied": "Configuración copiada al portapapeles"
+    },
+    "passkeys": {
+      "title": "Passkeys",
+      "description": "Inicia sesión con tu huella o rostro en lugar de tu contraseña. Añade una por dispositivo.",
+      "add": "Añadir passkey",
+      "loading": "Cargando…",
+      "empty": "Aún no hay passkeys registradas.",
+      "added": "Añadida el {date}",
+      "lastUsed": "último uso el {date}",
+      "deleteAria": "Eliminar passkey {name}",
+      "addTitle": "Añadir una passkey",
+      "addDescription": "Tu dispositivo te pedirá autenticarte con tu huella, rostro o PIN del dispositivo.",
+      "deviceName": "Nombre del dispositivo",
+      "deviceNamePlaceholder": "ej. MacBook Pro, iPhone",
+      "cancel": "Cancelar",
+      "enroll": "Registrar",
+      "loadError": "No se pudieron cargar las passkeys",
+      "nameRequired": "Dale un nombre a esta passkey",
+      "registered": "Passkey registrada",
+      "registerError": "No se pudo registrar la passkey",
+      "removed": "Passkey eliminada",
+      "removeError": "No se pudo eliminar la passkey"
+    }
+  },
+  "dateFilter": {
+    "label": "Periodo",
+    "thisMonth": "Este mes",
+    "lastMonth": "Mes pasado",
+    "last3Months": "Últimos 3 meses",
+    "thisYear": "Este año",
+    "allTime": "Todo el tiempo",
+    "customRange": "Rango personalizado",
+    "reset": "Restablecer"
+  },
+  "recurring": {
+    "emptyTitle": "No hay transacciones recurrentes",
+    "emptyDescription": "Configura tus gastos o ingresos fijos para que se generen automáticamente.",
+    "confirmDelete": "¿Estás seguro de eliminar la transacción recurrente \"{name}\"?",
+    "openMenu": "Abrir menú de {name}",
+    "actions": "Acciones",
+    "edit": "Editar",
+    "delete": "Eliminar",
+    "dayOfEveryMonth": "Día {day} de cada mes",
+    "lastRun": "Última ejecución: {date}",
+    "runNow": "Ejecutar ahora",
+    "newRecurring": "Nueva recurrente",
+    "runTitle": "Ejecutar transacciones recurrentes",
+    "runDescription": "¿Estás seguro de que deseas procesar todas las transacciones recurrentes pendientes hasta hoy? Esto generará automáticamente los gastos e ingresos programados.",
+    "cancel": "Cancelar",
+    "confirmRun": "Confirmar ejecución",
+    "processSuccess": "Transacciones procesadas correctamente",
+    "processSuccessDescription": "Se han generado las transacciones pendientes.",
+    "processError": "Error al procesar",
+    "processErrorDescription": "Hubo un problema al generar las transacciones.",
+    "editTitle": "Editar recurrente",
+    "createTitle": "Nueva transacción recurrente",
+    "fieldName": "Nombre",
+    "namePlaceholder": "Ej.: Netflix",
+    "fieldAmount": "Monto",
+    "fieldDayOfMonth": "Día del mes",
+    "fieldType": "Tipo",
+    "typeBill": "Gasto",
+    "typeIncome": "Ingreso",
+    "fieldCategory": "Categoría",
+    "fieldAccount": "Cuenta",
+    "fieldDescription": "Descripción (opcional)",
+    "selectPlaceholder": "Seleccionar",
+    "saveChanges": "Guardar cambios",
+    "create": "Crear",
+    "validation": {
+      "nameRequired": "El nombre es requerido",
+      "amountPositive": "El monto debe ser mayor a 0",
+      "typeRequired": "Selecciona un tipo",
+      "accountRequired": "Selecciona una cuenta",
+      "categoryRequired": "Selecciona una categoría",
+      "dayRange": "El día debe estar entre 1 y 31"
+    }
+  },
+  "search": {
+    "placeholder": "Buscar...",
+    "placeholderLong": "Buscar transacciones, cuentas...",
+    "hint": "Escribe para buscar en tus transacciones, cuentas, categorías y presupuestos.",
+    "searching": "Buscando...",
+    "noResults": "No se encontraron resultados.",
+    "transactions": "Transacciones",
+    "accounts": "Cuentas",
+    "categories": "Categorías",
+    "budgets": "Presupuestos",
+    "budget": "Presupuesto",
+    "loans": "Préstamos",
+    "loan": "Préstamo",
+    "certificates": "Certificados",
+    "certificate": "Certificado",
+    "open": "Abrir búsqueda",
+    "close": "Cerrar búsqueda"
   }
 }

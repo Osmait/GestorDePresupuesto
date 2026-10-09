@@ -5,6 +5,7 @@ import { DayPicker } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { buttonVariants } from "@/components/ui/button"
+import { useDateFnsLocale } from "@/lib/i18n/date-locale"
 
 export type CalendarProps = React.ComponentProps<typeof DayPicker>
 
@@ -12,10 +13,14 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
+  locale,
   ...props
 }: CalendarProps) {
+  // Month/weekday names follow the active app locale unless a caller overrides it.
+  const activeLocale = useDateFnsLocale()
   return (
     <DayPicker
+      locale={locale ?? activeLocale}
       showOutsideDays={showOutsideDays}
       className={cn("p-3", className)}
       classNames={{

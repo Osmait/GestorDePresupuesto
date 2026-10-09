@@ -1,8 +1,7 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getTransactionRepository } from '@/lib/repositoryConfig'
 import { TransactionFilters, TypeTransaction } from '@/types/transaction'
-import { BUDGET_KEYS } from './useBudgetsQuery'
-import { CATEGORY_KEYS } from './useCategoriesQuery'
+import { invalidateFinancialData } from './invalidateFinancialData'
 
 export const TRANSACTION_KEYS = {
 	all: ['transactions'] as const,
@@ -17,7 +16,6 @@ export function useGetTransactions(filters?: TransactionFilters) {
 		queryKey: TRANSACTION_KEYS.list(filters || {}),
 		queryFn: async () => {
 			const repo = await getTransactionRepository()
-			console.log('[useGetTransactions] Fetching with filters:', filters)
 			const response = await repo.findAll(filters)
 			return {
 				transactions: response.data || [],
@@ -69,14 +67,8 @@ export function useCreateTransactionMutation() {
 				data.createdAt,
 			)
 		},
-		onSuccess: () => {
-			// Invalidate all transaction lists to force refresh
-			queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() })
-			// Invalidate categories and budgets to reflect spending changes
-			queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
-			queryClient.invalidateQueries({ queryKey: BUDGET_KEYS.lists() })
-			// Optional: Invalidate account balance queries if they existed
-		},
+		// A transaction changes lists, account balances, budget spending and analytics.
+		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }
 
@@ -111,11 +103,8 @@ export function useUpdateTransactionMutation() {
 				data.createdAt,
 			)
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() })
-			queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
-			queryClient.invalidateQueries({ queryKey: BUDGET_KEYS.lists() })
-		},
+		// A transaction changes lists, account balances, budget spending and analytics.
+		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }
 
@@ -128,11 +117,7 @@ export function useDeleteTransactionMutation() {
 			const repo = await getTransactionRepository()
 			return repo.delete(id)
 		},
-		onSuccess: () => {
-			// Invalidate all transaction lists to force refresh
-			queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() })
-			queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
-			queryClient.invalidateQueries({ queryKey: BUDGET_KEYS.lists() })
-		},
+		// A transaction changes lists, account balances, budget spending and analytics.
+		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }

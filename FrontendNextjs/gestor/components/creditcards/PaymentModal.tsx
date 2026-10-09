@@ -1,9 +1,11 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useCallback, useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -12,7 +14,11 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
-import { accountRepository } from '@/lib/repositoryConfig'
+import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { hasAtMostDecimals } from '@/lib/money-validation'
+import { getAccountRepository } from '@/lib/repositoryConfig'
+import { formatCurrency } from '@/lib/utils'
 import { Account } from '@/types/account'
 import { CreatePaymentDTO, CreditCard } from '@/types/creditcard'
 
@@ -23,20 +29,39 @@ interface PaymentModalProps {
 	card: CreditCard | null
 }
 
-const paymentSchema = z.object({
-	fromAccountId: z.string().min(1, 'Select an account'),
-	currency: z.string().min(1),
-	amount: z.coerce.number().positive('Amount must be greater than 0'),
-	exchangeRate: z.string().optional().default(''),
-	includesInterest: z.boolean().default(false),
-	interestAmount: z.coerce.number().min(0).default(0),
-	notes: z.string().optional().default(''),
-})
+type Translator = (key: string, values?: Record<string, string | number>) => string
 
-type PaymentFormValues = z.infer<typeof paymentSchema>
+function createPaymentSchema(t: Translator, tForms: Translator) {
+	// card_payments.amount / interest_amount are DECIMAL(15,2): the API rejects sub-cent amounts.
+	const maxTwoDecimals = tForms('maxTwoDecimals')
+	return z.object({
+		fromAccountId: z.string().min(1, t('errors.selectAccount')),
+		currency: z.string().min(1),
+		amount: z.coerce
+			.number()
+			.positive(t('errors.amountPositive'))
+			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals),
+		exchangeRate: z.string().optional().default(''),
+		includesInterest: z.boolean().default(false),
+		interestAmount: z.coerce
+			.number()
+			.min(0)
+			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals)
+			.default(0),
+		notes: z.string().optional().default(''),
+	})
+}
+
+type PaymentFormValues = z.infer<ReturnType<typeof createPaymentSchema>>
 
 export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProps) {
+	const t = useTranslations('creditCards.payment')
+	const tCards = useTranslations('creditCards')
+	const tForms = useTranslations('forms')
+	const locale = useAppLocale()
+	const paymentSchema = useMemo(() => createPaymentSchema(t, tForms), [t, tForms])
 	const [loading, setLoading] = useState(false)
+	const [submitError, setSubmitError] = useState<{ detail: string | null } | null>(null)
 	const [accounts, setAccounts] = useState<Account[]>([])
 	const { data: rateData } = useExchangeRateQuery()
 
@@ -57,15 +82,16 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 	const loadAccounts = useCallback(async () => {
 		try {
-			const data = await accountRepository.findAll()
+			const data = await getAccountRepository().findAll()
 			setAccounts(data.filter((a: Account) => a.type === 'bank'))
 		} catch (error) {
 			console.error('Error loading accounts:', error)
 		}
-	}, [accountRepository])
+	}, [])
 
 	useEffect(() => {
 		if (open) {
+			setSubmitError(null)
 			loadAccounts()
 			if (card?.balances[0]) {
 				form.setValue('currency', card.balances[0].currency)
@@ -127,6 +153,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 		const parsedExchangeRate = parseFloat(values.exchangeRate || '0')
 
 		setLoading(true)
+		setSubmitError(null)
 		try {
 			await onSubmit({
 				from_account_id: values.fromAccountId,
@@ -140,7 +167,8 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 			onClose()
 			form.reset()
 		} catch (error) {
-			console.error('Error making payment:', error)
+			// Keep the modal open with the user's input and say why it failed.
+			setSubmitError({ detail: getInsufficientFundsMessage(error, tForms, locale) ?? getSafeErrorDetail(error) })
 		} finally {
 			setLoading(false)
 		}
@@ -148,9 +176,9 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 	return (
 		<Dialog open={open} onOpenChange={onClose}>
-			<DialogContent className='max-w-md'>
+			<DialogContent className='max-h-[90vh] w-[95vw] max-w-md overflow-y-auto'>
 				<DialogHeader>
-					<DialogTitle>Pay Credit Card</DialogTitle>
+					<DialogTitle>{t('title')}</DialogTitle>
 				</DialogHeader>
 				<Form {...form}>
 					<form onSubmit={form.handleSubmit(handleFormSubmit)} className='space-y-4'>
@@ -159,11 +187,11 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							name='fromAccountId'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Pay From Account</FormLabel>
+									<FormLabel>{t('fromAccount')}</FormLabel>
 									<Select value={field.value} onValueChange={field.onChange}>
 										<FormControl>
 											<SelectTrigger>
-												<SelectValue placeholder='Select account' />
+												<SelectValue placeholder={t('selectAccount')} />
 											</SelectTrigger>
 										</FormControl>
 										<SelectContent>
@@ -174,6 +202,13 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 											))}
 										</SelectContent>
 									</Select>
+									{selectedAccount?.current_balance !== undefined && (
+										<p className='text-xs text-muted-foreground'>
+											{tForms('availableBalance', {
+												amount: formatCurrency(selectedAccount.current_balance, sourceCurrency, { locale }),
+											})}
+										</p>
+									)}
 									<FormMessage />
 								</FormItem>
 							)}
@@ -184,7 +219,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							name='currency'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Currency</FormLabel>
+									<FormLabel>{t('currency')}</FormLabel>
 									<Select value={field.value} onValueChange={field.onChange}>
 										<FormControl>
 											<SelectTrigger>
@@ -194,7 +229,10 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 										<SelectContent>
 											{card?.balances.map((b) => (
 												<SelectItem key={b.currency} value={b.currency}>
-													{b.currency} (Debt: {Math.max(0, -b.current_balance).toLocaleString()})
+													{t('currencyOption', {
+														currency: b.currency,
+														debt: formatCurrency(Math.max(0, -b.current_balance), b.currency, { locale }),
+													})}
 												</SelectItem>
 											))}
 										</SelectContent>
@@ -209,18 +247,16 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							name='amount'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Amount to Pay</FormLabel>
+									<FormLabel>{t('amount')}</FormLabel>
 									<FormControl>
 										<Input type='number' step='0.01' placeholder={currentDebt.toString()} {...field} />
 									</FormControl>
 									<p className='text-xs text-muted-foreground'>
-										Current debt: {currentDebt.toLocaleString()} {watchedValues.currency}
+										{t('currentDebt', { amount: formatCurrency(currentDebt, watchedValues.currency, { locale }) })}
 									</p>
 									{exceedsDebt ? (
 										<p className='text-xs text-amber-600'>
-											Payment exceeds current debt by{' '}
-											{overpayAmount.toLocaleString(undefined, { maximumFractionDigits: 2 })} {watchedValues.currency}.
-											The extra will be credited to the card.
+											{t('exceedsDebt', { amount: formatCurrency(overpayAmount, watchedValues.currency, { locale }) })}
 										</p>
 									) : null}
 									<FormMessage />
@@ -231,16 +267,16 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 						{hasValidAmount && (
 							<div className='rounded-md border border-dashed p-3 space-y-1'>
 								<p className='text-xs text-muted-foreground'>
-									Debit from account:{' '}
+									{t('debitFromAccount')}{' '}
 									<span className='font-medium text-foreground'>
-										{debitPreview.toLocaleString(undefined, { maximumFractionDigits: 2 })} {sourceCurrency}
+										{formatCurrency(debitPreview, sourceCurrency, { locale })}
 									</span>
 								</p>
 								{watchedValues.currency === 'USD' && dopEquivalent !== null && (
 									<p className='text-xs text-muted-foreground'>
-										Equivalent in DOP:{' '}
+										{t('equivalentInDop')}{' '}
 										<span className='font-medium text-foreground'>
-											{dopEquivalent.toLocaleString(undefined, { maximumFractionDigits: 2 })} DOP
+											{formatCurrency(dopEquivalent, 'DOP', { locale })}
 										</span>
 									</p>
 								)}
@@ -253,25 +289,21 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 								name='exchangeRate'
 								render={({ field }) => (
 									<FormItem className='rounded-md border p-3'>
-										<FormLabel>
-											Exchange Rate ({watchedValues.currency} to {sourceCurrency})
-										</FormLabel>
+										<FormLabel>{t('exchangeRate', { from: watchedValues.currency, to: sourceCurrency })}</FormLabel>
 										<FormControl>
 											<Input
 												type='number'
 												step='0.0001'
-												placeholder={recommendedRate ? recommendedRate.toFixed(4) : 'Enter rate'}
+												placeholder={recommendedRate ? recommendedRate.toFixed(4) : t('enterRate')}
 												{...field}
 											/>
 										</FormControl>
 										{recommendedRate ? (
 											<p className='text-xs text-muted-foreground'>
-												Recommended rate from API: {recommendedRate.toFixed(4)}
+												{t('recommendedRate', { rate: recommendedRate.toFixed(4) })}
 											</p>
 										) : (
-											<p className='text-xs text-muted-foreground'>
-												Could not fetch recommended rate. Enter custom rate.
-											</p>
+											<p className='text-xs text-muted-foreground'>{t('noRecommendedRate')}</p>
 										)}
 										<FormMessage />
 									</FormItem>
@@ -281,7 +313,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 
 						<div className='space-y-2'>
 							<div className='flex items-center justify-between'>
-								<Label htmlFor='interest'>Includes Interest</Label>
+								<Label htmlFor='interest'>{t('includesInterest')}</Label>
 								<Switch
 									id='interest'
 									checked={watchedValues.includesInterest}
@@ -295,7 +327,13 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 									render={({ field }) => (
 										<FormItem>
 											<FormControl>
-												<Input type='number' step='0.01' placeholder='Interest amount' {...field} />
+												<Input
+													type='number'
+													step='0.01'
+													placeholder={t('interestAmount')}
+													aria-label={t('interestAmount')}
+													{...field}
+												/>
 											</FormControl>
 											<FormMessage />
 										</FormItem>
@@ -309,23 +347,32 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							name='notes'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Notes (Optional)</FormLabel>
+									<FormLabel>{t('notes')}</FormLabel>
 									<FormControl>
-										<Input {...field} placeholder='Payment notes' />
+										<Input {...field} placeholder={t('notesPlaceholder')} />
 									</FormControl>
 								</FormItem>
 							)}
 						/>
 
+						{submitError && (
+							<Alert variant='destructive'>
+								<AlertDescription>
+									<p>{t('errors.failed')}</p>
+									{submitError.detail && <p className='text-xs opacity-90'>{submitError.detail}</p>}
+								</AlertDescription>
+							</Alert>
+						)}
+
 						<DialogFooter>
 							<Button type='button' variant='outline' onClick={onClose}>
-								Cancel
+								{tCards('cancel')}
 							</Button>
 							<Button
 								type='submit'
 								disabled={loading || !watchedValues.fromAccountId || !exchangeRateValid || !hasValidAmount}
 							>
-								{loading ? 'Processing…' : 'Make Payment'}
+								{loading ? t('processing') : t('submit')}
 							</Button>
 						</DialogFooter>
 					</form>

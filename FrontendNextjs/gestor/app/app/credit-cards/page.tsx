@@ -2,6 +2,7 @@
 
 import { CreditCard as CardIcon, Plus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModal'
@@ -30,6 +31,8 @@ import {
 } from '@/hooks/queries/useCreditCardsQuery'
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { formatCurrency } from '@/lib/utils'
 import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard } from '@/types/creditcard'
 
 export default function CreditCardsPage() {
@@ -40,6 +43,9 @@ export default function CreditCardsPage() {
 	const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
 	const [resetDialogOpen, setResetDialogOpen] = useState(false)
 	const router = useRouter()
+	const t = useTranslations('creditCards')
+	const tCommon = useTranslations('common')
+	const locale = useAppLocale()
 
 	const { data: exchangeRateData } = useExchangeRateQuery()
 	const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
@@ -56,22 +62,22 @@ export default function CreditCardsPage() {
 
 	const handleCreateCard = async (data: CreateCreditCardDTO) => {
 		await createMutation.mutateAsync(data)
-		toast.success('Credit card created successfully')
+		toast.success(t('toasts.created'))
 	}
 
 	const handleUpdateCard = async (data: CreateCreditCardDTO) => {
 		if (!selectedCard) return
 		await updateMutation.mutateAsync({ id: selectedCard.id, data })
-		toast.success('Credit card updated successfully')
+		toast.success(t('toasts.updated'))
 	}
 
 	const handleDeleteCard = async () => {
 		if (!selectedCard) return
 		try {
 			await deleteMutation.mutateAsync(selectedCard.id)
-			toast.success('Credit card deleted successfully')
+			toast.success(t('toasts.deleted'))
 		} catch {
-			toast.error('Failed to delete credit card')
+			toast.error(t('toasts.deleteError'))
 		} finally {
 			setDeleteDialogOpen(false)
 			setSelectedCard(null)
@@ -81,7 +87,7 @@ export default function CreditCardsPage() {
 	const handlePayment = async (data: CreatePaymentDTO) => {
 		if (!selectedCard) return
 		await paymentMutation.mutateAsync({ cardId: selectedCard.id, data })
-		toast.success('Payment processed successfully')
+		toast.success(t('toasts.paymentProcessed'))
 	}
 
 	const handleEdit = (card: CreditCard) => {
@@ -114,7 +120,7 @@ export default function CreditCardsPage() {
 		try {
 			const balances = selectedCard.balances || []
 			if (balances.length === 0) {
-				toast.error('No balances to reset')
+				toast.error(t('toasts.noBalancesToReset'))
 				return
 			}
 			await Promise.all(
@@ -125,9 +131,9 @@ export default function CreditCardsPage() {
 					}),
 				),
 			)
-			toast.success('Card balance reset successfully')
+			toast.success(t('toasts.resetSuccess'))
 		} catch {
-			toast.error('Failed to reset card balance')
+			toast.error(t('toasts.resetError'))
 		} finally {
 			setResetDialogOpen(false)
 			setSelectedCard(null)
@@ -191,13 +197,18 @@ export default function CreditCardsPage() {
 	const totalLimitUSD = summary ? summaryLimitUSD : localTotalLimitUSD
 	const totalLimit = totalLimitDOP + totalLimitUSD * usdToDopRate
 	const avgUtilization = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0
-	const utilizationStatus = avgUtilization > 60 ? 'High Risk' : avgUtilization > 30 ? 'Watch' : 'Healthy'
+	const utilizationStatus =
+		avgUtilization > 60
+			? t('utilizationStatus.highRisk')
+			: avgUtilization > 30
+				? t('utilizationStatus.watch')
+				: t('utilizationStatus.healthy')
 	const utilizationStatusClass =
 		avgUtilization > 60 ? 'text-destructive' : avgUtilization > 30 ? 'text-warning' : 'text-success'
 
 	if (isFeatureFlagsLoading) {
 		return (
-			<div className='container mx-auto p-6 space-y-6'>
+			<div className='container mx-auto px-4 py-8 space-y-6'>
 				<Skeleton className='h-8 w-48' />
 				<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
 					<Skeleton className='h-36 md:col-span-2' />
@@ -209,11 +220,11 @@ export default function CreditCardsPage() {
 
 	if (!isCreditCardsModuleEnabled) {
 		return (
-			<div className='container mx-auto p-6 space-y-4'>
-				<h1 className='text-2xl font-semibold'>Credit Cards</h1>
-				<p className='text-muted-foreground'>This module is currently disabled for your account.</p>
+			<div className='container mx-auto px-4 py-8 space-y-4'>
+				<h1 className='text-2xl font-semibold'>{t('title')}</h1>
+				<p className='text-muted-foreground'>{tCommon('moduleDisabled.message')}</p>
 				<Button variant='outline' onClick={() => router.push('/app')}>
-					Go to dashboard
+					{tCommon('moduleDisabled.goToDashboard')}
 				</Button>
 			</div>
 		)
@@ -221,7 +232,7 @@ export default function CreditCardsPage() {
 
 	if (isLoading) {
 		return (
-			<div className='container mx-auto p-6 space-y-6'>
+			<div className='container mx-auto px-4 py-8 space-y-6'>
 				<Skeleton className='h-8 w-48' />
 				<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
 					<Skeleton className='h-36 md:col-span-2' />
@@ -237,65 +248,67 @@ export default function CreditCardsPage() {
 	}
 
 	return (
-		<div className='container mx-auto p-6 space-y-6'>
-			<div className='flex items-center justify-between'>
+		<div className='container mx-auto px-4 py-8 space-y-6'>
+			<div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
 				<div>
-					<h1 className='text-3xl font-bold'>Credit Cards</h1>
-					<p className='text-muted-foreground'>Manage your credit cards and payments</p>
+					<h1 className='text-3xl font-bold'>{t('title')}</h1>
+					<p className='text-muted-foreground'>{t('subtitle')}</p>
 				</div>
-				<Button onClick={() => setFormOpen(true)}>
+				<Button onClick={() => setFormOpen(true)} className='w-full sm:w-auto'>
 					<Plus className='h-4 w-4 mr-2' />
-					Add Card
+					{t('addCard')}
 				</Button>
 			</div>
 
 			<div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
 				<Card className='border-border/60 bg-card/60 md:col-span-2'>
 					<CardHeader className='pb-1'>
-						<CardTitle className='text-sm font-medium text-muted-foreground'>General Summary</CardTitle>
+						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('generalSummary')}</CardTitle>
 					</CardHeader>
 					<CardContent className='space-y-3 pt-0'>
 						<div className='flex items-center gap-2'>
 							<CardIcon className='h-5 w-5 text-primary' />
-							<span className='text-3xl font-semibold text-foreground'>
-								{totalDebt.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}
+							<span className='break-all text-2xl font-semibold text-foreground sm:text-3xl'>
+								{formatCurrency(totalDebt, 'DOP', { locale })}
 							</span>
 						</div>
 
 						<div className='grid grid-cols-1 gap-1 text-[12px] text-muted-foreground sm:grid-cols-2'>
-							<p>DOP: {totalDebtDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}</p>
-							<p>USD: {totalDebtUSD.toLocaleString('en-US', { style: 'currency', currency: 'USD' })}</p>
-							<p>USD→DOP: {totalDebtUSDInDOP.toLocaleString('es-DO', { style: 'currency', currency: 'DOP' })}</p>
-							<p>{cardsList.length} active cards</p>
+							<p>DOP: {formatCurrency(totalDebtDOP, 'DOP', { locale })}</p>
+							<p>USD: {formatCurrency(totalDebtUSD, 'USD', { locale })}</p>
+							<p>USD→DOP: {formatCurrency(totalDebtUSDInDOP, 'DOP', { locale })}</p>
+							<p>{t('activeCards', { count: cardsList.length })}</p>
 						</div>
 
 						{usdToDopRate > 0 && (
-							<p className='text-[11px] text-muted-foreground'>Rate: 1 USD = {usdToDopRate.toFixed(2)} DOP</p>
+							<p className='text-[11px] text-muted-foreground'>
+								{t('exchangeRate', { rate: usdToDopRate.toFixed(2) })}
+							</p>
 						)}
 					</CardContent>
 				</Card>
 
 				<Card className='border-border/60 bg-card/60'>
 					<CardHeader className='pb-1'>
-						<CardTitle className='text-sm font-medium text-muted-foreground'>Credit Health</CardTitle>
+						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('creditHealth')}</CardTitle>
 					</CardHeader>
 					<CardContent className='space-y-3 pt-0'>
 						<p className='text-3xl font-semibold text-foreground'>{avgUtilization.toFixed(1)}%</p>
 						<p className={`text-sm font-medium ${utilizationStatusClass}`}>{utilizationStatus}</p>
-						<p className='text-[12px] text-muted-foreground'>Target: below 30%</p>
+						<p className='text-[12px] text-muted-foreground'>{t('utilizationTarget')}</p>
 					</CardContent>
 				</Card>
 			</div>
 
 			{cardsList.length === 0 ? (
-				<Card className='p-12'>
+				<Card className='p-6 sm:p-12'>
 					<div className='flex flex-col items-center justify-center text-center'>
 						<CardIcon className='h-12 w-12 text-muted-foreground mb-4' />
-						<h3 className='text-lg font-medium'>No credit cards yet</h3>
-						<p className='text-muted-foreground mb-4'>Add your first credit card to start tracking your debt</p>
+						<h3 className='text-lg font-medium'>{t('emptyTitle')}</h3>
+						<p className='text-muted-foreground mb-4'>{t('emptyDescription')}</p>
 						<Button onClick={() => setFormOpen(true)}>
 							<Plus className='h-4 w-4 mr-2' />
-							Add Credit Card
+							{t('addCreditCard')}
 						</Button>
 					</div>
 				</Card>
@@ -329,18 +342,15 @@ export default function CreditCardsPage() {
 			<Dialog open={resetDialogOpen} onOpenChange={setResetDialogOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Reset Card Balance</DialogTitle>
-						<DialogDescription>
-							This will set {selectedCard?.name}&apos;s current balance to zero for all currencies. The previous balance
-							will be stored in history. Use this after paying off and closing the billing cycle.
-						</DialogDescription>
+						<DialogTitle>{t('resetDialog.title')}</DialogTitle>
+						<DialogDescription>{t('resetDialog.description', { name: selectedCard?.name ?? '' })}</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
 						<Button variant='outline' onClick={() => setResetDialogOpen(false)}>
-							Cancel
+							{t('cancel')}
 						</Button>
 						<Button onClick={handleConfirmReset} disabled={resetBalanceMutation.isPending}>
-							{resetBalanceMutation.isPending ? 'Resetting...' : 'Reset Balance'}
+							{resetBalanceMutation.isPending ? t('resetDialog.resetting') : t('resetDialog.confirm')}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -349,17 +359,15 @@ export default function CreditCardsPage() {
 			<Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
 				<DialogContent>
 					<DialogHeader>
-						<DialogTitle>Delete Credit Card</DialogTitle>
-						<DialogDescription>
-							Are you sure you want to delete {selectedCard?.name}? This action cannot be undone.
-						</DialogDescription>
+						<DialogTitle>{t('deleteDialog.title')}</DialogTitle>
+						<DialogDescription>{t('deleteDialog.description', { name: selectedCard?.name ?? '' })}</DialogDescription>
 					</DialogHeader>
 					<DialogFooter>
 						<Button variant='outline' onClick={() => setDeleteDialogOpen(false)}>
-							Cancel
+							{t('cancel')}
 						</Button>
 						<Button variant='destructive' onClick={handleDeleteCard} disabled={deleteMutation.isPending}>
-							{deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+							{deleteMutation.isPending ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

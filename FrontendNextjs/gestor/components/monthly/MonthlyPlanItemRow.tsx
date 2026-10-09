@@ -12,7 +12,9 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { useAppLocale } from '@/lib/i18n/date-locale'
 import { formatDop } from '@/lib/monthlyPlanUtils'
+import { formatCurrency } from '@/lib/utils'
 import { MonthlyPlanItem } from '@/types/monthlyPlan'
 
 interface MonthlyPlanItemRowProps {
@@ -34,6 +36,7 @@ export function MonthlyPlanItemRow({
 	onDelete,
 }: MonthlyPlanItemRowProps) {
 	const t = useTranslations('monthlyPlan')
+	const locale = useAppLocale()
 	const isIncome = item.type === 'income'
 	const barTone = isIncome ? 'bg-emerald-500' : 'bg-orange-500'
 
@@ -73,10 +76,12 @@ export function MonthlyPlanItemRow({
 				<div className='flex items-center gap-2 shrink-0'>
 					<div className='text-right'>
 						<p className={`text-sm font-semibold ${isIncome ? 'text-emerald-600' : 'text-orange-600'}`}>
-							{formatDop(item.amount_dop)}
+							{formatDop(item.amount_dop, locale)}
 						</p>
 						{item.currency === 'USD' && (
-							<p className='text-xs text-muted-foreground'>{t('originalAmount', { amount: item.amount.toFixed(2) })}</p>
+							<p className='text-xs text-muted-foreground'>
+								{t('originalAmount', { amount: formatCurrency(item.amount, item.currency, { locale }) })}
+							</p>
 						)}
 					</div>
 

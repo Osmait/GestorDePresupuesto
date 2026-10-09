@@ -2,6 +2,7 @@
 
 import { format } from 'date-fns'
 import { ChevronDown, ChevronsUpDown, ChevronUp, Filter, Save, Search, Trash2, X } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,6 +17,7 @@ import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useDateFnsLocale } from '@/lib/i18n/date-locale'
 import { UserResponse } from '@/types/user'
 
 interface EditableUserTableProps {
@@ -28,7 +30,18 @@ interface EditableUserTableProps {
 type SortField = keyof UserResponse
 type SortOrder = 'asc' | 'desc' | null
 
+const CHANGE_FIELD_LABELS = {
+	name: 'columns.name',
+	last_name: 'columns.lastName',
+	email: 'columns.email',
+	role: 'columns.role',
+} as const
+
 export function EditableUserTable({ users, onSave, onDelete, isLoading }: EditableUserTableProps) {
+	const t = useTranslations('admin.users')
+	const tRoles = useTranslations('admin.roles')
+	const dateLocale = useDateFnsLocale()
+	const roleLabel = (role: string) => (role === 'ADMIN' || role === 'USER' ? tRoles(role) : role)
 	const [editedUsers, setEditedUsers] = useState<Record<string, UserResponse>>({})
 	const [searchTerm, setSearchTerm] = useState('')
 	const [roleFilter, setRoleFilter] = useState<string>('ALL')
@@ -141,7 +154,8 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 				<div className='relative w-full sm:max-w-xs'>
 					<Search className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
 					<Input
-						placeholder='Search users...'
+						placeholder={t('searchPlaceholder')}
+						aria-label={t('searchPlaceholder')}
 						value={searchTerm}
 						onChange={(e) => setSearchTerm(e.target.value)}
 						className='pl-9 h-9'
@@ -150,26 +164,26 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 				<div className='flex items-center gap-2 w-full sm:w-auto'>
 					<Filter className='h-4 w-4 text-muted-foreground' />
 					<Select value={roleFilter} onValueChange={setRoleFilter}>
-						<SelectTrigger className='h-9 w-[130px]'>
-							<SelectValue placeholder='Filter by Role' />
+						<SelectTrigger className='h-9 w-[160px]' aria-label={t('filterByRole')}>
+							<SelectValue placeholder={t('filterByRole')} />
 						</SelectTrigger>
 						<SelectContent>
-							<SelectItem value='ALL'>All Roles</SelectItem>
-							<SelectItem value='USER'>Users</SelectItem>
-							<SelectItem value='ADMIN'>Admins</SelectItem>
+							<SelectItem value='ALL'>{t('allRoles')}</SelectItem>
+							<SelectItem value='USER'>{t('roleUsers')}</SelectItem>
+							<SelectItem value='ADMIN'>{t('roleAdmins')}</SelectItem>
 						</SelectContent>
 					</Select>
 				</div>
 
 				{hasChanges && (
-					<div className='flex items-center gap-2 ml-auto animate-in fade-in slide-in-from-right-2 duration-300'>
+					<div className='flex flex-wrap items-center gap-2 sm:ml-auto animate-in fade-in slide-in-from-right-2 duration-300'>
 						<Button variant='outline' size='sm' onClick={handleCancel} className='gap-2 h-9'>
 							<X className='h-4 w-4' />
-							Cancel
+							{t('cancel')}
 						</Button>
 						<Button size='sm' onClick={() => setIsConfirmOpen(true)} className='gap-2 h-9'>
 							<Save className='h-4 w-4' />
-							Save {Object.keys(editedUsers).length} Changes
+							{t('saveChanges', { count: Object.keys(editedUsers).length })}
 						</Button>
 					</div>
 				)}
@@ -185,7 +199,7 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 									onClick={() => handleSort('name')}
 								>
 									<div className='flex items-center'>
-										Name <SortIcon field='name' />
+										{t('columns.name')} <SortIcon field='name' />
 									</div>
 								</TableHead>
 								<TableHead
@@ -193,7 +207,7 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 									onClick={() => handleSort('last_name')}
 								>
 									<div className='flex items-center'>
-										Last Name <SortIcon field='last_name' />
+										{t('columns.lastName')} <SortIcon field='last_name' />
 									</div>
 								</TableHead>
 								<TableHead
@@ -201,7 +215,7 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 									onClick={() => handleSort('email')}
 								>
 									<div className='flex items-center'>
-										Email <SortIcon field='email' />
+										{t('columns.email')} <SortIcon field='email' />
 									</div>
 								</TableHead>
 								<TableHead
@@ -209,7 +223,7 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 									onClick={() => handleSort('role')}
 								>
 									<div className='flex items-center'>
-										Role <SortIcon field='role' />
+										{t('columns.role')} <SortIcon field='role' />
 									</div>
 								</TableHead>
 								<TableHead
@@ -217,11 +231,11 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 									onClick={() => handleSort('created_at')}
 								>
 									<div className='flex items-center'>
-										Created <SortIcon field='created_at' />
+										{t('columns.created')} <SortIcon field='created_at' />
 									</div>
 								</TableHead>
-								<TableHead className='text-right min-w-[100px]'>ID</TableHead>
-								<TableHead className='min-w-[80px]'>Actions</TableHead>
+								<TableHead className='text-right min-w-[100px]'>{t('columns.id')}</TableHead>
+								<TableHead className='min-w-[80px]'>{t('columns.actions')}</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
@@ -229,14 +243,14 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 								<TableRow>
 									<TableCell colSpan={7} className='h-24 text-center'>
 										<div className='flex items-center justify-center gap-2'>
-											<span className='animate-pulse'>Loading users...</span>
+											<span className='animate-pulse'>{t('loading')}</span>
 										</div>
 									</TableCell>
 								</TableRow>
 							) : filteredAndSortedUsers.length === 0 ? (
 								<TableRow>
 									<TableCell colSpan={7} className='h-24 text-center text-muted-foreground'>
-										No users found matching your criteria.
+										{t('empty')}
 									</TableCell>
 								</TableRow>
 							) : (
@@ -279,13 +293,13 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 														<SelectValue />
 													</SelectTrigger>
 													<SelectContent>
-														<SelectItem value='USER'>User</SelectItem>
-														<SelectItem value='ADMIN'>Admin</SelectItem>
+														<SelectItem value='USER'>{tRoles('USER')}</SelectItem>
+														<SelectItem value='ADMIN'>{tRoles('ADMIN')}</SelectItem>
 													</SelectContent>
 												</Select>
 											</TableCell>
 											<TableCell className='text-muted-foreground whitespace-nowrap px-4 py-2'>
-												{format(new Date(user.created_at), 'MMM d, yyyy')}
+												{format(new Date(user.created_at), 'PP', { locale: dateLocale })}
 											</TableCell>
 											<TableCell className='text-right font-mono text-xs text-muted-foreground px-4 py-2 opacity-50 group-hover:opacity-100 transition-opacity'>
 												{user.id.slice(0, 8)}...
@@ -295,6 +309,7 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 													variant='ghost'
 													size='sm'
 													className='h-8 w-8 p-0 text-muted-foreground hover:text-destructive'
+													aria-label={t('disableUser', { name: `${user.name} ${user.last_name}` })}
 													onClick={() => setDeleteTargetId(user.id)}
 												>
 													<Trash2 className='h-4 w-4' />
@@ -318,22 +333,21 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 			>
 				<DialogContent className='max-w-md'>
 					<DialogHeader>
-						<DialogTitle>Delete User</DialogTitle>
+						<DialogTitle>{t('deleteTitle')}</DialogTitle>
 						<DialogDescription>
-							Are you sure you want to disable{' '}
-							<span className='font-semibold text-foreground'>
-								{deleteTarget ? `${deleteTarget.name} ${deleteTarget.last_name}` : ''}
-							</span>
-							? This action will prevent them from logging in.
+							{t.rich('deleteDescription', {
+								name: deleteTarget ? `${deleteTarget.name} ${deleteTarget.last_name}` : '',
+								strong: (chunks) => <span className='font-semibold text-foreground'>{chunks}</span>,
+							})}
 						</DialogDescription>
 					</DialogHeader>
 					<DialogFooter className='mt-6'>
 						<Button variant='outline' onClick={() => setDeleteTargetId(null)}>
-							Cancel
+							{t('cancel')}
 						</Button>
 						<Button variant='destructive' onClick={handleConfirmDelete} className='gap-2'>
 							<Trash2 className='h-4 w-4' />
-							Delete User
+							{t('deleteConfirm')}
 						</Button>
 					</DialogFooter>
 				</DialogContent>
@@ -343,11 +357,8 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 			<Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
 				<DialogContent className='max-w-md'>
 					<DialogHeader>
-						<DialogTitle>Confirm Changes</DialogTitle>
-						<DialogDescription>
-							You are about to modify {Object.keys(editedUsers).length} users. Review the summary below before
-							proceeding.
-						</DialogDescription>
+						<DialogTitle>{t('confirmTitle')}</DialogTitle>
+						<DialogDescription>{t('confirmDescription', { count: Object.keys(editedUsers).length })}</DialogDescription>
 					</DialogHeader>
 
 					<ScrollArea className='max-h-[300px] mt-4 rounded-md border p-4 bg-muted/30'>
@@ -368,10 +379,14 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 										<div className='mt-1 space-y-1'>
 											{changedFields.map((f) => (
 												<div key={f} className='flex items-center gap-2 text-xs'>
-													<span className='capitalize text-muted-foreground w-16'>{f}:</span>
-													<span className='line-through text-destructive/70'>{original[f]}</span>
+													<span className='text-muted-foreground w-20 shrink-0'>{t(CHANGE_FIELD_LABELS[f])}:</span>
+													<span className='line-through text-destructive/70 break-all'>
+														{f === 'role' ? roleLabel(original[f]) : original[f]}
+													</span>
 													<span className='text-muted-foreground'>→</span>
-													<span className='text-green-500 font-medium'>{editedUser[f]}</span>
+													<span className='text-green-500 font-medium break-all'>
+														{f === 'role' ? roleLabel(editedUser[f]) : editedUser[f]}
+													</span>
 												</div>
 											))}
 										</div>
@@ -383,11 +398,11 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 
 					<DialogFooter className='mt-6'>
 						<Button variant='outline' onClick={() => setIsConfirmOpen(false)}>
-							Back
+							{t('back')}
 						</Button>
 						<Button onClick={handleConfirmSave} className='gap-2'>
 							<Save className='h-4 w-4' />
-							Confirm and Save
+							{t('confirmSave')}
 						</Button>
 					</DialogFooter>
 				</DialogContent>

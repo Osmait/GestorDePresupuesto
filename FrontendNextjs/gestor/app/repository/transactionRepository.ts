@@ -128,9 +128,7 @@ export class TransactionRepository extends BaseRepository {
 				created_at: created_at ? created_at.toISOString() : new Date().toISOString(),
 			}
 
-			console.log('[TransactionRepository] Creating transaction with body:', JSON.stringify(body, null, 2))
-			const data = await this.post('/transaction', body)
-			console.log('[TransactionRepository] Transaction created:', data)
+			await this.post('/transaction', body)
 		} catch (error) {
 			console.error('[TransactionRepository] Error creating transaction:', error)
 			throw error

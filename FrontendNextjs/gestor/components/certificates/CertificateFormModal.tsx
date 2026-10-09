@@ -1,43 +1,53 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useEffect, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import { getSafeErrorDetail } from '@/lib/api-error'
+import { hasAtMostDecimals } from '@/lib/money-validation'
 import { Certificate, CreateCertificateDTO, InterestType, UpdateCertificateDTO } from '@/types/certificate'
 
-const certificateSchema = z
-	.object({
-		bank: z.string().min(2, 'Bank name must be at least 2 characters'),
-		base_capital: z.coerce.number().min(0.01, 'Capital must be greater than 0'),
-		interest_type: z.enum(['simple', 'compound']),
-		current_interest_rate: z.coerce.number().min(0.01).max(100),
-		current_tax_rate: z.coerce.number().min(0).max(100),
-		cut_day: z.coerce.number().min(1).max(28),
-		reinvest_interest: z.boolean(),
-		payout_account_id: z.string().optional(),
-		maturity_date: z.string().optional(),
-	})
-	.refine(
-		(data) => {
-			if (data.interest_type === 'simple' && (!data.payout_account_id || data.payout_account_id.trim() === '')) {
-				return false
-			}
-			return true
-		},
-		{
-			message: 'Payout account is required for simple interest type',
-			path: ['payout_account_id'],
-		},
-	)
+function createCertificateSchema(t: (key: string) => string, tForms: (key: string) => string) {
+	return z
+		.object({
+			bank: z.string().min(2, t('errors.bankMin')),
+			// certificates.base_capital is DECIMAL(15,2): the API rejects sub-cent amounts.
+			base_capital: z.coerce
+				.number()
+				.min(0.01, t('errors.capitalMin'))
+				.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals')),
+			interest_type: z.enum(['simple', 'compound']),
+			current_interest_rate: z.coerce.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
+			current_tax_rate: z.coerce.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+			cut_day: z.coerce.number().min(1, t('errors.cutDayRange')).max(28, t('errors.cutDayRange')),
+			reinvest_interest: z.boolean(),
+			payout_account_id: z.string().optional(),
+			maturity_date: z.string().optional(),
+		})
+		.refine(
+			(data) => {
+				if (data.interest_type === 'simple' && (!data.payout_account_id || data.payout_account_id.trim() === '')) {
+					return false
+				}
+				return true
+			},
+			{
+				message: t('errors.payoutRequired'),
+				path: ['payout_account_id'],
+			},
+		)
+}
 
-type FormData = z.infer<typeof certificateSchema>
+type FormData = z.infer<ReturnType<typeof createCertificateSchema>>
 
 interface CertificateFormModalProps {
 	open: boolean
@@ -62,8 +72,12 @@ export function CertificateFormModal({
 	onSubmit,
 	onSimulate,
 }: CertificateFormModalProps) {
+	const t = useTranslations('certificates.form')
+	const tForms = useTranslations('forms')
 	const [isSubmitting, setIsSubmitting] = useState(false)
+	const [submitError, setSubmitError] = useState<{ detail: string | null } | null>(null)
 	const isEditing = !!certificate
+	const certificateSchema = useMemo(() => createCertificateSchema(t, tForms), [t, tForms])
 
 	const {
 		register,
@@ -89,6 +103,10 @@ export function CertificateFormModal({
 
 	const interestType = watch('interest_type')
 	const reinvestInterest = watch('reinvest_interest')
+
+	useEffect(() => {
+		if (open) setSubmitError(null)
+	}, [open])
 
 	useEffect(() => {
 		if (certificate) {
@@ -123,6 +141,7 @@ export function CertificateFormModal({
 
 	const onFormSubmit = async (data: FormData) => {
 		setIsSubmitting(true)
+		setSubmitError(null)
 		try {
 			const submitData: CreateCertificateDTO = {
 				bank: data.bank,
@@ -142,11 +161,10 @@ export function CertificateFormModal({
 				submitData.maturity_date = data.maturity_date.trim()
 			}
 
-			console.log('Submitting certificate data:', submitData)
 			await onSubmit(submitData)
 			onOpenChange(false)
 		} catch (error) {
-			console.error('Error submitting certificate:', error)
+			setSubmitError({ detail: getSafeErrorDetail(error) })
 		} finally {
 			setIsSubmitting(false)
 		}
@@ -154,80 +172,80 @@ export function CertificateFormModal({
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className='sm:max-w-[500px]'>
+			<DialogContent className='w-[95vw] max-h-[90vh] overflow-y-auto sm:max-w-[500px]'>
 				<DialogHeader>
-					<DialogTitle>{isEditing ? 'Edit Certificate' : 'New Certificate'}</DialogTitle>
+					<DialogTitle>{isEditing ? t('editTitle') : t('newTitle')}</DialogTitle>
 				</DialogHeader>
 				<form onSubmit={handleSubmit(onFormSubmit)} className='space-y-4'>
 					<div className='grid gap-4 py-4'>
-						<div className='grid grid-cols-4 items-center gap-4'>
-							<Label htmlFor='bank' className='text-right'>
-								Bank
+						<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+							<Label htmlFor='bank' className='sm:text-right'>
+								{t('bank')}
 							</Label>
-							<Input id='bank' className='col-span-3' {...register('bank')} placeholder='Bank name' />
-							{errors.bank && <p className='col-span-4 text-right text-sm text-red-500'>{errors.bank.message}</p>}
+							<Input id='bank' className='sm:col-span-3' {...register('bank')} placeholder={t('bankPlaceholder')} />
+							{errors.bank && <p className='text-sm text-red-500 sm:col-span-4 sm:text-right'>{errors.bank.message}</p>}
 						</div>
 
-						<div className='grid grid-cols-4 items-center gap-4'>
-							<Label htmlFor='base_capital' className='text-right'>
-								Capital
+						<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+							<Label htmlFor='base_capital' className='sm:text-right'>
+								{t('capital')}
 							</Label>
 							<Input
 								id='base_capital'
 								type='number'
 								step='0.01'
-								className='col-span-3'
+								className='sm:col-span-3'
 								{...register('base_capital', { valueAsNumber: true })}
 								placeholder='0.00'
 							/>
 							{errors.base_capital && (
-								<p className='col-span-4 text-right text-sm text-red-500'>{errors.base_capital.message}</p>
+								<p className='text-sm text-red-500 sm:col-span-4 sm:text-right'>{errors.base_capital.message}</p>
 							)}
 						</div>
 
-						<div className='grid grid-cols-4 items-center gap-4'>
-							<Label htmlFor='interest_type' className='text-right'>
-								Type
+						<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+							<Label htmlFor='interest_type' className='sm:text-right'>
+								{t('type')}
 							</Label>
 							<Select value={interestType} onValueChange={(value) => setValue('interest_type', value as InterestType)}>
-								<SelectTrigger className='col-span-3'>
+								<SelectTrigger className='sm:col-span-3'>
 									<SelectValue />
 								</SelectTrigger>
 								<SelectContent>
-									<SelectItem value='simple'>Simple Interest</SelectItem>
-									<SelectItem value='compound'>Compound Interest</SelectItem>
+									<SelectItem value='simple'>{t('simpleInterest')}</SelectItem>
+									<SelectItem value='compound'>{t('compoundInterest')}</SelectItem>
 								</SelectContent>
 							</Select>
 						</div>
 
 						{showReinvestToggle && (
-							<div className='grid grid-cols-4 items-center gap-4'>
-								<Label htmlFor='reinvest_interest' className='text-right'>
-									Reinvest
+							<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+								<Label htmlFor='reinvest_interest' className='sm:text-right'>
+									{t('reinvest')}
 								</Label>
-								<div className='col-span-3 flex items-center gap-2'>
+								<div className='flex items-center gap-2 sm:col-span-3'>
 									<Switch
 										id='reinvest_interest'
 										checked={reinvestInterest}
 										onCheckedChange={(checked) => setValue('reinvest_interest', checked)}
 									/>
-									<span className='text-sm text-muted-foreground'>Reinvest net interest</span>
+									<span className='text-sm text-muted-foreground'>{t('reinvestHelp')}</span>
 								</div>
 							</div>
 						)}
 
 						{showPayoutAccount && (
-							<div className='grid grid-cols-4 items-center gap-4'>
-								<Label htmlFor='payout_account_id' className='text-right'>
-									Payout Account *
+							<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+								<Label htmlFor='payout_account_id' className='sm:text-right'>
+									{t('payoutAccount')}
 								</Label>
-								<div className='col-span-3 space-y-1'>
+								<div className='space-y-1 sm:col-span-3'>
 									<Select
 										value={watch('payout_account_id') || ''}
 										onValueChange={(value) => setValue('payout_account_id', value)}
 									>
 										<SelectTrigger>
-											<SelectValue placeholder='Select account' />
+											<SelectValue placeholder={t('selectAccount')} />
 										</SelectTrigger>
 										<SelectContent>
 											{accounts.map((account) => (
@@ -244,67 +262,80 @@ export function CertificateFormModal({
 							</div>
 						)}
 
-						<div className='grid grid-cols-4 items-center gap-4'>
-							<Label htmlFor='current_interest_rate' className='text-right'>
-								Rate (%)
+						<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+							<Label htmlFor='current_interest_rate' className='sm:text-right'>
+								{t('rate')}
 							</Label>
 							<Input
 								id='current_interest_rate'
 								type='number'
 								step='0.01'
-								className='col-span-3'
+								className='sm:col-span-3'
 								{...register('current_interest_rate', { valueAsNumber: true })}
 								placeholder='4.55'
 							/>
 							{errors.current_interest_rate && (
-								<p className='col-span-4 text-right text-sm text-red-500'>{errors.current_interest_rate.message}</p>
+								<p className='text-sm text-red-500 sm:col-span-4 sm:text-right'>
+									{errors.current_interest_rate.message}
+								</p>
 							)}
 						</div>
 
-						<div className='grid grid-cols-4 items-center gap-4'>
-							<Label htmlFor='current_tax_rate' className='text-right'>
-								Tax (%)
+						<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+							<Label htmlFor='current_tax_rate' className='sm:text-right'>
+								{t('tax')}
 							</Label>
 							<Input
 								id='current_tax_rate'
 								type='number'
 								step='0.01'
-								className='col-span-3'
+								className='sm:col-span-3'
 								{...register('current_tax_rate', { valueAsNumber: true })}
 								placeholder='10.00'
 							/>
 							{errors.current_tax_rate && (
-								<p className='col-span-4 text-right text-sm text-red-500'>{errors.current_tax_rate.message}</p>
+								<p className='text-sm text-red-500 sm:col-span-4 sm:text-right'>{errors.current_tax_rate.message}</p>
 							)}
 						</div>
 
-						<div className='grid grid-cols-4 items-center gap-4'>
-							<Label htmlFor='cut_day' className='text-right'>
-								Cut Day
+						<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+							<Label htmlFor='cut_day' className='sm:text-right'>
+								{t('cutDay')}
 							</Label>
 							<Input
 								id='cut_day'
 								type='number'
 								min={1}
 								max={28}
-								className='col-span-3'
+								className='sm:col-span-3'
 								{...register('cut_day', { valueAsNumber: true })}
 								placeholder='19'
 							/>
-							{errors.cut_day && <p className='col-span-4 text-right text-sm text-red-500'>{errors.cut_day.message}</p>}
+							{errors.cut_day && (
+								<p className='text-sm text-red-500 sm:col-span-4 sm:text-right'>{errors.cut_day.message}</p>
+							)}
 						</div>
 
-						<div className='grid grid-cols-4 items-center gap-4'>
-							<Label htmlFor='maturity_date' className='text-right'>
-								Maturity
+						<div className='grid grid-cols-1 gap-2 sm:grid-cols-4 sm:items-center sm:gap-4'>
+							<Label htmlFor='maturity_date' className='sm:text-right'>
+								{t('maturity')}
 							</Label>
-							<Input id='maturity_date' type='date' className='col-span-3' {...register('maturity_date')} />
+							<Input id='maturity_date' type='date' className='sm:col-span-3' {...register('maturity_date')} />
 						</div>
 					</div>
 
+					{submitError && (
+						<Alert variant='destructive'>
+							<AlertDescription>
+								<p>{t('errors.saveFailed')}</p>
+								{submitError.detail && <p className='text-xs opacity-90'>{submitError.detail}</p>}
+							</AlertDescription>
+						</Alert>
+					)}
+
 					<DialogFooter className='gap-2'>
 						<Button type='button' variant='outline' onClick={() => onOpenChange(false)}>
-							Cancel
+							{t('cancel')}
 						</Button>
 						{onSimulate && (
 							<Button
@@ -320,11 +351,11 @@ export function CertificateFormModal({
 									})
 								}
 							>
-								Simulate
+								{t('simulate')}
 							</Button>
 						)}
 						<Button type='submit' disabled={isSubmitting}>
-							{isSubmitting ? 'Saving...' : isEditing ? 'Update' : 'Create'}
+							{isSubmitting ? t('saving') : isEditing ? t('update') : t('create')}
 						</Button>
 					</DialogFooter>
 				</form>

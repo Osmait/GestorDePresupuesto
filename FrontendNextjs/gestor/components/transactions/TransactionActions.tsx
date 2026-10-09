@@ -134,7 +134,8 @@ export function TransactionActions() {
 			/>
 
 			<Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
-				<DrawerContent className='w-full max-w-sm ml-auto h-full'>
+				{/* Filter drawer has no description; opt out explicitly (Radix warns otherwise). */}
+				<DrawerContent className='w-full max-w-sm ml-auto h-full' aria-describedby={undefined}>
 					<DrawerHeader>
 						<DrawerTitle>{t('filterTransactions')}</DrawerTitle>
 					</DrawerHeader>
