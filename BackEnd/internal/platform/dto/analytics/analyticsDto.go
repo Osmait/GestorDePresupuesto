@@ -1,15 +1,18 @@
 package analyticsdto
 
-import "github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
+import (
+	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+)
 
 type GetCategoryExpensesResponse struct {
-	ID               string  `json:"id"`
-	Label            string  `json:"label"`
-	Value            float64 `json:"value"`
-	Color            string  `json:"color"`
-	TransactionCount int     `json:"transaction_count"`
-	DopTotal         float64 `json:"dop_total"`
-	UsdTotal         float64 `json:"usd_total"`
+	ID               string       `json:"id"`
+	Label            string       `json:"label"`
+	Value            money.Amount `json:"value"`
+	Color            string       `json:"color"`
+	TransactionCount int          `json:"transaction_count"`
+	DopTotal         money.Amount `json:"dop_total"`
+	UsdTotal         money.Amount `json:"usd_total"`
 }
 
 func NewGetCategoryExpensesResponse(categoryExpenses []*analytics.CategoryExpense) []GetCategoryExpensesResponse {
@@ -29,9 +32,9 @@ func NewGetCategoryExpensesResponse(categoryExpenses []*analytics.CategoryExpens
 }
 
 type GetMonthlySummaryResponse struct {
-	Month    string  `json:"month"`
-	Ingresos float64 `json:"Ingresos"`
-	Gastos   float64 `json:"Gastos"`
+	Month    string       `json:"month"`
+	Ingresos money.Amount `json:"Ingresos"`
+	Gastos   money.Amount `json:"Gastos"`
 }
 
 func NewGetMonthlySummaryResponse(monthlySummaries []*analytics.MonthlySummary) []GetMonthlySummaryResponse {
@@ -47,13 +50,13 @@ func NewGetMonthlySummaryResponse(monthlySummaries []*analytics.MonthlySummary) 
 }
 
 type DashboardSummaryResponse struct {
-	TotalIncome       float64                       `json:"total_income"`
-	TotalExpenses     float64                       `json:"total_expenses"`
-	NetAmount         float64                       `json:"net_amount"`
-	UsdToDopRate      float64                       `json:"usd_to_dop_rate"`
-	AccountsTotal     float64                       `json:"accounts_total"`
-	InvestmentsTotal  float64                       `json:"investments_total"`
-	CertificatesTotal float64                       `json:"certificates_total"`
+	TotalIncome       money.Amount                  `json:"total_income"`
+	TotalExpenses     money.Amount                  `json:"total_expenses"`
+	NetAmount         money.Amount                  `json:"net_amount"`
+	UsdToDopRate      money.Amount                  `json:"usd_to_dop_rate"`
+	AccountsTotal     money.Amount                  `json:"accounts_total"`
+	InvestmentsTotal  money.Amount                  `json:"investments_total"`
+	CertificatesTotal money.Amount                  `json:"certificates_total"`
 	AccountsCount     int                           `json:"accounts_count"`
 	InvestmentsCount  int                           `json:"investments_count"`
 	CertificatesCount int                           `json:"certificates_count"`

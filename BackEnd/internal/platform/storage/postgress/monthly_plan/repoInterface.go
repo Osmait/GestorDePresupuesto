@@ -3,6 +3,7 @@ package monthly_plan
 import (
 	"context"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/monthly_plan"
 )
 
@@ -16,5 +17,5 @@ type MonthlyPlanRepoInterface interface {
 	Update(ctx context.Context, item *monthly_plan.MonthlyPlanItem) (int64, error)
 	SetActive(ctx context.Context, id string, userID string, isActive bool) (int64, error)
 	Delete(ctx context.Context, id string, userID string) (int64, error)
-	Totals(ctx context.Context, userID string, usdToDop float64) (*monthly_plan.Totals, error)
+	Totals(ctx context.Context, userID string, usdToDop money.Amount) (*monthly_plan.Totals, error)
 }

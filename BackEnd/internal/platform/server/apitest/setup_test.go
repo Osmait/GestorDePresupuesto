@@ -18,16 +18,22 @@ import (
 	"github.com/testcontainers/testcontainers-go/wait"
 
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
+	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	accountSvc "github.com/osmait/gestorDePresupuesto/internal/services/account"
 	authSvc "github.com/osmait/gestorDePresupuesto/internal/services/auth"
+	investmentSvc "github.com/osmait/gestorDePresupuesto/internal/services/investment"
+	notificationSvc "github.com/osmait/gestorDePresupuesto/internal/services/notification"
+	transactionSvc "github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	userSvc "github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
 
@@ -87,7 +93,9 @@ func TestMain(m *testing.M) {
 
 	_, filename, _, _ := runtime.Caller(0)
 	migrationsDir, _ := filepath.Abs(filepath.Join(filepath.Dir(filename), "../../../../cmd/api/db/migrations"))
-	utils.RunDBMigration("file://"+filepath.ToSlash(migrationsDir), connStr)
+	if err := utils.RunDBMigration("file://"+filepath.ToSlash(migrationsDir), connStr); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
 
 	testCfg = newTestConfig()
 
@@ -142,6 +150,21 @@ func buildRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 		cfg,
 	)
 	accountService := accountSvc.NewAccountService(accountRepository)
+	transactionService := transactionSvc.NewTransactionService(
+		transactionRepository,
+		budgetRepository,
+		notificationSvc.NewNotificationService(notificationRepo.NewNotificationRepository(db)),
+		cache.NewInMemoryCache(5*time.Minute, 10*time.Minute),
+		nil,
+		nil,
+	)
+	investmentService := investmentSvc.NewInvestmentService(
+		investmentRepo.NewInvestmentRepository(db),
+		nil,
+		transactionService,
+		accountRepository,
+		categoryRepository,
+	)
 
 	r := gin.New()
 	r.Use(cors.AllowAll())
@@ -152,6 +175,8 @@ func buildRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	routes.AuhtRoutes(r, authService)
 	routes.UserRoute(r, userService)
 	routes.AccountRotes(r, accountService)
+	routes.TransactionRoutes(r, transactionService)
+	routes.InvestmentRoutes(r, investmentService, db)
 
 	return r
 }

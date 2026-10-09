@@ -3,14 +3,26 @@ package auth
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	authDomain "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
 )
 
+// ErrTokenNotActive is returned by Rotate when the presented token is not an
+// active (unrevoked, unexpired) token — either it does not exist, has
+// expired, or another request already rotated/revoked it.
+var ErrTokenNotActive = errors.New("refresh token is not active")
+
 // RefreshTokenRepositoryInterface defines the contract for refresh token storage
 type RefreshTokenRepositoryInterface interface {
 	Save(ctx context.Context, token *authDomain.RefreshToken) error
+	// Rotate atomically revokes the active token identified by oldTokenHash
+	// (marking it replaced by newToken.Id) and inserts newToken for the same
+	// user, in a single DB transaction. The conditional UPDATE guarantees
+	// that of N concurrent rotations of the same token exactly one succeeds;
+	// the others get ErrTokenNotActive. Returns the owning user id.
+	Rotate(ctx context.Context, oldTokenHash string, newToken *authDomain.RefreshToken, now time.Time) (string, error)
 	FindByHash(ctx context.Context, tokenHash string) (*authDomain.RefreshToken, error)
 	FindByUserId(ctx context.Context, userId string) ([]*authDomain.RefreshToken, error)
 	Revoke(ctx context.Context, tokenId string, replacedBy *string) error
@@ -45,6 +57,51 @@ func (r *RefreshTokenRepository) Save(ctx context.Context, token *authDomain.Ref
 		token.IpAddress,
 	)
 	return err
+}
+
+// Rotate implements RefreshTokenRepositoryInterface.Rotate.
+func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash string, newToken *authDomain.RefreshToken, now time.Time) (userID string, err error) {
+	tx, err := r.db.BeginTx(ctx, nil)
+	if err != nil {
+		return "", err
+	}
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+
+	// Row-level lock + re-check: a concurrent rotation of the same token
+	// blocks on this UPDATE and, once the first one commits, re-evaluates
+	// "revoked_at IS NULL" as false and matches zero rows.
+	var oldID string
+	err = tx.QueryRowContext(ctx, `
+		UPDATE refresh_tokens
+		SET revoked_at = $2, replaced_by = $3
+		WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
+		RETURNING id, user_id
+	`, oldTokenHash, now, newToken.Id).Scan(&oldID, &userID)
+	if errors.Is(err, sql.ErrNoRows) {
+		err = ErrTokenNotActive
+		return "", err
+	}
+	if err != nil {
+		return "", err
+	}
+
+	newToken.UserId = userID
+	if _, err = tx.ExecContext(ctx, `
+		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, user_agent, ip_address)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
+	`, newToken.Id, newToken.UserId, newToken.TokenHash, newToken.ExpiresAt, newToken.CreatedAt,
+		newToken.UserAgent, newToken.IpAddress); err != nil {
+		return "", err
+	}
+
+	if err = tx.Commit(); err != nil {
+		return "", err
+	}
+	return userID, nil
 }
 
 // FindByHash retrieves a refresh token by its hash

@@ -11,6 +11,7 @@ import (
 	accountDomain "github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
 	certificateDomain "github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
 	postgres "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/analytics"
 	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
@@ -22,7 +23,7 @@ func NewAnalyticsService(
 	accountRepository accountRepo.AccountRepositoryInterface,
 	investmentRepository investmentRepo.InvestmentRepoInterface,
 	certificateRepository certificateRepo.CertificateRepositoryInterface,
-	usdToDopRateFn func(context.Context) (float64, error),
+	usdToDopRateFn func(context.Context) (money.Amount, error),
 ) *AnalyticsService {
 	return &AnalyticsService{
 		repo:                  repo,
@@ -38,7 +39,7 @@ type AnalyticsService struct {
 	accountRepository     accountRepo.AccountRepositoryInterface
 	investmentRepository  investmentRepo.InvestmentRepoInterface
 	certificateRepository certificateRepo.CertificateRepositoryInterface
-	usdToDopRateFn        func(context.Context) (float64, error)
+	usdToDopRateFn        func(context.Context) (money.Amount, error)
 }
 
 type DashboardFilters struct {
@@ -47,21 +48,49 @@ type DashboardFilters struct {
 	AccountID       string
 	CategoryID      string
 	TransactionType string
-	MinAmount       *float64
-	MaxAmount       *float64
+	MinAmount       *money.Amount
+	MaxAmount       *money.Amount
+}
+
+// resolveUsdToDop returns the USD->DOP rate, or 1 (no conversion) when the
+// rate is unavailable.
+func (s *AnalyticsService) resolveUsdToDop(ctx context.Context) money.Amount {
+	if s.usdToDopRateFn == nil {
+		log.Warn().Msg("exchange rate function not configured, USD amounts will not be converted")
+		return money.FromInt(1)
+	}
+	rate, rateErr := s.usdToDopRateFn(ctx)
+	if rateErr != nil || !rate.IsPositive() {
+		log.Warn().Msg("exchange rate unavailable, USD amounts will not be converted")
+		return money.FromInt(1)
+	}
+	return rate
+}
+
+// toCategoryExpense maps a repository row, rounding the SQL aggregates
+// (sums of amount * rate) half-even to cents for presentation.
+func toCategoryExpense(row *analytics.CategoryExpenseRepository) *analytics.CategoryExpense {
+	return &analytics.CategoryExpense{
+		ID:               row.CategoryID,
+		Label:            row.CategoryName,
+		Value:            row.TotalAmount.RoundCents(),
+		Color:            row.CategoryColor,
+		TransactionCount: row.TransactionCount,
+		DopTotal:         row.DopTotal.RoundCents(),
+		UsdTotal:         row.UsdTotal.RoundCents(),
+	}
+}
+
+func toMonthlySummary(row *analytics.MonthlySummaryRepository) *analytics.MonthlySummary {
+	return &analytics.MonthlySummary{
+		Month:    fmt.Sprintf("%d-%02d", row.Year, row.Month),
+		Income:   row.TotalIncome.RoundCents(),
+		Expenses: row.TotalBill.RoundCents(),
+	}
 }
 
 func (s *AnalyticsService) GetCategoryExpenses(ctx context.Context, userID string) ([]*analytics.CategoryExpense, error) {
-	usdToDop := 1.0 // fallback: no conversion if rate unavailable
-	if s.usdToDopRateFn != nil {
-		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
-			usdToDop = rate
-		} else {
-			log.Warn().Msg("exchange rate unavailable, USD amounts will not be converted")
-		}
-	} else {
-		log.Warn().Msg("exchange rate function not configured, USD amounts will not be converted")
-	}
+	usdToDop := s.resolveUsdToDop(ctx)
 
 	categoryExpensesRepo, err := s.repo.GetCategoryExpenses(ctx, userID, usdToDop)
 	if err != nil {
@@ -71,31 +100,14 @@ func (s *AnalyticsService) GetCategoryExpenses(ctx context.Context, userID strin
 	categoryExpenses := make([]*analytics.CategoryExpense, 0)
 
 	for _, categoryExpenseRepo := range categoryExpensesRepo {
-		categoryExpenses = append(categoryExpenses, &analytics.CategoryExpense{
-			ID:               categoryExpenseRepo.CategoryID,
-			Label:            categoryExpenseRepo.CategoryName,
-			Value:            categoryExpenseRepo.TotalAmount,
-			Color:            categoryExpenseRepo.CategoryColor,
-			TransactionCount: categoryExpenseRepo.TransactionCount,
-			DopTotal:         categoryExpenseRepo.DopTotal,
-			UsdTotal:         categoryExpenseRepo.UsdTotal,
-		})
+		categoryExpenses = append(categoryExpenses, toCategoryExpense(categoryExpenseRepo))
 	}
 
 	return categoryExpenses, nil
 }
 
 func (s *AnalyticsService) GetMonthlySummary(ctx context.Context, userID string) ([]*analytics.MonthlySummary, error) {
-	usdToDop := 1.0 // fallback: no conversion if rate unavailable
-	if s.usdToDopRateFn != nil {
-		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
-			usdToDop = rate
-		} else {
-			log.Warn().Msg("exchange rate unavailable, USD amounts will not be converted")
-		}
-	} else {
-		log.Warn().Msg("exchange rate function not configured, USD amounts will not be converted")
-	}
+	usdToDop := s.resolveUsdToDop(ctx)
 
 	monthlySummariesRepo, err := s.repo.GetMonthlySummary(ctx, userID, usdToDop)
 	if err != nil {
@@ -105,11 +117,7 @@ func (s *AnalyticsService) GetMonthlySummary(ctx context.Context, userID string)
 	monthlySummaries := make([]*analytics.MonthlySummary, 0)
 
 	for _, monthlySummaryRepo := range monthlySummariesRepo {
-		monthlySummaries = append(monthlySummaries, &analytics.MonthlySummary{
-			Month:    fmt.Sprintf("%d-%02d", monthlySummaryRepo.Year, monthlySummaryRepo.Month),
-			Income:   monthlySummaryRepo.TotalIncome,
-			Expenses: monthlySummaryRepo.TotalBill,
-		})
+		monthlySummaries = append(monthlySummaries, toMonthlySummary(monthlySummaryRepo))
 	}
 
 	return monthlySummaries, nil
@@ -119,16 +127,7 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 	dateFrom, dateTo := normalizeDashboardDateRange(filters.DateFrom, filters.DateTo)
 	transactionType := normalizeTransactionType(filters.TransactionType)
 
-	usdToDop := 1.0 // fallback: no conversion if rate unavailable
-	if s.usdToDopRateFn != nil {
-		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
-			usdToDop = rate
-		} else {
-			log.Warn().Msg("exchange rate unavailable, USD amounts will not be converted")
-		}
-	} else {
-		log.Warn().Msg("exchange rate function not configured, USD amounts will not be converted")
-	}
+	usdToDop := s.resolveUsdToDop(ctx)
 
 	categoryExpensesRepo, err := s.repo.GetCategoryExpensesInRange(
 		ctx,
@@ -180,27 +179,15 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 
 	categoryExpenses := make([]*analytics.CategoryExpense, 0)
 	for _, categoryExpenseRepo := range categoryExpensesRepo {
-		categoryExpenses = append(categoryExpenses, &analytics.CategoryExpense{
-			ID:               categoryExpenseRepo.CategoryID,
-			Label:            categoryExpenseRepo.CategoryName,
-			Value:            categoryExpenseRepo.TotalAmount,
-			Color:            categoryExpenseRepo.CategoryColor,
-			TransactionCount: categoryExpenseRepo.TransactionCount,
-			DopTotal:         categoryExpenseRepo.DopTotal,
-			UsdTotal:         categoryExpenseRepo.UsdTotal,
-		})
+		categoryExpenses = append(categoryExpenses, toCategoryExpense(categoryExpenseRepo))
 	}
 
 	monthlySummaries := make([]*analytics.MonthlySummary, 0)
 	for _, monthlySummaryRepo := range monthlySummariesRepo {
-		monthlySummaries = append(monthlySummaries, &analytics.MonthlySummary{
-			Month:    fmt.Sprintf("%d-%02d", monthlySummaryRepo.Year, monthlySummaryRepo.Month),
-			Income:   monthlySummaryRepo.TotalIncome,
-			Expenses: monthlySummaryRepo.TotalBill,
-		})
+		monthlySummaries = append(monthlySummaries, toMonthlySummary(monthlySummaryRepo))
 	}
 
-	accountsTotal := 0.0
+	accountsTotal := money.Zero
 	accountsCount := 0
 	if s.accountRepository != nil {
 		accounts, accErr := s.accountRepository.FindAll(ctx, userID)
@@ -212,45 +199,45 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 						continue
 					}
 					accountsCount++
-					accountsTotal += balances[acc.Id] + acc.InitialBalance
+					accountsTotal = accountsTotal.Add(balances[acc.Id]).Add(acc.InitialBalance)
 				}
 			}
 		}
 	}
 
-	investmentsTotalUSD := 0.0
+	investmentsTotalUSD := money.Zero
 	investmentsCount := 0
 	if s.investmentRepository != nil {
 		investments, invErr := s.investmentRepository.FindAll(ctx, userID)
 		if invErr == nil {
 			investmentsCount = len(investments)
 			for _, inv := range investments {
-				investmentsTotalUSD += inv.Quantity * inv.CurrentPrice
+				investmentsTotalUSD = investmentsTotalUSD.Add(inv.Quantity.Mul(inv.CurrentPrice))
 			}
 		}
 	}
-	investmentsTotalDOP := investmentsTotalUSD * usdToDop
+	investmentsTotalDOP := investmentsTotalUSD.Mul(usdToDop).RoundCents()
 
-	certificatesTotal := 0.0
+	certificatesTotal := money.Zero
 	certificatesCount := 0
 	if s.certificateRepository != nil {
 		certificates, certErr := s.certificateRepository.FindAll(ctx, userID)
 		if certErr == nil {
-			totalCapital := 0.0
+			totalCapital := money.Zero
 			for _, cert := range certificates {
 				if cert.Status == certificateDomain.StatusActive {
-					totalCapital += cert.BaseCapital
+					totalCapital = totalCapital.Add(cert.BaseCapital)
 					certificatesCount++
 				}
 			}
 
 			payments, payErr := s.certificateRepository.FindAllPayments(ctx, userID)
 			if payErr == nil {
-				totalNet := 0.0
+				totalNet := money.Zero
 				for _, p := range payments {
-					totalNet += p.NetInterest
+					totalNet = totalNet.Add(p.NetInterest)
 				}
-				certificatesTotal = totalCapital + totalNet
+				certificatesTotal = totalCapital.Add(totalNet)
 			} else {
 				certificatesTotal = totalCapital
 			}
@@ -258,13 +245,13 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 	}
 
 	return &analytics.DashboardSummary{
-		TotalIncome:       totalsRepo.TotalIncome,
-		TotalExpenses:     totalsRepo.TotalBill,
-		NetAmount:         totalsRepo.TotalIncome - totalsRepo.TotalBill,
+		TotalIncome:       totalsRepo.TotalIncome.RoundCents(),
+		TotalExpenses:     totalsRepo.TotalBill.RoundCents(),
+		NetAmount:         totalsRepo.TotalIncome.Sub(totalsRepo.TotalBill).RoundCents(),
 		UsdToDopRate:      usdToDop,
-		AccountsTotal:     accountsTotal,
+		AccountsTotal:     accountsTotal.RoundCents(),
 		InvestmentsTotal:  investmentsTotalDOP,
-		CertificatesTotal: certificatesTotal,
+		CertificatesTotal: certificatesTotal.RoundCents(),
 		AccountsCount:     accountsCount,
 		InvestmentsCount:  investmentsCount,
 		CertificatesCount: certificatesCount,

@@ -1,0 +1,4 @@
+// Global type overrides for `swag init` (read from .swaggo by default).
+// money.Amount and money.NullAmount are exact decimals encoded as JSON numbers.
+replace github.com/osmait/gestorDePresupuesto/internal/domain/money.Amount number
+replace github.com/osmait/gestorDePresupuesto/internal/domain/money.NullAmount number

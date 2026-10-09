@@ -6,7 +6,6 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/category"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
-	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/segmentio/ksuid"
 )
 
@@ -52,15 +51,9 @@ func (c *CategoryServices) FindAll(ctx context.Context, userId string) ([]*dto.C
 
 // Delete removes a category by its ID and User ID.
 func (c *CategoryServices) Delete(ctx context.Context, id string, userId string) error {
-	categoryToDelete, err := c.repository.FindOne(ctx, id)
-	if err != nil {
-		return err
-	}
-	if categoryToDelete.Id != id {
-		return errorhttp.ErrNotFound
-	}
-	err = c.repository.Delete(ctx, id, userId)
-	return err
+	// The repository scopes the delete to userId and reports a missing or
+	// foreign category as not found.
+	return c.repository.Delete(ctx, id, userId)
 }
 
 // UpdateCategory modifies an existing category's details.

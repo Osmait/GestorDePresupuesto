@@ -68,7 +68,9 @@ func TestMain(m *testing.M) {
 
 	_, filename, _, _ := runtime.Caller(0)
 	migrationsDir, _ := filepath.Abs(filepath.Join(filepath.Dir(filename), "../../../../../cmd/api/db/migrations"))
-	utils.RunDBMigration("file://"+filepath.ToSlash(migrationsDir), connStr)
+	if err := utils.RunDBMigration("file://"+filepath.ToSlash(migrationsDir), connStr); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
 
 	os.Exit(m.Run())
 }

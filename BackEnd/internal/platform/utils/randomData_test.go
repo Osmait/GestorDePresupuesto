@@ -29,7 +29,7 @@ func TestGetNewRandomAccount(t *testing.T) {
 	assert.NotEmpty(t, account.Id, "Account ID should not be empty")
 	assert.NotEmpty(t, account.Name, "Account name should not be empty")
 	assert.NotEmpty(t, account.Bank, "Account bank should not be empty")
-	assert.GreaterOrEqual(t, account.InitialBalance, 0.0, "Account balance should be non-negative")
+	assert.False(t, account.InitialBalance.IsNegative(), "Account balance should be non-negative")
 
 	// Test that multiple calls generate different accounts
 	account2 := GetNewRandomAccount()
@@ -46,7 +46,7 @@ func TestGetNewRandomTransaction(t *testing.T) {
 	assert.NotEmpty(t, transaction.TypeTransation, "Transaction type should not be empty")
 	assert.NotEmpty(t, transaction.AccountId, "Transaction account ID should not be empty")
 	assert.NotEmpty(t, transaction.CategoryId, "Transaction category ID should not be empty")
-	assert.NotZero(t, transaction.Amount, "Transaction amount should not be zero")
+	assert.False(t, transaction.Amount.IsZero(), "Transaction amount should not be zero")
 
 	// Verify transaction type is one of the expected values
 	validTypes := []string{"bill", "income"}
@@ -78,7 +78,7 @@ func TestGetNewRandomBudget(t *testing.T) {
 	assert.NotEmpty(t, budget.Id, "Budget ID should not be empty")
 	assert.NotEmpty(t, budget.CategoryId, "Budget category ID should not be empty")
 	assert.NotEmpty(t, budget.UserId, "Budget user ID should not be empty")
-	assert.Greater(t, budget.Amount, 0.0, "Budget amount should be positive")
+	assert.True(t, budget.Amount.IsPositive(), "Budget amount should be positive")
 
 	// Test that multiple calls generate different budgets
 	budget2 := GetNewRandomBudget()
@@ -92,9 +92,9 @@ func TestGetNewRandomInvestment(t *testing.T) {
 	assert.NotEmpty(t, investment.ID, "Investment ID should not be empty")
 	assert.NotEmpty(t, investment.Name, "Investment name should not be empty")
 	assert.NotEmpty(t, investment.UserID, "Investment user ID should not be empty")
-	assert.Greater(t, investment.PurchasePrice, 0.0, "Investment price should be positive")
-	assert.Greater(t, investment.CurrentPrice, 0.0, "Investment current price should be positive")
-	assert.Greater(t, investment.Quantity, 0.0, "Investment quantity should be positive")
+	assert.True(t, investment.PurchasePrice.IsPositive(), "Investment price should be positive")
+	assert.True(t, investment.CurrentPrice.IsPositive(), "Investment current price should be positive")
+	assert.True(t, investment.Quantity.IsPositive(), "Investment quantity should be positive")
 
 	// Test that multiple calls generate different investments
 	investment2 := GetNewRandomInvestment()

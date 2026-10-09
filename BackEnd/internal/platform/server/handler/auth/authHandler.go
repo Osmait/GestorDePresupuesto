@@ -2,7 +2,9 @@ package handler
 
 import (
 	"errors"
+	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	authDomain "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
@@ -31,11 +33,14 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 			ctx.JSON(http.StatusBadRequest, err)
 			return
 		}
-		token, err := authService.Login(ctx, &authRequest)
+		token, err := authService.LoginFromIP(ctx, &authRequest, ctx.ClientIP())
 		if err != nil {
+			if writeLoginLocked(ctx, err) {
+				return
+			}
 			switch {
 			case errors.Is(err, errorhttp.ErrBadRequest):
-				ctx.JSON(http.StatusBadRequest, err)
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid email or password"})
 				return
 			}
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "problem with password or email "})
@@ -43,6 +48,22 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 		}
 		ctx.JSON(http.StatusOK, token)
 	}
+}
+
+// writeLoginLocked answers 429 + Retry-After when the (email, IP) pair is
+// locked out after too many failed password attempts.
+func writeLoginLocked(ctx *gin.Context, err error) bool {
+	var locked *auth.LoginLockedError
+	if !errors.As(err, &locked) {
+		return false
+	}
+	seconds := int(math.Ceil(locked.RetryAfter.Seconds()))
+	ctx.Header("Retry-After", strconv.Itoa(seconds))
+	ctx.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+		"error":       "too many failed login attempts, try again later",
+		"retry_after": seconds,
+	})
+	return true
 }
 
 // LoginWithTokens godoc
@@ -71,6 +92,9 @@ func LoginWithTokens(authService *auth.AuthService) gin.HandlerFunc {
 
 		response, err := authService.LoginWithTokens(ctx, &authRequest, userAgent, ipAddress)
 		if err != nil {
+			if writeLoginLocked(ctx, err) {
+				return
+			}
 			switch {
 			case errors.Is(err, errorhttp.ErrBadRequest):
 				ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})

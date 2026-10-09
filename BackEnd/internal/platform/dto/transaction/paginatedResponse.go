@@ -1,6 +1,10 @@
 package dto
 
-import "math"
+import (
+	"math"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+)
 
 // PaginatedTransactionResponse represents a paginated response for transactions
 type PaginatedTransactionResponse struct {
@@ -61,30 +65,30 @@ func NewPaginatedTransactionResponse(
 
 // TransactionSummary provides aggregated data for transactions
 type TransactionSummary struct {
-	TotalIncome       float64                    `json:"total_income" example:"5000.00"`
-	TotalExpenses     float64                    `json:"total_expenses" example:"3000.00"`
-	NetAmount         float64                    `json:"net_amount" example:"2000.00"`
-	IncomeDOP         float64                    `json:"income_dop" example:"4500.00"`
-	IncomeUSD         float64                    `json:"income_usd" example:"10.00"`
-	ExpensesDOP       float64                    `json:"expenses_dop" example:"2800.00"`
-	ExpensesUSD       float64                    `json:"expenses_usd" example:"5.00"`
-	UsdToDopRate      float64                    `json:"usd_to_dop_rate" example:"60.00"`
+	TotalIncome       money.Amount               `json:"total_income" example:"5000.00"`
+	TotalExpenses     money.Amount               `json:"total_expenses" example:"3000.00"`
+	NetAmount         money.Amount               `json:"net_amount" example:"2000.00"`
+	IncomeDOP         money.Amount               `json:"income_dop" example:"4500.00"`
+	IncomeUSD         money.Amount               `json:"income_usd" example:"10.00"`
+	ExpensesDOP       money.Amount               `json:"expenses_dop" example:"2800.00"`
+	ExpensesUSD       money.Amount               `json:"expenses_usd" example:"5.00"`
+	UsdToDopRate      money.Amount               `json:"usd_to_dop_rate" example:"60.00"`
 	IncomeCount       int                        `json:"income_count" example:"15"`
 	ExpenseCount      int                        `json:"expense_count" example:"35"`
-	AverageIncome     float64                    `json:"average_income" example:"333.33"`
-	AverageExpense    float64                    `json:"average_expense" example:"85.71"`
-	LargestIncome     float64                    `json:"largest_income" example:"2500.00"`
-	LargestExpense    float64                    `json:"largest_expense" example:"800.00"`
+	AverageIncome     money.Amount               `json:"average_income" example:"333.33"`
+	AverageExpense    money.Amount               `json:"average_expense" example:"85.71"`
+	LargestIncome     money.Amount               `json:"largest_income" example:"2500.00"`
+	LargestExpense    money.Amount               `json:"largest_expense" example:"800.00"`
 	FilteredRecords   int64                      `json:"filtered_records" example:"50"`
 	CategoryBreakdown map[string]CategorySummary `json:"category_breakdown,omitempty"`
 }
 
 // CategorySummary provides summary for each category
 type CategorySummary struct {
-	CategoryId    string  `json:"category_id" example:"cat_123456789"`
-	TotalAmount   float64 `json:"total_amount" example:"500.00"`
-	Count         int     `json:"count" example:"10"`
-	AverageAmount float64 `json:"average_amount" example:"50.00"`
+	CategoryId    string       `json:"category_id" example:"cat_123456789"`
+	TotalAmount   money.Amount `json:"total_amount" example:"500.00"`
+	Count         int          `json:"count" example:"10"`
+	AverageAmount money.Amount `json:"average_amount" example:"50.00"`
 }
 
 // PaginatedTransactionResponseWithSummary extends the paginated response with summary data
@@ -110,10 +114,17 @@ func NewPaginatedTransactionResponseWithSummary(
 	}
 }
 
-// CalculateSummary calculates summary statistics from a list of transactions
-func CalculateSummary(transactions []*TransactionResponse, filteredCount int64, usdToDopRate float64) TransactionSummary {
-	if usdToDopRate <= 0 {
-		usdToDopRate = 60
+// DefaultUsdToDopRate is used when no exchange rate is available.
+var DefaultUsdToDopRate = money.FromInt(60)
+
+// CalculateSummary calculates summary statistics from a list of transactions.
+//
+// USD amounts are converted exactly (amount * rate) and accumulated without
+// intermediate rounding; totals, averages and the largest values are rounded
+// half-even to cents once, at the end.
+func CalculateSummary(transactions []*TransactionResponse, filteredCount int64, usdToDopRate money.Amount) TransactionSummary {
+	if !usdToDopRate.IsPositive() {
+		usdToDopRate = DefaultUsdToDopRate
 	}
 
 	summary := TransactionSummary{
@@ -126,7 +137,7 @@ func CalculateSummary(transactions []*TransactionResponse, filteredCount int64, 
 		return summary
 	}
 
-	categoryTotals := make(map[string]float64)
+	categoryTotals := make(map[string]money.Amount)
 	categoryCounts := make(map[string]int)
 
 	for _, transaction := range transactions {
@@ -138,62 +149,67 @@ func CalculateSummary(transactions []*TransactionResponse, filteredCount int64, 
 
 		amountDOP := amountAbs
 		if currency == "USD" {
-			amountDOP = amountAbs * usdToDopRate
+			amountDOP = amountAbs.Mul(usdToDopRate)
 		}
 
 		switch transaction.TypeTransation {
 		case "income":
-			summary.TotalIncome += amountDOP
+			summary.TotalIncome = summary.TotalIncome.Add(amountDOP)
 			if currency == "USD" {
-				summary.IncomeUSD += amountAbs
+				summary.IncomeUSD = summary.IncomeUSD.Add(amountAbs)
 			} else {
-				summary.IncomeDOP += amountAbs
+				summary.IncomeDOP = summary.IncomeDOP.Add(amountAbs)
 			}
 			summary.IncomeCount++
 
-			if amountDOP > summary.LargestIncome {
+			if amountDOP.GreaterThan(summary.LargestIncome) {
 				summary.LargestIncome = amountDOP
 			}
 		case "bill", "expense":
-			summary.TotalExpenses += amountDOP
+			summary.TotalExpenses = summary.TotalExpenses.Add(amountDOP)
 			if currency == "USD" {
-				summary.ExpensesUSD += amountAbs
+				summary.ExpensesUSD = summary.ExpensesUSD.Add(amountAbs)
 			} else {
-				summary.ExpensesDOP += amountAbs
+				summary.ExpensesDOP = summary.ExpensesDOP.Add(amountAbs)
 			}
 			summary.ExpenseCount++
 
-			if amountDOP > summary.LargestExpense {
+			if amountDOP.GreaterThan(summary.LargestExpense) {
 				summary.LargestExpense = amountDOP
 			}
 		}
 
 		// Category breakdown
 		if transaction.CategoryId != "" {
-			categoryTotals[transaction.CategoryId] += amountDOP
+			categoryTotals[transaction.CategoryId] = categoryTotals[transaction.CategoryId].Add(amountDOP)
 			categoryCounts[transaction.CategoryId]++
 		}
 	}
 
 	// Calculate derived values
-	summary.NetAmount = summary.TotalIncome - summary.TotalExpenses
+	summary.NetAmount = summary.TotalIncome.Sub(summary.TotalExpenses).RoundCents()
 
 	if summary.IncomeCount > 0 {
-		summary.AverageIncome = summary.TotalIncome / float64(summary.IncomeCount)
+		summary.AverageIncome = summary.TotalIncome.DivInt(int64(summary.IncomeCount)).RoundCents()
 	}
 
 	if summary.ExpenseCount > 0 {
-		summary.AverageExpense = summary.TotalExpenses / float64(summary.ExpenseCount)
+		summary.AverageExpense = summary.TotalExpenses.DivInt(int64(summary.ExpenseCount)).RoundCents()
 	}
+
+	summary.TotalIncome = summary.TotalIncome.RoundCents()
+	summary.TotalExpenses = summary.TotalExpenses.RoundCents()
+	summary.LargestIncome = summary.LargestIncome.RoundCents()
+	summary.LargestExpense = summary.LargestExpense.RoundCents()
 
 	// Build category breakdown
 	for categoryId, total := range categoryTotals {
 		count := categoryCounts[categoryId]
-		average := total / float64(count)
+		average := total.DivInt(int64(count)).RoundCents()
 
 		summary.CategoryBreakdown[categoryId] = CategorySummary{
 			CategoryId:    categoryId,
-			TotalAmount:   total,
+			TotalAmount:   total.RoundCents(),
 			Count:         count,
 			AverageAmount: average,
 		}

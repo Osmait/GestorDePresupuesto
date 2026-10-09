@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	accountDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/account"
 	categoryDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/category"
 	creditcardDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/creditcard"
@@ -236,7 +237,10 @@ func (s *MCPServer) handleCreateAccount(ctx context.Context, req mcp.CallToolReq
 	if err != nil {
 		return mcp.NewToolResultError("bank is required"), nil
 	}
-	initialBalance := req.GetFloat("initial_balance", 0)
+	initialBalance, argErr := amountArg(req, "initial_balance", money.StorageScale)
+	if argErr != nil {
+		return mcp.NewToolResultError(argErr.Error()), nil
+	}
 
 	return s.runRW(ctx, userID, func(txCtx context.Context) (interface{}, error) {
 		if createErr := s.services.Account.CreateAccount(txCtx, name, bank, initialBalance, userID); createErr != nil {
@@ -460,14 +464,16 @@ func (s *MCPServer) handleFinancialSummary(ctx context.Context, req mcp.CallTool
 		if err != nil {
 			return nil, fmt.Errorf("failed to load previous month: %w", err)
 		}
-		pctChange := func(curr, prev float64) float64 {
-			if prev == 0 {
-				if curr == 0 {
+		// Display-only percentage change, computed in decimal and rounded
+		// half-even to 2 places.
+		pctChange := func(curr, prev money.Amount) float64 {
+			if prev.IsZero() {
+				if curr.IsZero() {
 					return 0
 				}
 				return 100
 			}
-			return ((curr - prev) / prev) * 100
+			return money.Percent(curr.Sub(prev), prev)
 		}
 		return map[string]interface{}{
 			"current_month": map[string]interface{}{
@@ -543,18 +549,27 @@ func (s *MCPServer) handlePayCreditCard(ctx context.Context, req mcp.CallToolReq
 	if err != nil {
 		return mcp.NewToolResultError("currency is required"), nil
 	}
-	amount := req.GetFloat("amount", 0)
-	if amount <= 0 {
+	amount, amountErr := amountArg(req, "amount", money.StorageScale)
+	if amountErr != nil || !amount.IsPositive() {
 		return mcp.NewToolResultError("amount must be positive"), nil
+	}
+
+	exchangeRate, argErr := amountArg(req, "exchange_rate", money.RateScale)
+	if argErr != nil {
+		return mcp.NewToolResultError(argErr.Error()), nil
+	}
+	interestAmount, argErr := amountArg(req, "interest_amount", money.StorageScale)
+	if argErr != nil {
+		return mcp.NewToolResultError(argErr.Error()), nil
 	}
 
 	payReq := &creditcardDTO.CreatePaymentRequest{
 		FromAccountId:    fromAccount,
 		Currency:         currency,
 		Amount:           amount,
-		ExchangeRate:     req.GetFloat("exchange_rate", 0),
+		ExchangeRate:     exchangeRate,
 		IncludesInterest: req.GetBool("includes_interest", false),
-		InterestAmount:   req.GetFloat("interest_amount", 0),
+		InterestAmount:   interestAmount,
 		Notes:            req.GetString("notes", ""),
 	}
 
@@ -638,8 +653,8 @@ func (s *MCPServer) handleCreateLoan(ctx context.Context, req mcp.CallToolReques
 	if err != nil {
 		return mcp.NewToolResultError("borrower_name is required"), nil
 	}
-	principal := req.GetFloat("principal_amount", 0)
-	if principal <= 0 {
+	principal, principalErr := amountArg(req, "principal_amount", money.StorageScale)
+	if principalErr != nil || !principal.IsPositive() {
 		return mcp.NewToolResultError("principal_amount must be positive"), nil
 	}
 	interestMode, err := req.RequireString("interest_mode")
@@ -655,13 +670,18 @@ func (s *MCPServer) handleCreateLoan(ctx context.Context, req mcp.CallToolReques
 		return mcp.NewToolResultError("source_account_id is required"), nil
 	}
 
+	annualRate, argErr := amountArg(req, "annual_rate", money.StorageScale)
+	if argErr != nil {
+		return mcp.NewToolResultError(argErr.Error()), nil
+	}
+
 	loanReq := &loanDTO.CreateLoanRequest{
 		BorrowerName:    borrower,
 		BorrowerContact: req.GetString("borrower_contact", ""),
 		PrincipalAmount: principal,
 		Currency:        req.GetString("currency", ""),
 		InterestMode:    interestMode,
-		AnnualRate:      req.GetFloat("annual_rate", 0),
+		AnnualRate:      annualRate,
 		TermMonths:      termMonths,
 		StartDate:       req.GetString("start_date", ""),
 		SourceAccountId: sourceAccount,
@@ -692,8 +712,8 @@ func (s *MCPServer) handleRegisterLoanPayment(ctx context.Context, req mcp.CallT
 	if err != nil {
 		return mcp.NewToolResultError("destination_account_id is required"), nil
 	}
-	amount := req.GetFloat("amount", 0)
-	if amount <= 0 {
+	amount, amountErr := amountArg(req, "amount", money.StorageScale)
+	if amountErr != nil || !amount.IsPositive() {
 		return mcp.NewToolResultError("amount must be positive"), nil
 	}
 

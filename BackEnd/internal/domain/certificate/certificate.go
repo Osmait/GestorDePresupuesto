@@ -1,6 +1,10 @@
 package certificate
 
-import "time"
+import (
+	"time"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+)
 
 type InterestType string
 
@@ -21,10 +25,10 @@ type Certificate struct {
 	Id                  string
 	UserId              string
 	Bank                string
-	BaseCapital         float64
+	BaseCapital         money.Amount
 	InterestType        InterestType
-	CurrentInterestRate float64
-	CurrentTaxRate      float64
+	CurrentInterestRate money.Amount
+	CurrentTaxRate      money.Amount
 	CutDay              int
 	ReinvestInterest    bool
 	PayoutAccountId     *string
@@ -35,7 +39,7 @@ type Certificate struct {
 	UpdatedAt           time.Time
 }
 
-func NewCertificate(id, userId, bank string, baseCapital float64, interestType InterestType, rate, taxRate float64, cutDay int) *Certificate {
+func NewCertificate(id, userId, bank string, baseCapital money.Amount, interestType InterestType, rate, taxRate money.Amount, cutDay int) *Certificate {
 	return &Certificate{
 		Id:                  id,
 		UserId:              userId,

@@ -4,50 +4,102 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"math"
+	"fmt"
 	"time"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 )
 
+var (
+	// ErrCertificateNotFound is returned when a certificate does not exist or belongs to another user.
+	ErrCertificateNotFound = fmt.Errorf("%w: certificate not found", errorhttp.ErrNotFound)
+	// ErrPaymentNotFound is returned when a certificate payment does not exist or belongs to another user.
+	ErrPaymentNotFound = fmt.Errorf("%w: payment not found", errorhttp.ErrNotFound)
+	// ErrPayoutAccountNotFound is returned when the payout account is not one of the user's accounts.
+	ErrPayoutAccountNotFound = fmt.Errorf("%w: payout account not found", errorhttp.ErrBadRequest)
+	// ErrCreditCardPayoutAccount is returned when a credit card account is used
+	// as the account that funds a certificate / receives its interest.
+	ErrCreditCardPayoutAccount = fmt.Errorf("%w: a credit card account cannot be used as the funding/payout account of a certificate", errorhttp.ErrBadRequest)
+)
+
+func isNotFound(err error) bool {
+	return errors.Is(err, sql.ErrNoRows) || errors.Is(err, errorhttp.ErrNotFound)
+}
+
 type TransactionCreator interface {
-	CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error
+	CreateTransaction(ctx context.Context, name, description string, amount money.Amount, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error
+}
+
+// AccountFinder looks up one of the user's accounts.
+type AccountFinder interface {
+	FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error)
 }
 
 type CertificateService struct {
 	repository         certificateRepo.CertificateRepositoryInterface
 	transactionService TransactionCreator
+	accountRepository  AccountFinder
 }
 
-func NewCertificateService(repository certificateRepo.CertificateRepositoryInterface, transactionService TransactionCreator) *CertificateService {
+// NewCertificateService builds the service. accountRepository validates the
+// payout account; when nil (unit tests) that validation is skipped.
+func NewCertificateService(repository certificateRepo.CertificateRepositoryInterface, transactionService TransactionCreator, accountRepository AccountFinder) *CertificateService {
 	return &CertificateService{
 		repository:         repository,
 		transactionService: transactionService,
+		accountRepository:  accountRepository,
 	}
+}
+
+// validatePayoutAccount rejects a payout account that is not the user's or
+// that is a credit card (interest cannot be paid into / funded from a card).
+func (s *CertificateService) validatePayoutAccount(ctx context.Context, payoutAccountId *string, userId string) error {
+	if payoutAccountId == nil || *payoutAccountId == "" || s.accountRepository == nil {
+		return nil
+	}
+	acc, err := s.accountRepository.FindByIdAndUserId(ctx, *payoutAccountId, userId)
+	if err != nil {
+		if isNotFound(err) {
+			return ErrPayoutAccountNotFound
+		}
+		return err
+	}
+	if acc.Type == account.AccountTypeCreditCard {
+		return ErrCreditCardPayoutAccount
+	}
+	return nil
 }
 
 type PaymentCalculator struct{}
 
 type PaymentResult struct {
-	GrossInterest  float64
-	TaxWithheld    float64
-	NetInterest    float64
-	AppliedCapital float64
+	GrossInterest  money.Amount
+	TaxWithheld    money.Amount
+	NetInterest    money.Amount
+	AppliedCapital money.Amount
 }
 
-func (c *PaymentCalculator) CalculateMonthlyPayment(capital, rate, taxRate float64) PaymentResult {
-	grossInterest := capital * (rate / 100) / 12
-	taxWithheld := grossInterest * (taxRate / 100)
-	netInterest := grossInterest - taxWithheld
+// CalculateMonthlyPayment computes one month of interest. Rates are
+// percentages (annual interest, tax on interest). Gross interest and tax are
+// derived amounts, each rounded half-even to cents; net interest is then
+// gross - tax exactly, so the three always reconcile (gross == tax + net).
+func (c *PaymentCalculator) CalculateMonthlyPayment(capital, rate, taxRate money.Amount) PaymentResult {
+	grossInterest := capital.Mul(rate).DivInt(1200).RoundCents()
+	taxWithheld := grossInterest.Mul(taxRate).DivInt(100).RoundCents()
+	netInterest := grossInterest.Sub(taxWithheld)
 
 	return PaymentResult{
-		GrossInterest:  math.Round(grossInterest*100) / 100,
-		TaxWithheld:    math.Round(taxWithheld*100) / 100,
-		NetInterest:    math.Round(netInterest*100) / 100,
+		GrossInterest:  grossInterest,
+		TaxWithheld:    taxWithheld,
+		NetInterest:    netInterest,
 		AppliedCapital: capital,
 	}
 }
@@ -55,6 +107,10 @@ func (c *PaymentCalculator) CalculateMonthlyPayment(capital, rate, taxRate float
 func (s *CertificateService) CreateCertificate(ctx context.Context, req *dto.CreateCertificateRequest, userId string) error {
 	if err := req.Validate(); err != nil {
 		log.Error().Err(err).Str("user_id", userId).Msg("Certificate validation failed")
+		return err
+	}
+
+	if err := s.validatePayoutAccount(ctx, req.PayoutAccountId, userId); err != nil {
 		return err
 	}
 
@@ -133,13 +189,13 @@ func (s *CertificateService) FindById(ctx context.Context, id string, userId str
 
 	cert, err := s.repository.FindById(ctx, id, userId)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.New("certificate not found")
+		if isNotFound(err) {
+			return nil, ErrCertificateNotFound
 		}
 		return nil, err
 	}
 
-	payments, err := s.repository.FindPaymentsByCertificate(ctx, id)
+	payments, err := s.repository.FindPaymentsByCertificate(ctx, id, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -157,12 +213,12 @@ func (s *CertificateService) FindById(ctx context.Context, id string, userId str
 	certResponse := dto.NewCertificateResponse(cert, effectiveCapital, nextPaymentDate, projected)
 
 	paymentResponses := make([]dto.PaymentResponse, 0, len(payments))
-	var totalGross, totalTax, totalNet float64
+	var totalGross, totalTax, totalNet money.Amount
 	for _, p := range payments {
 		paymentResponses = append(paymentResponses, *dto.NewPaymentResponse(p))
-		totalGross += p.GrossInterest
-		totalTax += p.TaxWithheld
-		totalNet += p.NetInterest
+		totalGross = totalGross.Add(p.GrossInterest)
+		totalTax = totalTax.Add(p.TaxWithheld)
+		totalNet = totalNet.Add(p.NetInterest)
 	}
 
 	summary := dto.CertificateSummaryResponse{
@@ -179,10 +235,13 @@ func (s *CertificateService) FindById(ctx context.Context, id string, userId str
 }
 
 func (s *CertificateService) UpdateCertificate(ctx context.Context, id string, req *dto.UpdateCertificateRequest, userId string) error {
+	if err := req.Validate(); err != nil {
+		return fmt.Errorf("%w: %s", errorhttp.ErrBadRequest, err.Error())
+	}
 	cert, err := s.repository.FindById(ctx, id, userId)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return errors.New("certificate not found")
+		if isNotFound(err) {
+			return ErrCertificateNotFound
 		}
 		return err
 	}
@@ -206,21 +265,36 @@ func (s *CertificateService) UpdateCertificate(ctx context.Context, id string, r
 		cert.ReinvestInterest = *req.ReinvestInterest
 	}
 	if req.PayoutAccountId != nil {
+		if err := s.validatePayoutAccount(ctx, req.PayoutAccountId, userId); err != nil {
+			return err
+		}
 		cert.PayoutAccountId = req.PayoutAccountId
 	}
 	if req.Status != nil {
 		cert.Status = *req.Status
 	}
 	cert.UpdatedAt = time.Now()
+	// Ownership is fixed by the scoped lookup above.
+	cert.Id = id
+	cert.UserId = userId
 
-	return s.repository.Update(ctx, cert)
+	if err := s.repository.Update(ctx, cert); err != nil {
+		if isNotFound(err) {
+			return ErrCertificateNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *CertificateService) UpdatePayment(ctx context.Context, paymentId string, req *dto.UpdateCertificatePaymentRequest, userId string) error {
+	if err := req.Validate(); err != nil {
+		return fmt.Errorf("%w: %s", errorhttp.ErrBadRequest, err.Error())
+	}
 	payment, err := s.repository.FindPaymentById(ctx, paymentId, userId)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return errors.New("payment not found")
+		if isNotFound(err) {
+			return ErrPaymentNotFound
 		}
 		return err
 	}
@@ -228,21 +302,21 @@ func (s *CertificateService) UpdatePayment(ctx context.Context, paymentId string
 	if req.PaymentDate != nil {
 		t, err := time.Parse("2006-01-02", *req.PaymentDate)
 		if err != nil {
-			return errors.New("invalid payment_date format, expected YYYY-MM-DD")
+			return fmt.Errorf("%w: invalid payment_date format, expected YYYY-MM-DD", errorhttp.ErrBadRequest)
 		}
 		payment.PaymentDate = t
 	}
 	if req.PeriodStart != nil {
 		t, err := time.Parse("2006-01-02", *req.PeriodStart)
 		if err != nil {
-			return errors.New("invalid period_start format, expected YYYY-MM-DD")
+			return fmt.Errorf("%w: invalid period_start format, expected YYYY-MM-DD", errorhttp.ErrBadRequest)
 		}
 		payment.PeriodStart = t
 	}
 	if req.PeriodEnd != nil {
 		t, err := time.Parse("2006-01-02", *req.PeriodEnd)
 		if err != nil {
-			return errors.New("invalid period_end format, expected YYYY-MM-DD")
+			return fmt.Errorf("%w: invalid period_end format, expected YYYY-MM-DD", errorhttp.ErrBadRequest)
 		}
 		payment.PeriodEnd = t
 	}
@@ -267,17 +341,33 @@ func (s *CertificateService) UpdatePayment(ctx context.Context, paymentId string
 
 	now := time.Now()
 	payment.UpdatedAt = &now
+	payment.UserId = userId
 
-	return s.repository.UpdatePayment(ctx, payment)
+	if err := s.repository.UpdatePayment(ctx, payment); err != nil {
+		if isNotFound(err) {
+			return ErrPaymentNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *CertificateService) DeleteCertificate(ctx context.Context, id string, userId string) error {
-	return s.repository.Delete(ctx, id, userId)
+	if err := s.repository.Delete(ctx, id, userId); err != nil {
+		if isNotFound(err) {
+			return ErrCertificateNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *CertificateService) Simulate(ctx context.Context, id string, req *dto.SimulatePaymentRequest, userId string) (*dto.SimulationResponse, error) {
 	cert, err := s.repository.FindById(ctx, id, userId)
 	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrCertificateNotFound
+		}
 		return nil, err
 	}
 
@@ -301,7 +391,7 @@ func (s *CertificateService) Simulate(ctx context.Context, id string, req *dto.S
 
 	calculator := &PaymentCalculator{}
 	var payments []dto.ProjectedPaymentResponse
-	var totalGross, totalTax, totalNet float64
+	var totalGross, totalTax, totalNet money.Amount
 
 	currentCapital := capital
 	for i := 0; i < months; i++ {
@@ -311,21 +401,21 @@ func (s *CertificateService) Simulate(ctx context.Context, id string, req *dto.S
 			TaxWithheld:   result.TaxWithheld,
 			NetInterest:   result.NetInterest,
 		})
-		totalGross += result.GrossInterest
-		totalTax += result.TaxWithheld
-		totalNet += result.NetInterest
+		totalGross = totalGross.Add(result.GrossInterest)
+		totalTax = totalTax.Add(result.TaxWithheld)
+		totalNet = totalNet.Add(result.NetInterest)
 
 		if cert.InterestType == certificate.InterestTypeCompound && cert.ReinvestInterest {
-			currentCapital += result.NetInterest
+			currentCapital = currentCapital.Add(result.NetInterest)
 		}
 	}
 
 	return &dto.SimulationResponse{
 		Payments: payments,
 		Totals: dto.SimulationTotals{
-			GrossInterest: math.Round(totalGross*100) / 100,
-			TaxWithheld:   math.Round(totalTax*100) / 100,
-			NetInterest:   math.Round(totalNet*100) / 100,
+			GrossInterest: totalGross.RoundCents(),
+			TaxWithheld:   totalTax.RoundCents(),
+			NetInterest:   totalNet.RoundCents(),
 		},
 	}, nil
 }
@@ -344,7 +434,7 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 			continue
 		}
 
-		lastPayment, err := s.repository.FindLastPayment(ctx, cert.Id)
+		lastPayment, err := s.repository.FindLastPayment(ctx, cert.Id, userId)
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			continue
 		}
@@ -364,7 +454,7 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 			}
 
 			if cert.MaturityDate != nil && nextPaymentDate.After(*cert.MaturityDate) {
-				_ = s.repository.UpdateStatus(ctx, cert.Id, certificate.StatusMatured)
+				_ = s.repository.UpdateStatus(ctx, cert.Id, userId, certificate.StatusMatured)
 				break
 			}
 
@@ -396,8 +486,8 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 			}
 
 			if cert.InterestType == certificate.InterestTypeSimple && cert.PayoutAccountId != nil && s.transactionService != nil {
-				transactionName := cert.Bank + " - Interest Payment"
-				transactionDesc := "Certificate interest payment for period " + periodStart.Format("2006-01-02") + " to " + periodEnd.Format("2006-01-02")
+				transactionName := i18n.T(ctx, i18n.CertificateInterestName, cert.Bank)
+				transactionDesc := i18n.T(ctx, i18n.CertificateInterestDescription, periodStart.Format("2006-01-02"), periodEnd.Format("2006-01-02"))
 				_ = s.transactionService.CreateTransaction(ctx, transactionName, transactionDesc, result.NetInterest, "income", *cert.PayoutAccountId, userId, "", "", cert.Currency, nextPaymentDate)
 			}
 
@@ -409,24 +499,24 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 	return nil
 }
 
-func (s *CertificateService) GetEffectiveCapital(cert *certificate.Certificate) (float64, *certificate.CertificatePayment) {
+func (s *CertificateService) GetEffectiveCapital(cert *certificate.Certificate) (money.Amount, *certificate.CertificatePayment) {
 	if cert.InterestType == certificate.InterestTypeSimple {
 		return cert.BaseCapital, nil
 	}
 
-	lastPayment, err := s.repository.FindLastPayment(context.Background(), cert.Id)
+	lastPayment, err := s.repository.FindLastPayment(context.Background(), cert.Id, cert.UserId)
 	if err != nil {
 		return cert.BaseCapital, nil
 	}
 
 	if cert.ReinvestInterest {
-		return lastPayment.AppliedCapital + lastPayment.NetInterest, lastPayment
+		return lastPayment.AppliedCapital.Add(lastPayment.NetInterest), lastPayment
 	}
 
 	return cert.BaseCapital, lastPayment
 }
 
-func (s *CertificateService) getEffectiveCapitalForPayment(cert *certificate.Certificate, lastPayment *certificate.CertificatePayment) float64 {
+func (s *CertificateService) getEffectiveCapitalForPayment(cert *certificate.Certificate, lastPayment *certificate.CertificatePayment) money.Amount {
 	if cert.InterestType == certificate.InterestTypeSimple {
 		return cert.BaseCapital
 	}
@@ -436,7 +526,7 @@ func (s *CertificateService) getEffectiveCapitalForPayment(cert *certificate.Cer
 	}
 
 	if cert.ReinvestInterest {
-		return lastPayment.AppliedCapital + lastPayment.NetInterest
+		return lastPayment.AppliedCapital.Add(lastPayment.NetInterest)
 	}
 
 	return cert.BaseCapital
@@ -474,7 +564,7 @@ func (s *CertificateService) calculateNextPaymentDate(from time.Time, cutDay int
 	return time.Date(year, month, day, 0, 0, 0, 0, from.Location())
 }
 
-func (s *CertificateService) GetProjectedPayment(cert *certificate.Certificate, capital float64, calculator *PaymentCalculator) *dto.ProjectedPaymentResponse {
+func (s *CertificateService) GetProjectedPayment(cert *certificate.Certificate, capital money.Amount, calculator *PaymentCalculator) *dto.ProjectedPaymentResponse {
 	result := calculator.CalculateMonthlyPayment(capital, cert.CurrentInterestRate, cert.CurrentTaxRate)
 	return &dto.ProjectedPaymentResponse{
 		GrossInterest: result.GrossInterest,
@@ -494,20 +584,20 @@ func (s *CertificateService) GetSummary(ctx context.Context, userId string) (*dt
 		return nil, err
 	}
 
-	var totalCapital, totalGross, totalTax, totalNet float64
+	var totalCapital, totalGross, totalTax, totalNet money.Amount
 	activeCount := 0
 
 	for _, cert := range certificates {
 		if cert.Status == certificate.StatusActive {
-			totalCapital += cert.BaseCapital
+			totalCapital = totalCapital.Add(cert.BaseCapital)
 			activeCount++
 		}
 	}
 
 	for _, p := range payments {
-		totalGross += p.GrossInterest
-		totalTax += p.TaxWithheld
-		totalNet += p.NetInterest
+		totalGross = totalGross.Add(p.GrossInterest)
+		totalTax = totalTax.Add(p.TaxWithheld)
+		totalNet = totalNet.Add(p.NetInterest)
 	}
 
 	return &dto.CertificateSummaryResponse{
@@ -515,7 +605,7 @@ func (s *CertificateService) GetSummary(ctx context.Context, userId string) (*dt
 		TotalGrossInterest: totalGross,
 		TotalTaxWithheld:   totalTax,
 		TotalNetInterest:   totalNet,
-		PortfolioValue:     totalCapital + totalNet,
+		PortfolioValue:     totalCapital.Add(totalNet),
 		ActiveCertificates: activeCount,
 	}, nil
 }

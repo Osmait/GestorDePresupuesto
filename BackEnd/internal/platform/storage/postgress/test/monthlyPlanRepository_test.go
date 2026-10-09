@@ -7,6 +7,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money/moneytest"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/monthly_plan"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
 	monthlyPlanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/monthly_plan"
@@ -39,7 +41,7 @@ func TestMonthlyPlanRepository_CRUD(t *testing.T) {
 
 	day := 5
 	item := monthly_plan.NewMonthlyPlanItem(
-		"plan-crud-1", userID, "Internet", "Fibra óptica", 2200,
+		"plan-crud-1", userID, "Internet", "Fibra óptica", money.FromInt(2200),
 		monthly_plan.CurrencyDOP, monthly_plan.TypeBill,
 		&category.Id, nil, &day, true,
 	)
@@ -53,7 +55,7 @@ func TestMonthlyPlanRepository_CRUD(t *testing.T) {
 	require.NotNil(t, found)
 	assert.Equal(t, "Internet", found.Name)
 	assert.Equal(t, "Fibra óptica", found.Description)
-	assert.Equal(t, 2200.0, found.Amount)
+	moneytest.Equal(t, 2200.0, found.Amount)
 	assert.Equal(t, monthly_plan.CurrencyDOP, found.Currency)
 	assert.Equal(t, monthly_plan.TypeBill, found.Type)
 	assert.True(t, found.IsActive)
@@ -66,7 +68,7 @@ func TestMonthlyPlanRepository_CRUD(t *testing.T) {
 
 	// Update
 	found.Name = "Internet Claro"
-	found.Amount = 2500
+	found.Amount = money.FromInt(2500)
 	rows, err := repository.Update(ctx, found)
 	require.NoError(t, err)
 	assert.Equal(t, int64(1), rows)
@@ -74,7 +76,7 @@ func TestMonthlyPlanRepository_CRUD(t *testing.T) {
 	updated, err := repository.FindOne(ctx, item.ID, userID)
 	require.NoError(t, err)
 	assert.Equal(t, "Internet Claro", updated.Name)
-	assert.Equal(t, 2500.0, updated.Amount)
+	moneytest.Equal(t, 2500.0, updated.Amount)
 
 	// SetActive
 	rows, err = repository.SetActive(ctx, item.ID, userID, false)
@@ -118,7 +120,7 @@ func TestMonthlyPlanRepository_IsScopedByUser(t *testing.T) {
 	attackerID := seedPlanUser(t, ctx)
 
 	item := monthly_plan.NewMonthlyPlanItem(
-		"plan-scope-1", ownerID, "Alquiler", "", 25000,
+		"plan-scope-1", ownerID, "Alquiler", "", money.FromInt(25000),
 		monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, nil, true,
 	)
 	require.NoError(t, repository.Save(ctx, item))
@@ -137,7 +139,7 @@ func TestMonthlyPlanRepository_IsScopedByUser(t *testing.T) {
 
 	t.Run("Update", func(t *testing.T) {
 		stolen := monthly_plan.NewMonthlyPlanItem(
-			item.ID, attackerID, "Hacked", "", 1,
+			item.ID, attackerID, "Hacked", "", money.FromInt(1),
 			monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, nil, true,
 		)
 		rows, err := repository.Update(ctx, stolen)
@@ -179,12 +181,12 @@ func TestMonthlyPlanRepository_FindAllByUserOrdering(t *testing.T) {
 
 	day1, day15, day30 := 1, 15, 30
 	seed := []*monthly_plan.MonthlyPlanItem{
-		monthly_plan.NewMonthlyPlanItem("ord-bill-15", userID, "Internet", "", 2200, monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, &day15, true),
-		monthly_plan.NewMonthlyPlanItem("ord-income-30", userID, "Salario", "", 85000, monthly_plan.CurrencyDOP, monthly_plan.TypeIncome, nil, nil, &day30, true),
-		monthly_plan.NewMonthlyPlanItem("ord-bill-1", userID, "Alquiler", "", 25000, monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, &day1, true),
-		monthly_plan.NewMonthlyPlanItem("ord-income-15", userID, "Freelance", "", 12000, monthly_plan.CurrencyDOP, monthly_plan.TypeIncome, nil, nil, &day15, true),
+		monthly_plan.NewMonthlyPlanItem("ord-bill-15", userID, "Internet", "", money.FromInt(2200), monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, &day15, true),
+		monthly_plan.NewMonthlyPlanItem("ord-income-30", userID, "Salario", "", money.FromInt(85000), monthly_plan.CurrencyDOP, monthly_plan.TypeIncome, nil, nil, &day30, true),
+		monthly_plan.NewMonthlyPlanItem("ord-bill-1", userID, "Alquiler", "", money.FromInt(25000), monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, &day1, true),
+		monthly_plan.NewMonthlyPlanItem("ord-income-15", userID, "Freelance", "", money.FromInt(12000), monthly_plan.CurrencyDOP, monthly_plan.TypeIncome, nil, nil, &day15, true),
 		// No day set: must sort last inside its own group.
-		monthly_plan.NewMonthlyPlanItem("ord-bill-noday", userID, "Imprevistos", "", 3000, monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, nil, true),
+		monthly_plan.NewMonthlyPlanItem("ord-bill-noday", userID, "Imprevistos", "", money.FromInt(3000), monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, nil, true),
 	}
 	for _, item := range seed {
 		require.NoError(t, repository.Save(ctx, item))
@@ -218,25 +220,25 @@ func TestMonthlyPlanRepository_Totals(t *testing.T) {
 	userID := seedPlanUser(t, ctx)
 
 	seed := []*monthly_plan.MonthlyPlanItem{
-		monthly_plan.NewMonthlyPlanItem("tot-income-dop", userID, "Salario", "", 85000, monthly_plan.CurrencyDOP, monthly_plan.TypeIncome, nil, nil, nil, true),
-		monthly_plan.NewMonthlyPlanItem("tot-income-usd", userID, "Freelance", "", 200, monthly_plan.CurrencyUSD, monthly_plan.TypeIncome, nil, nil, nil, true),
-		monthly_plan.NewMonthlyPlanItem("tot-bill-dop", userID, "Alquiler", "", 25000, monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, nil, true),
-		monthly_plan.NewMonthlyPlanItem("tot-bill-usd", userID, "Netflix", "", 15, monthly_plan.CurrencyUSD, monthly_plan.TypeBill, nil, nil, nil, true),
+		monthly_plan.NewMonthlyPlanItem("tot-income-dop", userID, "Salario", "", money.FromInt(85000), monthly_plan.CurrencyDOP, monthly_plan.TypeIncome, nil, nil, nil, true),
+		monthly_plan.NewMonthlyPlanItem("tot-income-usd", userID, "Freelance", "", money.FromInt(200), monthly_plan.CurrencyUSD, monthly_plan.TypeIncome, nil, nil, nil, true),
+		monthly_plan.NewMonthlyPlanItem("tot-bill-dop", userID, "Alquiler", "", money.FromInt(25000), monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, nil, true),
+		monthly_plan.NewMonthlyPlanItem("tot-bill-usd", userID, "Netflix", "", money.FromInt(15), monthly_plan.CurrencyUSD, monthly_plan.TypeBill, nil, nil, nil, true),
 		// Paused rows must be excluded from every total.
-		monthly_plan.NewMonthlyPlanItem("tot-bill-paused", userID, "Gym", "", 1500, monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, nil, false),
-		monthly_plan.NewMonthlyPlanItem("tot-income-paused", userID, "Bono viejo", "", 9999, monthly_plan.CurrencyDOP, monthly_plan.TypeIncome, nil, nil, nil, false),
+		monthly_plan.NewMonthlyPlanItem("tot-bill-paused", userID, "Gym", "", money.FromInt(1500), monthly_plan.CurrencyDOP, monthly_plan.TypeBill, nil, nil, nil, false),
+		monthly_plan.NewMonthlyPlanItem("tot-income-paused", userID, "Bono viejo", "", money.FromInt(9999), monthly_plan.CurrencyDOP, monthly_plan.TypeIncome, nil, nil, nil, false),
 	}
 	for _, item := range seed {
 		require.NoError(t, repository.Save(ctx, item))
 	}
 
-	totals, err := repository.Totals(ctx, userID, 60)
+	totals, err := repository.Totals(ctx, userID, money.FromInt(60))
 	require.NoError(t, err)
 
 	// 85000 DOP + (200 USD * 60) = 97000
-	assert.Equal(t, 97000.0, totals.TotalIncome)
+	moneytest.Equal(t, 97000.0, totals.TotalIncome)
 	// 25000 DOP + (15 USD * 60) = 25900
-	assert.Equal(t, 25900.0, totals.TotalExpenses)
+	moneytest.Equal(t, 25900.0, totals.TotalExpenses)
 	assert.Equal(t, 2, totals.IncomeCount, "the paused income must not be counted")
 	assert.Equal(t, 2, totals.ExpensesCount, "the paused expense must not be counted")
 
@@ -250,11 +252,11 @@ func TestMonthlyPlanRepository_TotalsOnEmptyPlan(t *testing.T) {
 	repository := monthlyPlanRepo.NewMonthlyPlanRepository(db)
 	userID := seedPlanUser(t, ctx)
 
-	totals, err := repository.Totals(ctx, userID, 60)
+	totals, err := repository.Totals(ctx, userID, money.FromInt(60))
 
 	require.NoError(t, err)
-	assert.Zero(t, totals.TotalIncome, "COALESCE must turn a NULL sum into 0")
-	assert.Zero(t, totals.TotalExpenses)
+	assert.True(t, totals.TotalIncome.IsZero(), "COALESCE must turn a NULL sum into 0")
+	assert.True(t, totals.TotalExpenses.IsZero())
 	assert.Zero(t, totals.IncomeCount)
 	assert.Zero(t, totals.ExpensesCount)
 }
@@ -269,15 +271,15 @@ func TestMonthlyPlanRepository_TotalsGuardsAgainstInvalidRate(t *testing.T) {
 	userID := seedPlanUser(t, ctx)
 
 	item := monthly_plan.NewMonthlyPlanItem(
-		"rate-guard-1", userID, "Netflix", "", 15,
+		"rate-guard-1", userID, "Netflix", "", money.FromInt(15),
 		monthly_plan.CurrencyUSD, monthly_plan.TypeBill, nil, nil, nil, true,
 	)
 	require.NoError(t, repository.Save(ctx, item))
 
-	totals, err := repository.Totals(ctx, userID, 0)
+	totals, err := repository.Totals(ctx, userID, money.Zero)
 
 	require.NoError(t, err)
-	assert.Equal(t, 15.0, totals.TotalExpenses)
+	moneytest.Equal(t, 15.0, totals.TotalExpenses)
 
 	require.NoError(t, deletePlanItems(ctx, repository, userID))
 }

@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money/moneytest"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -57,6 +59,30 @@ func TestTransactionFilter_ParseFromQuery(t *testing.T) {
 			},
 		},
 		{
+			name: "sort by transaction_name (sent by the frontend)",
+			queryParams: map[string]string{
+				"sort_by":    "transaction_name",
+				"sort_order": "asc",
+			},
+			expectedFilter: func() *TransactionFilter {
+				f := NewTransactionFilter()
+				f.SortBy = "transaction_name"
+				f.SortOrder = "asc"
+				return f
+			},
+		},
+		{
+			name: "sort by name is an alias of transaction_name",
+			queryParams: map[string]string{
+				"sort_by": "name",
+			},
+			expectedFilter: func() *TransactionFilter {
+				f := NewTransactionFilter()
+				f.SortBy = "transaction_name"
+				return f
+			},
+		},
+		{
 			name: "filtering parameters",
 			queryParams: map[string]string{
 				"type":        "income",
@@ -81,8 +107,8 @@ func TestTransactionFilter_ParseFromQuery(t *testing.T) {
 			},
 			expectedFilter: func() *TransactionFilter {
 				f := NewTransactionFilter()
-				min := 100.50
-				max := 999.99
+				min := money.MustParse("100.50")
+				max := money.MustParse("999.99")
 				f.AmountMin = &min
 				f.AmountMax = &max
 				return f
@@ -187,14 +213,14 @@ func TestTransactionFilter_ParseFromQuery(t *testing.T) {
 				// Compare amount filters
 				if expected.AmountMin != nil {
 					assert.NotNil(t, filter.AmountMin)
-					assert.Equal(t, *expected.AmountMin, *filter.AmountMin)
+					moneytest.Equal(t, *expected.AmountMin, *filter.AmountMin)
 				} else {
 					assert.Nil(t, filter.AmountMin)
 				}
 
 				if expected.AmountMax != nil {
 					assert.NotNil(t, filter.AmountMax)
-					assert.Equal(t, *expected.AmountMax, *filter.AmountMax)
+					moneytest.Equal(t, *expected.AmountMax, *filter.AmountMax)
 				} else {
 					assert.Nil(t, filter.AmountMax)
 				}
@@ -256,8 +282,8 @@ func TestTransactionFilter_Validate(t *testing.T) {
 			name: "invalid amount range",
 			filter: func() *TransactionFilter {
 				f := NewTransactionFilter()
-				min := 100.0
-				max := 50.0
+				min := money.FromInt(100)
+				max := money.FromInt(50)
 				f.AmountMin = &min
 				f.AmountMax = &max
 				return f
@@ -405,7 +431,7 @@ func TestTransactionFilter_HasFilters(t *testing.T) {
 			name: "has amount filter",
 			filter: func() *TransactionFilter {
 				f := NewTransactionFilter()
-				min := 100.0
+				min := money.FromInt(100)
 				f.AmountMin = &min
 				return f
 			}(),

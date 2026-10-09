@@ -45,7 +45,7 @@ func TestTransactionRepository(t *testing.T) {
 	currentTime := time.Now()
 	date1 := currentTime.AddDate(0, 0, -7).Format("2006-01-02")
 	date2 := currentTime.AddDate(0, 0, 5).Format("2006-01-02")
-	transactionList, err := transactionRepo.FindAll(ctx, date1, date2, account.Id)
+	transactionList, err := transactionRepo.FindAll(ctx, date1, date2, account.Id, user.Id)
 	assert.NoError(t, err)
 	assert.NotEmpty(t, transactionList)
 

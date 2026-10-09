@@ -2,9 +2,10 @@ package dto
 
 // AccountUpdateRequest represents the data required to update an existing account.
 // Only name and bank can be updated - balance and creation date remain unchanged.
+// Both are capped at the VARCHAR(255) column size (overlong input is a 400).
 type AccountUpdateRequest struct {
-	Name string `json:"name" validate:"required,min=2,max=100,printascii" binding:"required" example:"Updated Savings Account"`
-	Bank string `json:"bank" validate:"required,min=2,max=100,printascii" binding:"required" example:"Updated Bank Name"`
+	Name string `json:"name" validate:"required,min=2,max=100,printascii" binding:"required,max=255" example:"Updated Savings Account"`
+	Bank string `json:"bank" validate:"required,min=2,max=100,printascii" binding:"required,max=255" example:"Updated Bank Name"`
 }
 
 // NewAccountUpdateRequest creates a new AccountUpdateRequest with the provided information.

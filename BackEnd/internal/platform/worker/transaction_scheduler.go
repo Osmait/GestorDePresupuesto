@@ -8,6 +8,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// TransactionScheduler periodically executes due recurring transactions.
+// It is safe to run in several replicas at once: each occurrence is claimed
+// with SELECT ... FOR UPDATE SKIP LOCKED and guarded by a unique
+// (recurring_transaction_id, execution_date) row, so it is created only once.
 type TransactionScheduler struct {
 	service *recurring_transaction.RecurringTransactionService
 }

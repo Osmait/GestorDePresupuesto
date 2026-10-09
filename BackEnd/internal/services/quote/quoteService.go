@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"strings"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 type QuoteService struct{}
@@ -35,7 +36,7 @@ type BinanceResponse struct {
 	Price  string `json:"price"`
 }
 
-func (s *QuoteService) GetQuote(symbol string) (float64, string, string, error) {
+func (s *QuoteService) GetQuote(symbol string) (money.Amount, string, string, error) {
 	// Clean symbol
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
 
@@ -63,41 +64,43 @@ func (s *QuoteService) GetQuote(symbol string) (float64, string, string, error) 
 		return price, currency, name, nil
 	}
 
-	return 0, "", "", fmt.Errorf("quote not found")
+	return money.Zero, "", "", fmt.Errorf("quote not found")
 }
 
-func (s *QuoteService) fetchNasdaq(symbol, assetClass string) (float64, string, string, error) {
+func (s *QuoteService) fetchNasdaq(symbol, assetClass string) (money.Amount, string, string, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.nasdaq.com/api/quote/"+symbol+"/info?assetclass="+assetClass, nil)
 	if err != nil {
-		return 0, "", "", err
+		return money.Zero, "", "", err
 	}
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, "", "", err
+		return money.Zero, "", "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
-		return 0, "", "", fmt.Errorf("bad status")
+		return money.Zero, "", "", fmt.Errorf("bad status")
 	}
 
 	var result NasdaqResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, "", "", err
+		return money.Zero, "", "", err
 	}
 
 	if result.Status.RCode != 200 || result.Data.PrimaryData.LastSalePrice == "" || result.Data.PrimaryData.LastSalePrice == "N/A" {
-		return 0, "", "", fmt.Errorf("not found or empty")
+		return money.Zero, "", "", fmt.Errorf("not found or empty")
 	}
 
 	priceStr := strings.ReplaceAll(result.Data.PrimaryData.LastSalePrice, "$", "")
 	priceStr = strings.ReplaceAll(priceStr, ",", "")
-	price, err := strconv.ParseFloat(priceStr, 64)
+	// Boundary: the API returns the price as text; parse it exactly once and
+	// round half-even to the unit-price scale.
+	price, err := parsePrice(priceStr)
 	if err != nil {
-		return 0, "", "", err
+		return money.Zero, "", "", err
 	}
 
 	// Nasdaq API often returns null currency, default to USD for US stocks
@@ -114,32 +117,40 @@ func (s *QuoteService) fetchNasdaq(symbol, assetClass string) (float64, string, 
 	return price, curr, companyName, nil
 }
 
-func (s *QuoteService) fetchBinance(symbol string) (float64, string, string, error) {
+func (s *QuoteService) fetchBinance(symbol string) (money.Amount, string, string, error) {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", "https://api.binance.com/api/v3/ticker/price?symbol="+symbol, nil)
 	if err != nil {
-		return 0, "", "", err
+		return money.Zero, "", "", err
 	}
 
 	resp, err := client.Do(req)
 	if err != nil {
-		return 0, "", "", err
+		return money.Zero, "", "", err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != 200 {
-		return 0, "", "", fmt.Errorf("bad status")
+		return money.Zero, "", "", fmt.Errorf("bad status")
 	}
 
 	var result BinanceResponse
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
-		return 0, "", "", err
+		return money.Zero, "", "", err
 	}
 
-	price, err := strconv.ParseFloat(result.Price, 64)
+	price, err := parsePrice(result.Price)
 	if err != nil {
-		return 0, "", "", err
+		return money.Zero, "", "", err
 	}
 
 	return price, "USD", result.Symbol, nil // Binance USDT is basically USD, return symbol as name
+}
+
+func parsePrice(raw string) (money.Amount, error) {
+	price, err := money.Parse(raw)
+	if err != nil {
+		return money.Zero, err
+	}
+	return price.Round(money.PriceScale), nil
 }

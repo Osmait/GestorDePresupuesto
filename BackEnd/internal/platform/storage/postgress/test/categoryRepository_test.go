@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/stretchr/testify/assert"
@@ -32,7 +33,7 @@ func TestCategoryRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test FindOne
-	foundCategory, err := categoryRepository.FindOne(ctx, category.Id)
+	foundCategory, err := categoryRepository.FindOne(ctx, category.Id, user.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, category.Id, foundCategory.Id)
 	assert.Equal(t, category.Name, foundCategory.Name)
@@ -53,9 +54,9 @@ func TestCategoryRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Verify deletion
-	deletedCategory, err := categoryRepository.FindOne(ctx, category.Id)
-	assert.NoError(t, err)
-	assert.Equal(t, "", deletedCategory.Id) // Should be empty after deletion
+	deletedCategory, err := categoryRepository.FindOne(ctx, category.Id, user.Id)
+	assert.ErrorIs(t, err, ownership.ErrNotFound)
+	assert.Nil(t, deletedCategory)
 
 	// Verify FindAll is empty after deletion
 	categoriesAfterDelete, err := categoryRepository.FindAll(ctx, user.Id)
@@ -73,9 +74,9 @@ func TestCategoryRepository_FindOne_NotFound(t *testing.T) {
 	categoryRepository := categoryRepo.NewCategoryRepository(db)
 
 	// Test FindOne with non-existent ID
-	category, err := categoryRepository.FindOne(ctx, "non-existent-id")
-	assert.NoError(t, err)           // Current implementation doesn't return error for not found
-	assert.Equal(t, "", category.Id) // Should be empty when not found
+	category, err := categoryRepository.FindOne(ctx, "non-existent-id", "non-existent-user")
+	assert.ErrorIs(t, err, ownership.ErrNotFound)
+	assert.Nil(t, category)
 }
 
 func TestCategoryRepository_FindAll_EmptyResult(t *testing.T) {
@@ -136,7 +137,7 @@ func TestCategoryRepository_Multiple_Categories(t *testing.T) {
 
 	// Test FindOne for each category
 	for _, categoryId := range createdCategories {
-		foundCategory, err := categoryRepository.FindOne(ctx, categoryId)
+		foundCategory, err := categoryRepository.FindOne(ctx, categoryId, user.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, categoryId, foundCategory.Id)
 		assert.Equal(t, user.Id, foundCategory.UserId)

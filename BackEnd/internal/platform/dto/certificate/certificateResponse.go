@@ -4,15 +4,16 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 type CertificateResponse struct {
 	Id                  string                        `json:"id"`
 	Bank                string                        `json:"bank"`
-	BaseCapital         float64                       `json:"base_capital"`
+	BaseCapital         money.Amount                  `json:"base_capital"`
 	InterestType        certificate.InterestType      `json:"interest_type"`
-	CurrentInterestRate float64                       `json:"current_interest_rate"`
-	CurrentTaxRate      float64                       `json:"current_tax_rate"`
+	CurrentInterestRate money.Amount                  `json:"current_interest_rate"`
+	CurrentTaxRate      money.Amount                  `json:"current_tax_rate"`
 	CutDay              int                           `json:"cut_day"`
 	ReinvestInterest    bool                          `json:"reinvest_interest"`
 	PayoutAccountId     *string                       `json:"payout_account_id"`
@@ -21,24 +22,24 @@ type CertificateResponse struct {
 	Currency            string                        `json:"currency"`
 	CreatedAt           time.Time                     `json:"created_at"`
 	UpdatedAt           time.Time                     `json:"updated_at"`
-	EffectiveCapital    float64                       `json:"effective_capital"`
+	EffectiveCapital    money.Amount                  `json:"effective_capital"`
 	NextPaymentDate     *time.Time                    `json:"next_payment_date"`
 	ProjectedPayment    *ProjectedPaymentResponse     `json:"projected_payment"`
 }
 
 type ProjectedPaymentResponse struct {
-	GrossInterest float64 `json:"gross_interest"`
-	TaxWithheld   float64 `json:"tax_withheld"`
-	NetInterest   float64 `json:"net_interest"`
+	GrossInterest money.Amount `json:"gross_interest"`
+	TaxWithheld   money.Amount `json:"tax_withheld"`
+	NetInterest   money.Amount `json:"net_interest"`
 }
 
 type CertificateSummaryResponse struct {
-	TotalCapital       float64 `json:"total_capital"`
-	TotalGrossInterest float64 `json:"total_gross_interest"`
-	TotalTaxWithheld   float64 `json:"total_tax_withheld"`
-	TotalNetInterest   float64 `json:"total_net_interest"`
-	PortfolioValue     float64 `json:"portfolio_value"`
-	ActiveCertificates int     `json:"active_certificates"`
+	TotalCapital       money.Amount `json:"total_capital"`
+	TotalGrossInterest money.Amount `json:"total_gross_interest"`
+	TotalTaxWithheld   money.Amount `json:"total_tax_withheld"`
+	TotalNetInterest   money.Amount `json:"total_net_interest"`
+	PortfolioValue     money.Amount `json:"portfolio_value"`
+	ActiveCertificates int          `json:"active_certificates"`
 }
 
 type CertificateWithHistoryResponse struct {
@@ -48,20 +49,20 @@ type CertificateWithHistoryResponse struct {
 }
 
 type PaymentResponse struct {
-	Id             string     `json:"id"`
-	CertificateId  string     `json:"certificate_id"`
-	PaymentDate    time.Time  `json:"payment_date"`
-	PeriodStart    time.Time  `json:"period_start"`
-	PeriodEnd      time.Time  `json:"period_end"`
-	GrossInterest  float64    `json:"gross_interest"`
-	TaxWithheld    float64    `json:"tax_withheld"`
-	NetInterest    float64    `json:"net_interest"`
-	AppliedRate    float64    `json:"applied_rate"`
-	AppliedTaxRate float64    `json:"applied_tax_rate"`
-	AppliedCapital float64    `json:"applied_capital"`
-	TransactionId  *string    `json:"transaction_id"`
-	CreatedAt      time.Time  `json:"created_at"`
-	UpdatedAt      *time.Time `json:"updated_at"`
+	Id             string       `json:"id"`
+	CertificateId  string       `json:"certificate_id"`
+	PaymentDate    time.Time    `json:"payment_date"`
+	PeriodStart    time.Time    `json:"period_start"`
+	PeriodEnd      time.Time    `json:"period_end"`
+	GrossInterest  money.Amount `json:"gross_interest"`
+	TaxWithheld    money.Amount `json:"tax_withheld"`
+	NetInterest    money.Amount `json:"net_interest"`
+	AppliedRate    money.Amount `json:"applied_rate"`
+	AppliedTaxRate money.Amount `json:"applied_tax_rate"`
+	AppliedCapital money.Amount `json:"applied_capital"`
+	TransactionId  *string      `json:"transaction_id"`
+	CreatedAt      time.Time    `json:"created_at"`
+	UpdatedAt      *time.Time   `json:"updated_at"`
 }
 
 type SimulationResponse struct {
@@ -70,12 +71,12 @@ type SimulationResponse struct {
 }
 
 type SimulationTotals struct {
-	GrossInterest float64 `json:"gross_interest"`
-	TaxWithheld   float64 `json:"tax_withheld"`
-	NetInterest   float64 `json:"net_interest"`
+	GrossInterest money.Amount `json:"gross_interest"`
+	TaxWithheld   money.Amount `json:"tax_withheld"`
+	NetInterest   money.Amount `json:"net_interest"`
 }
 
-func NewCertificateResponse(cert *certificate.Certificate, effectiveCapital float64, nextPaymentDate *time.Time, projected *ProjectedPaymentResponse) *CertificateResponse {
+func NewCertificateResponse(cert *certificate.Certificate, effectiveCapital money.Amount, nextPaymentDate *time.Time, projected *ProjectedPaymentResponse) *CertificateResponse {
 	return &CertificateResponse{
 		Id:                  cert.Id,
 		Bank:                cert.Bank,

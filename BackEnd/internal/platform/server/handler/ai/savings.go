@@ -3,16 +3,33 @@ package ai
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"math"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	"github.com/segmentio/ksuid"
 )
+
+// verifyAccountOwnership rejects an account id that is not one of the user's
+// accounts. An empty id is accepted (the goal is not tied to an account).
+func (h *Handler) verifyAccountOwnership(ctx context.Context, userID string, accountID string) error {
+	accountID = strings.TrimSpace(accountID)
+	if accountID == "" {
+		return nil
+	}
+	if h.db == nil {
+		return fmt.Errorf("database connection not available")
+	}
+	return ownership.VerifyReference(ctx, h.db, userID, ownership.Account, accountID)
+}
 
 func (h *Handler) SavingsPlan(c *gin.Context) {
 	userID := c.GetString("X-User-Id")
@@ -20,6 +37,11 @@ func (h *Handler) SavingsPlan(c *gin.Context) {
 	var req dto.SavingsPlanRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		return
+	}
+
+	if err := h.verifyAccountOwnership(c.Request.Context(), userID, req.AccountID); err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -65,6 +87,11 @@ func (h *Handler) CreateSavingsGoal(c *gin.Context) {
 		return
 	}
 
+	if err := h.verifyAccountOwnership(c.Request.Context(), userID, req.AccountID); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
 	_, err = h.db.ExecContext(
 		c.Request.Context(),
 		`INSERT INTO savings_goals
@@ -74,7 +101,7 @@ func (h *Handler) CreateSavingsGoal(c *gin.Context) {
 		userID,
 		strings.TrimSpace(req.Name),
 		req.TargetAmount,
-		math.Max(req.CurrentSaved, 0),
+		money.Max(req.CurrentSaved, money.Zero),
 		targetDate,
 		strings.TrimSpace(req.AccountID),
 		now,
@@ -141,7 +168,7 @@ func (h *Handler) UpdateSavingsGoal(c *gin.Context) {
 
 	current, err := h.findSavingsGoalByID(c.Request.Context(), userID, goalID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("SAVINGS_GOAL_NOT_FOUND", "Savings goal not found"))
 			return
 		}
@@ -155,12 +182,12 @@ func (h *Handler) UpdateSavingsGoal(c *gin.Context) {
 	}
 
 	targetAmount := current.TargetAmount
-	if req.TargetAmount > 0 {
+	if req.TargetAmount.IsPositive() {
 		targetAmount = req.TargetAmount
 	}
 
 	currentSaved := current.CurrentSaved
-	if req.CurrentSaved >= 0 {
+	if !req.CurrentSaved.IsNegative() {
 		currentSaved = req.CurrentSaved
 	}
 
@@ -171,6 +198,10 @@ func (h *Handler) UpdateSavingsGoal(c *gin.Context) {
 
 	accountID := current.AccountID
 	if req.AccountID != "" {
+		if err := h.verifyAccountOwnership(c.Request.Context(), userID, req.AccountID); err != nil {
+			_ = c.Error(err)
+			return
+		}
 		accountID = req.AccountID
 	}
 
@@ -253,7 +284,7 @@ func (h *Handler) GetSavingsGoalProgress(c *gin.Context) {
 
 	goal, err := h.findSavingsGoalByID(c.Request.Context(), userID, goalID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("SAVINGS_GOAL_NOT_FOUND", "Savings goal not found"))
 			return
 		}
@@ -267,10 +298,7 @@ func (h *Handler) GetSavingsGoalProgress(c *gin.Context) {
 		return
 	}
 
-	remaining := goal.TargetAmount - goal.CurrentSaved
-	if remaining < 0 {
-		remaining = 0
-	}
+	remaining := money.Max(goal.TargetAmount.Sub(goal.CurrentSaved), money.Zero)
 	planningMonths := resolvePlanningMonths(goal.TargetDate)
 	recommendedMonthly, recommendedWeekly, estimatedMonths := buildSavingsPlan(remaining, averageMonthlySavings, planningMonths)
 	feasibleByDate := isTargetFeasibleByDate(goal.TargetDate, estimatedMonths)
@@ -288,16 +316,18 @@ func (h *Handler) GetSavingsGoalProgress(c *gin.Context) {
 	})
 }
 
-func (h *Handler) calculateAverageMonthlySavings(ctx context.Context, userID string, accountID string) (float64, error) {
+// calculateAverageMonthlySavings returns the average net savings of the last
+// three months, computed in decimal and rounded half-even to cents.
+func (h *Handler) calculateAverageMonthlySavings(ctx context.Context, userID string, accountID string) (money.Amount, error) {
 	dateTo := time.Now()
 	dateFrom := dateTo.AddDate(0, -3, 0)
 	transactions, err := h.transactionRepository.FindByUserAndDateRange(ctx, userID, dateFrom, dateTo)
 	if err != nil {
-		return 0, err
+		return money.Zero, err
 	}
 
-	totalIncome := 0.0
-	totalExpense := 0.0
+	totalIncome := money.Zero
+	totalExpense := money.Zero
 	for _, txn := range transactions {
 		if txn == nil {
 			continue
@@ -305,38 +335,41 @@ func (h *Handler) calculateAverageMonthlySavings(ctx context.Context, userID str
 		if accountID != "" && txn.AccountId != accountID {
 			continue
 		}
-		amount := math.Abs(txn.Amount)
+		amount := txn.Amount.Abs()
 		switch txn.TypeTransation {
 		case "income":
-			totalIncome += amount
+			totalIncome = totalIncome.Add(amount)
 		case "bill":
-			totalExpense += amount
+			totalExpense = totalExpense.Add(amount)
 		}
 	}
 
-	averageMonthlySavings := (totalIncome - totalExpense) / 3
-	if averageMonthlySavings < 0 {
-		averageMonthlySavings = 0
-	}
-
-	return averageMonthlySavings, nil
+	averageMonthlySavings := totalIncome.Sub(totalExpense).DivInt(3).RoundCents()
+	return money.Max(averageMonthlySavings, money.Zero), nil
 }
 
-func buildSavingsPlan(targetAmount float64, averageMonthlySavings float64, planningMonths int) (float64, float64, int) {
+// weeksPerMonth is the average number of weeks in a month.
+var weeksPerMonth = money.New(433, -2)
+
+// buildSavingsPlan returns the recommended monthly and weekly savings
+// (rounded half-even to cents) and the months needed to reach targetAmount.
+// Everything is computed in decimal; the month estimate is the exact ceiling.
+func buildSavingsPlan(targetAmount money.Amount, averageMonthlySavings money.Amount, planningMonths int) (money.Amount, money.Amount, int) {
 	if planningMonths <= 0 {
 		planningMonths = 6
 	}
 
 	recommendedMonthly := averageMonthlySavings
-	if targetAmount > 0 {
-		targetByPlan := targetAmount / float64(planningMonths)
-		recommendedMonthly = math.Max(targetByPlan, averageMonthlySavings)
+	if targetAmount.IsPositive() {
+		targetByPlan := targetAmount.DivInt(int64(planningMonths))
+		recommendedMonthly = money.Max(targetByPlan, averageMonthlySavings)
 	}
+	recommendedMonthly = recommendedMonthly.RoundCents()
 
-	recommendedWeekly := recommendedMonthly / 4.33
+	recommendedWeekly := recommendedMonthly.Div(weeksPerMonth).RoundCents()
 	estimatedMonths := 0
-	if recommendedMonthly > 0 {
-		estimatedMonths = int(math.Ceil(targetAmount / recommendedMonthly))
+	if recommendedMonthly.IsPositive() {
+		estimatedMonths = int(targetAmount.Div(recommendedMonthly).Decimal().Ceil().IntPart())
 	}
 	return recommendedMonthly, recommendedWeekly, estimatedMonths
 }
@@ -424,8 +457,9 @@ func scanSavingsGoal(scanner interface {
 	}
 
 	goal.ProgressPct = 0
-	if goal.TargetAmount > 0 {
-		goal.ProgressPct = math.Min((goal.CurrentSaved/goal.TargetAmount)*100, 100)
+	if goal.TargetAmount.IsPositive() {
+		// Display-only percentage, computed in decimal, capped at 100.
+		goal.ProgressPct = math.Min(money.Percent(goal.CurrentSaved, goal.TargetAmount), 100)
 	}
 	if targetDate.Valid {
 		goal.TargetDate = targetDate.Time.Format("2006-01-02")

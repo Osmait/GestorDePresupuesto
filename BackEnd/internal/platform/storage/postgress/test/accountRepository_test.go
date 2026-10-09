@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money/moneytest"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/stretchr/testify/assert"
 
@@ -29,9 +30,9 @@ func TestAccountRepository(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, account.Id, listofAccout[len(listofAccout)-1].Id)
 
-	balance, err := accountRepo.Balance(ctx, account.Id)
+	balance, err := accountRepo.Balance(ctx, account.Id, user.Id)
 	assert.NoError(t, err)
-	assert.Equal(t, 0.0, balance)
+	moneytest.Equal(t, 0.0, balance)
 
 	err = accountRepo.Delete(ctx, account.Id, user.Id)
 	assert.NoError(t, err)

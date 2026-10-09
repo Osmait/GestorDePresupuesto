@@ -6,6 +6,7 @@ import (
 	"errors"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/account"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
@@ -26,7 +27,7 @@ func NewAccountService(accountRepository accountRepo.AccountRepositoryInterface)
 }
 
 // CreateAccount creates a new account for a user.
-func (s *AccountService) CreateAccount(ctx context.Context, name, bank string, balace float64, userId string) error {
+func (s *AccountService) CreateAccount(ctx context.Context, name, bank string, balace money.Amount, userId string) error {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {
 		return err
@@ -54,7 +55,7 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.Acc
 
 	for _, account := range accounts {
 		balance := balances[account.Id]
-		accountResponse := dto.NewAccountResponse(account, balance+account.InitialBalance)
+		accountResponse := dto.NewAccountResponse(account, balance.Add(account.InitialBalance))
 		accountResponses = append(accountResponses, accountResponse)
 	}
 
@@ -67,11 +68,11 @@ func (s *AccountService) DeleteAccount(ctx context.Context, id string, userId st
 	return err
 }
 
-// Balance retrieves the current balance of an account.
-func (s *AccountService) Balance(ctx context.Context, id string) (float64, error) {
-	balance, err := s.accountRepository.Balance(ctx, id)
+// Balance retrieves the current balance of an account owned by userId.
+func (s *AccountService) Balance(ctx context.Context, id string, userId string) (money.Amount, error) {
+	balance, err := s.accountRepository.Balance(ctx, id, userId)
 	if err != nil {
-		return 0, err
+		return money.Zero, err
 	}
 	return balance, nil
 }
@@ -114,10 +115,10 @@ func (s *AccountService) FindById(ctx context.Context, id, userId string) (*dto.
 		return nil, err
 	}
 
-	balance, err := s.accountRepository.Balance(ctx, id)
+	balance, err := s.accountRepository.Balance(ctx, id, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	return dto.NewAccountResponse(acc, balance+acc.InitialBalance), nil
+	return dto.NewAccountResponse(acc, balance.Add(acc.InitialBalance)), nil
 }

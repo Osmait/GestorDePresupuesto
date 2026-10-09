@@ -4,25 +4,26 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/loan"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 type LoanResponse struct {
 	Id              string            `json:"id"`
 	BorrowerName    string            `json:"borrower_name"`
 	BorrowerContact string            `json:"borrower_contact"`
-	PrincipalAmount float64           `json:"principal_amount"`
+	PrincipalAmount money.Amount      `json:"principal_amount"`
 	Currency        string            `json:"currency"`
 	InterestMode    loan.InterestMode `json:"interest_mode"`
-	AnnualRate      float64           `json:"annual_rate"`
+	AnnualRate      money.Amount      `json:"annual_rate"`
 	TermMonths      int               `json:"term_months"`
 	StartDate       time.Time         `json:"start_date"`
 	SourceAccountId string            `json:"source_account_id"`
 	Notes           string            `json:"notes"`
-	TotalInterest   float64           `json:"total_interest"`
-	TotalAmount     float64           `json:"total_amount"`
-	PaidPrincipal   float64           `json:"paid_principal"`
-	PaidInterest    float64           `json:"paid_interest"`
-	PendingAmount   float64           `json:"pending_amount"`
+	TotalInterest   money.Amount      `json:"total_interest"`
+	TotalAmount     money.Amount      `json:"total_amount"`
+	PaidPrincipal   money.Amount      `json:"paid_principal"`
+	PaidInterest    money.Amount      `json:"paid_interest"`
+	PendingAmount   money.Amount      `json:"pending_amount"`
 	Status          loan.LoanStatus   `json:"status"`
 	CreatedAt       time.Time         `json:"created_at"`
 	UpdatedAt       time.Time         `json:"updated_at"`
@@ -32,21 +33,21 @@ type LoanInstallmentResponse struct {
 	Id                string                 `json:"id"`
 	InstallmentNumber int                    `json:"installment_number"`
 	DueDate           time.Time              `json:"due_date"`
-	ExpectedAmount    float64                `json:"expected_amount"`
-	PaidAmount        float64                `json:"paid_amount"`
+	ExpectedAmount    money.Amount           `json:"expected_amount"`
+	PaidAmount        money.Amount           `json:"paid_amount"`
 	Status            loan.InstallmentStatus `json:"status"`
 	PaidAt            *time.Time             `json:"paid_at"`
 }
 
 type LoanPaymentResponse struct {
-	Id                   string    `json:"id"`
-	DestinationAccountId string    `json:"destination_account_id"`
-	Amount               float64   `json:"amount"`
-	PrincipalComponent   float64   `json:"principal_component"`
-	InterestComponent    float64   `json:"interest_component"`
-	PaymentDate          time.Time `json:"payment_date"`
-	Notes                string    `json:"notes"`
-	CreatedAt            time.Time `json:"created_at"`
+	Id                   string       `json:"id"`
+	DestinationAccountId string       `json:"destination_account_id"`
+	Amount               money.Amount `json:"amount"`
+	PrincipalComponent   money.Amount `json:"principal_component"`
+	InterestComponent    money.Amount `json:"interest_component"`
+	PaymentDate          time.Time    `json:"payment_date"`
+	Notes                string       `json:"notes"`
+	CreatedAt            time.Time    `json:"created_at"`
 }
 
 type LoanDetailsResponse struct {
@@ -56,19 +57,16 @@ type LoanDetailsResponse struct {
 }
 
 type LoanSummaryResponse struct {
-	TotalPrincipal      float64 `json:"total_principal"`
-	TotalPending        float64 `json:"total_pending"`
-	TotalCollected      float64 `json:"total_collected"`
-	TotalInterestEarned float64 `json:"total_interest_earned"`
-	OverdueLoans        int     `json:"overdue_loans"`
-	ActiveLoans         int     `json:"active_loans"`
+	TotalPrincipal      money.Amount `json:"total_principal"`
+	TotalPending        money.Amount `json:"total_pending"`
+	TotalCollected      money.Amount `json:"total_collected"`
+	TotalInterestEarned money.Amount `json:"total_interest_earned"`
+	OverdueLoans        int          `json:"overdue_loans"`
+	ActiveLoans         int          `json:"active_loans"`
 }
 
 func NewLoanResponse(entity *loan.Loan) LoanResponse {
-	pending := entity.TotalAmount - (entity.PaidPrincipal + entity.PaidInterest)
-	if pending < 0 {
-		pending = 0
-	}
+	pending := money.Max(entity.TotalAmount.Sub(entity.PaidPrincipal.Add(entity.PaidInterest)), money.Zero)
 
 	return LoanResponse{
 		Id:              entity.Id,

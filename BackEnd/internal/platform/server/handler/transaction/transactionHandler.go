@@ -2,7 +2,6 @@ package transaction
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"net/http"
 	"strings"
@@ -62,7 +61,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 				Str("account_id", transactionRequest.AccountId).
 				Str("category_id", transactionRequest.CategoryId).
 				Str("currency", transactionRequest.Currency).
-				Float64("amount", transactionRequest.Amount).
+				Stringer("amount", transactionRequest.Amount).
 				Str("type_transation", transactionRequest.TypeTransation).
 				Msg("Transaction validation failed")
 			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
@@ -73,7 +72,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			Str("user_id", userID).
 			Str("account_id", transactionRequest.AccountId).
 			Str("currency", transactionRequest.Currency).
-			Float64("amount", transactionRequest.Amount).
+			Stringer("amount", transactionRequest.Amount).
 			Msg("Creating transaction")
 
 		err := transactionservice.CreateTransaction(
@@ -227,6 +226,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 //	@Router			/transaction/{id} [get]
 func FindAllTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		userID := ctx.GetString("X-User-Id")
 		accountId := ctx.Param("id")
 
 		// Parse filter parameters
@@ -251,7 +251,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		includeSummary := ctx.Query("include_summary") == "true"
 
 		// Get filtered and paginated transactions
-		result, err := transactionService.FindAllWithFilters(ctx, filter, includeSummary)
+		result, err := transactionService.FindAllWithFilters(ctx, userID, filter, includeSummary)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -302,26 +302,38 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 func DeleteTransaction(transactionService *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
-		userId := ctx.MustGet("X-User-Id").(string)
-		err := transactionService.DeleteTransaction(ctx, id, userId)
-		if err != nil {
-			fmt.Println(err)
-			ctx.JSON(http.StatusInternalServerError, err.Error())
+		userId := ctx.GetString("X-User-Id")
+		if err := transactionService.DeleteTransaction(ctx, id, userId); err != nil {
+			_ = ctx.Error(err)
 			return
 		}
 		ctx.JSON(http.StatusOK, "Deleted")
 	}
 }
 
+// UpdateTransaction godoc
+//
+//	@Summary		Update a transaction
+//	@Description	Update a transaction owned by the authenticated user. The account, category and budget must also belong to the user.
+//	@Tags			Transactions
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			id			path	string					true	"Transaction ID"
+//	@Param			transaction	body	dto.TransactionRequest	true	"Transaction data"
+//	@Success		200
+//	@Failure		400	{object}	map[string]string	"Invalid input or account/category not owned by the user"
+//	@Failure		404	{object}	map[string]string	"Transaction not found"
+//	@Router			/transaction/{id} [put]
 func UpdateTransaction(s *transaction.TransactionService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		var transactionRequest dto.TransactionRequest
 		if err := ctx.ShouldBindJSON(&transactionRequest); err != nil {
-			ctx.JSON(http.StatusBadRequest, err.Error())
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
 			return
 		}
-		userId := ctx.MustGet("X-User-Id").(string)
+		userId := ctx.GetString("X-User-Id")
 		transactionObj := domain.NewTransaction(id, transactionRequest.Name, transactionRequest.Description, transactionRequest.TypeTransation, transactionRequest.AccountId, transactionRequest.CategoryId, transactionRequest.Amount)
 		if !transactionRequest.CreatedAt.IsZero() {
 			transactionObj.CreatedAt = transactionRequest.CreatedAt
@@ -330,7 +342,7 @@ func UpdateTransaction(s *transaction.TransactionService) gin.HandlerFunc {
 		transactionObj.Currency = transactionRequest.Currency
 
 		if err := s.UpdateTransaction(ctx, id, transactionObj); err != nil {
-			ctx.JSON(http.StatusInternalServerError, err.Error())
+			_ = ctx.Error(err)
 			return
 		}
 		ctx.Status(http.StatusOK)

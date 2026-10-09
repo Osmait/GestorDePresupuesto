@@ -10,9 +10,24 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
 
+// GetUser returns a user profile. Requires authentication (enforced by
+// AuthMiddleware) and is restricted to the user themself or an ADMIN.
 func GetUser(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
+		requesterID := c.GetString("X-User-Id")
+		if requesterID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			return
+		}
+		if id != requesterID {
+			requester, ok := c.Get("User")
+			model, isUser := requester.(*dto.UserResponse)
+			if !ok || !isUser || model.Role != "ADMIN" {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+				return
+			}
+		}
 		user, err := userService.FindUserById(c, id)
 		if err != nil {
 			_ = c.Error(err)

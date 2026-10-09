@@ -2,9 +2,9 @@ package exchange
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	exchangeService "github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 )
 
@@ -27,7 +27,7 @@ func ConvertCurrency(service *exchangeService.ExchangeRateService) gin.HandlerFu
 			return
 		}
 
-		amount, err := strconv.ParseFloat(amountStr, 64)
+		amount, err := money.Parse(amountStr)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid amount"})
 			return

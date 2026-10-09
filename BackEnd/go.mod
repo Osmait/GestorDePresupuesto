@@ -16,6 +16,7 @@ require (
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/rs/cors/wrapper/gin v0.0.0-20231013084403-73f81b45a644
 	github.com/rs/zerolog v1.34.0
+	github.com/shopspring/decimal v1.4.0
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.5

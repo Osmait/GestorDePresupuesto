@@ -91,13 +91,19 @@ func DeleteCreditCard(service *creditcard.CreditCardService) gin.HandlerFunc {
 
 func UpdateCardBalance(service *creditcard.CreditCardService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		cardId := ctx.Param("id")
 		balanceId := ctx.Param("balanceId")
 		var req dto.UpdateBalanceRequest
 		if err := ctx.BindJSON(&req); err != nil {
 			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
 			return
 		}
-		response, err := service.UpdateBalance(ctx, balanceId, &req)
+		if err := req.Validate(); err != nil {
+			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
+			return
+		}
+		response, err := service.UpdateBalance(ctx, cardId, balanceId, userId, &req)
 		if err != nil {
 			_ = ctx.Error(err)
 			return

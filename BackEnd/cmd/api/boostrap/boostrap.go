@@ -7,16 +7,17 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+	_ "time/tzdata" // embed the IANA database so APP_TIMEZONE works on minimal images
 
-	_ "github.com/golang-migrate/migrate/v4/database/postgres"
-	_ "github.com/golang-migrate/migrate/v4/source/file"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog/log"
 	"golang.org/x/crypto/bcrypt"
 
+	migrationsdb "github.com/osmait/gestorDePresupuesto/cmd/api/db"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 	domainAI "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	userDomain "github.com/osmait/gestorDePresupuesto/internal/domain/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp"
@@ -109,45 +110,81 @@ func Run() error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 
-	// Initialize repositories
-	repositories := initializeRepositories(db)
+	// Wire repositories, services and the HTTP router.
+	app, err := NewApp(ctx, cfg, db)
+	if err != nil {
+		return err
+	}
 
 	// Seed admin user if configured
-	if err := seedAdminUser(ctx, cfg, repositories, logger); err != nil {
+	if err := seedAdminUser(ctx, cfg, app.repos, logger); err != nil {
 		return fmt.Errorf("failed to seed admin user: %w", err)
 	}
 
-	// Initialize services
-	services := initializeServices(repositories, cfg)
-
-	// Initialize and start server
-	scheduler := worker.NewTransactionScheduler(services.recurringService)
+	// Start background workers
+	scheduler := worker.NewTransactionScheduler(app.services.recurringService)
 	scheduler.Start(ctx)
 
-	demoCleanupWorker := worker.NewDemoCleanupWorker(services.userService, 24*time.Hour)
+	demoCleanupWorker := worker.NewDemoCleanupWorker(app.services.userService, 24*time.Hour)
 	demoCleanupWorker.Start(ctx)
+
+	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
+
+	// Start server
+	if err := app.Server.Run(app.Ctx); err != nil {
+		return fmt.Errorf("server failed: %w", err)
+	}
+
+	logger.Info("Application shutdown completed")
+	return nil
+}
+
+// App is the fully wired application: repositories, services and the HTTP
+// router, built exactly as production builds them.
+type App struct {
+	// Ctx is the server context returned by server.New (cancelled on SIGINT).
+	Ctx context.Context
+	// Server holds the gin engine with every middleware and route registered.
+	Server *server.Server
+
+	repos    *repositories
+	services *services
+}
+
+// NewApp wires repositories, services, the optional MCP/OAuth servers and the
+// HTTP router on top of an already-migrated database. It does not listen on a
+// port, seed data or start background workers, so tests (e.g. the e2e suite)
+// can serve app.Server.Engine through httptest and exercise the same
+// middleware chain (auth, RLS transactions, rate limiting, CORS) as production.
+func NewApp(ctx context.Context, cfg *config.Config, db *sql.DB) (*App, error) {
+	repos := initializeRepositories(db)
+
+	svcs, err := initializeServices(repos, cfg)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize services: %w", err)
+	}
 
 	// Conditionally create the MCP server if enabled in config
 	var mcpServer *mcp.MCPServer
 	var oauthSrv *oauth2.Server
 	if cfg.MCP.Enabled {
 		mcpServer = mcp.NewMCPServer(cfg.MCP.ServerName, cfg.MCP.ServerVersion, &mcp.Services{
-			Account:     services.accountService,
-			Transaction: services.transactionService,
-			Category:    services.categoryService,
-			Budget:      services.budgetService,
-			Analytics:   services.analyticsService,
-			CreditCard:  services.creditCardService,
-			Loan:        services.loanService,
+			Account:     svcs.accountService,
+			Transaction: svcs.transactionService,
+			Category:    svcs.categoryService,
+			Budget:      svcs.budgetService,
+			Analytics:   svcs.analyticsService,
+			CreditCard:  svcs.creditCardService,
+			Loan:        svcs.loanService,
 		}, db)
 
 		issuer := cfg.MCP.BaseURL
 		if issuer == "" {
 			issuer = fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)
 		}
-		oauthSrv, err = mcp.NewOAuthServer(issuer, services.authService)
+		oauthSrv, err = mcp.NewOAuthServer(issuer, svcs.authService)
 		if err != nil {
-			return fmt.Errorf("failed to create OAuth server: %w", err)
+			return nil, fmt.Errorf("failed to create OAuth server: %w", err)
 		}
 	}
 
@@ -156,44 +193,36 @@ func Run() error {
 		cfg.Server.Host,
 		cfg.Server.Port,
 		&cfg.Server.ShutdownTimeout,
-		services.accountService,
-		services.transactionService,
-		services.userService,
-		services.authService,
-		services.budgetService,
-		services.categoryService,
-		services.analyticsService,
-		services.recurringService,
-		services.monthlyPlanService,
-		services.searchService,
-		services.investmentService,
+		svcs.accountService,
+		svcs.transactionService,
+		svcs.userService,
+		svcs.authService,
+		svcs.budgetService,
+		svcs.categoryService,
+		svcs.analyticsService,
+		svcs.recurringService,
+		svcs.monthlyPlanService,
+		svcs.searchService,
+		svcs.investmentService,
 		db,
 		cfg,
-		services.quoteService,
-		services.notificationService,
-		services.aiService,
-		services.aiCache,
-		repositories.categoryRepository,
-		repositories.transactionRepository,
-		services.certificateService,
-		services.creditCardService,
-		services.loanService,
-		services.exchangeService,
-		services.apiKeyService,
-		services.passkeyService,
+		svcs.quoteService,
+		svcs.notificationService,
+		svcs.aiService,
+		svcs.aiCache,
+		repos.categoryRepository,
+		repos.transactionRepository,
+		svcs.certificateService,
+		svcs.creditCardService,
+		svcs.loanService,
+		svcs.exchangeService,
+		svcs.apiKeyService,
+		svcs.passkeyService,
 		mcpServer,
 		oauthSrv,
 	)
 
-	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
-
-	// Start server
-	if err := srv.Run(serverCtx); err != nil {
-		return fmt.Errorf("server failed: %w", err)
-	}
-
-	logger.Info("Application shutdown completed")
-	return nil
+	return &App{Ctx: serverCtx, Server: srv, repos: repos, services: svcs}, nil
 }
 
 // initializeLogger sets up the logger
@@ -263,8 +292,10 @@ func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 
 	switch cfg.Database.Type {
 	case config.DatabaseTypePostgres:
-		utils.RunDBMigration("file://cmd/api/db/migrations", cfg.GetPostgresUrl())
-		return nil
+		// Migrations are embedded in the binary, so this does not depend on the
+		// process working directory. A dirty migration state is returned as an
+		// error and the application refuses to start.
+		return utils.RunMigrationsFromFS(migrationsdb.Migrations, migrationsdb.MigrationsDir, cfg.GetPostgresUrl())
 	default:
 		return fmt.Errorf("unsupported database type for migrations: %s", cfg.Database.Type)
 	}
@@ -338,7 +369,12 @@ type services struct {
 }
 
 // initializeServices creates all service instances
-func initializeServices(repos *repositories, cfg *config.Config) *services {
+func initializeServices(repos *repositories, cfg *config.Config) (*services, error) {
+	appLocation, err := time.LoadLocation(cfg.Server.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("invalid APP_TIMEZONE %q: %w", cfg.Server.Timezone, err)
+	}
+
 	// Services
 	quoteService := quote.NewQuoteService()
 
@@ -358,17 +394,17 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 
 	exchangeService := exchange.NewExchangeRateService()
 
-	usdToDopRateFn := func(ctx context.Context) (float64, error) {
+	usdToDopRateFn := func(ctx context.Context) (money.Amount, error) {
 		rateResp, err := exchangeService.GetUSDtoDOP(ctx)
 		if err != nil {
-			return 0, err
+			return money.Zero, err
 		}
 		return rateResp.USDToDOP, nil
 	}
 
 	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator, usdToDopRateFn)
 
-	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService)
+	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService, repos.accountRepository)
 
 	creditCardService := creditcard.NewCreditCardService(repos.creditCardRepository, repos.accountRepository, transactionService)
 	loanService := loan.NewLoanService(repos.loanRepository, transactionService, repos.accountRepository, repos.categoryRepository)
@@ -376,15 +412,15 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 	userService := user.NewUserService(repos.userRepository)
 	authService := auth.NewAuthServiceWithRefreshTokens(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, repos.refreshTokenRepository, cfg)
 
-	// WebAuthn / passkey service. The shared transactionCache doubles as the
-	// challenge session store — the entries live under passkey:session:* keys.
+	// WebAuthn / passkey service. Ceremony sessions (challenges) are stored in
+	// Postgres (webauthn_sessions) so they work across instances.
 	var passkeyService *passkeySvc.PasskeyService
 	if wa, waErr := webauthn.New(&webauthn.Config{
 		RPDisplayName: cfg.WebAuthn.RPDisplayName,
 		RPID:          cfg.WebAuthn.RPID,
 		RPOrigins:     cfg.WebAuthn.RPOrigins,
 	}); waErr == nil {
-		passkeyService = passkeySvc.NewPasskeyService(wa, repos.passkeyRepository, userService, authService, transactionCache, cfg.WebAuthn.ChallengeTTL)
+		passkeyService = passkeySvc.NewPasskeyService(wa, repos.passkeyRepository, userService, authService, cfg.WebAuthn.ChallengeTTL)
 	} else {
 		log.Warn().Err(waErr).Msg("WebAuthn init failed, passkey endpoints will be disabled")
 	}
@@ -398,7 +434,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService, transactionService, repos.accountRepository, repos.categoryRepository),
 		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn),
-		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService),
+		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService, recurring_transaction.WithLocation(appLocation)),
 		monthlyPlanService:  monthly_plan.NewMonthlyPlanService(repos.monthlyPlanRepository, usdToDopRateFn),
 		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository, repos.loanRepository, repos.certificateRepository),
 		quoteService:        quoteService,
@@ -411,7 +447,7 @@ func initializeServices(repos *repositories, cfg *config.Config) *services {
 		exchangeService:     exchangeService,
 		apiKeyService:       apikey.NewAPIKeyService(repos.apiKeyRepository),
 		passkeyService:      passkeyService,
-	}
+	}, nil
 }
 
 // initializeAIService creates the AI service instance

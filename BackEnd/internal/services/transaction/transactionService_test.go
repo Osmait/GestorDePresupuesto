@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
@@ -33,8 +34,8 @@ func (m *MockTransaction) Update(ctx context.Context, id string, transaction *tr
 	return args.Error(0)
 }
 
-func (m *MockTransaction) FindAll(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
-	args := m.Called(ctx, date1, date2, id)
+func (m *MockTransaction) FindAll(ctx context.Context, date1 string, date2 string, id string, userId string) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, date1, date2, id, userId)
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
@@ -43,19 +44,19 @@ func (m *MockTransaction) FindAllOfAllAccounts(ctx context.Context, id string) (
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
-func (m *MockTransaction) BalanceByAccountAndCurrency(ctx context.Context, accountId string, currency string) (float64, error) {
-	args := m.Called(ctx, accountId, currency)
-	return args.Get(0).(float64), args.Error(1)
+func (m *MockTransaction) BalanceByAccountAndCurrency(ctx context.Context, accountId string, userId string, currency string) (money.Amount, error) {
+	args := m.Called(ctx, accountId, userId, currency)
+	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string, usdToDop float64) (float64, error) {
-	args := m.Called(ctx, budgetId, usdToDop)
-	return args.Get(0).(float64), args.Error(1)
+func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string, userId string, usdToDop money.Amount) (money.Amount, error) {
+	args := m.Called(ctx, budgetId, userId, usdToDop)
+	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string, usdToDop float64) (map[string]float64, error) {
+func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
 	args := m.Called(ctx, userId, usdToDop)
-	return args.Get(0).(map[string]float64), args.Error(1)
+	return args.Get(0).(map[string]money.Amount), args.Error(1)
 }
 
 func (m *MockTransaction) Delete(ctx context.Context, id string, userId string) error {
@@ -68,8 +69,8 @@ func (m *MockTransaction) FindAllOfAllAccountsWithFilters(ctx context.Context, u
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
-func (m *MockTransaction) FindAllWithFilters(ctx context.Context, filter *dto.TransactionFilter) ([]*transaction.Transaction, error) {
-	args := m.Called(ctx, filter)
+func (m *MockTransaction) FindAllWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error) {
+	args := m.Called(ctx, userId, filter)
 	return args.Get(0).([]*transaction.Transaction), args.Error(1)
 }
 
@@ -97,8 +98,8 @@ func (m *MockBudgetRepository) FindAll(ctx context.Context, userId string) ([]*b
 	return args.Get(0).([]*budget.Budget), args.Error(1)
 }
 
-func (m *MockBudgetRepository) FindOne(ctx context.Context, id string) (*budget.Budget, error) {
-	args := m.Called(ctx, id)
+func (m *MockBudgetRepository) FindOne(ctx context.Context, id string, userId string) (*budget.Budget, error) {
+	args := m.Called(ctx, id, userId)
 	return args.Get(0).(*budget.Budget), args.Error(1)
 }
 
@@ -107,8 +108,8 @@ func (m *MockBudgetRepository) Delete(ctx context.Context, id string, userId str
 	return args.Error(0)
 }
 
-func (m *MockBudgetRepository) FindByCategory(ctx context.Context, categoryId string) (*budget.Budget, error) {
-	args := m.Called(ctx, categoryId)
+func (m *MockBudgetRepository) FindByCategory(ctx context.Context, categoryId string, userId string) (*budget.Budget, error) {
+	args := m.Called(ctx, categoryId, userId)
 	return args.Get(0).(*budget.Budget), args.Error(1)
 }
 
@@ -170,9 +171,9 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 	mockAICache.On("InvalidateUserAnalysis", mock.Anything).Return()
 	mockAICache.On("InvalidateUserExtractions", mock.Anything).Return()
 
-	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
+	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
 	mockRepo.On("ResolveAndValidateCurrencyForAccount", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("DOP", nil)
-	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything, mock.Anything).Return(1000.0, nil)
+	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(money.FromInt(1000), nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
@@ -196,13 +197,13 @@ func TestFindAllTransaction(t *testing.T) {
 		expectedTransactions = append(expectedTransactions, utils.GetNewRandomTransaction())
 	}
 
-	mockRepo.On("FindAll", context.Background(), mock.Anything, mock.Anything, mock.Anything).Return(expectedTransactions, nil)
+	mockRepo.On("FindAll", context.Background(), mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(expectedTransactions, nil)
 
 	ctx := context.Background()
 	currenTime := time.Now()
 	date1 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()-7)
 	date2 := fmt.Sprintf("%d/%d/%d", currenTime.Year(), currenTime.Month(), currenTime.Day()+1)
-	_, err := s.FindAll(ctx, date1, date2, "1")
+	_, err := s.FindAll(ctx, date1, date2, "1", "user-1")
 	assert.NoError(t, err, "CreateAccount should not return an error")
 	mockRepo.AssertExpectations(t)
 }

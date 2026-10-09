@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/creditcard"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 type CreateCreditCardRequest struct {
@@ -17,9 +18,9 @@ type CreateCreditCardRequest struct {
 }
 
 type CreateBalanceRequest struct {
-	Currency    string  `json:"currency" binding:"required,len=3"`
-	CreditLimit float64 `json:"credit_limit" binding:"required,gt=0"`
-	InitialDebt float64 `json:"initial_debt" binding:"gte=0"`
+	Currency    string       `json:"currency" binding:"required,len=3"`
+	CreditLimit money.Amount `json:"credit_limit" binding:"required,gt=0"`
+	InitialDebt money.Amount `json:"initial_debt" binding:"gte=0"`
 }
 
 func (r *CreateCreditCardRequest) Validate() error {
@@ -33,8 +34,15 @@ func (r *CreateCreditCardRequest) Validate() error {
 		return errors.New("at least one balance is required")
 	}
 	for _, b := range r.Balances {
-		if b.CreditLimit <= 0 {
+		if !b.CreditLimit.IsPositive() {
 			return errors.New("credit_limit must be greater than 0")
+		}
+		// card_balances.credit_limit / current_balance are DECIMAL(15,2).
+		if err := money.CheckCents("credit_limit", b.CreditLimit); err != nil {
+			return err
+		}
+		if err := money.CheckCents("initial_debt", b.InitialDebt); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -49,27 +57,39 @@ type UpdateCreditCardRequest struct {
 }
 
 type UpdateBalanceRequest struct {
-	CreditLimit *float64 `json:"credit_limit" binding:"omitempty,gt=0"`
+	CreditLimit *money.Amount `json:"credit_limit" binding:"omitempty,gt=0"`
+}
+
+func (r *UpdateBalanceRequest) Validate() error {
+	if r.CreditLimit != nil {
+		return money.CheckCents("credit_limit", *r.CreditLimit)
+	}
+	return nil
 }
 
 type CreatePaymentRequest struct {
-	FromAccountId    string  `json:"from_account_id" binding:"required"`
-	Currency         string  `json:"currency" binding:"required,len=3"`
-	Amount           float64 `json:"amount" binding:"required,gt=0"`
-	ExchangeRate     float64 `json:"exchange_rate"`
-	IncludesInterest bool    `json:"includes_interest"`
-	InterestAmount   float64 `json:"interest_amount" binding:"gte=0"`
-	Notes            string  `json:"notes"`
+	FromAccountId    string       `json:"from_account_id" binding:"required"`
+	Currency         string       `json:"currency" binding:"required,len=3"`
+	Amount           money.Amount `json:"amount" binding:"required,gt=0"`
+	ExchangeRate     money.Amount `json:"exchange_rate"`
+	IncludesInterest bool         `json:"includes_interest"`
+	InterestAmount   money.Amount `json:"interest_amount" binding:"gte=0"`
+	Notes            string       `json:"notes"`
 }
 
 func (r *CreatePaymentRequest) Validate() error {
-	if r.Amount <= 0 {
+	if !r.Amount.IsPositive() {
 		return errors.New("amount must be greater than 0")
 	}
-	if r.IncludesInterest && r.InterestAmount < 0 {
+	if r.IncludesInterest && r.InterestAmount.IsNegative() {
 		return errors.New("interest_amount cannot be negative")
 	}
-	return nil
+	// card_payments.amount / interest_amount are DECIMAL(15,2): reject what
+	// PostgreSQL would silently round (e.g. 0.001).
+	if err := money.CheckCents("amount", r.Amount); err != nil {
+		return err
+	}
+	return money.CheckCents("interest_amount", r.InterestAmount)
 }
 
 type ResetBalanceRequest struct {
@@ -79,13 +99,13 @@ type ResetBalanceRequest struct {
 }
 
 type BalanceResetResponse struct {
-	Id              string    `json:"id"`
-	BalanceId       string    `json:"balance_id"`
-	CardId          string    `json:"card_id"`
-	Currency        string    `json:"currency"`
-	PreviousBalance float64   `json:"previous_balance"`
-	Notes           string    `json:"notes"`
-	CreatedAt       time.Time `json:"created_at"`
+	Id              string       `json:"id"`
+	BalanceId       string       `json:"balance_id"`
+	CardId          string       `json:"card_id"`
+	Currency        string       `json:"currency"`
+	PreviousBalance money.Amount `json:"previous_balance"`
+	Notes           string       `json:"notes"`
+	CreatedAt       time.Time    `json:"created_at"`
 }
 
 func NewBalanceResetResponse(r *creditcard.CardBalanceReset) *BalanceResetResponse {
@@ -101,14 +121,14 @@ func NewBalanceResetResponse(r *creditcard.CardBalanceReset) *BalanceResetRespon
 }
 
 type BalanceResponse struct {
-	Id                 string    `json:"id"`
-	Currency           string    `json:"currency"`
-	CurrentBalance     float64   `json:"current_balance"`
-	CreditLimit        float64   `json:"credit_limit"`
-	AvailableCredit    float64   `json:"available_credit"`
-	UtilizationPercent float64   `json:"utilization_percent"`
-	CreatedAt          time.Time `json:"created_at"`
-	UpdatedAt          time.Time `json:"updated_at"`
+	Id                 string       `json:"id"`
+	Currency           string       `json:"currency"`
+	CurrentBalance     money.Amount `json:"current_balance"`
+	CreditLimit        money.Amount `json:"credit_limit"`
+	AvailableCredit    money.Amount `json:"available_credit"`
+	UtilizationPercent float64      `json:"utilization_percent"`
+	CreatedAt          time.Time    `json:"created_at"`
+	UpdatedAt          time.Time    `json:"updated_at"`
 }
 
 func NewBalanceResponse(b *creditcard.CardBalance) *BalanceResponse {
@@ -129,12 +149,12 @@ type PaymentResponse struct {
 	CardId           string                   `json:"card_id"`
 	FromAccountId    string                   `json:"from_account_id"`
 	Currency         string                   `json:"currency"`
-	Amount           float64                  `json:"amount"`
+	Amount           money.Amount             `json:"amount"`
 	SourceCurrency   string                   `json:"source_currency"`
-	SourceAmount     float64                  `json:"source_amount"`
-	ExchangeRate     float64                  `json:"exchange_rate"`
+	SourceAmount     money.Amount             `json:"source_amount"`
+	ExchangeRate     money.Amount             `json:"exchange_rate"`
 	IncludesInterest bool                     `json:"includes_interest"`
-	InterestAmount   float64                  `json:"interest_amount"`
+	InterestAmount   money.Amount             `json:"interest_amount"`
 	PaymentDate      time.Time                `json:"payment_date"`
 	Status           creditcard.PaymentStatus `json:"status"`
 	Notes            string                   `json:"notes"`
@@ -175,9 +195,9 @@ type CreditCardResponse struct {
 }
 
 type CreditCardSummaryResponse struct {
-	TotalCards       int                   `json:"total_cards"`
-	TotalDebt        map[string]float64    `json:"total_debt"`
-	TotalCreditLimit map[string]float64    `json:"total_credit_limit"`
-	AvgUtilization   map[string]float64    `json:"avg_utilization"`
-	ByCard           []*CreditCardResponse `json:"by_card"`
+	TotalCards       int                     `json:"total_cards"`
+	TotalDebt        map[string]money.Amount `json:"total_debt"`
+	TotalCreditLimit map[string]money.Amount `json:"total_credit_limit"`
+	AvgUtilization   map[string]float64      `json:"avg_utilization"`
+	ByCard           []*CreditCardResponse   `json:"by_card"`
 }

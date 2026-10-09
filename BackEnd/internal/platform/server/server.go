@@ -8,11 +8,13 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	mcpServer "github.com/mark3labs/mcp-go/server"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	mcpPkg "github.com/osmait/gestorDePresupuesto/internal/platform/mcp"
 	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
@@ -44,7 +46,6 @@ import (
 
 	_ "github.com/osmait/gestorDePresupuesto/docs"
 
-	cors "github.com/rs/cors/wrapper/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -80,6 +81,7 @@ type Server struct {
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
+	rateLimiter         *middleware.RateLimitService
 }
 
 func New(ctx context.Context,
@@ -151,14 +153,36 @@ func New(ctx context.Context,
 }
 
 func (s *Server) registerRoutes() {
-	// Basic middleware
-	s.Engine.Use(cors.AllowAll())
+	// Client IP resolution: only trust forwarding headers from configured
+	// proxies (TRUSTED_PROXIES / TRUSTED_PLATFORM_HEADER). Must run before
+	// anything calls c.ClientIP() (rate limiting, login lockout, demo users).
+	if err := middleware.ConfigureClientIP(s.Engine, s.config.Server); err != nil {
+		log.Printf("[security] %v — falling back to trusting no proxies", err)
+		_ = s.Engine.SetTrustedProxies(nil)
+		s.Engine.TrustedPlatform = ""
+	}
+	if s.config.IsProduction() && len(s.config.Server.TrustedProxies) == 0 && s.config.Server.TrustedPlatformHeader == "" {
+		log.Printf("[security] WARNING: no TRUSTED_PROXIES / TRUSTED_PLATFORM_HEADER configured; " +
+			"behind a reverse proxy every client will share the proxy's IP for rate limiting")
+	}
+
+	// CORS: explicit allow-list from CORS_ALLOWED_ORIGINS.
+	if s.config.IsProduction() && onlyLocalOrigins(s.config.CORS.AllowedOrigins) {
+		log.Printf("[security] WARNING: CORS_ALLOWED_ORIGINS only lists localhost origins; " +
+			"browser calls from the production frontend will be blocked")
+	}
+	s.Engine.Use(middleware.CORS(s.config.CORS))
 
 	// Error handling middleware (must be first)
 	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
 
-	// Rate limiting middleware
-	s.Engine.Use(middleware.RateLimitMiddleware(s.config))
+	// Locale for backend-generated names (Accept-Language: es|en, default es).
+	s.Engine.Use(i18n.Middleware())
+
+	// Rate limiting middleware (expired keys are evicted by the cleanup
+	// goroutine started in Run).
+	s.rateLimiter = middleware.NewRateLimitService(s.config)
+	s.Engine.Use(s.rateLimiter.Middleware())
 
 	// Swagger documentation route (before authentication)
 	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -213,13 +237,14 @@ func (s *Server) registerRoutes() {
 			mcpServer.WithStaticBasePath("/mcp"),
 			mcpServer.WithBaseURL(baseURL),
 		)
-		mcpGroup.GET("/sse", gin.WrapH(sseHandler.SSEHandler()))
+		mcpGroup.GET("/sse", middleware.StreamingNoDeadline(), gin.WrapH(sseHandler.SSEHandler()))
 		mcpGroup.POST("/message", gin.WrapH(sseHandler.MessageHandler()))
 
 		// Streamable HTTP transport (for Claude Web custom connectors)
 		streamHandler := mcpServer.NewStreamableHTTPServer(s.mcpServer.GetServer())
 		mcpGroup.POST("", gin.WrapH(streamHandler))
-		mcpGroup.GET("", gin.WrapH(streamHandler))
+		// GET opens the server->client SSE stream of the streamable transport.
+		mcpGroup.GET("", middleware.StreamingNoDeadline(), gin.WrapH(streamHandler))
 		mcpGroup.DELETE("", gin.WrapH(streamHandler))
 	}
 
@@ -271,9 +296,10 @@ func (s *Server) registerRoutes() {
 func (s *Server) Run(ctx context.Context) error {
 	log.Println("Server running on", s.httpAddr)
 
-	srv := &http.Server{
-		Addr:    s.httpAddr,
-		Handler: s.Engine,
+	srv := NewHTTPServer(s.httpAddr, s.Engine, s.config.Server)
+
+	if s.rateLimiter != nil {
+		s.rateLimiter.StartCleanup(ctx, 0)
 	}
 
 	go func() {
@@ -287,6 +313,49 @@ func (s *Server) Run(ctx context.Context) error {
 	defer cancel()
 
 	return srv.Shutdown(ctxShutDown)
+}
+
+func onlyLocalOrigins(origins []string) bool {
+	for _, o := range origins {
+		if !strings.Contains(o, "://localhost") && !strings.Contains(o, "://127.0.0.1") {
+			return false
+		}
+	}
+	return true
+}
+
+// Fallback timeouts used when the config leaves a value unset (zero).
+const (
+	defaultReadHeaderTimeout = 10 * time.Second
+	defaultReadTimeout       = 60 * time.Second
+	defaultWriteTimeout      = 120 * time.Second
+	defaultIdleTimeout       = 120 * time.Second
+)
+
+func durationOr(d, fallback time.Duration) time.Duration {
+	if d > 0 {
+		return d
+	}
+	return fallback
+}
+
+// NewHTTPServer builds the http.Server with timeouts from configuration.
+// Streaming endpoints (SSE) clear their per-connection deadlines themselves
+// (middleware.ClearConnDeadlines), so WriteTimeout can stay bounded for
+// regular requests.
+func NewHTTPServer(addr string, handler http.Handler, cfg config.ServerConfig) *http.Server {
+	srv := &http.Server{
+		Addr:              addr,
+		Handler:           handler,
+		ReadHeaderTimeout: durationOr(cfg.ReadHeaderTimeout, defaultReadHeaderTimeout),
+		ReadTimeout:       durationOr(cfg.ReadTimeout, defaultReadTimeout),
+		WriteTimeout:      durationOr(cfg.WriteTimeout, defaultWriteTimeout),
+		IdleTimeout:       durationOr(cfg.IdleTimeout, defaultIdleTimeout),
+	}
+	if cfg.MaxHeaderBytes > 0 {
+		srv.MaxHeaderBytes = cfg.MaxHeaderBytes
+	}
+	return srv
 }
 
 func serverContext(ctx context.Context) context.Context {

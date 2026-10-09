@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 )
@@ -23,6 +25,11 @@ func (h *Handler) ReconciliationPreview(c *gin.Context) {
 	var req dto.ReconciliationPreviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		return
+	}
+
+	if err := h.verifyAccountOwnership(c.Request.Context(), userID, req.AccountID); err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -108,7 +115,7 @@ func (h *Handler) GetReconciliationSession(c *gin.Context) {
 
 	data, err := h.loadReconciliationSession(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("RECONCILIATION_NOT_FOUND", "Reconciliation session not found"))
 			return
 		}
@@ -131,7 +138,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 
 	data, err := h.loadReconciliationSession(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("RECONCILIATION_NOT_FOUND", "Reconciliation session not found"))
 			return
 		}
@@ -141,7 +148,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 
 	sessionAccountID, err := h.getReconciliationSessionAccountID(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("RECONCILIATION_NOT_FOUND", "Reconciliation session not found"))
 			return
 		}
@@ -187,7 +194,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 
 		switch action.Action {
 		case "ignore":
-			err = h.updateReconciliationItemAction(c.Request.Context(), sessionID, action.ExtractedTransactionID, "ignore", "", "")
+			err = h.updateReconciliationItemAction(c.Request.Context(), userID, sessionID, action.ExtractedTransactionID, "ignore", "", "")
 			if err != nil {
 				addFailure(action.ExtractedTransactionID, action.Action, "UPDATE_FAILED", "Failed to mark item as ignored", err)
 				continue
@@ -202,7 +209,11 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 				addFailure(action.ExtractedTransactionID, action.Action, "MISSING_LINKED_TRANSACTION", "No linked transaction was provided for link action", nil)
 				continue
 			}
-			err = h.updateReconciliationItemAction(c.Request.Context(), sessionID, action.ExtractedTransactionID, "link", linkedID, "")
+			if refErr := ownership.VerifyReference(c.Request.Context(), h.db, userID, ownership.Transaction, linkedID); refErr != nil {
+				addFailure(action.ExtractedTransactionID, action.Action, "INVALID_LINKED_TRANSACTION", "Linked transaction was not found", refErr)
+				continue
+			}
+			err = h.updateReconciliationItemAction(c.Request.Context(), userID, sessionID, action.ExtractedTransactionID, "link", linkedID, "")
 			if err != nil {
 				addFailure(action.ExtractedTransactionID, action.Action, "UPDATE_FAILED", "Failed to save link action", err)
 				continue
@@ -258,7 +269,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 				continue
 			}
 
-			err = h.updateReconciliationItemAction(c.Request.Context(), sessionID, action.ExtractedTransactionID, "create", "", createdID)
+			err = h.updateReconciliationItemAction(c.Request.Context(), userID, sessionID, action.ExtractedTransactionID, "create", "", createdID)
 			if err != nil {
 				addFailure(action.ExtractedTransactionID, action.Action, "UPDATE_FAILED", "Transaction was created but reconciliation item update failed", err)
 				continue
@@ -269,7 +280,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 		}
 	}
 
-	if err := h.markReconciliationSessionApplied(c.Request.Context(), sessionID); err != nil {
+	if err := h.markReconciliationSessionApplied(c.Request.Context(), userID, sessionID); err != nil {
 		log.Warn().Err(err).Str("session_id", sessionID).Msg("failed to mark reconciliation session as applied")
 	}
 
@@ -402,8 +413,10 @@ func (h *Handler) loadReconciliationSession(ctx context.Context, userID string, 
 		`SELECT extracted_data, candidate_data, match_status, score
 		 FROM reconciliation_items
 		 WHERE session_id = $1
+		   AND session_id IN (SELECT id FROM reconciliation_sessions WHERE user_id = $2)
 		 ORDER BY created_at ASC`,
 		sessionID,
+		userID,
 	)
 	if err != nil {
 		return dto.ReconciliationPreviewData{}, err
@@ -489,19 +502,32 @@ func classifyReconciliationCreateError(err error) (string, string) {
 		return "CARD_BALANCE_CURRENCY_NOT_ENABLED", message
 	}
 
+	if errors.Is(err, ownership.ErrReferenceNotOwned) {
+		if strings.Contains(lowerMessage, "(category)") {
+			return "INVALID_CATEGORY_ID", "Category was not found"
+		}
+		if strings.Contains(lowerMessage, "(account)") {
+			return "INVALID_ACCOUNT_ID", "Account was not found"
+		}
+		return "INVALID_REFERENCE", "Referenced resource was not found"
+	}
+
 	if strings.Contains(lowerMessage, "violates foreign key constraint") {
 		if strings.Contains(lowerMessage, "category") {
-			return "INVALID_CATEGORY_ID", message
+			return "INVALID_CATEGORY_ID", "Category was not found"
 		}
 		if strings.Contains(lowerMessage, "account") {
-			return "INVALID_ACCOUNT_ID", message
+			return "INVALID_ACCOUNT_ID", "Account was not found"
 		}
 	}
 
-	return "CREATE_TRANSACTION_FAILED", message
+	// Never echo raw database errors back to the client.
+	return "CREATE_TRANSACTION_FAILED", "Failed to create transaction"
 }
 
-func (h *Handler) updateReconciliationItemAction(ctx context.Context, sessionID string, extractedTransactionID string, action string, linkedID string, createdID string) error {
+// updateReconciliationItemAction records the action taken on an item of a
+// session owned by userID; items of other users' sessions are never touched.
+func (h *Handler) updateReconciliationItemAction(ctx context.Context, userID string, sessionID string, extractedTransactionID string, action string, linkedID string, createdID string) error {
 	if h.db == nil {
 		return fmt.Errorf("database connection not available")
 	}
@@ -513,27 +539,30 @@ func (h *Handler) updateReconciliationItemAction(ctx context.Context, sessionID 
 		     linked_transaction_id = NULLIF($2, ''),
 		     created_transaction_id = NULLIF($3, ''),
 		     updated_at = $4
-		 WHERE session_id = $5 AND extracted_transaction_id = $6`,
+		 WHERE session_id = $5 AND extracted_transaction_id = $6
+		   AND session_id IN (SELECT id FROM reconciliation_sessions WHERE user_id = $7)`,
 		action,
 		linkedID,
 		createdID,
 		time.Now(),
 		sessionID,
 		extractedTransactionID,
+		userID,
 	)
 	return err
 }
 
-func (h *Handler) markReconciliationSessionApplied(ctx context.Context, sessionID string) error {
+func (h *Handler) markReconciliationSessionApplied(ctx context.Context, userID string, sessionID string) error {
 	if h.db == nil {
 		return fmt.Errorf("database connection not available")
 	}
 
 	_, err := h.db.ExecContext(
 		ctx,
-		`UPDATE reconciliation_sessions SET status = 'applied', updated_at = $1 WHERE id = $2`,
+		`UPDATE reconciliation_sessions SET status = 'applied', updated_at = $1 WHERE id = $2 AND user_id = $3`,
 		time.Now(),
 		sessionID,
+		userID,
 	)
 	return err
 }

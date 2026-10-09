@@ -1,9 +1,8 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"regexp"
@@ -41,6 +40,21 @@ type ServerConfig struct {
 	WriteTimeout    time.Duration `json:"write_timeout"`
 	IdleTimeout     time.Duration `json:"idle_timeout"`
 	MaxHeaderBytes  int           `json:"max_header_bytes"`
+	// Timezone is the IANA zone used for calendar-day logic such as
+	// recurring transaction scheduling (APP_TIMEZONE).
+	Timezone string `json:"timezone"`
+	// ReadHeaderTimeout bounds how long the server waits for request headers
+	// (slowloris protection).
+	ReadHeaderTimeout time.Duration `json:"read_header_timeout"`
+	// TrustedProxies is the list of proxy IPs/CIDRs whose X-Forwarded-For /
+	// X-Real-IP headers are trusted when resolving the client IP. Empty (the
+	// default) trusts nobody: the TCP peer address is used as the client IP.
+	TrustedProxies []string `json:"trusted_proxies"`
+	// TrustedPlatformHeader, when set, names a header injected by the hosting
+	// platform's edge proxy (e.g. "X-Real-IP" on Railway, "CF-Connecting-IP"
+	// on Cloudflare) that is trusted as the client IP unconditionally. Only
+	// set it when the app is reachable exclusively through that proxy.
+	TrustedPlatformHeader string `json:"trusted_platform_header"`
 }
 
 // DatabaseConfig holds database-related configuration
@@ -64,7 +78,13 @@ type JWTConfig struct {
 	Expiration        time.Duration `json:"expiration" validate:"required"`
 	RefreshExpiration time.Duration `json:"refresh_expiration"`
 	Issuer            string        `json:"issuer"`
+	Audience          string        `json:"audience"`
 	Algorithm         string        `json:"algorithm"`
+	// RefreshReuseGrace is the window after a refresh token was rotated during
+	// which presenting it again is rejected (401) WITHOUT revoking every
+	// session of the user. It absorbs legitimate parallel refreshes (two tabs,
+	// app + widget). Reuse after the window is treated as token theft.
+	RefreshReuseGrace time.Duration `json:"refresh_reuse_grace"`
 }
 
 // SecurityConfig holds security-related configuration
@@ -249,10 +269,18 @@ func LoadConfig() (*Config, error) {
 			Port:            uint(getEnvInt("SERVER_PORT", 8080)),
 			ShutdownTimeout: getDuration(getEnvString("SHUTDOWN_TIMEOUT", "30s")),
 			Environment:     Environment(getEnvString("ENV", "development")),
-			ReadTimeout:     getDuration(getEnvString("SERVER_READ_TIMEOUT", "30s")),
-			WriteTimeout:    getDuration(getEnvString("SERVER_WRITE_TIMEOUT", "30s")),
-			IdleTimeout:     getDuration(getEnvString("SERVER_IDLE_TIMEOUT", "60s")),
-			MaxHeaderBytes:  getEnvInt("SERVER_MAX_HEADER_BYTES", 1<<20), // 1MB
+			// ReadTimeout covers headers + body (AI uploads can be several MB).
+			ReadTimeout: getDuration(getEnvString("SERVER_READ_TIMEOUT", "60s")),
+			// WriteTimeout must exceed the slowest non-streaming handler (AI
+			// extraction with retries). Streaming endpoints (SSE) clear their
+			// own deadlines.
+			WriteTimeout:          getDuration(getEnvString("SERVER_WRITE_TIMEOUT", "120s")),
+			IdleTimeout:           getDuration(getEnvString("SERVER_IDLE_TIMEOUT", "120s")),
+			ReadHeaderTimeout:     getDuration(getEnvString("SERVER_READ_HEADER_TIMEOUT", "10s")),
+			MaxHeaderBytes:        getEnvInt("SERVER_MAX_HEADER_BYTES", 1<<20), // 1MB
+			TrustedProxies:        getEnvStringSlice("TRUSTED_PROXIES", nil),
+			TrustedPlatformHeader: strings.TrimSpace(getEnvString("TRUSTED_PLATFORM_HEADER", "")),
+			Timezone:              getEnvString("APP_TIMEZONE", "America/Santo_Domingo"),
 		},
 
 		Database: DatabaseConfig{
@@ -274,7 +302,9 @@ func LoadConfig() (*Config, error) {
 			Expiration:        getDuration(getEnvString("JWT_EXPIRATION", "24h")),
 			RefreshExpiration: getDuration(getEnvString("JWT_REFRESH_EXPIRATION", "168h")), // 7 days
 			Issuer:            getEnvString("JWT_ISSUER", "gestor-de-presupuesto"),
+			Audience:          getEnvString("JWT_AUDIENCE", "gestor-de-presupuesto-api"),
 			Algorithm:         getEnvString("JWT_ALGORITHM", "HS256"),
+			RefreshReuseGrace: getDuration(getEnvString("JWT_REFRESH_REUSE_GRACE", "30s")),
 		},
 
 		Security: SecurityConfig{
@@ -318,10 +348,16 @@ func LoadConfig() (*Config, error) {
 				"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH",
 			}),
 			AllowedHeaders: getEnvStringSlice("CORS_ALLOWED_HEADERS", []string{
-				"Origin", "Content-Type", "Authorization", "X-Requested-With", "X-Trace-ID",
+				"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With",
+				"X-Trace-ID", "X-Request-ID", "Last-Event-ID", "Cache-Control",
 			}),
-			ExposedHeaders:   getEnvStringSlice("CORS_EXPOSED_HEADERS", []string{"X-Trace-ID"}),
-			AllowCredentials: getEnvBool("CORS_ALLOW_CREDENTIALS", true),
+			ExposedHeaders: getEnvStringSlice("CORS_EXPOSED_HEADERS", []string{
+				"X-Trace-ID", "X-Request-ID", "Retry-After",
+				"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Window",
+			}),
+			// Clients authenticate with Bearer tokens, not cookies, so
+			// credentialed CORS requests are not needed.
+			AllowCredentials: getEnvBool("CORS_ALLOW_CREDENTIALS", false),
 			MaxAge:           getEnvInt("CORS_MAX_AGE", 86400), // 24 hours
 		},
 
@@ -574,8 +610,14 @@ func (c *Config) validateRateLimit() error {
 
 	// Validate IP whitelist
 	for _, ip := range c.RateLimit.IPWhitelist {
-		if !isValidIP(ip) {
+		if !isValidIP(ip) && !isValidCIDR(ip) {
 			return fmt.Errorf("invalid IP in whitelist: %s", ip)
+		}
+	}
+
+	for _, proxy := range c.Server.TrustedProxies {
+		if net.ParseIP(proxy) == nil && !isValidCIDR(proxy) {
+			return fmt.Errorf("invalid entry in TRUSTED_PROXIES: %s", proxy)
 		}
 	}
 
@@ -592,6 +634,9 @@ func (c *Config) validateCORS() error {
 	for _, origin := range c.CORS.AllowedOrigins {
 		if origin != "*" && !isValidURL(origin) {
 			return fmt.Errorf("invalid CORS origin: %s", origin)
+		}
+		if origin == "*" && c.CORS.AllowCredentials {
+			return fmt.Errorf("CORS wildcard origin cannot be combined with CORS_ALLOW_CREDENTIALS=true")
 		}
 	}
 
@@ -688,8 +733,14 @@ func (c *Config) validatePrometheus() error {
 // validateEnvironmentSpecific validates environment-specific requirements
 func (c *Config) validateEnvironmentSpecific() error {
 	if c.Server.Environment == EnvironmentProduction {
-		if c.JWT.Secret == "development-secret-key-change-in-production-please-use-env-var" {
+		if c.JWT.Secret == devJWTSecret {
 			return fmt.Errorf("default JWT secret cannot be used in production")
+		}
+
+		for _, origin := range c.CORS.AllowedOrigins {
+			if origin == "*" {
+				return fmt.Errorf("CORS wildcard origin cannot be used in production; set CORS_ALLOWED_ORIGINS")
+			}
 		}
 
 		// if !c.Security.EnableTLS {
@@ -878,7 +929,14 @@ func getDuration(value string) time.Duration {
 // getEnvStringSlice returns the environment variable value as string slice
 func getEnvStringSlice(key string, defaultValue []string) []string {
 	if value := os.Getenv(key); value != "" {
-		return strings.Split(value, ",")
+		parts := strings.Split(value, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if p = strings.TrimSpace(p); p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
 	}
 	return defaultValue
 }
@@ -931,15 +989,6 @@ func getJWTSecret() string {
 			"Set it to a random string of at least 32 characters.", env))
 }
 
-// generateSecureSecret generates a cryptographically secure secret
-func generateSecureSecret() string {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return ""
-	}
-	return hex.EncodeToString(bytes)
-}
-
 // isProduction checks if running in production environment
 func isProduction() bool {
 	return os.Getenv("ENV") == "production" || os.Getenv("GO_ENV") == "production"
@@ -982,6 +1031,12 @@ func isValidIP(ip string) bool {
 	// IPv6 validation (basic)
 	ipv6Regex := regexp.MustCompile(`^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$`)
 	return ipv6Regex.MatchString(ip)
+}
+
+// isValidCIDR checks if string is a valid CIDR range (e.g. 10.0.0.0/8)
+func isValidCIDR(s string) bool {
+	_, _, err := net.ParseCIDR(s)
+	return err == nil
 }
 
 // toStringSlice converts any slice to string slice for validation

@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money/moneytest"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/monthly_plan"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/monthly_plan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
@@ -48,14 +50,14 @@ func (m *MockMonthlyPlanRepository) Delete(ctx context.Context, id string, userI
 	return args.Get(0).(int64), args.Error(1)
 }
 
-func (m *MockMonthlyPlanRepository) Totals(ctx context.Context, userID string, usdToDop float64) (*monthly_plan.Totals, error) {
+func (m *MockMonthlyPlanRepository) Totals(ctx context.Context, userID string, usdToDop money.Amount) (*monthly_plan.Totals, error) {
 	args := m.Called(ctx, userID, usdToDop)
 	totals, _ := args.Get(0).(*monthly_plan.Totals)
 	return totals, args.Error(1)
 }
 
-func fixedRate(rate float64) func(context.Context) (float64, error) {
-	return func(context.Context) (float64, error) {
+func fixedRate(rate money.Amount) func(context.Context) (money.Amount, error) {
+	return func(context.Context) (money.Amount, error) {
 		return rate, nil
 	}
 }
@@ -79,7 +81,7 @@ func TestCreate(t *testing.T) {
 			name: "fixed expense with every optional field set",
 			request: &dto.MonthlyPlanItemRequest{
 				Name:       "Alquiler",
-				Amount:     25000,
+				Amount:     money.FromInt(25000),
 				Type:       monthly_plan.TypeBill,
 				Currency:   monthly_plan.CurrencyDOP,
 				CategoryID: ptr("cat-1"),
@@ -93,7 +95,7 @@ func TestCreate(t *testing.T) {
 			name: "empty currency defaults to DOP",
 			request: &dto.MonthlyPlanItemRequest{
 				Name:   "Salario",
-				Amount: 85000,
+				Amount: money.FromInt(85000),
 				Type:   monthly_plan.TypeIncome,
 			},
 			wantActive:  true,
@@ -104,7 +106,7 @@ func TestCreate(t *testing.T) {
 			name: "empty category id is stored as NULL, not as an empty key",
 			request: &dto.MonthlyPlanItemRequest{
 				Name:       "Netflix",
-				Amount:     15,
+				Amount:     money.FromInt(15),
 				Type:       monthly_plan.TypeBill,
 				Currency:   monthly_plan.CurrencyUSD,
 				CategoryID: ptr(""),
@@ -118,7 +120,7 @@ func TestCreate(t *testing.T) {
 			name: "explicitly inactive item stays inactive",
 			request: &dto.MonthlyPlanItemRequest{
 				Name:     "Gym cancelado",
-				Amount:   1500,
+				Amount:   money.FromInt(1500),
 				Type:     monthly_plan.TypeBill,
 				IsActive: ptr(false),
 			},
@@ -133,7 +135,7 @@ func TestCreate(t *testing.T) {
 			t.Parallel()
 
 			repo := &MockMonthlyPlanRepository{}
-			service := NewMonthlyPlanService(repo, fixedRate(60))
+			service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 
 			var saved *monthly_plan.MonthlyPlanItem
 			repo.On("Save", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -161,14 +163,14 @@ func TestCreatePropagatesRepositoryError(t *testing.T) {
 	t.Parallel()
 
 	repo := &MockMonthlyPlanRepository{}
-	service := NewMonthlyPlanService(repo, fixedRate(60))
+	service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 
 	repoErr := errors.New("db down")
 	repo.On("Save", mock.Anything, mock.Anything).Return(repoErr)
 
 	err := service.Create(context.Background(), &dto.MonthlyPlanItemRequest{
 		Name:   "Alquiler",
-		Amount: 25000,
+		Amount: money.FromInt(25000),
 		Type:   monthly_plan.TypeBill,
 	}, "user-1")
 
@@ -179,11 +181,11 @@ func TestFindAllByUserConvertsUsdToDop(t *testing.T) {
 	t.Parallel()
 
 	repo := &MockMonthlyPlanRepository{}
-	service := NewMonthlyPlanService(repo, fixedRate(62.5))
+	service := NewMonthlyPlanService(repo, fixedRate(money.MustParse("62.5")))
 
 	items := []*monthly_plan.MonthlyPlanItem{
-		{ID: "1", Name: "Alquiler", Amount: 25000, Currency: monthly_plan.CurrencyDOP, Type: monthly_plan.TypeBill},
-		{ID: "2", Name: "Netflix", Amount: 15, Currency: monthly_plan.CurrencyUSD, Type: monthly_plan.TypeBill},
+		{ID: "1", Name: "Alquiler", Amount: money.FromInt(25000), Currency: monthly_plan.CurrencyDOP, Type: monthly_plan.TypeBill},
+		{ID: "2", Name: "Netflix", Amount: money.FromInt(15), Currency: monthly_plan.CurrencyUSD, Type: monthly_plan.TypeBill},
 	}
 	repo.On("FindAllByUser", mock.Anything, "user-1").Return(items, nil)
 
@@ -192,18 +194,18 @@ func TestFindAllByUserConvertsUsdToDop(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Len(t, responses, 2)
 	// A DOP row is left untouched.
-	assert.Equal(t, 25000.0, responses[0].Amount)
-	assert.Equal(t, 25000.0, responses[0].AmountDop)
+	moneytest.Equal(t, 25000.0, responses[0].Amount)
+	moneytest.Equal(t, 25000.0, responses[0].AmountDop)
 	// A USD row keeps its original amount and exposes the converted one.
-	assert.Equal(t, 15.0, responses[1].Amount)
-	assert.Equal(t, 937.5, responses[1].AmountDop)
+	moneytest.Equal(t, 15.0, responses[1].Amount)
+	moneytest.Equal(t, 937.5, responses[1].AmountDop)
 }
 
 func TestFindAllByUserReturnsEmptySliceNotNil(t *testing.T) {
 	t.Parallel()
 
 	repo := &MockMonthlyPlanRepository{}
-	service := NewMonthlyPlanService(repo, fixedRate(60))
+	service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 
 	repo.On("FindAllByUser", mock.Anything, "user-1").Return([]*monthly_plan.MonthlyPlanItem{}, nil)
 
@@ -220,31 +222,31 @@ func TestSummary(t *testing.T) {
 	tests := []struct {
 		name            string
 		totals          *monthly_plan.Totals
-		wantAvailable   float64
+		wantAvailable   money.Amount
 		wantCommittedPc float64
 	}{
 		{
 			name:            "income above expenses leaves a positive balance",
-			totals:          &monthly_plan.Totals{TotalIncome: 97000, TotalExpenses: 27790, IncomeCount: 2, ExpensesCount: 3},
-			wantAvailable:   69210,
-			wantCommittedPc: 28.649484536082475,
+			totals:          &monthly_plan.Totals{TotalIncome: money.FromInt(97000), TotalExpenses: money.FromInt(27790), IncomeCount: 2, ExpensesCount: 3},
+			wantAvailable:   money.FromInt(69210),
+			wantCommittedPc: 28.65, // 27790/97000 = 28.6494...%, rounded half-even to 2 places
 		},
 		{
 			name:            "expenses above income report a negative balance and over 100 percent committed",
-			totals:          &monthly_plan.Totals{TotalIncome: 20000, TotalExpenses: 25000, IncomeCount: 1, ExpensesCount: 4},
-			wantAvailable:   -5000,
+			totals:          &monthly_plan.Totals{TotalIncome: money.FromInt(20000), TotalExpenses: money.FromInt(25000), IncomeCount: 1, ExpensesCount: 4},
+			wantAvailable:   money.FromInt(-5000),
 			wantCommittedPc: 125,
 		},
 		{
 			name:            "no income at all does not divide by zero",
-			totals:          &monthly_plan.Totals{TotalIncome: 0, TotalExpenses: 5000, ExpensesCount: 2},
-			wantAvailable:   -5000,
+			totals:          &monthly_plan.Totals{TotalIncome: money.Zero, TotalExpenses: money.FromInt(5000), ExpensesCount: 2},
+			wantAvailable:   money.FromInt(-5000),
 			wantCommittedPc: 0,
 		},
 		{
 			name:            "an empty plan is all zeros",
 			totals:          &monthly_plan.Totals{},
-			wantAvailable:   0,
+			wantAvailable:   money.Zero,
 			wantCommittedPc: 0,
 		},
 	}
@@ -254,18 +256,18 @@ func TestSummary(t *testing.T) {
 			t.Parallel()
 
 			repo := &MockMonthlyPlanRepository{}
-			service := NewMonthlyPlanService(repo, fixedRate(60))
+			service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 
-			repo.On("Totals", mock.Anything, "user-1", 60.0).Return(tt.totals, nil)
+			repo.On("Totals", mock.Anything, "user-1", money.FromInt(60)).Return(tt.totals, nil)
 
 			summary, err := service.Summary(context.Background(), "user-1")
 
 			assert.NoError(t, err)
-			assert.Equal(t, tt.totals.TotalIncome, summary.TotalIncome)
-			assert.Equal(t, tt.totals.TotalExpenses, summary.TotalExpenses)
-			assert.Equal(t, tt.wantAvailable, summary.Available)
+			moneytest.Equal(t, tt.totals.TotalIncome, summary.TotalIncome)
+			moneytest.Equal(t, tt.totals.TotalExpenses, summary.TotalExpenses)
+			moneytest.Equal(t, tt.wantAvailable, summary.Available)
 			assert.InDelta(t, tt.wantCommittedPc, summary.CommittedPercentage, 0.0001)
-			assert.Equal(t, 60.0, summary.UsdToDopRate)
+			moneytest.Equal(t, 60.0, summary.UsdToDopRate)
 			assert.Equal(t, tt.totals.IncomeCount, summary.IncomeCount)
 			assert.Equal(t, tt.totals.ExpensesCount, summary.ExpensesCount)
 		})
@@ -277,7 +279,7 @@ func TestSummaryUsesFallbackRateWhenExchangeFails(t *testing.T) {
 
 	tests := []struct {
 		name   string
-		rateFn func(context.Context) (float64, error)
+		rateFn func(context.Context) (money.Amount, error)
 	}{
 		{
 			name:   "no rate function configured",
@@ -285,14 +287,14 @@ func TestSummaryUsesFallbackRateWhenExchangeFails(t *testing.T) {
 		},
 		{
 			name: "exchange service returns an error",
-			rateFn: func(context.Context) (float64, error) {
-				return 0, errors.New("exchange unreachable")
+			rateFn: func(context.Context) (money.Amount, error) {
+				return money.Zero, errors.New("exchange unreachable")
 			},
 		},
 		{
 			name: "exchange service returns a non-positive rate",
-			rateFn: func(context.Context) (float64, error) {
-				return 0, nil
+			rateFn: func(context.Context) (money.Amount, error) {
+				return money.Zero, nil
 			},
 		},
 	}
@@ -305,12 +307,12 @@ func TestSummaryUsesFallbackRateWhenExchangeFails(t *testing.T) {
 			service := NewMonthlyPlanService(repo, tt.rateFn)
 
 			repo.On("Totals", mock.Anything, "user-1", fallbackUsdToDopRate).
-				Return(&monthly_plan.Totals{TotalIncome: 1000}, nil)
+				Return(&monthly_plan.Totals{TotalIncome: money.FromInt(1000)}, nil)
 
 			summary, err := service.Summary(context.Background(), "user-1")
 
 			assert.NoError(t, err)
-			assert.Equal(t, fallbackUsdToDopRate, summary.UsdToDopRate)
+			moneytest.Equal(t, fallbackUsdToDopRate, summary.UsdToDopRate)
 			repo.AssertExpectations(t)
 		})
 	}
@@ -321,7 +323,7 @@ func TestUpdate(t *testing.T) {
 
 	request := &dto.MonthlyPlanItemRequest{
 		Name:   "Alquiler",
-		Amount: 26000,
+		Amount: money.FromInt(26000),
 		Type:   monthly_plan.TypeBill,
 	}
 
@@ -329,7 +331,7 @@ func TestUpdate(t *testing.T) {
 		t.Parallel()
 
 		repo := &MockMonthlyPlanRepository{}
-		service := NewMonthlyPlanService(repo, fixedRate(60))
+		service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 		repo.On("Update", mock.Anything, mock.Anything).Return(int64(1), nil)
 
 		err := service.Update(context.Background(), request, "item-1", "user-1")
@@ -341,7 +343,7 @@ func TestUpdate(t *testing.T) {
 		t.Parallel()
 
 		repo := &MockMonthlyPlanRepository{}
-		service := NewMonthlyPlanService(repo, fixedRate(60))
+		service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 		// The UPDATE is scoped by user id, so someone else's item affects no rows.
 		repo.On("Update", mock.Anything, mock.Anything).Return(int64(0), nil)
 
@@ -354,7 +356,7 @@ func TestUpdate(t *testing.T) {
 		t.Parallel()
 
 		repo := &MockMonthlyPlanRepository{}
-		service := NewMonthlyPlanService(repo, fixedRate(60))
+		service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 
 		var updated *monthly_plan.MonthlyPlanItem
 		repo.On("Update", mock.Anything, mock.Anything).Run(func(args mock.Arguments) {
@@ -386,7 +388,7 @@ func TestSetActive(t *testing.T) {
 			t.Parallel()
 
 			repo := &MockMonthlyPlanRepository{}
-			service := NewMonthlyPlanService(repo, fixedRate(60))
+			service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 			repo.On("SetActive", mock.Anything, "item-1", "user-1", false).Return(tt.rowsAffected, nil)
 
 			err := service.SetActive(context.Background(), "item-1", "user-1", false)
@@ -418,7 +420,7 @@ func TestDelete(t *testing.T) {
 			t.Parallel()
 
 			repo := &MockMonthlyPlanRepository{}
-			service := NewMonthlyPlanService(repo, fixedRate(60))
+			service := NewMonthlyPlanService(repo, fixedRate(money.FromInt(60)))
 			repo.On("Delete", mock.Anything, "item-1", "user-1").Return(tt.rowsAffected, tt.repoErr)
 
 			err := service.Delete(context.Background(), "item-1", "user-1")
@@ -437,16 +439,16 @@ func TestCommittedPercentage(t *testing.T) {
 
 	tests := []struct {
 		name     string
-		income   float64
-		expenses float64
+		income   money.Amount
+		expenses money.Amount
 		want     float64
 	}{
-		{name: "half the income is committed", income: 100, expenses: 50, want: 50},
-		{name: "everything is committed", income: 100, expenses: 100, want: 100},
-		{name: "overcommitted goes above 100", income: 100, expenses: 150, want: 150},
-		{name: "zero income guards the division", income: 0, expenses: 50, want: 0},
-		{name: "negative income guards the division", income: -10, expenses: 50, want: 0},
-		{name: "no expenses means nothing committed", income: 100, expenses: 0, want: 0},
+		{name: "half the income is committed", income: money.FromInt(100), expenses: money.FromInt(50), want: 50},
+		{name: "everything is committed", income: money.FromInt(100), expenses: money.FromInt(100), want: 100},
+		{name: "overcommitted goes above 100", income: money.FromInt(100), expenses: money.FromInt(150), want: 150},
+		{name: "zero income guards the division", income: money.Zero, expenses: money.FromInt(50), want: 0},
+		{name: "negative income guards the division", income: money.FromInt(-10), expenses: money.FromInt(50), want: 0},
+		{name: "no expenses means nothing committed", income: money.FromInt(100), expenses: money.Zero, want: 0},
 	}
 
 	for _, tt := range tests {

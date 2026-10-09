@@ -5,6 +5,7 @@ import (
 	"database/sql"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/rs/zerolog/log"
 )
@@ -50,29 +51,15 @@ func (c *CategoryRespository) FindAll(ctx context.Context, userId string) ([]*ca
 	return categorys, nil
 }
 
-func (c *CategoryRespository) FindOne(ctx context.Context, id string) (*category.Category, error) {
-	rows, err := txhelper.FromContext(ctx, c.db).QueryContext(ctx, "SELECT id, name ,icon ,color,user_id,created_at FROM categorys  WHERE id = $1 ", id)
-	if err != nil {
-		return nil, err
-	}
+// FindOne returns the category `id` owned by userId, or ownership.ErrNotFound.
+func (c *CategoryRespository) FindOne(ctx context.Context, id string, userId string) (*category.Category, error) {
+	row := txhelper.FromContext(ctx, c.db).QueryRowContext(ctx, "SELECT id, name, icon, color, user_id, created_at FROM categorys WHERE id = $1 AND user_id = $2", id, userId)
 
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close database rows")
-		}
-	}()
-
-	var category category.Category
-	for rows.Next() {
-		if err = rows.Scan(&category.Id, &category.Name, &category.Icon, &category.Color, &category.UserId, &category.CreatedAt); err != nil {
-			return nil, err
-		}
+	var found category.Category
+	if err := row.Scan(&found.Id, &found.Name, &found.Icon, &found.Color, &found.UserId, &found.CreatedAt); err != nil {
+		return nil, ownership.NotFoundIfNoRows(err)
 	}
-	if err = rows.Err(); err != nil {
-		return nil, err
-	}
-	return &category, nil
+	return &found, nil
 }
 
 func (c *CategoryRespository) Delete(ctx context.Context, id string, userId string) error {
@@ -85,14 +72,19 @@ func (c *CategoryRespository) Delete(ctx context.Context, id string, userId stri
 		return err
 	}
 	if rowsAffected == 0 {
-		return sql.ErrNoRows
+		return ownership.ErrNotFound
 	}
 	return nil
 }
 
+// Update changes a category owned by category.UserId; it returns
+// ownership.ErrNotFound when the category does not exist or is not the user's.
 func (c *CategoryRespository) Update(ctx context.Context, category *category.Category) error {
-	_, err := txhelper.FromContext(ctx, c.db).ExecContext(ctx, "UPDATE categorys SET name = $1, icon = $2, color = $3 WHERE id = $4 AND user_id = $5", category.Name, category.Icon, category.Color, category.Id, category.UserId)
-	return err
+	result, err := txhelper.FromContext(ctx, c.db).ExecContext(ctx, "UPDATE categorys SET name = $1, icon = $2, color = $3 WHERE id = $4 AND user_id = $5", category.Name, category.Icon, category.Color, category.Id, category.UserId)
+	if err != nil {
+		return err
+	}
+	return ownership.RequireAffected(result)
 }
 
 func (c *CategoryRespository) Search(ctx context.Context, userId string, query string) ([]*category.Category, error) {

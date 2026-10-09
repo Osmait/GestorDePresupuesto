@@ -3,6 +3,7 @@ package passkey
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -98,6 +99,10 @@ func FinishLogin(service *svc.PasskeyService) gin.HandlerFunc {
 		tokens, _, err := service.FinishLogin(ctx, req.SessionId, assertionReq, userAgent, ipAddress)
 		if err != nil {
 			log.Error().Err(err).Msg("passkey finish login failed")
+			if errors.Is(err, svc.ErrClonedAuthenticator) {
+				_ = ctx.Error(apperrors.NewUnauthorizedError("passkey rejected"))
+				return
+			}
 			_ = ctx.Error(err)
 			return
 		}

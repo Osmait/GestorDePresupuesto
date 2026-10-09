@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"net/http"
@@ -12,18 +13,27 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 )
 
+// rateEntry is the sliding-window state of a single rate-limit key. The
+// window is stored per key because endpoint-specific limits (e.g. /auth/demo,
+// 1h) can be much longer than the global window; cleanup must not drop them
+// early.
+type rateEntry struct {
+	hits   []time.Time
+	window time.Duration
+}
+
 // RateLimitStore represents a rate limiting store
 type RateLimitStore struct {
-	requests map[string][]time.Time
-	mu       sync.RWMutex
-	config   *config.Config
+	entries map[string]*rateEntry
+	mu      sync.Mutex
+	config  *config.Config
 }
 
 // NewRateLimitStore creates a new rate limiting store
 func NewRateLimitStore(config *config.Config) *RateLimitStore {
 	return &RateLimitStore{
-		requests: make(map[string][]time.Time),
-		config:   config,
+		entries: make(map[string]*rateEntry),
+		config:  config,
 	}
 }
 
@@ -31,6 +41,7 @@ func NewRateLimitStore(config *config.Config) *RateLimitStore {
 type RateLimitService struct {
 	store  *RateLimitStore
 	config *config.Config
+	now    func() time.Time
 }
 
 // NewRateLimitService creates a new rate limiting service
@@ -38,43 +49,54 @@ func NewRateLimitService(config *config.Config) *RateLimitService {
 	return &RateLimitService{
 		store:  NewRateLimitStore(config),
 		config: config,
+		now:    time.Now,
 	}
 }
 
-// IsAllowed checks if a request should be allowed based on rate limits
+// pruneLocked drops hits older than the window. Caller holds the lock.
+func pruneLocked(hits []time.Time, now time.Time, window time.Duration) []time.Time {
+	kept := hits[:0]
+	for _, h := range hits {
+		if now.Sub(h) <= window {
+			kept = append(kept, h)
+		}
+	}
+	return kept
+}
+
+// IsAllowed checks if a request should be allowed based on rate limits and,
+// when it is, records it.
 func (rls *RateLimitService) IsAllowed(key string, limit int, window time.Duration, burst int) bool {
+	allowed, _ := rls.allow(key, limit, window, burst)
+	return allowed
+}
+
+// allow records the request when permitted and returns the remaining quota.
+func (rls *RateLimitService) allow(key string, limit int, window time.Duration, burst int) (bool, int) {
 	rls.store.mu.Lock()
 	defer rls.store.mu.Unlock()
 
-	now := time.Now()
+	now := rls.now()
+	entry, ok := rls.store.entries[key]
+	if !ok {
+		entry = &rateEntry{}
+		rls.store.entries[key] = entry
+	}
+	if window > entry.window {
+		entry.window = window
+	}
+	entry.hits = pruneLocked(entry.hits, now, window)
 
-	// Get current requests for this key
-	requests, exists := rls.store.requests[key]
-	if !exists {
-		requests = []time.Time{}
+	if len(entry.hits) >= limit+burst {
+		return false, 0
 	}
 
-	// Remove old requests outside the window
-	validRequests := []time.Time{}
-	for _, req := range requests {
-		if now.Sub(req) <= window {
-			validRequests = append(validRequests, req)
-		}
+	entry.hits = append(entry.hits, now)
+	remaining := limit - len(entry.hits)
+	if remaining < 0 {
+		remaining = 0
 	}
-
-	// Check if we're within limits
-	if len(validRequests) >= limit {
-		// Check if we can allow burst traffic
-		if len(validRequests) >= limit+burst {
-			return false
-		}
-	}
-
-	// Add current request
-	validRequests = append(validRequests, now)
-	rls.store.requests[key] = validRequests
-
-	return true
+	return true, remaining
 }
 
 // isIPWhitelisted checks if an IP is in the whitelist
@@ -103,12 +125,18 @@ func (store *RateLimitStore) isIPWhitelisted(ip string) bool {
 	return false
 }
 
-// generateRateLimitKey generates a key for rate limiting
+// generateRateLimitKey generates a key for rate limiting.
+//
+// The IP comes from gin's ClientIP(), which only honours X-Forwarded-For /
+// X-Real-IP when the TCP peer is a configured trusted proxy (see
+// server.ConfigureClientIP). Never derive the key from raw headers here.
 func (rls *RateLimitService) generateRateLimitKey(c *gin.Context) string {
 	// If user-based rate limiting is enabled and user is authenticated
 	if rls.config.RateLimit.UserBased {
 		if userID, exists := c.Get("X-User-Id"); exists {
-			return "user:" + userID.(string)
+			if id, ok := userID.(string); ok && id != "" {
+				return "user:" + id
+			}
 		}
 	}
 
@@ -118,45 +146,43 @@ func (rls *RateLimitService) generateRateLimitKey(c *gin.Context) string {
 
 // matchEndpointConfig matches the request path to an endpoint configuration
 func (rls *RateLimitService) matchEndpointConfig(path string) *config.EndpointRateLimitConfig {
-	for _, endpoint := range rls.config.RateLimit.Endpoints {
+	for i := range rls.config.RateLimit.Endpoints {
+		endpoint := &rls.config.RateLimit.Endpoints[i]
 		// support wildcard at the end (e.g. /api/auth/*)
 		if strings.HasSuffix(endpoint.Path, "*") {
 			prefix := strings.TrimSuffix(endpoint.Path, "*")
 			if strings.HasPrefix(path, prefix) {
-				return &endpoint
+				return endpoint
 			}
-		} else {
-			if path == endpoint.Path {
-				return &endpoint
-			}
+		} else if path == endpoint.Path {
+			return endpoint
 		}
 	}
 	return nil
 }
 
-// RateLimitMiddleware creates a rate limiting middleware
-func RateLimitMiddleware(config *config.Config) gin.HandlerFunc {
-	service := NewRateLimitService(config)
-
+// Middleware returns the gin handler enforcing the configured limits.
+func (rls *RateLimitService) Middleware() gin.HandlerFunc {
+	cfg := rls.config
 	return func(c *gin.Context) {
 		// Skip rate limiting if disabled
-		if !config.RateLimit.Enabled {
+		if !cfg.RateLimit.Enabled {
 			c.Next()
 			return
 		}
 
 		// Check IP whitelist
-		if service.store.isIPWhitelisted(c.ClientIP()) {
+		if rls.store.isIPWhitelisted(c.ClientIP()) {
 			c.Next()
 			return
 		}
 
 		// Determine limits based on endpoint or global config
-		limit := config.RateLimit.Requests
-		window := config.RateLimit.Window
-		burst := config.RateLimit.Burst
+		limit := cfg.RateLimit.Requests
+		window := cfg.RateLimit.Window
+		burst := cfg.RateLimit.Burst
 
-		endpointConfig := service.matchEndpointConfig(c.Request.URL.Path)
+		endpointConfig := rls.matchEndpointConfig(c.Request.URL.Path)
 		if endpointConfig != nil {
 			limit = endpointConfig.Requests
 			window = endpointConfig.Window
@@ -164,124 +190,80 @@ func RateLimitMiddleware(config *config.Config) gin.HandlerFunc {
 		}
 
 		// Generate rate limit key (append path if endpoint specific to isolate quotas)
-		baseKey := service.generateRateLimitKey(c)
-		key := baseKey
+		key := rls.generateRateLimitKey(c)
 		if endpointConfig != nil {
-			key = baseKey + ":" + endpointConfig.Path
+			key = key + ":" + endpointConfig.Path
 		}
 
-		// Check if request is allowed
-		if !service.IsAllowed(key, limit, window, burst) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
+		allowed, remaining := rls.allow(key, limit, window, burst)
+		if !allowed {
+			c.Header("Retry-After", fmt.Sprintf("%d", int(window.Seconds())))
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error":       "rate limit exceeded",
 				"retry_after": window.Seconds(),
 			})
-			c.Abort()
 			return
 		}
 
 		// Add rate limit headers
 		c.Header("X-RateLimit-Limit", fmt.Sprintf("%d", limit))
 		c.Header("X-RateLimit-Window", window.String())
-		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", getRemainingRequests(service, key, limit, window)))
+		c.Header("X-RateLimit-Remaining", fmt.Sprintf("%d", remaining))
 
 		c.Next()
 	}
 }
 
-// getRemainingRequests calculates remaining requests for a key
-func getRemainingRequests(service *RateLimitService, key string, limit int, window time.Duration) int {
-	service.store.mu.RLock()
-	defer service.store.mu.RUnlock()
-
-	requests, exists := service.store.requests[key]
-	if !exists {
-		return limit
-	}
-
-	now := time.Now()
-
-	// Count valid requests within the window
-	validCount := 0
-	for _, req := range requests {
-		if now.Sub(req) <= window {
-			validCount++
-		}
-	}
-
-	remaining := limit - validCount
-	if remaining < 0 {
-		return 0
-	}
-	return remaining
+// RateLimitMiddleware creates a rate limiting middleware without background
+// cleanup. Long-running servers should use NewRateLimitService +
+// StartCleanup + Middleware so the key map does not grow without bound.
+func RateLimitMiddleware(config *config.Config) gin.HandlerFunc {
+	return NewRateLimitService(config).Middleware()
 }
 
-// IPRateLimitMiddleware creates an IP-based rate limiting middleware
-func IPRateLimitMiddleware(config *config.Config) gin.HandlerFunc {
-	return RateLimitMiddleware(config) // Re-use main middleware logic which falls back to IP
-}
-
-// UserRateLimitMiddleware creates a user-based rate limiting middleware
-func UserRateLimitMiddleware(config *config.Config) gin.HandlerFunc {
-	service := NewRateLimitService(config)
-
-	return func(c *gin.Context) {
-		if !config.RateLimit.Enabled {
-			c.Next()
-			return
-		}
-
-		userID, exists := c.Get("X-User-Id")
-		if !exists {
-			c.Next()
-			return
-		}
-
-		key := "user:" + userID.(string)
-
-		if !service.IsAllowed(key, config.RateLimit.Requests, config.RateLimit.Window, config.RateLimit.Burst) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
-				"error":       "user rate limit exceeded",
-				"retry_after": config.RateLimit.Window.Seconds(),
-			})
-			c.Abort()
-			return
-		}
-
-		c.Next()
+// StartCleanup periodically evicts expired rate-limit entries until ctx is
+// cancelled. The returned channel is closed once the goroutine has exited.
+func (rls *RateLimitService) StartCleanup(ctx context.Context, interval time.Duration) <-chan struct{} {
+	if interval <= 0 {
+		interval = rls.config.RateLimit.Window
 	}
-}
-
-// CleanupMiddleware periodically cleans up old rate limit entries
-func (rls *RateLimitService) CleanupMiddleware() {
-	ticker := time.NewTicker(rls.config.RateLimit.Window)
+	if interval <= 0 {
+		interval = time.Minute
+	}
+	done := make(chan struct{})
+	ticker := time.NewTicker(interval)
 	go func() {
-		for range ticker.C {
-			rls.cleanup()
+		defer close(done)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				rls.cleanup()
+			}
 		}
 	}()
+	return done
 }
 
-// cleanup removes old rate limit entries
+// cleanup removes expired rate limit entries.
 func (rls *RateLimitService) cleanup() {
 	rls.store.mu.Lock()
 	defer rls.store.mu.Unlock()
 
-	now := time.Now()
-	window := rls.config.RateLimit.Window
-
-	for key, requests := range rls.store.requests {
-		validRequests := []time.Time{}
-		for _, req := range requests {
-			if now.Sub(req) <= window {
-				validRequests = append(validRequests, req)
-			}
-		}
-
-		if len(validRequests) == 0 {
-			delete(rls.store.requests, key)
-		} else {
-			rls.store.requests[key] = validRequests
+	now := rls.now()
+	for key, entry := range rls.store.entries {
+		entry.hits = pruneLocked(entry.hits, now, entry.window)
+		if len(entry.hits) == 0 {
+			delete(rls.store.entries, key)
 		}
 	}
+}
+
+// size returns the number of tracked keys (used by tests).
+func (rls *RateLimitService) size() int {
+	rls.store.mu.Lock()
+	defer rls.store.mu.Unlock()
+	return len(rls.store.entries)
 }

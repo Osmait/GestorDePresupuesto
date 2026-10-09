@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
@@ -18,9 +19,9 @@ type AnalyticsRepository struct {
 	db *sql.DB
 }
 
-func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *float64, maxAmount *float64) ([]*analytics.CategoryExpenseRepository, error) {
-	if usdToDop <= 0 {
-		usdToDop = 1
+func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.CategoryExpenseRepository, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(1)
 	}
 
 	query := `
@@ -57,8 +58,8 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 		accountID,
 		categoryID,
 		transactionType,
-		nullableFloatArg(minAmount),
-		nullableFloatArg(maxAmount),
+		nullableAmountArg(minAmount),
+		nullableAmountArg(maxAmount),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting category expenses in range: %w", err)
@@ -88,9 +89,9 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 	return categoryExpenses, nil
 }
 
-func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID string, usdToDop float64) ([]*analytics.CategoryExpenseRepository, error) {
-	if usdToDop <= 0 {
-		usdToDop = 1
+func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID string, usdToDop money.Amount) ([]*analytics.CategoryExpenseRepository, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(1)
 	}
 
 	query := `
@@ -139,9 +140,9 @@ func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID st
 	return categoryExpenses, nil
 }
 
-func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID string, usdToDop float64) ([]*analytics.MonthlySummaryRepository, error) {
-	if usdToDop <= 0 {
-		usdToDop = 60
+func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID string, usdToDop money.Amount) ([]*analytics.MonthlySummaryRepository, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(60)
 	}
 
 	query := `
@@ -189,9 +190,9 @@ func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID stri
 	return monthlySummaries, nil
 }
 
-func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *float64, maxAmount *float64) ([]*analytics.MonthlySummaryRepository, error) {
-	if usdToDop <= 0 {
-		usdToDop = 60
+func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.MonthlySummaryRepository, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(60)
 	}
 
 	query := `
@@ -230,8 +231,8 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 		accountID,
 		categoryID,
 		transactionType,
-		nullableFloatArg(minAmount),
-		nullableFloatArg(maxAmount),
+		nullableAmountArg(minAmount),
+		nullableAmountArg(maxAmount),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary in range: %w", err)
@@ -257,9 +258,9 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 	return monthlySummaries, nil
 }
 
-func (a *AnalyticsRepository) GetTotals(ctx context.Context, userID string, usdToDop float64) (*analytics.TotalsRepository, error) {
-	if usdToDop <= 0 {
-		usdToDop = 60
+func (a *AnalyticsRepository) GetTotals(ctx context.Context, userID string, usdToDop money.Amount) (*analytics.TotalsRepository, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(60)
 	}
 
 	query := `
@@ -286,9 +287,9 @@ func (a *AnalyticsRepository) GetTotals(ctx context.Context, userID string, usdT
 	return &totals, nil
 }
 
-func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID string, usdToDop float64, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *float64, maxAmount *float64) (*analytics.TotalsRepository, error) {
-	if usdToDop <= 0 {
-		usdToDop = 60
+func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) (*analytics.TotalsRepository, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(60)
 	}
 
 	query := `
@@ -324,8 +325,8 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 		accountID,
 		categoryID,
 		transactionType,
-		nullableFloatArg(minAmount),
-		nullableFloatArg(maxAmount),
+		nullableAmountArg(minAmount),
+		nullableAmountArg(maxAmount),
 	).Scan(&totals.TotalIncome, &totals.TotalBill); err != nil {
 		return nil, err
 	}
@@ -333,7 +334,7 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 	return &totals, nil
 }
 
-func nullableFloatArg(value *float64) any {
+func nullableAmountArg(value *money.Amount) any {
 	if value == nil {
 		return nil
 	}

@@ -52,11 +52,12 @@ func TestCreateUser_MissingRequiredFields(t *testing.T) {
 
 // GET /user/:id
 
-func TestGetUserByID_Success(t *testing.T) {
-	user := createUser(t)
+func TestGetUserByID_Self(t *testing.T) {
+	user := createAndLoginUser(t)
 
 	w := httptest.NewRecorder()
 	req := httptest.NewRequest(http.MethodGet, "/user/"+user.ID, nil)
+	req.Header.Set("Authorization", bearerToken(user.Token))
 	testEngine.ServeHTTP(w, req)
 
 	require.Equal(t, http.StatusOK, w.Code)
@@ -68,12 +69,37 @@ func TestGetUserByID_Success(t *testing.T) {
 	assert.Equal(t, user.Email, resp["email"])
 }
 
-func TestGetUserByID_NotFound(t *testing.T) {
-	w := httptest.NewRecorder()
-	req := httptest.NewRequest(http.MethodGet, "/user/non-existent-id-xyz", nil)
-	testEngine.ServeHTTP(w, req)
+func TestGetUserByID_AccessControl(t *testing.T) {
+	owner := createUser(t)
+	other := createAndLoginUser(t)
+	admin := createAndLoginUser(t)
+	promoteToAdmin(t, admin.ID)
 
-	assert.Equal(t, http.StatusNotFound, w.Code)
+	tests := []struct {
+		name   string
+		path   string
+		token  string
+		status int
+	}{
+		{"anonymous is rejected", "/user/" + owner.ID, "", http.StatusUnauthorized},
+		{"invalid token is rejected", "/user/" + owner.ID, "invalid.token.here", http.StatusUnauthorized},
+		{"other user is forbidden", "/user/" + owner.ID, other.Token, http.StatusForbidden},
+		{"admin can read any user", "/user/" + owner.ID, admin.Token, http.StatusOK},
+		{"admin gets 404 for unknown id", "/user/non-existent-id-xyz", admin.Token, http.StatusNotFound},
+		{"non-admin cannot probe unknown ids", "/user/non-existent-id-xyz", other.Token, http.StatusForbidden},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest(http.MethodGet, tc.path, nil)
+			if tc.token != "" {
+				req.Header.Set("Authorization", bearerToken(tc.token))
+			}
+			testEngine.ServeHTTP(w, req)
+			assert.Equal(t, tc.status, w.Code, w.Body.String())
+		})
+	}
 }
 
 // GET /profile (requires auth)

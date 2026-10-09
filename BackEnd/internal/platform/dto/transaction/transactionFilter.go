@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 // TransactionFilter represents the filtering and pagination parameters for transaction queries
@@ -39,8 +40,8 @@ type TransactionFilter struct {
 	Period   string `json:"period" example:"this_month" enums:"today,this_week,this_month,this_year,last_week,last_month,last_year"`
 
 	// Amount filters
-	AmountMin *float64 `json:"amount_min" example:"0.00"`
-	AmountMax *float64 `json:"amount_max" example:"1000.00"`
+	AmountMin *money.Amount `json:"amount_min" example:"0.00"`
+	AmountMax *money.Amount `json:"amount_max" example:"1000.00"`
 
 	// Search filter
 	Search string `json:"search" example:"grocery"`
@@ -48,6 +49,17 @@ type TransactionFilter struct {
 	// Internal fields for calculated values
 	CalculatedDateFrom time.Time `json:"-"`
 	CalculatedDateTo   time.Time `json:"-"`
+}
+
+// allowedSortFields maps the accepted sort_by values to their canonical name.
+// The frontend sends `transaction_name`; `name` is kept as an alias. The
+// repository maps these canonical names to SQL columns.
+var allowedSortFields = map[string]string{
+	"created_at":       "created_at",
+	"amount":           "amount",
+	"transaction_name": "transaction_name",
+	"name":             "transaction_name",
+	"type_transation":  "type_transation",
 }
 
 // NewTransactionFilter creates a new TransactionFilter with default values
@@ -90,13 +102,8 @@ func (f *TransactionFilter) ParseFromQuery(ctx *gin.Context) error {
 
 	// Parse sorting parameters
 	if sortBy := ctx.Query("sort_by"); sortBy != "" {
-		// Validate allowed sort fields
-		allowedSortFields := []string{"created_at", "amount", "name", "type_transation"}
-		for _, field := range allowedSortFields {
-			if sortBy == field {
-				f.SortBy = sortBy
-				break
-			}
+		if field, ok := allowedSortFields[sortBy]; ok {
+			f.SortBy = field
 		}
 	}
 
@@ -136,13 +143,13 @@ func (f *TransactionFilter) ParseFromQuery(ctx *gin.Context) error {
 
 	// Parse amount filters
 	if amountMinStr := ctx.Query("amount_min"); amountMinStr != "" {
-		if amountMin, err := strconv.ParseFloat(amountMinStr, 64); err == nil {
+		if amountMin, err := money.Parse(amountMinStr); err == nil {
 			f.AmountMin = &amountMin
 		}
 	}
 
 	if amountMaxStr := ctx.Query("amount_max"); amountMaxStr != "" {
-		if amountMax, err := strconv.ParseFloat(amountMaxStr, 64); err == nil {
+		if amountMax, err := money.Parse(amountMaxStr); err == nil {
 			f.AmountMax = &amountMax
 		}
 	}
@@ -262,7 +269,7 @@ func (f *TransactionFilter) Validate() error {
 		return fmt.Errorf("page must be positive")
 	}
 
-	if f.AmountMin != nil && f.AmountMax != nil && *f.AmountMin > *f.AmountMax {
+	if f.AmountMin != nil && f.AmountMax != nil && f.AmountMin.GreaterThan(*f.AmountMax) {
 		return fmt.Errorf("amount_min cannot be greater than amount_max")
 	}
 

@@ -34,6 +34,10 @@ func CreateItem(service *monthly_plan.MonthlyPlanService) gin.HandlerFunc {
 			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
+		if err := req.Validate(); err != nil {
+			_ = c.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
+			return
+		}
 
 		if err := service.Create(c, &req, userID); err != nil {
 			_ = c.Error(err)
@@ -121,6 +125,10 @@ func UpdateItem(service *monthly_plan.MonthlyPlanService) gin.HandlerFunc {
 
 		if err := c.ShouldBindJSON(&req); err != nil {
 			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
+			return
+		}
+		if err := req.Validate(); err != nil {
+			_ = c.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
 

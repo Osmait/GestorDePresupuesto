@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/notification"
 	"github.com/r3labs/sse/v2"
 )
@@ -50,9 +51,9 @@ func (s *NotificationService) Publish(streamID string, event string, data string
 func (s *NotificationService) SendToUser(ctx context.Context, userID string, messageJSON string) {
 	// 1. Persist to Database
 	var notifPayload struct {
-		Type    string   `json:"type"`
-		Message string   `json:"message"`
-		Amount  *float64 `json:"amount"`
+		Type    string        `json:"type"`
+		Message string        `json:"message"`
+		Amount  *money.Amount `json:"amount"`
 	}
 
 	// Try to parse the JSON message

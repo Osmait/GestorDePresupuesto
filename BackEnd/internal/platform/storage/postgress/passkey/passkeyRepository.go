@@ -68,9 +68,18 @@ func (r *PasskeyRepository) FindByUserId(ctx context.Context, userId string) ([]
 	return passkeys, nil
 }
 
-func (r *PasskeyRepository) UpdateSignCount(ctx context.Context, id string, signCount uint32) error {
-	query := `UPDATE passkeys SET sign_count = $1, last_used_at = $2 WHERE id = $3`
-	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, signCount, time.Now(), id)
+func (r *PasskeyRepository) UpdateSignCount(ctx context.Context, id string, signCount uint32, credentialJSON []byte) error {
+	// credential_json is what toWebAuthnCredential prefers on the next login,
+	// so it must carry the new counter/flags too — otherwise the stale JSON
+	// counter would make every later login look like a cloned authenticator.
+	var credJSON any
+	if len(credentialJSON) > 0 {
+		credJSON = string(credentialJSON)
+	}
+	query := `UPDATE passkeys
+		SET sign_count = $1, last_used_at = $2, credential_json = COALESCE($3::jsonb, credential_json)
+		WHERE id = $4`
+	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, signCount, time.Now(), credJSON, id)
 	if err != nil {
 		return err
 	}
@@ -98,6 +107,47 @@ func (r *PasskeyRepository) Delete(ctx context.Context, id string, userId string
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+// SaveSession stores a WebAuthn ceremony session. It deliberately uses the
+// pool (autocommit) rather than the request transaction so the session is
+// visible to other instances immediately and its lifecycle is independent of
+// the request outcome. Expired rows are purged opportunistically.
+func (r *PasskeyRepository) SaveSession(ctx context.Context, session *WebAuthnSession) error {
+	if _, err := r.db.ExecContext(ctx, `DELETE FROM webauthn_sessions WHERE expires_at < NOW()`); err != nil {
+		log.Warn().Err(err).Msg("failed to purge expired webauthn sessions")
+	}
+	var userID any
+	if session.UserId != "" {
+		userID = session.UserId
+	}
+	_, err := r.db.ExecContext(ctx, `INSERT INTO webauthn_sessions (id, kind, user_id, session_data, expires_at)
+		VALUES ($1, $2, $3, $4::jsonb, $5)`,
+		session.Id, session.Kind, userID, string(session.SessionData), session.ExpiresAt)
+	return err
+}
+
+// TakeSession atomically consumes a session: the DELETE ... RETURNING makes
+// it single-use even across instances. It runs outside the request
+// transaction on purpose — a failed ceremony rolls the request back, and the
+// session must stay consumed regardless.
+func (r *PasskeyRepository) TakeSession(ctx context.Context, id, kind string) (*WebAuthnSession, error) {
+	s := &WebAuthnSession{}
+	var userID sql.NullString
+	var data string
+	err := r.db.QueryRowContext(ctx, `DELETE FROM webauthn_sessions
+		WHERE id = $1 AND kind = $2
+		RETURNING id, kind, user_id, session_data::text, expires_at`, id, kind).
+		Scan(&s.Id, &s.Kind, &userID, &data, &s.ExpiresAt)
+	if err != nil {
+		return nil, err
+	}
+	if !s.ExpiresAt.After(time.Now()) {
+		return nil, sql.ErrNoRows
+	}
+	s.UserId = userID.String
+	s.SessionData = []byte(data)
+	return s, nil
 }
 
 type scannable interface {

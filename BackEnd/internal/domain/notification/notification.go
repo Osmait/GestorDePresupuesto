@@ -5,16 +5,17 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 type Notification struct {
-	ID        uuid.UUID `json:"id"`
-	UserID    string    `json:"user_id"`
-	Type      string    `json:"type"`
-	Message   string    `json:"message"`
-	Amount    *float64  `json:"amount,omitempty"`
-	IsRead    bool      `json:"is_read"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        uuid.UUID     `json:"id"`
+	UserID    string        `json:"user_id"`
+	Type      string        `json:"type"`
+	Message   string        `json:"message"`
+	Amount    *money.Amount `json:"amount,omitempty"`
+	IsRead    bool          `json:"is_read"`
+	CreatedAt time.Time     `json:"created_at"`
 }
 
 type NotificationRepository interface {

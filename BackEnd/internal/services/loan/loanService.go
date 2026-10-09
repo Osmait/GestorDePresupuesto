@@ -5,25 +5,41 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"math"
 	"strings"
 	"time"
 
 	accountDomain "github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	categoryDomain "github.com/osmait/gestorDePresupuesto/internal/domain/category"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/loan"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/loan"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	loanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
+	"github.com/osmait/gestorDePresupuesto/internal/services/funds"
+	"github.com/osmait/gestorDePresupuesto/internal/services/systemcategory"
 	"github.com/segmentio/ksuid"
 )
 
+var (
+	// ErrLoanNotFound is returned when a loan does not exist or belongs to another user.
+	ErrLoanNotFound = fmt.Errorf("%w: loan not found", errorhttp.ErrNotFound)
+)
+
+func isNotFound(err error) bool {
+	return errors.Is(err, sql.ErrNoRows) || errors.Is(err, errorhttp.ErrNotFound)
+}
+
 type TransactionServiceInterface interface {
-	CreateTransaction(ctx context.Context, name, description string, amount float64, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error
+	CreateTransaction(ctx context.Context, name, description string, amount money.Amount, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error
 }
 
 type AccountRepositoryInterface interface {
 	FindByIdAndUserId(ctx context.Context, id string, userId string) (*accountDomain.Account, error)
+	// FindByIdAndUserIdForUpdate locks the source account of a disbursement
+	// for the request transaction; Balance feeds the overdraft check.
+	FindByIdAndUserIdForUpdate(ctx context.Context, id string, userId string) (*accountDomain.Account, error)
+	Balance(ctx context.Context, id string, userId string) (money.Amount, error)
 }
 
 type CategoryRepositoryInterface interface {
@@ -49,22 +65,38 @@ func NewLoanService(repository loanRepo.LoanRepositoryInterface, transactionServ
 
 func (s *LoanService) CreateLoan(ctx context.Context, req *dto.CreateLoanRequest, userId string) (*dto.LoanResponse, error) {
 	if err := req.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", errorhttp.ErrBadRequest, err.Error())
 	}
 
-	_, err := s.accountRepository.FindByIdAndUserId(ctx, req.SourceAccountId, userId)
+	// Lock the source account until the request transaction ends so the funds
+	// check below cannot interleave with another debit of the same account.
+	sourceAccount, err := s.accountRepository.FindByIdAndUserIdForUpdate(ctx, req.SourceAccountId, userId)
 	if err != nil {
-		return nil, errors.New("source account not found")
+		if isNotFound(err) {
+			return nil, fmt.Errorf("%w: source account not found", errorhttp.ErrBadRequest)
+		}
+		return nil, err
 	}
 
 	id, _ := ksuid.NewRandom()
 
-	principal := round2(req.PrincipalAmount)
-	totalInterest := 0.0
-	if req.InterestMode == string(loan.InterestModeFixedTotal) {
-		totalInterest = round2(principal * (req.AnnualRate / 100) * (float64(req.TermMonths) / 12))
+	principal := req.PrincipalAmount.RoundCents()
+
+	// No overdrafts: the disbursement leaves the source account, which must
+	// hold the principal. Balances are only comparable in the same currency;
+	// a loan in another currency than its source account is not checked.
+	if s.transactionService != nil && sameCurrency(sourceAccount.Currency, req.Currency) {
+		if err := funds.Require(ctx, s.accountRepository, sourceAccount, userId, principal); err != nil {
+			return nil, err
+		}
 	}
-	totalAmount := round2(principal + totalInterest)
+	totalInterest := money.Zero
+	if req.InterestMode == string(loan.InterestModeFixedTotal) {
+		// principal * rate% * months/12, multiplied exactly and divided once,
+		// then rounded half-even to cents.
+		totalInterest = principal.Mul(req.AnnualRate).MulInt(int64(req.TermMonths)).DivInt(1200).RoundCents()
+	}
+	totalAmount := principal.Add(totalInterest)
 	now := time.Now()
 
 	entity := &loan.Loan{
@@ -82,8 +114,8 @@ func (s *LoanService) CreateLoan(ctx context.Context, req *dto.CreateLoanRequest
 		Notes:           req.Notes,
 		TotalInterest:   totalInterest,
 		TotalAmount:     totalAmount,
-		PaidPrincipal:   0,
-		PaidInterest:    0,
+		PaidPrincipal:   money.Zero,
+		PaidInterest:    money.Zero,
 		Status:          loan.LoanStatusActive,
 		CreatedAt:       now,
 		UpdatedAt:       now,
@@ -95,15 +127,15 @@ func (s *LoanService) CreateLoan(ctx context.Context, req *dto.CreateLoanRequest
 	}
 
 	if s.transactionService != nil {
-		categoryId, catErr := s.ensureSystemCategory(ctx, userId, "Prestamos otorgados", "💸", "#0ea5e9")
+		categoryId, catErr := s.ensureSystemCategory(ctx, userId, categoryDomain.SystemLoansGranted)
 		if catErr != nil {
 			return nil, catErr
 		}
 
 		txErr := s.transactionService.CreateTransaction(
 			ctx,
-			"Loan to "+entity.BorrowerName,
-			"Loan disbursement",
+			i18n.T(ctx, i18n.LoanDisbursementName, entity.BorrowerName),
+			i18n.T(ctx, i18n.LoanDisbursementDescription),
 			entity.PrincipalAmount,
 			"loan_disbursement",
 			entity.SourceAccountId,
@@ -120,6 +152,17 @@ func (s *LoanService) CreateLoan(ctx context.Context, req *dto.CreateLoanRequest
 
 	response := dto.NewLoanResponse(entity)
 	return &response, nil
+}
+
+// sameCurrency compares currency codes; an empty code is the default DOP.
+func sameCurrency(a, b string) bool {
+	norm := func(c string) string {
+		if c = strings.ToUpper(strings.TrimSpace(c)); c == "" {
+			return "DOP"
+		}
+		return c
+	}
+	return norm(a) == norm(b)
 }
 
 func (s *LoanService) FindAll(ctx context.Context, userId string) ([]dto.LoanResponse, error) {
@@ -139,15 +182,18 @@ func (s *LoanService) FindAll(ctx context.Context, userId string) ([]dto.LoanRes
 func (s *LoanService) FindById(ctx context.Context, id string, userId string) (*dto.LoanDetailsResponse, error) {
 	entity, err := s.repository.FindById(ctx, id, userId)
 	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrLoanNotFound
+		}
 		return nil, err
 	}
 
-	installments, err := s.repository.FindInstallmentsByLoan(ctx, id)
+	installments, err := s.repository.FindInstallmentsByLoan(ctx, id, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	payments, err := s.repository.FindPaymentsByLoan(ctx, id)
+	payments, err := s.repository.FindPaymentsByLoan(ctx, id, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -173,72 +219,75 @@ func (s *LoanService) FindById(ctx context.Context, id string, userId string) (*
 
 func (s *LoanService) RegisterPayment(ctx context.Context, loanId string, userId string, req *dto.RegisterLoanPaymentRequest) (*dto.LoanPaymentResponse, error) {
 	if err := req.Validate(); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%w: %s", errorhttp.ErrBadRequest, err.Error())
 	}
 
-	entity, err := s.repository.FindById(ctx, loanId, userId)
+	// Lock the loan row for the rest of the request transaction: the paid
+	// totals below are read-modify-write, and concurrent payments must
+	// serialise on this lock instead of overwriting each other.
+	entity, err := s.repository.FindByIdForUpdate(ctx, loanId, userId)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.New("loan not found")
+		if isNotFound(err) {
+			return nil, ErrLoanNotFound
 		}
 		return nil, err
 	}
 
 	if entity.Status != loan.LoanStatusActive {
-		return nil, errors.New("loan is not active")
+		return nil, fmt.Errorf("%w: loan is not active", errorhttp.ErrBadRequest)
 	}
 
 	_, err = s.accountRepository.FindByIdAndUserId(ctx, req.DestinationAccountId, userId)
 	if err != nil {
-		return nil, errors.New("destination account not found")
+		if isNotFound(err) {
+			return nil, fmt.Errorf("%w: destination account not found", errorhttp.ErrBadRequest)
+		}
+		return nil, err
 	}
 
-	pending := entity.TotalAmount - (entity.PaidPrincipal + entity.PaidInterest)
-	if pending <= 0 {
-		return nil, errors.New("loan already paid")
+	pending := entity.TotalAmount.Sub(entity.PaidPrincipal.Add(entity.PaidInterest))
+	if !pending.IsPositive() {
+		return nil, fmt.Errorf("%w: loan already paid", errorhttp.ErrBadRequest)
 	}
 
-	paymentAmount := req.Amount
-	if paymentAmount > pending {
+	paymentAmount := req.Amount.RoundCents()
+	if paymentAmount.GreaterThan(pending) {
 		return nil, fmt.Errorf("%w: payment amount cannot be greater than pending amount", errorhttp.ErrBadRequest)
 	}
 
-	remainingInterest := entity.TotalInterest - entity.PaidInterest
-	if remainingInterest < 0 {
-		remainingInterest = 0
-	}
+	remainingInterest := money.Max(entity.TotalInterest.Sub(entity.PaidInterest), money.Zero)
 
-	interestComponent := math.Min(paymentAmount, remainingInterest)
-	principalComponent := paymentAmount - interestComponent
+	interestComponent := money.Min(paymentAmount, remainingInterest)
+	principalComponent := paymentAmount.Sub(interestComponent)
 
 	paymentId, _ := ksuid.NewRandom()
 	payment := &loan.Payment{
 		Id:                   paymentId.String(),
 		LoanId:               entity.Id,
 		DestinationAccountId: req.DestinationAccountId,
-		Amount:               round2(paymentAmount),
-		PrincipalComponent:   round2(principalComponent),
-		InterestComponent:    round2(interestComponent),
+		Amount:               paymentAmount,
+		PrincipalComponent:   principalComponent,
+		InterestComponent:    interestComponent,
 		PaymentDate:          req.ParsedPaymentDate(),
 		Notes:                req.Notes,
 		CreatedAt:            time.Now(),
 	}
 
-	if err := s.repository.SavePayment(ctx, payment); err != nil {
+	if err := s.repository.SavePayment(ctx, payment, userId); err != nil {
 		return nil, err
 	}
 
 	if s.transactionService != nil {
-		if payment.PrincipalComponent > 0 {
-			principalCategoryId, catErr := s.ensureSystemCategory(ctx, userId, "Cobro de prestamos", "💰", "#22c55e")
+		if payment.PrincipalComponent.IsPositive() {
+			principalCategoryId, catErr := s.ensureSystemCategory(ctx, userId, categoryDomain.SystemLoanCollections)
 			if catErr != nil {
 				return nil, catErr
 			}
 
 			txErr := s.transactionService.CreateTransaction(
 				ctx,
-				"Loan principal - "+entity.BorrowerName,
-				"Principal collection for loan",
+				i18n.T(ctx, i18n.LoanPrincipalName, entity.BorrowerName),
+				i18n.T(ctx, i18n.LoanPrincipalDescription),
 				payment.PrincipalComponent,
 				"loan_collection",
 				req.DestinationAccountId,
@@ -253,16 +302,16 @@ func (s *LoanService) RegisterPayment(ctx context.Context, loanId string, userId
 			}
 		}
 
-		if payment.InterestComponent > 0 {
-			interestCategoryId, catErr := s.ensureSystemCategory(ctx, userId, "Intereses cobrados", "📈", "#16a34a")
+		if payment.InterestComponent.IsPositive() {
+			interestCategoryId, catErr := s.ensureSystemCategory(ctx, userId, categoryDomain.SystemLoanInterest)
 			if catErr != nil {
 				return nil, catErr
 			}
 
 			txErr := s.transactionService.CreateTransaction(
 				ctx,
-				"Loan interest - "+entity.BorrowerName,
-				"Interest income from loan",
+				i18n.T(ctx, i18n.LoanInterestName, entity.BorrowerName),
+				i18n.T(ctx, i18n.LoanInterestDescription),
 				payment.InterestComponent,
 				"income",
 				req.DestinationAccountId,
@@ -278,9 +327,9 @@ func (s *LoanService) RegisterPayment(ctx context.Context, loanId string, userId
 		}
 	}
 
-	entity.PaidInterest = round2(entity.PaidInterest + payment.InterestComponent)
-	entity.PaidPrincipal = round2(entity.PaidPrincipal + payment.PrincipalComponent)
-	if entity.PaidInterest+entity.PaidPrincipal >= entity.TotalAmount {
+	entity.PaidInterest = entity.PaidInterest.Add(payment.InterestComponent)
+	entity.PaidPrincipal = entity.PaidPrincipal.Add(payment.PrincipalComponent)
+	if entity.PaidInterest.Add(entity.PaidPrincipal).GreaterThanOrEqual(entity.TotalAmount) {
 		entity.Status = loan.LoanStatusPaid
 	}
 	entity.UpdatedAt = time.Now()
@@ -298,27 +347,32 @@ func (s *LoanService) RegisterPayment(ctx context.Context, loanId string, userId
 }
 
 func (s *LoanService) CancelLoan(ctx context.Context, loanId string, userId string) error {
-	entity, err := s.repository.FindById(ctx, loanId, userId)
+	// Locked so a concurrent payment cannot change paid_principal between the
+	// refund computation and the status change.
+	entity, err := s.repository.FindByIdForUpdate(ctx, loanId, userId)
 	if err != nil {
-		return errors.New("loan not found")
+		if isNotFound(err) {
+			return ErrLoanNotFound
+		}
+		return err
 	}
 
 	if entity.Status != loan.LoanStatusActive {
-		return errors.New("only active loans can be cancelled")
+		return fmt.Errorf("%w: only active loans can be cancelled", errorhttp.ErrBadRequest)
 	}
 
-	remainingPrincipal := round2(entity.PrincipalAmount - entity.PaidPrincipal)
+	remainingPrincipal := entity.PrincipalAmount.Sub(entity.PaidPrincipal).RoundCents()
 
-	if remainingPrincipal > 0 && s.transactionService != nil {
-		categoryId, catErr := s.ensureSystemCategory(ctx, userId, "Cancelacion de prestamo", "🔙", "#ef4444")
+	if remainingPrincipal.IsPositive() && s.transactionService != nil {
+		categoryId, catErr := s.ensureSystemCategory(ctx, userId, categoryDomain.SystemLoanCancellation)
 		if catErr != nil {
 			return catErr
 		}
 
 		txErr := s.transactionService.CreateTransaction(
 			ctx,
-			"Loan cancellation refund - "+entity.BorrowerName,
-			"Refund of remaining principal due to loan cancellation",
+			i18n.T(ctx, i18n.LoanRefundName, entity.BorrowerName),
+			i18n.T(ctx, i18n.LoanRefundDescription),
 			remainingPrincipal,
 			"loan_cancellation_refund",
 			entity.SourceAccountId,
@@ -337,7 +391,13 @@ func (s *LoanService) CancelLoan(ctx context.Context, loanId string, userId stri
 }
 
 func (s *LoanService) UpdateStatus(ctx context.Context, loanId string, userId string, status loan.LoanStatus) error {
-	return s.repository.UpdateLoanStatus(ctx, loanId, userId, status)
+	if err := s.repository.UpdateLoanStatus(ctx, loanId, userId, status); err != nil {
+		if isNotFound(err) {
+			return ErrLoanNotFound
+		}
+		return err
+	}
+	return nil
 }
 
 func (s *LoanService) GetSummary(ctx context.Context, userId string) (*dto.LoanSummaryResponse, error) {
@@ -350,19 +410,19 @@ func (s *LoanService) GetSummary(ctx context.Context, userId string) (*dto.LoanS
 	summary := &dto.LoanSummaryResponse{}
 
 	for _, item := range loans {
-		summary.TotalPrincipal += item.PrincipalAmount
-		summary.TotalCollected += item.PaidPrincipal + item.PaidInterest
-		summary.TotalInterestEarned += item.PaidInterest
+		summary.TotalPrincipal = summary.TotalPrincipal.Add(item.PrincipalAmount)
+		summary.TotalCollected = summary.TotalCollected.Add(item.PaidPrincipal.Add(item.PaidInterest))
+		summary.TotalInterestEarned = summary.TotalInterestEarned.Add(item.PaidInterest)
 
-		pending := item.TotalAmount - (item.PaidPrincipal + item.PaidInterest)
-		if pending > 0 {
-			summary.TotalPending += pending
+		pending := item.TotalAmount.Sub(item.PaidPrincipal.Add(item.PaidInterest))
+		if pending.IsPositive() {
+			summary.TotalPending = summary.TotalPending.Add(pending)
 		}
 
 		if item.Status == loan.LoanStatusActive {
 			summary.ActiveLoans++
 
-			installments, _ := s.repository.FindInstallmentsByLoan(ctx, item.Id)
+			installments, _ := s.repository.FindInstallmentsByLoan(ctx, item.Id, userId)
 			for _, installment := range installments {
 				if installment.Status != loan.InstallmentStatusPaid && installment.DueDate.Before(now) {
 					summary.OverdueLoans++
@@ -372,27 +432,27 @@ func (s *LoanService) GetSummary(ctx context.Context, userId string) (*dto.LoanS
 		}
 	}
 
-	summary.TotalPrincipal = round2(summary.TotalPrincipal)
-	summary.TotalCollected = round2(summary.TotalCollected)
-	summary.TotalPending = round2(summary.TotalPending)
-	summary.TotalInterestEarned = round2(summary.TotalInterestEarned)
+	summary.TotalPrincipal = summary.TotalPrincipal.RoundCents()
+	summary.TotalCollected = summary.TotalCollected.RoundCents()
+	summary.TotalPending = summary.TotalPending.RoundCents()
+	summary.TotalInterestEarned = summary.TotalInterestEarned.RoundCents()
 
 	return summary, nil
 }
 
 func (s *LoanService) syncInstallments(ctx context.Context, entity *loan.Loan) error {
-	installments, err := s.repository.FindInstallmentsByLoan(ctx, entity.Id)
+	installments, err := s.repository.FindInstallmentsByLoan(ctx, entity.Id, entity.UserId)
 	if err != nil {
 		return err
 	}
 
-	remaining := round2(entity.PaidPrincipal + entity.PaidInterest)
+	remaining := entity.PaidPrincipal.Add(entity.PaidInterest)
 	now := time.Now()
 	for _, installment := range installments {
-		installment.PaidAmount = 0
+		installment.PaidAmount = money.Zero
 		installment.PaidAt = nil
 
-		if remaining <= 0 {
+		if !remaining.IsPositive() {
 			if installment.DueDate.Before(now) {
 				installment.Status = loan.InstallmentStatusOverdue
 			} else {
@@ -402,29 +462,31 @@ func (s *LoanService) syncInstallments(ctx context.Context, entity *loan.Loan) e
 			continue
 		}
 
-		if remaining >= installment.ExpectedAmount {
-			installment.PaidAmount = round2(installment.ExpectedAmount)
+		if remaining.GreaterThanOrEqual(installment.ExpectedAmount) {
+			installment.PaidAmount = installment.ExpectedAmount
 			installment.Status = loan.InstallmentStatusPaid
 			paidAt := now
 			installment.PaidAt = &paidAt
-			remaining = round2(remaining - installment.ExpectedAmount)
+			remaining = remaining.Sub(installment.ExpectedAmount)
 		} else {
-			installment.PaidAmount = round2(remaining)
+			installment.PaidAmount = remaining
 			installment.Status = loan.InstallmentStatusPartial
 			paidAt := now
 			installment.PaidAt = &paidAt
-			remaining = 0
+			remaining = money.Zero
 		}
 		installment.UpdatedAt = now
 	}
 
-	return s.repository.BulkUpdateInstallments(ctx, installments)
+	return s.repository.BulkUpdateInstallments(ctx, installments, entity.UserId)
 }
 
 func buildInstallments(entity *loan.Loan) []*loan.Installment {
 	installments := make([]*loan.Installment, 0, entity.TermMonths)
-	baseAmount := round2(entity.TotalAmount / float64(entity.TermMonths))
-	running := 0.0
+	// Equal installments rounded half-even to cents; the last one absorbs the
+	// rounding remainder so the schedule always sums exactly to TotalAmount.
+	baseAmount := entity.TotalAmount.DivInt(int64(entity.TermMonths)).RoundCents()
+	running := money.Zero
 	now := time.Now()
 
 	for i := 1; i <= entity.TermMonths; i++ {
@@ -432,9 +494,9 @@ func buildInstallments(entity *loan.Loan) []*loan.Installment {
 		dueDate := entity.StartDate.AddDate(0, i, 0)
 		expected := baseAmount
 		if i == entity.TermMonths {
-			expected = round2(entity.TotalAmount - running)
+			expected = entity.TotalAmount.Sub(running)
 		}
-		running = round2(running + expected)
+		running = running.Add(expected)
 
 		installments = append(installments, &loan.Installment{
 			Id:                installmentId.String(),
@@ -442,7 +504,7 @@ func buildInstallments(entity *loan.Loan) []*loan.Installment {
 			InstallmentNumber: i,
 			DueDate:           dueDate,
 			ExpectedAmount:    expected,
-			PaidAmount:        0,
+			PaidAmount:        money.Zero,
 			Status:            loan.InstallmentStatusPending,
 			CreatedAt:         now,
 			UpdatedAt:         now,
@@ -452,29 +514,8 @@ func buildInstallments(entity *loan.Loan) []*loan.Installment {
 	return installments
 }
 
-func round2(value float64) float64 {
-	return math.Round(value*100) / 100
-}
-
-func (s *LoanService) ensureSystemCategory(ctx context.Context, userId string, name string, icon string, color string) (string, error) {
-	categories, err := s.categoryRepository.FindAll(ctx, userId)
-	if err != nil {
-		return "", err
-	}
-
-	for _, category := range categories {
-		if strings.EqualFold(strings.TrimSpace(category.Name), strings.TrimSpace(name)) {
-			return category.Id, nil
-		}
-	}
-
-	id, _ := ksuid.NewRandom()
-	newCategory := categoryDomain.NewCategory(id.String(), name, icon, color)
-	newCategory.UserId = userId
-
-	if err := s.categoryRepository.Save(ctx, newCategory); err != nil {
-		return "", err
-	}
-
-	return newCategory.Id, nil
+// ensureSystemCategory returns the id of the user's system category sys,
+// found by its stable identity (never by the localized name).
+func (s *LoanService) ensureSystemCategory(ctx context.Context, userId string, sys categoryDomain.System) (string, error) {
+	return systemcategory.Ensure(ctx, s.categoryRepository, userId, sys)
 }

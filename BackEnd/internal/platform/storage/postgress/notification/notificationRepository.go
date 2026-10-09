@@ -7,6 +7,7 @@ import (
 	"log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/notification"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
@@ -59,7 +60,8 @@ func (r *NotificationRepository) MarkAsRead(ctx context.Context, id string, user
 		return fmt.Errorf("error checking rows affected: %w", err)
 	}
 	if rows == 0 {
-		return fmt.Errorf("notification not found or already read")
+		// Missing, or owned by another user: indistinguishable on purpose.
+		return ownership.ErrNotFound
 	}
 
 	return nil

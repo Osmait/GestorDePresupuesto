@@ -3,11 +3,13 @@ package search
 import (
 	"context"
 	"strings"
+
 	// For potential concurrency, though sequential is fine for MVP
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/dto/search"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
@@ -103,10 +105,7 @@ func (s *SearchService) Search(ctx context.Context, userId string, query string)
 	} else {
 		q := strings.ToLower(strings.TrimSpace(query))
 		for _, item := range loans {
-			pendingAmount := item.TotalAmount - (item.PaidPrincipal + item.PaidInterest)
-			if pendingAmount < 0 {
-				pendingAmount = 0
-			}
+			pendingAmount := money.Max(item.TotalAmount.Sub(item.PaidPrincipal.Add(item.PaidInterest)), money.Zero)
 
 			if strings.Contains(strings.ToLower(item.BorrowerName), q) ||
 				strings.Contains(strings.ToLower(item.BorrowerContact), q) ||

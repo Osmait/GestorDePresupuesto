@@ -17,7 +17,8 @@ func InvestmentRoutes(r *gin.Engine, service *investmentService.InvestmentServic
 		routes.GET("/funding/balances", handler.GetFundingBalances)
 		routes.POST("", handler.Create)
 		routes.GET("", handler.FindAll)
-		routes.PUT("", handler.Update)
+		routes.PUT("", handler.Update) // legacy: id read from the body
+		routes.PUT("/:id", handler.Update)
 		routes.DELETE("/:id", handler.Delete)
 	}
 }

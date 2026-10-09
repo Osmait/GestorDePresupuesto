@@ -3,12 +3,15 @@ package postgress
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/rs/zerolog/log"
 )
@@ -27,6 +30,22 @@ func (repo *TransactionRepository) Save(ctx context.Context, transaction *transa
 	currency := transaction.Currency
 	if currency == "" {
 		currency = "DOP"
+	}
+
+	if transaction.UserId == "" {
+		return errors.New("transaction user id is required")
+	}
+	if transaction.AccountId == "" {
+		return fmt.Errorf("%w (account)", ownership.ErrReferenceNotOwned)
+	}
+
+	// Every referenced row must belong to the transaction owner.
+	if err := ownership.VerifyReferences(ctx, txhelper.FromContext(ctx, repo.db), transaction.UserId,
+		ownership.Reference{Table: ownership.Account, ID: transaction.AccountId},
+		ownership.Reference{Table: ownership.Category, ID: transaction.CategoryId},
+		ownership.Reference{Table: ownership.Budget, ID: transaction.BudgetId},
+	); err != nil {
+		return err
 	}
 
 	categoryID := transaction.CategoryId
@@ -71,6 +90,10 @@ func (repo *TransactionRepository) ResolveAndValidateCurrencyForAccount(ctx cont
 	var accountType string
 	var accountCurrency string
 	if err := row.Scan(&accountType, &accountCurrency); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			// The account does not exist or belongs to another user.
+			return "", fmt.Errorf("%w (account)", ownership.ErrReferenceNotOwned)
+		}
 		return "", err
 	}
 	if accountType == "" {
@@ -142,9 +165,9 @@ func (repo *TransactionRepository) FindAllOfAllAccounts(ctx context.Context, id 
 	return transactions, nil
 }
 
-func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, date2 string, id string) ([]*transaction.Transaction, error) {
+func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, date2 string, id string, userId string) ([]*transaction.Transaction, error) {
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
-		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,COALESCE(currency, 'DOP'),created_at FROM transactions WHERE  account_id = $1 and created_at BETWEEN $2 and $3 ORDER BY created_at DESC", id, date1, date2)
+		"SELECT id,transaction_name,transaction_description,amount,type_transation,account_id,category_id,budget_id,COALESCE(currency, 'DOP'),created_at FROM transactions WHERE account_id = $1 AND user_id = $4 AND created_at BETWEEN $2 AND $3 ORDER BY created_at DESC", id, date1, date2, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -177,14 +200,14 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	return transactions, nil
 }
 
-func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string, usdToDop float64) (float64, error) {
-	if usdToDop <= 0 {
-		usdToDop = 60
+func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string, userId string, usdToDop money.Amount) (money.Amount, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(60)
 	}
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
-		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)", budgetID, usdToDop)
+		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND user_id = $3 AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)", budgetID, usdToDop, userId)
 	if err != nil {
-		return 0, err
+		return money.Zero, err
 	}
 	defer func() {
 		err = rows.Close()
@@ -192,7 +215,7 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 			log.Error().Err(err).Msg("failed to close database rows")
 		}
 	}()
-	var currentBudget float64
+	var currentBudget money.Amount
 	for rows.Next() {
 		if err = rows.Scan(&currentBudget); err == nil {
 			return currentBudget, nil
@@ -200,33 +223,33 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 	}
 	if err = rows.Err(); err != nil {
 		log.Error().Err(err).Msg("error iterating over budget rows")
-		return 0, err
+		return money.Zero, err
 	}
-	return 0, nil
+	return money.Zero, nil
 }
 
-func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Context, accountId string, currency string) (float64, error) {
+func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Context, accountId string, userId string, currency string) (money.Amount, error) {
 	query := `SELECT COALESCE(SUM(CASE
     WHEN type_transation IN ('income','loan_collection','loan_cancellation_refund')
     THEN amount
     ELSE -amount
-END), 0) FROM transactions WHERE account_id = $1 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))`
-	row := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, query, accountId, currency)
+END), 0) FROM transactions WHERE account_id = $1 AND user_id = $3 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))`
+	row := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, query, accountId, currency, userId)
 
-	var total float64
+	var total money.Amount
 	err := row.Scan(&total)
 	if err != nil {
-		return 0, err
+		return money.Zero, err
 	}
 	return total, nil
 }
 
-func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string, usdToDop float64) (map[string]float64, error) {
-	if usdToDop <= 0 {
-		usdToDop = 60
+func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(60)
 	}
-	query := `SELECT budget_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions 
-		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill' 
+	query := `SELECT budget_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions
+		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill'
 		AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
 		GROUP BY budget_id`
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, usdToDop)
@@ -239,10 +262,10 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 		}
 	}()
 
-	budgets := make(map[string]float64)
+	budgets := make(map[string]money.Amount)
 	for rows.Next() {
 		var budgetId string
-		var total float64
+		var total money.Amount
 		if err = rows.Scan(&budgetId, &total); err == nil {
 			budgets[budgetId] = total
 		}
@@ -258,41 +281,57 @@ func (repo *TransactionRepository) Delete(ctx context.Context, id string, userId
 	if err != nil {
 		return err
 	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
+	return ownership.RequireAffected(result)
 }
 
+// Update rewrites a transaction owned by t.UserId. The row must belong to that
+// user (otherwise ownership.ErrNotFound is returned) and so must the account,
+// category and budget it points to (otherwise ownership.ErrReferenceNotOwned).
 func (repo *TransactionRepository) Update(ctx context.Context, id string, t *transaction.Transaction) error {
-	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3, 
-		type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, currency = $8 
-		WHERE id = $9`
+	if t.UserId == "" {
+		return ownership.ErrNotFound
+	}
+	q := txhelper.FromContext(ctx, repo.db)
+
+	var exists bool
+	if err := q.QueryRowContext(ctx, "SELECT EXISTS (SELECT 1 FROM transactions WHERE id = $1 AND user_id = $2)", id, t.UserId).Scan(&exists); err != nil {
+		return err
+	}
+	if !exists {
+		return ownership.ErrNotFound
+	}
+
+	if t.AccountId == "" || t.CategoryId == "" {
+		return fmt.Errorf("%w (account and category are required)", ownership.ErrReferenceNotOwned)
+	}
+	if err := ownership.VerifyReferences(ctx, q, t.UserId,
+		ownership.Reference{Table: ownership.Account, ID: t.AccountId},
+		ownership.Reference{Table: ownership.Category, ID: t.CategoryId},
+		ownership.Reference{Table: ownership.Budget, ID: t.BudgetId},
+	); err != nil {
+		return err
+	}
+
+	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3,
+		type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, currency = $8
+		WHERE id = $9 AND user_id = $10`
 	currency := t.Currency
 	if currency == "" {
 		currency = "DOP"
 	}
-	result, err := txhelper.FromContext(ctx, repo.db).ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id)
+	result, err := q.ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id, t.UserId)
 	if err != nil {
 		return err
 	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
+	return ownership.RequireAffected(result)
 }
 
 // FindAllOfAllAccountsWithFilters retrieves all transactions across all user accounts with filtering and pagination
 func (repo *TransactionRepository) FindAllOfAllAccountsWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error) {
-	query, args := repo.buildTransactionQuery(userId, filter, false)
+	query, args, err := repo.buildTransactionQuery(userId, filter, false)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Debug().Str("query", query).Interface("args", args).Msg("executing transaction query")
 
@@ -309,9 +348,13 @@ func (repo *TransactionRepository) FindAllOfAllAccountsWithFilters(ctx context.C
 	return repo.scanTransactions(rows)
 }
 
-// FindAllWithFilters retrieves transactions for a specific account with filtering and pagination
-func (repo *TransactionRepository) FindAllWithFilters(ctx context.Context, filter *dto.TransactionFilter) ([]*transaction.Transaction, error) {
-	query, args := repo.buildTransactionQuery("", filter, false)
+// FindAllWithFilters retrieves transactions of userId for a specific account
+// (filter.AccountId) with filtering and pagination.
+func (repo *TransactionRepository) FindAllWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error) {
+	query, args, err := repo.buildTransactionQuery(userId, filter, false)
+	if err != nil {
+		return nil, err
+	}
 
 	log.Debug().Str("query", query).Interface("args", args).Msg("executing transaction query")
 
@@ -330,12 +373,15 @@ func (repo *TransactionRepository) FindAllWithFilters(ctx context.Context, filte
 
 // CountWithFilters counts transactions with applied filters
 func (repo *TransactionRepository) CountWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) (int64, error) {
-	query, args := repo.buildTransactionQuery(userId, filter, true)
+	query, args, err := repo.buildTransactionQuery(userId, filter, true)
+	if err != nil {
+		return 0, err
+	}
 
 	log.Debug().Str("count_query", query).Interface("args", args).Msg("executing transaction count query")
 
 	var count int64
-	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, query, args...).Scan(&count)
+	err = txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, query, args...).Scan(&count)
 	if err != nil {
 		return 0, fmt.Errorf("failed to count transactions: %w", err)
 	}
@@ -343,8 +389,30 @@ func (repo *TransactionRepository) CountWithFilters(ctx context.Context, userId 
 	return count, nil
 }
 
-// buildTransactionQuery constructs the SQL query with filters, sorting, and pagination
-func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *dto.TransactionFilter, isCount bool) (string, []interface{}) {
+// transactionSortColumns maps the public sort_by values to SQL columns. Only
+// these columns may ever be interpolated into ORDER BY.
+var transactionSortColumns = map[string]string{
+	"created_at":       "created_at",
+	"amount":           "amount",
+	"name":             "transaction_name",
+	"transaction_name": "transaction_name",
+	"type_transation":  "type_transation",
+}
+
+// errMissingUserScope is returned when a transaction query is built without a
+// user id: every transaction query must be scoped to its owner.
+var errMissingUserScope = errors.New("transaction query requires a user id")
+
+// buildTransactionQuery constructs the SQL query with filters, sorting, and
+// pagination. The query is always scoped to userId.
+func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *dto.TransactionFilter, isCount bool) (string, []interface{}, error) {
+	if userId == "" {
+		return "", nil, errMissingUserScope
+	}
+	if filter == nil {
+		filter = dto.NewTransactionFilter()
+	}
+
 	var queryBuilder strings.Builder
 	var args []interface{}
 	argIndex := 1
@@ -359,12 +427,10 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	// WHERE clause
 	var whereConditions []string
 
-	// User ID filter (for all accounts query)
-	if userId != "" {
-		whereConditions = append(whereConditions, fmt.Sprintf("user_id = $%d", argIndex))
-		args = append(args, userId)
-		argIndex++
-	}
+	// User ID filter: always applied.
+	whereConditions = append(whereConditions, fmt.Sprintf("user_id = $%d", argIndex))
+	args = append(args, userId)
+	argIndex++
 
 	// Account ID filter (for specific account query)
 	if filter.AccountId != "" {
@@ -447,27 +513,19 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 
 	// For count queries, we don't need ORDER BY, LIMIT, or OFFSET
 	if isCount {
-		return queryBuilder.String(), args
+		return queryBuilder.String(), args, nil
 	}
 
-	// ORDER BY clause
-	if filter.SortBy != "" {
-		queryBuilder.WriteString(" ORDER BY ")
-		if filter.SortBy == "amount" {
-			queryBuilder.WriteString("amount")
-		} else {
-			queryBuilder.WriteString(filter.SortBy)
-		}
-
-		if filter.SortOrder == "asc" || filter.SortOrder == "desc" {
-			queryBuilder.WriteString(" ")
-			queryBuilder.WriteString(strings.ToUpper(filter.SortOrder))
-		} else {
-			queryBuilder.WriteString(" DESC") // Default to DESC
-		}
-	} else {
-		queryBuilder.WriteString(" ORDER BY created_at DESC") // Default sorting
+	// ORDER BY clause: only whitelisted columns and directions are interpolated.
+	sortColumn, ok := transactionSortColumns[filter.SortBy]
+	if !ok {
+		sortColumn = "created_at"
 	}
+	sortDirection := "DESC"
+	if strings.EqualFold(filter.SortOrder, "asc") {
+		sortDirection = "ASC"
+	}
+	fmt.Fprintf(&queryBuilder, " ORDER BY %s %s, id %s", sortColumn, sortDirection, sortDirection)
 
 	// LIMIT and OFFSET for pagination (only if limit > 0)
 	if filter.Limit > 0 {
@@ -481,7 +539,7 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 		}
 	}
 
-	return queryBuilder.String(), args
+	return queryBuilder.String(), args, nil
 }
 
 // scanTransactions scans database rows into Transaction objects
@@ -523,9 +581,9 @@ func (repo *TransactionRepository) scanTransactions(rows *sql.Rows) ([]*transact
 }
 
 func (repo *TransactionRepository) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateTo time.Time) ([]*transaction.Transaction, error) {
-	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at 
-		FROM transactions 
-		WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3 
+	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at
+		FROM transactions
+		WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
 		ORDER BY created_at DESC`
 
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, dateFrom, dateTo)

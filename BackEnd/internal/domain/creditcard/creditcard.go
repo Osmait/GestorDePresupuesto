@@ -1,6 +1,10 @@
 package creditcard
 
-import "time"
+import (
+	"time"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+)
 
 type PaymentStatus string
 
@@ -25,8 +29,8 @@ type CardBalance struct {
 	Id             string
 	CardId         string
 	Currency       string
-	CurrentBalance float64
-	CreditLimit    float64
+	CurrentBalance money.Amount
+	CreditLimit    money.Amount
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
@@ -36,7 +40,7 @@ type CardBalanceReset struct {
 	BalanceId       string
 	CardId          string
 	Currency        string
-	PreviousBalance float64
+	PreviousBalance money.Amount
 	Notes           string
 	CreatedAt       time.Time
 }
@@ -46,12 +50,12 @@ type CardPayment struct {
 	CardId           string
 	FromAccountId    string
 	Currency         string
-	Amount           float64
+	Amount           money.Amount
 	SourceCurrency   string
-	SourceAmount     float64
-	ExchangeRate     float64
+	SourceAmount     money.Amount
+	ExchangeRate     money.Amount
 	IncludesInterest bool
-	InterestAmount   float64
+	InterestAmount   money.Amount
 	PaymentDate      time.Time
 	Status           PaymentStatus
 	Notes            string
@@ -71,20 +75,20 @@ func NewCreditCard(accountId, bank, lastFourDigits string, cutDay, dueDay int) *
 	}
 }
 
-func NewCardBalance(id, cardId, currency string, creditLimit float64) *CardBalance {
+func NewCardBalance(id, cardId, currency string, creditLimit money.Amount) *CardBalance {
 	now := time.Now()
 	return &CardBalance{
 		Id:             id,
 		CardId:         cardId,
 		Currency:       currency,
-		CurrentBalance: 0,
+		CurrentBalance: money.Zero,
 		CreditLimit:    creditLimit,
 		CreatedAt:      now,
 		UpdatedAt:      now,
 	}
 }
 
-func NewCardPayment(id, cardId, fromAccountId, currency string, amount float64) *CardPayment {
+func NewCardPayment(id, cardId, fromAccountId, currency string, amount money.Amount) *CardPayment {
 	return &CardPayment{
 		Id:            id,
 		CardId:        cardId,
@@ -97,17 +101,13 @@ func NewCardPayment(id, cardId, fromAccountId, currency string, amount float64) 
 	}
 }
 
-func (cb *CardBalance) AvailableCredit() float64 {
-	return cb.CreditLimit + cb.CurrentBalance
+func (cb *CardBalance) AvailableCredit() money.Amount {
+	return cb.CreditLimit.Add(cb.CurrentBalance)
 }
 
+// UtilizationPercent is the share of the credit limit in use. It is computed
+// in decimal and returned as a float64 because it is a display-only ratio.
 func (cb *CardBalance) UtilizationPercent() float64 {
-	if cb.CreditLimit == 0 {
-		return 0
-	}
-	debt := cb.CurrentBalance * -1
-	if debt < 0 {
-		debt = 0
-	}
-	return (debt / cb.CreditLimit) * 100
+	debt := money.Max(cb.CurrentBalance.Neg(), money.Zero)
+	return money.Percent(debt, cb.CreditLimit)
 }
