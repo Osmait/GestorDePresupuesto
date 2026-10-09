@@ -10,8 +10,7 @@ import (
 	"log"
 	"net/http/httptest"
 	"os"
-	"path/filepath"
-	"runtime"
+	"strings"
 	"testing"
 	"time"
 
@@ -21,28 +20,22 @@ import (
 	"github.com/testcontainers/testcontainers-go/modules/postgres"
 	"github.com/testcontainers/testcontainers-go/wait"
 
+	"github.com/osmait/gestorDePresupuesto/cmd/api/boostrap"
+	migrationsdb "github.com/osmait/gestorDePresupuesto/cmd/api/db"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 	"github.com/osmait/gestorDePresupuesto/internal/e2e/helpers"
-	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
-	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
-	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
-	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
-	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
-	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
-	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
-	accountSvc "github.com/osmait/gestorDePresupuesto/internal/services/account"
-	authSvc "github.com/osmait/gestorDePresupuesto/internal/services/auth"
-	budgetSvc "github.com/osmait/gestorDePresupuesto/internal/services/budget"
-	categorySvc "github.com/osmait/gestorDePresupuesto/internal/services/category"
-	transactionSvc "github.com/osmait/gestorDePresupuesto/internal/services/transaction"
-	userSvc "github.com/osmait/gestorDePresupuesto/internal/services/user"
 
 	_ "github.com/lib/pq"
-	cors "github.com/rs/cors/wrapper/gin"
 )
 
-// E2ETestSuite defines the test suite for end-to-end tests
+// E2ETestSuite defines the test suite for end-to-end tests.
+//
+// The HTTP application under test is built with boostrap.NewApp — the same
+// wiring cmd/api uses in production (every repository, service, middleware and
+// route, including AuthMiddleware and the per-request RLS transaction) — so
+// the suite cannot drift from the real server. Configuration comes from
+// config.LoadConfig with only the environment variables below overridden.
 type E2ETestSuite struct {
 	suite.Suite
 	server      *httptest.Server
@@ -50,10 +43,11 @@ type E2ETestSuite struct {
 	dbContainer *postgres.PostgresContainer
 	db          *sql.DB
 	config      *config.Config
-	authToken   string
-	testUserID  string
+	cancelApp   context.CancelFunc
 	helpers     *helpers.TestHelpers
 }
+
+const e2eJWTSecret = "e2e-test-secret-key-very-long-and-secure"
 
 // SetupSuite runs once before all tests in the suite
 func (suite *E2ETestSuite) SetupSuite() {
@@ -62,7 +56,7 @@ func (suite *E2ETestSuite) SetupSuite() {
 	// Setup test database with testcontainers
 	log.Println("Setting up test database container...")
 	dbContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:15-alpine"),
+		testcontainers.WithImage("postgres:17-alpine"),
 		postgres.WithDatabase("e2e_testdb"),
 		postgres.WithUsername("e2e_user"),
 		postgres.WithPassword("e2e_password"),
@@ -75,178 +69,60 @@ func (suite *E2ETestSuite) SetupSuite() {
 	suite.Require().NoError(err)
 	suite.dbContainer = dbContainer
 
-	// Get database connection string
 	host, err := dbContainer.Host(ctx)
 	suite.Require().NoError(err)
 
 	port, err := dbContainer.MappedPort(ctx, "5432")
 	suite.Require().NoError(err)
 
-	// Setup test configuration
-	suite.config = &config.Config{
-		Database: config.DatabaseConfig{
-			Host:            host,
-			Port:            uint(port.Int()),
-			User:            "e2e_user",
-			Password:        "e2e_password",
-			Name:            "e2e_testdb",
-			Type:            "postgres",
-			MaxOpenConns:    10,
-			MaxIdleConns:    5,
-			SSLMode:         "disable",
-			ConnMaxLifetime: 10 * time.Minute,
-			ConnMaxIdleTime: 5 * time.Minute,
-		},
-		Server: config.ServerConfig{
-			Port:            8080,
-			Host:            "localhost",
-			Environment:     "test",
-			ShutdownTimeout: 30 * time.Second,
-			ReadTimeout:     30 * time.Second,
-			WriteTimeout:    30 * time.Second,
-			IdleTimeout:     60 * time.Second,
-		},
-		JWT: config.JWTConfig{
-			Secret:            "e2e-test-secret-key-very-long-and-secure",
-			Expiration:        24 * time.Hour,
-			RefreshExpiration: 7 * 24 * time.Hour,
-			Issuer:            "e2e-test",
-			Algorithm:         "HS256",
-		},
-		Logging: config.LoggingConfig{
-			Level:  "error", // Reduce noise during tests
-			Format: "json",
-			Output: "stdout",
-			Caller: false,
-		},
-		FeatureFlags: config.FeatureFlagsConfig{
-			EnableMetrics:     false,
-			EnableTracing:     false,
-			EnableHealthCheck: true,
-			EnableSwaggerDocs: false,
-			EnableProfiling:   false,
-			EnableDebugMode:   false,
-		},
-		Middleware: config.MiddlewareConfig{
-			EnableLogging:        false,
-			EnableTracing:        false,
-			EnableMetrics:        false,
-			EnableRecovery:       true,
-			EnableRateLimit:      false,
-			EnableCORS:           true,
-			EnableCompression:    false,
-			EnableAuthentication: true,
-			EnableValidation:     true,
-		},
-		Security: config.SecurityConfig{
-			PasswordMinLength:     8,
-			PasswordRequireUpper:  false,
-			PasswordRequireLower:  false,
-			PasswordRequireDigit:  false,
-			PasswordRequireSymbol: false,
-			MaxLoginAttempts:      5,
-			AccountLockTime:       15 * time.Minute,
-			SessionTimeout:        24 * time.Hour,
-			EnableTLS:             false,
-		},
-		CORS: config.CORSConfig{
-			AllowedOrigins:   []string{"*"},
-			AllowedMethods:   []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-			AllowedHeaders:   []string{"*"},
-			AllowCredentials: false,
-		},
+	// Load configuration exactly as production does, pointing it at the
+	// container. Only what the test environment needs is overridden.
+	t := suite.T()
+	for key, value := range map[string]string{
+		"ENV":                     "test",
+		"JWT_SECRET":              e2eJWTSecret,
+		"DB_TYPE":                 "postgres",
+		"DB_HOST":                 host,
+		"DB_PORT":                 port.Port(),
+		"DB_USER":                 "e2e_user",
+		"DB_PASSWORD":             "e2e_password",
+		"DB_NAME":                 "e2e_testdb",
+		"DB_SSL_MODE":             "disable",
+		"LOG_LEVEL":               "error",
+		"RATE_LIMIT_ENABLED":      "true",
+		"RATE_LIMIT_IP_WHITELIST": "127.0.0.1,::1",
+		"TRUSTED_PROXIES":         "",
+		"MCP_ENABLED":             "false",
+		"GEMINI_API_KEY":          "",
+		"ADMIN_SEED_ENABLED":      "false",
+	} {
+		t.Setenv(key, value)
 	}
-
-	// Setup database connection
-	suite.db, err = sql.Open("postgres", suite.config.GetDatabaseUrl())
+	suite.config, err = config.LoadConfig()
 	suite.Require().NoError(err)
 
-	// Test the connection
-	err = suite.db.Ping()
+	suite.db, err = sql.Open("postgres", suite.config.GetPostgresUrl())
 	suite.Require().NoError(err)
+	suite.db.SetMaxOpenConns(suite.config.Database.MaxOpenConns)
+	suite.db.SetMaxIdleConns(suite.config.Database.MaxIdleConns)
+	suite.Require().NoError(suite.db.Ping())
 
-	// Run database migrations
+	// Run the embedded migrations, as the production binary does.
 	log.Println("Running database migrations...")
-	_, filename, _, _ := runtime.Caller(0)
-	migrationsDir, _ := filepath.Abs(filepath.Join(filepath.Dir(filename), "../../../cmd/api/db/migrations"))
-	connURL := suite.config.GetDatabaseUrl()
-	utils.RunDBMigration("file://"+filepath.ToSlash(migrationsDir), connURL)
+	suite.Require().NoError(utils.RunMigrationsFromFS(migrationsdb.Migrations, migrationsdb.MigrationsDir, suite.config.GetPostgresUrl()))
 
-	// Setup test server
+	// Build the real application router.
 	gin.SetMode(gin.TestMode)
-	suite.engine = gin.New()
+	appCtx, cancel := context.WithCancel(ctx)
+	suite.cancelApp = cancel
+	app, err := boostrap.NewApp(appCtx, suite.config, suite.db)
+	suite.Require().NoError(err)
+	suite.engine = app.Server.Engine
 
-	// Setup services
-	suite.setupServices()
-
-	// Setup test server
 	suite.server = httptest.NewServer(suite.engine)
-
 	log.Printf("Test server started at: %s", suite.server.URL)
 
-	// Initialize test helpers
 	suite.helpers = helpers.NewTestHelpers(suite.server.URL, suite.config)
-
-	// Wait for server to be ready
-	time.Sleep(2 * time.Second)
-}
-
-// setupServices initializes all services required for testing
-func (suite *E2ETestSuite) setupServices() {
-	// Repository layer
-	userRepository := userRepo.NewUserRepository(suite.db) // Note: this is the actual function name
-	accountRepository := accountRepo.NewAccountRepository(suite.db)
-	categoryRepository := categoryRepo.NewCategoryRepository(suite.db)
-	budgetRepository := budgetRepo.NewBudgetRepository(suite.db)
-	transactionRepository := transactionRepo.NewTransactionRepository(suite.db)
-
-	// Service layer
-	userService := userSvc.NewUserService(userRepository)
-	authService := authSvc.NewAuthService(
-		userRepository,
-		accountRepository,
-		categoryRepository,
-		budgetRepository,
-		transactionRepository,
-		suite.config,
-	)
-	accountService := accountSvc.NewAccountService(accountRepository)
-	categoryService := categorySvc.NewCategoryServices(categoryRepository) // Fixed name
-	budgetService := budgetSvc.NewBudgetServices(budgetRepository, transactionRepository, nil)
-	transactionService := transactionSvc.NewTransactionService(transactionRepository, budgetRepository, nil, nil, nil, nil)
-
-	// Setup routes
-	suite.setupRoutes(userService, authService, accountService, categoryService, budgetService, transactionService)
-}
-
-// setupRoutes configures all routes for the test server
-func (suite *E2ETestSuite) setupRoutes(
-	userService *userSvc.UserService,
-	authService *authSvc.AuthService,
-	accountService *accountSvc.AccountService,
-	categoryService *categorySvc.CategoryServices, // Fixed type name
-	budgetService *budgetSvc.BudgetServices, // Fixed type name
-	transactionService *transactionSvc.TransactionService,
-) {
-	// Basic middleware
-	suite.engine.Use(cors.AllowAll())
-
-	// Error handling middleware
-	suite.engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
-
-	// Health routes (before authentication)
-	routes.HealthRoutes(suite.engine, suite.db, "1.0.0", string(suite.config.Server.Environment))
-
-	// Authentication middleware for protected routes
-	suite.engine.Use(middleware.AuthMiddleware(userService, suite.config))
-
-	// Application routes
-	routes.AuhtRoutes(suite.engine, authService)
-	routes.UserRoute(suite.engine, userService)
-	routes.AccountRotes(suite.engine, accountService)
-	routes.TransactionRoutes(suite.engine, transactionService)
-	routes.CategoryRoutes(suite.engine, categoryService)
-	routes.BudgetRoutes(suite.engine, budgetService)
 }
 
 // TearDownSuite runs once after all tests in the suite
@@ -259,6 +135,10 @@ func (suite *E2ETestSuite) TearDownSuite() {
 
 	if suite.server != nil {
 		suite.server.Close()
+	}
+
+	if suite.cancelApp != nil {
+		suite.cancelApp()
 	}
 
 	if suite.db != nil {
@@ -275,38 +155,33 @@ func (suite *E2ETestSuite) TearDownSuite() {
 
 // SetupTest runs before each individual test
 func (suite *E2ETestSuite) SetupTest() {
-	// Clean database before each test
 	suite.cleanDatabase()
-
-	// Reset auth token
-	suite.authToken = ""
-	suite.testUserID = ""
 }
 
-// TearDownTest runs after each individual test
-func (suite *E2ETestSuite) TearDownTest() {
-	// Additional cleanup if needed
-}
-
-// cleanDatabase removes all data from test database
+// cleanDatabase empties every application table (all of public except the
+// migration bookkeeping) so each test starts from a blank database.
 func (suite *E2ETestSuite) cleanDatabase() {
-	if suite.helpers == nil {
+	if suite.db == nil {
 		return
 	}
 
-	// Clean tables in correct order (respecting foreign keys)
-	tables := []string{
-		"transactions",
-		"budgets",
-		"account",   // Note: singular, not plural
-		"categorys", // Note: this is how it's named in the schema
-		"users",
+	rows, err := suite.db.Query(`SELECT quote_ident(tablename) FROM pg_tables
+		WHERE schemaname = 'public' AND tablename <> 'schema_migrations'`)
+	suite.Require().NoError(err)
+	var tables []string
+	for rows.Next() {
+		var name string
+		suite.Require().NoError(rows.Scan(&name))
+		tables = append(tables, name)
 	}
+	suite.Require().NoError(rows.Err())
+	suite.Require().NoError(rows.Close())
 
-	for _, table := range tables {
-		query := fmt.Sprintf("DELETE FROM %s", table)
-		suite.helpers.ExecuteSQL(query)
+	if len(tables) == 0 {
+		return
 	}
+	_, err = suite.db.Exec(fmt.Sprintf("TRUNCATE %s RESTART IDENTITY CASCADE", strings.Join(tables, ", ")))
+	suite.Require().NoError(err)
 }
 
 // TestMain is the entry point for running E2E tests
@@ -316,11 +191,7 @@ func TestMain(m *testing.M) {
 		os.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
 	}
 
-	// Run tests
-	exitCode := m.Run()
-
-	// Exit with the test result code
-	os.Exit(exitCode)
+	os.Exit(m.Run())
 }
 
 // TestE2ETestSuite runs the entire E2E test suite

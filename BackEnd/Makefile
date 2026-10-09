@@ -478,6 +478,7 @@ help:
 	@echo ""
 	@echo "$(YELLOW)E2E Testing Commands:$(RESET)"
 	@echo "  e2e           - Run all E2E tests"
+	@echo "  e2e-api       - Run the API E2E suite only (CI)"
 	@echo "  e2e-smoke     - Run E2E smoke tests"
 	@echo "  e2e-flows     - Run E2E flow tests"
 	@echo "  e2e-scenarios - Run E2E scenario tests"
@@ -496,6 +497,11 @@ help:
 ## E2E Test Commands
 
 # E2E Test targets
+# API e2e suite only (no unit tests, no container cleanup) - used by CI.
+e2e-api:
+	@echo "$(BLUE)🧪 Running API E2E tests...$(RESET)"
+	@go test -tags e2e -count=1 -timeout 15m ./internal/e2e/...
+
 e2e:
 	@echo "$(BLUE)🧪 Running E2E tests...$(RESET)"
 	@./scripts/e2e-test.sh run

@@ -195,30 +195,17 @@ func (suite *E2ETestSuite) TestCompleteUserFlow() {
 		updatedBalance := accounts[0]["current_balance"].(float64)
 		suite.InDelta(expectedBalance, updatedBalance, 0.01, "Account balance should be updated correctly")
 
-		// 9. Get All Transactions (Note: Date filtering might not return recent transactions)
-		resp = suite.helpers.MakeRequest("GET", "/transaction", nil, token)
+		// 9. Get All Transactions (paginated response)
+		allTransactions, resp := suite.helpers.ListTransactions("/transaction?limit=100", token)
 		suite.Equal(http.StatusOK, resp.StatusCode, "Should get all transactions")
+		suite.Len(allTransactions.Data, len(transactions), "Should list every created transaction")
 
-		var allTransactions []map[string]interface{}
-		err = resp.AsJSON(&allTransactions)
-		if err != nil {
-			// The response might be null instead of empty array
-			suite.T().Log("Transaction response might be null, this is acceptable for date filtering")
-		} else {
-			suite.T().Logf("Found %d transactions via GET /transaction", len(allTransactions))
-		}
-
-		// 10. Get Transactions by Account (Note: Date filtering might not return recent transactions)
-		resp = suite.helpers.MakeRequest("GET", fmt.Sprintf("/transaction/%s", accountID), nil, token)
+		// 10. Get Transactions by Account
+		accountTransactions, resp := suite.helpers.ListTransactions(fmt.Sprintf("/transaction/%s?limit=100", accountID), token)
 		suite.Equal(http.StatusOK, resp.StatusCode, "Should get transactions by account")
-
-		var accountTransactions []map[string]interface{}
-		err = resp.AsJSON(&accountTransactions)
-		if err != nil {
-			// The response might be null instead of empty array
-			suite.T().Log("Account transaction response might be null, this is acceptable for date filtering")
-		} else {
-			suite.T().Logf("Found %d transactions for account %s", len(accountTransactions), accountID)
+		suite.Len(accountTransactions.Data, len(transactions), "All transactions belong to the main account")
+		for _, tx := range accountTransactions.Data {
+			suite.Equal(accountID, tx.AccountID, "Account listing should only contain that account's transactions")
 		}
 
 		// 11. Create Second Account
@@ -331,8 +318,7 @@ func (suite *E2ETestSuite) TestCompleteUserFlow() {
 		expectedTransactionCount := len(transactions) + 2 // +2 for transfers
 		suite.T().Logf("Expected transactions: %d, Actual transactions: %d", expectedTransactionCount, transactionCount)
 
-		// The important thing is that we have transactions (not necessarily the exact count due to possible test issues)
-		suite.Greater(transactionCount, 0, "Should have at least some transactions")
+		suite.Equal(expectedTransactionCount, transactionCount, "Every transaction should be persisted exactly once")
 
 		suite.T().Log("✅ Complete user flow test passed successfully!")
 		suite.T().Logf("Final balances - Main: %.2f, Savings: %.2f", mainAccountBalance, savingsAccountBalance)
@@ -360,34 +346,38 @@ func (suite *E2ETestSuite) TestMultipleUsersIsolation() {
 		resp = suite.helpers.MakeRequest("POST", "/account", account2Data, user2Data.Token)
 		suite.Equal(http.StatusCreated, resp.StatusCode, "User2 account creation should succeed")
 
-		// Verify user1 can only see their own accounts
-		resp = suite.helpers.MakeRequest("GET", "/account", nil, user1Data.Token)
-		suite.Equal(http.StatusOK, resp.StatusCode, "User1 should get their accounts")
+		// Each user has two accounts: the one from CreateUserFlow plus the one
+		// created above. Both are named "Test Account <suffix>".
+		accountIDs := func(token, wantName string) map[string]bool {
+			accounts, resp := suite.helpers.ListAccounts(token)
+			suite.Equal(http.StatusOK, resp.StatusCode, "Should get accounts")
+			suite.Len(accounts, 2, "User should see exactly their own two accounts")
+			ids := make(map[string]bool, len(accounts))
+			for _, account := range accounts {
+				suite.Equal(wantName, account.AccountInfo.Name, "User should only see their own accounts")
+				ids[account.AccountInfo.ID] = true
+			}
+			return ids
+		}
 
-		var user1Accounts []map[string]interface{}
-		err := resp.AsJSON(&user1Accounts)
-		suite.NoError(err, "Should parse user1 accounts")
-		suite.Len(user1Accounts, 1, "User1 should only see their own account")
-		user1AccountInfo := user1Accounts[0]["account_info"].(map[string]interface{})
-		suite.Equal(account1Data.Name, user1AccountInfo["name"], "User1 should see their account")
+		// Verify user1 can only see their own accounts
+		user1AccountIDs := accountIDs(user1Data.Token, account1Data.Name)
+		suite.True(user1AccountIDs[user1Data.AccountID], "User1 should see their initial account")
 
 		// Verify user2 can only see their own accounts
-		resp = suite.helpers.MakeRequest("GET", "/account", nil, user2Data.Token)
-		suite.Equal(http.StatusOK, resp.StatusCode, "User2 should get their accounts")
+		user2AccountIDs := accountIDs(user2Data.Token, account2Data.Name)
+		suite.True(user2AccountIDs[user2Data.AccountID], "User2 should see their initial account")
 
-		var user2Accounts []map[string]interface{}
-		err = resp.AsJSON(&user2Accounts)
-		suite.NoError(err, "Should parse user2 accounts")
-		suite.Len(user2Accounts, 1, "User2 should only see their own account")
-		user2AccountInfo := user2Accounts[0]["account_info"].(map[string]interface{})
-		suite.Equal(account2Data.Name, user2AccountInfo["name"], "User2 should see their account")
+		for id := range user1AccountIDs {
+			suite.False(user2AccountIDs[id], "Account %s must not be visible to both users", id)
+		}
 
 		// Verify categories are also isolated
 		resp = suite.helpers.MakeRequest("GET", "/category", nil, user1Data.Token)
 		suite.Equal(http.StatusOK, resp.StatusCode, "User1 should get their categories")
 
 		var user1Categories []map[string]interface{}
-		err = resp.AsJSON(&user1Categories)
+		err := resp.AsJSON(&user1Categories)
 		suite.NoError(err, "Should parse user1 categories")
 		suite.Len(user1Categories, 1, "User1 should only see their own category")
 
@@ -425,7 +415,8 @@ func (suite *E2ETestSuite) TestAccountDeletion() {
 		var accounts []map[string]interface{}
 		err := resp.AsJSON(&accounts)
 		suite.NoError(err)
-		suite.Len(accounts, 2, "Should have 2 accounts initially")
+		// 3 = the CreateUserFlow account + the two created above
+		suite.Len(accounts, 3, "Should have 3 accounts initially")
 
 		accountInfo := accounts[0]["account_info"].(map[string]interface{})
 		accountToDelete := accountInfo["id"].(string)
@@ -440,12 +431,17 @@ func (suite *E2ETestSuite) TestAccountDeletion() {
 
 		err = resp.AsJSON(&accounts)
 		suite.NoError(err)
-		suite.Len(accounts, 1, "Should have 1 account after deletion")
+		suite.Len(accounts, 2, "Should have 2 accounts after deletion")
 
 		// Verify the correct account was deleted
-		remainingAccountInfo := accounts[0]["account_info"].(map[string]interface{})
-		remainingAccountID := remainingAccountInfo["id"].(string)
-		suite.NotEqual(accountToDelete, remainingAccountID, "Deleted account should not be in the list")
+		for _, account := range accounts {
+			remainingAccountInfo := account["account_info"].(map[string]interface{})
+			suite.NotEqual(accountToDelete, remainingAccountInfo["id"], "Deleted account should not be in the list")
+		}
+
+		// Deleting it again is a 404
+		resp = suite.helpers.MakeRequest("DELETE", fmt.Sprintf("/account/%s", accountToDelete), nil, userData.Token)
+		suite.Equal(http.StatusNotFound, resp.StatusCode, "Deleting an already deleted account should be 404")
 
 		suite.T().Log("✅ Account deletion test passed!")
 	})

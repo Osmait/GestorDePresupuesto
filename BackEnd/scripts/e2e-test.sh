@@ -23,6 +23,14 @@ PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 E2E_DIR="${PROJECT_ROOT}/internal/e2e"
 COVERAGE_DIR="${PROJECT_ROOT}/coverage"
 
+# All E2E tests are methods of one testify suite (TestE2ETestSuite) in the
+# single package ./internal/e2e, so subsets are selected with
+# -run 'TestE2ETestSuite/<method regexp>'.
+E2E_PKG="./internal/e2e/..."
+E2E_SUITE="TestE2ETestSuite"
+FLOW_TESTS="TestCompleteUserFlow|TestMultipleUsersIsolation|TestAccountDeletion"
+SCENARIO_TESTS="TestUserValidationErrors|TestAuthenticationErrors|TestAuthorizationErrors|TestDuplicateEmailError|TestResourceNotFoundErrors|TestAccountValidationErrors|TestTransactionValidationErrors|TestConcurrentUserCreation|TestInvalidJSONPayloads|TestLargeDatasets|TestConcurrentRequests|TestBoundaryValues|TestRateLimiting|TestLongRunningOperations|TestSpecialCharacters|TestMemoryAndResourceUsage"
+
 # Functions
 log_info() {
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -126,9 +134,9 @@ run_e2e_tests() {
     fi
     
     # Run E2E tests
-    log_info "Executing: go test $TEST_FLAGS ./internal/e2e/..."
+    log_info "Executing: go test $TEST_FLAGS ${E2E_PKG}"
     
-    if go test $TEST_FLAGS ./internal/e2e/...; then
+    if go test $TEST_FLAGS ${E2E_PKG}; then
         log_success "E2E tests passed!"
     else
         log_error "E2E tests failed!"
@@ -144,7 +152,7 @@ run_specific_test() {
     
     TEST_FLAGS="-tags=e2e -timeout=${E2E_TIMEOUT} -v"
     
-    if go test $TEST_FLAGS ./internal/e2e/... -run "$test_name"; then
+    if go test $TEST_FLAGS ${E2E_PKG} -run "${E2E_SUITE}/${test_name}"; then
         log_success "Test $test_name passed!"
     else
         log_error "Test $test_name failed!"
@@ -160,10 +168,10 @@ run_test_suite() {
     
     case "$suite_name" in
         "flows")
-            go test -tags=e2e -timeout=${E2E_TIMEOUT} -v ./internal/e2e/flows/...
+            go test -tags=e2e -timeout=${E2E_TIMEOUT} -v ${E2E_PKG} -run "${E2E_SUITE}/(${FLOW_TESTS})$"
             ;;
         "scenarios")
-            go test -tags=e2e -timeout=${E2E_TIMEOUT} -v ./internal/e2e/scenarios/...
+            go test -tags=e2e -timeout=${E2E_TIMEOUT} -v ${E2E_PKG} -run "${E2E_SUITE}/(${SCENARIO_TESTS})$"
             ;;
         "all")
             run_e2e_tests
@@ -206,7 +214,7 @@ performance_test() {
     cd "${PROJECT_ROOT}"
     
     # Run specific performance-related tests
-    go test -tags=e2e -timeout=${E2E_TIMEOUT} -v ./internal/e2e/scenarios/... -run "TestConcurrentRequests|TestLargeDatasets|TestRateLimiting"
+    go test -tags=e2e -timeout=${E2E_TIMEOUT} -v ${E2E_PKG} -run "${E2E_SUITE}/(TestConcurrentRequests|TestLargeDatasets|TestRateLimiting)$"
     
     log_success "Performance tests completed"
 }
@@ -222,7 +230,7 @@ stress_test() {
     # Run stress-related tests multiple times
     for i in {1..3}; do
         log_info "Stress test iteration $i/3"
-        go test -tags=e2e -timeout=15m -v ./internal/e2e/scenarios/... -run "TestConcurrentRequests|TestMemoryAndResourceUsage"
+        go test -tags=e2e -count=1 -timeout=15m -v ${E2E_PKG} -run "${E2E_SUITE}/(TestConcurrentRequests|TestMemoryAndResourceUsage)$"
     done
     
     log_success "Stress tests completed"
@@ -234,7 +242,7 @@ smoke_test() {
     cd "${PROJECT_ROOT}"
     
     # Run basic flow tests only
-    go test -tags=e2e -timeout=5m -v ./internal/e2e/... -run "TestCompleteUserFlow"
+    go test -tags=e2e -timeout=5m -v ${E2E_PKG} -run "${E2E_SUITE}/TestCompleteUserFlow$"
     
     log_success "Smoke tests completed"
 }

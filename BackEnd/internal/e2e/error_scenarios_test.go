@@ -83,8 +83,14 @@ func (suite *E2ETestSuite) TestAuthenticationErrors() {
 			"password": "wrongpassword",
 		}
 
+		// Bad credentials are a 400 with one generic message for both wrong
+		// password and unknown email, so the response cannot be used for
+		// account enumeration.
+		const genericLoginError = `{"error":"invalid email or password"}`
+
 		resp = suite.helpers.MakeRequest("POST", "/login", wrongPasswordData, "")
-		suite.Equal(http.StatusUnauthorized, resp.StatusCode, "Should reject wrong password")
+		suite.Equal(http.StatusBadRequest, resp.StatusCode, "Should reject wrong password")
+		suite.JSONEq(genericLoginError, resp.AsString(), "Wrong password should get the generic error")
 
 		// Test nonexistent user
 		nonexistentUserData := map[string]string{
@@ -93,7 +99,8 @@ func (suite *E2ETestSuite) TestAuthenticationErrors() {
 		}
 
 		resp = suite.helpers.MakeRequest("POST", "/login", nonexistentUserData, "")
-		suite.Equal(http.StatusUnauthorized, resp.StatusCode, "Should reject nonexistent user")
+		suite.Equal(http.StatusBadRequest, resp.StatusCode, "Should reject nonexistent user")
+		suite.JSONEq(genericLoginError, resp.AsString(), "Unknown email should be indistinguishable from a wrong password")
 
 		// Test empty credentials
 		emptyCredentials := map[string]string{
@@ -185,31 +192,74 @@ func (suite *E2ETestSuite) TestResourceNotFoundErrors() {
 		// Create user and get token
 		userData := suite.helpers.CreateUserFlow("notfound-test")
 
+		otherUser := suite.helpers.CreateUserFlow("notfound-other")
+
 		// Test nonexistent resource IDs
 		nonExistentID := "550e8400-e29b-41d4-a716-446655440000"
+
+		// Valid bodies, so the request is well-formed and only the ID is wrong.
+		accountBody := map[string]interface{}{"name": "Renamed", "bank": "Bank"}
+		categoryBody := map[string]interface{}{"name": "Renamed", "icon": "x", "color": "#FFFFFF"}
+		budgetBody := map[string]interface{}{"category_id": userData.CategoryID, "amount": 10}
+		transactionBody := map[string]interface{}{
+			"name": "Renamed", "amount": 10, "type_transation": "bill",
+			"account_id": userData.AccountID, "category_id": userData.CategoryID,
+		}
 
 		notFoundEndpoints := []struct {
 			method string
 			path   string
+			body   interface{}
 		}{
-			{"GET", fmt.Sprintf("/account/%s", nonExistentID)},
-			{"PUT", fmt.Sprintf("/account/%s", nonExistentID)},
-			{"DELETE", fmt.Sprintf("/account/%s", nonExistentID)},
-			{"GET", fmt.Sprintf("/category/%s", nonExistentID)},
-			{"PUT", fmt.Sprintf("/category/%s", nonExistentID)},
-			{"DELETE", fmt.Sprintf("/category/%s", nonExistentID)},
-			{"GET", fmt.Sprintf("/budget/%s", nonExistentID)},
-			{"PUT", fmt.Sprintf("/budget/%s", nonExistentID)},
-			{"DELETE", fmt.Sprintf("/budget/%s", nonExistentID)},
-			{"GET", fmt.Sprintf("/transaction/%s", nonExistentID)},
-			{"PUT", fmt.Sprintf("/transaction/%s", nonExistentID)},
-			{"DELETE", fmt.Sprintf("/transaction/%s", nonExistentID)},
+			{"GET", fmt.Sprintf("/account/%s", nonExistentID), nil},
+			{"PUT", fmt.Sprintf("/account/%s", nonExistentID), accountBody},
+			{"DELETE", fmt.Sprintf("/account/%s", nonExistentID), nil},
+			// Categories and budgets have no GET-by-ID route: unknown route -> 404.
+			{"GET", fmt.Sprintf("/category/%s", nonExistentID), nil},
+			{"PUT", fmt.Sprintf("/category/%s", nonExistentID), categoryBody},
+			{"DELETE", fmt.Sprintf("/category/%s", nonExistentID), nil},
+			{"GET", fmt.Sprintf("/budget/%s", nonExistentID), nil},
+			{"PUT", fmt.Sprintf("/budget/%s", nonExistentID), budgetBody},
+			{"DELETE", fmt.Sprintf("/budget/%s", nonExistentID), nil},
+			{"PUT", fmt.Sprintf("/transaction/%s", nonExistentID), transactionBody},
+			{"DELETE", fmt.Sprintf("/transaction/%s", nonExistentID), nil},
+			// Another user's resources are reported as not found, not forbidden.
+			{"GET", fmt.Sprintf("/account/%s", otherUser.AccountID), nil},
+			{"PUT", fmt.Sprintf("/account/%s", otherUser.AccountID), accountBody},
+			{"DELETE", fmt.Sprintf("/account/%s", otherUser.AccountID), nil},
+			{"PUT", fmt.Sprintf("/category/%s", otherUser.CategoryID), categoryBody},
+			{"DELETE", fmt.Sprintf("/category/%s", otherUser.CategoryID), nil},
 		}
 
 		for _, endpoint := range notFoundEndpoints {
-			resp := suite.helpers.MakeRequest(endpoint.method, endpoint.path, nil, userData.Token)
+			resp := suite.helpers.MakeRequest(endpoint.method, endpoint.path, endpoint.body, userData.Token)
 			suite.Equal(http.StatusNotFound, resp.StatusCode,
-				"Should return 404 for %s %s", endpoint.method, endpoint.path)
+				"Should return 404 for %s %s: %s", endpoint.method, endpoint.path, resp.AsString())
+		}
+
+		// The other user's data must be untouched.
+		otherAccounts, resp := suite.helpers.ListAccounts(otherUser.Token)
+		suite.Equal(http.StatusOK, resp.StatusCode)
+		suite.Require().Len(otherAccounts, 1)
+		suite.Equal(otherUser.AccountID, otherAccounts[0].AccountInfo.ID)
+		suite.Equal("Test Account notfound-other", otherAccounts[0].AccountInfo.Name)
+
+		// A request without a body is malformed: 400 is reported before the
+		// resource lookup.
+		for _, path := range []string{"/account/", "/category/", "/budget/", "/transaction/"} {
+			resp := suite.helpers.MakeRequest("PUT", path+nonExistentID, nil, userData.Token)
+			suite.Equal(http.StatusBadRequest, resp.StatusCode, "PUT %s without body should be 400", path)
+			suite.Equal("INVALID_JSON", resp.ErrorCode(), "PUT %s without body should be INVALID_JSON", path)
+		}
+
+		// GET /transaction/:id lists the transactions of account :id. For an
+		// unknown (or foreign) account it is an empty page, not a 404, and it
+		// never exposes another user's transactions.
+		for _, accountID := range []string{nonExistentID, otherUser.AccountID} {
+			page, resp := suite.helpers.ListTransactions("/transaction/"+accountID, userData.Token)
+			suite.Equal(http.StatusOK, resp.StatusCode)
+			suite.Empty(page.Data, "No transactions should be listed for account %s", accountID)
+			suite.Zero(page.Pagination.TotalRecords)
 		}
 
 		suite.T().Log("✅ Resource not found errors test passed!")
@@ -263,76 +313,94 @@ func (suite *E2ETestSuite) TestTransactionValidationErrors() {
 		// Create user with account and category
 		userData := suite.helpers.CreateUserFlow("transaction-validation")
 
-		// Get account and category IDs
-		resp := suite.helpers.MakeRequest("GET", "/account", nil, userData.Token)
-		suite.Equal(http.StatusOK, resp.StatusCode)
+		otherUser := suite.helpers.CreateUserFlow("transaction-validation-other")
 
-		var accounts []map[string]interface{}
-		err := resp.AsJSON(&accounts)
-		suite.NoError(err)
-		suite.Len(accounts, 1)
-		accountID := accounts[0]["id"].(string)
+		// Get account and category IDs
+		accounts, resp := suite.helpers.ListAccounts(userData.Token)
+		suite.Equal(http.StatusOK, resp.StatusCode)
+		suite.Require().Len(accounts, 1)
+		accountID := accounts[0].AccountInfo.ID
 
 		resp = suite.helpers.MakeRequest("GET", "/category", nil, userData.Token)
 		suite.Equal(http.StatusOK, resp.StatusCode)
 
 		var categories []map[string]interface{}
-		err = resp.AsJSON(&categories)
+		err := resp.AsJSON(&categories)
 		suite.NoError(err)
-		suite.Len(categories, 1)
+		suite.Require().Len(categories, 1)
 		categoryID := categories[0]["id"].(string)
 
 		// Test invalid transaction type
 		invalidTypeTransaction := map[string]interface{}{
-			"name":        "Test Transaction",
-			"description": "Test",
-			"amount":      100.0,
-			"type":        "invalid-type",
-			"account_id":  accountID,
-			"category_id": categoryID,
+			"name":            "Test Transaction",
+			"description":     "Test",
+			"amount":          100.0,
+			"type_transation": "invalid-type",
+			"account_id":      accountID,
+			"category_id":     categoryID,
 		}
 
 		resp = suite.helpers.MakeRequest("POST", "/transaction", invalidTypeTransaction, userData.Token)
 		suite.Equal(http.StatusBadRequest, resp.StatusCode, "Should reject invalid transaction type")
+		suite.Equal("VALIDATION_FAILED", resp.ErrorCode(), "Invalid type should fail validation")
 
 		// Test negative amount
 		negativeAmountTransaction := map[string]interface{}{
-			"name":        "Test Transaction",
-			"description": "Test",
-			"amount":      -50.0,
-			"type":        "bill",
-			"account_id":  accountID,
-			"category_id": categoryID,
+			"name":            "Test Transaction",
+			"description":     "Test",
+			"amount":          -50.0,
+			"type_transation": "bill",
+			"account_id":      accountID,
+			"category_id":     categoryID,
 		}
 
 		resp = suite.helpers.MakeRequest("POST", "/transaction", negativeAmountTransaction, userData.Token)
 		suite.Equal(http.StatusBadRequest, resp.StatusCode, "Should reject negative amount")
+		suite.Equal("INVALID_JSON", resp.ErrorCode(), "Negative amount should fail request binding (gt=0)")
 
 		// Test invalid account ID
 		invalidAccountTransaction := map[string]interface{}{
-			"name":        "Test Transaction",
-			"description": "Test",
-			"amount":      100.0,
-			"type":        "bill",
-			"account_id":  "invalid-account-id",
-			"category_id": categoryID,
+			"name":            "Test Transaction",
+			"description":     "Test",
+			"amount":          100.0,
+			"type_transation": "bill",
+			"account_id":      "invalid-account-id",
+			"category_id":     categoryID,
 		}
 
 		resp = suite.helpers.MakeRequest("POST", "/transaction", invalidAccountTransaction, userData.Token)
 		suite.Equal(http.StatusBadRequest, resp.StatusCode, "Should reject invalid account ID")
+		suite.Equal("BAD_REQUEST", resp.ErrorCode(), "Unknown account should be a bad reference")
 
 		// Test invalid category ID
 		invalidCategoryTransaction := map[string]interface{}{
-			"name":        "Test Transaction",
-			"description": "Test",
-			"amount":      100.0,
-			"type":        "bill",
-			"account_id":  accountID,
-			"category_id": "invalid-category-id",
+			"name":            "Test Transaction",
+			"description":     "Test",
+			"amount":          100.0,
+			"type_transation": "bill",
+			"account_id":      accountID,
+			"category_id":     "invalid-category-id",
 		}
 
 		resp = suite.helpers.MakeRequest("POST", "/transaction", invalidCategoryTransaction, userData.Token)
 		suite.Equal(http.StatusBadRequest, resp.StatusCode, "Should reject invalid category ID")
+		suite.Equal("BAD_REQUEST", resp.ErrorCode(), "Unknown category should be a bad reference")
+
+		// Another user's account or category is treated exactly like an unknown one.
+		for name, body := range map[string]map[string]interface{}{
+			"other user's account":  {"account_id": otherUser.AccountID, "category_id": categoryID},
+			"other user's category": {"account_id": accountID, "category_id": otherUser.CategoryID},
+		} {
+			body["name"] = "Test Transaction"
+			body["amount"] = 100.0
+			body["type_transation"] = "bill"
+			resp = suite.helpers.MakeRequest("POST", "/transaction", body, userData.Token)
+			suite.Equal(http.StatusBadRequest, resp.StatusCode, "Should reject %s", name)
+			suite.Equal("BAD_REQUEST", resp.ErrorCode(), "Should reject %s as a bad reference", name)
+		}
+
+		// Nothing was created by any of the rejected requests.
+		suite.Equal(0, suite.helpers.CountRecords("transactions"), "Rejected transactions must not be persisted")
 
 		suite.T().Log("✅ Transaction validation errors test passed!")
 	})

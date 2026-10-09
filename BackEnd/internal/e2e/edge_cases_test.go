@@ -31,22 +31,19 @@ func (suite *E2ETestSuite) TestLargeDatasets() {
 				InitialBalance: float64(i * 1000),
 			}
 
+			// Account 0 is opened with a zero balance, which must be accepted.
 			resp := suite.helpers.MakeRequest("POST", "/account", accountData, userData.Token)
-			suite.Equal(http.StatusOK, resp.StatusCode, "Account creation should succeed")
+			suite.Equal(http.StatusCreated, resp.StatusCode, "Account creation should succeed: %s", resp.AsString())
 		}
 
 		// Get all accounts
-		resp := suite.helpers.MakeRequest("GET", "/account", nil, userData.Token)
+		accounts, resp := suite.helpers.ListAccounts(userData.Token)
 		suite.Equal(http.StatusOK, resp.StatusCode, "Should retrieve all accounts")
-
-		var accounts []map[string]interface{}
-		err := resp.AsJSON(&accounts)
-		suite.NoError(err, "Should parse accounts response")
 		suite.Len(accounts, numAccounts+1, "Should have all created accounts plus initial one") // +1 for the account created in CreateUserFlow
 
 		// Store account IDs for transaction tests
 		for _, account := range accounts {
-			accountIDs = append(accountIDs, account["id"].(string))
+			accountIDs = append(accountIDs, account.AccountInfo.ID)
 		}
 
 		// Create many categories
@@ -65,7 +62,7 @@ func (suite *E2ETestSuite) TestLargeDatasets() {
 			}
 
 			resp := suite.helpers.MakeRequest("POST", "/category", categoryData, userData.Token)
-			suite.Equal(http.StatusOK, resp.StatusCode, "Category creation should succeed")
+			suite.Equal(http.StatusCreated, resp.StatusCode, "Category creation should succeed")
 		}
 
 		// Get all categories
@@ -73,7 +70,7 @@ func (suite *E2ETestSuite) TestLargeDatasets() {
 		suite.Equal(http.StatusOK, resp.StatusCode, "Should retrieve all categories")
 
 		var categories []map[string]interface{}
-		err = resp.AsJSON(&categories)
+		err := resp.AsJSON(&categories)
 		suite.NoError(err, "Should parse categories response")
 		suite.Len(categories, numCategories+1, "Should have all created categories plus initial one") // +1 for the category created in CreateUserFlow
 
@@ -91,7 +88,7 @@ func (suite *E2ETestSuite) TestLargeDatasets() {
 				Name        string  `json:"name"`
 				Description string  `json:"description"`
 				Amount      float64 `json:"amount"`
-				Type        string  `json:"type"`
+				Type        string  `json:"type_transation"`
 				AccountID   string  `json:"account_id"`
 				CategoryID  string  `json:"category_id"`
 			}{
@@ -104,17 +101,14 @@ func (suite *E2ETestSuite) TestLargeDatasets() {
 			}
 
 			resp := suite.helpers.MakeRequest("POST", "/transaction", transactionData, userData.Token)
-			suite.Equal(http.StatusOK, resp.StatusCode, "Transaction creation should succeed")
+			suite.Equal(http.StatusCreated, resp.StatusCode, "Transaction creation should succeed: %s", resp.AsString())
 		}
 
-		// Get all transactions
-		resp = suite.helpers.MakeRequest("GET", "/transaction", nil, userData.Token)
+		// Get all transactions (GET /transaction is paginated; 100 is the max page size)
+		page, resp := suite.helpers.ListTransactions("/transaction?limit=100", userData.Token)
 		suite.Equal(http.StatusOK, resp.StatusCode, "Should retrieve all transactions")
-
-		var transactions []map[string]interface{}
-		err = resp.AsJSON(&transactions)
-		suite.NoError(err, "Should parse transactions response")
-		suite.Len(transactions, numTransactions, "Should have all created transactions")
+		suite.Len(page.Data, numTransactions, "Should have all created transactions")
+		suite.Equal(int64(numTransactions), page.Pagination.TotalRecords, "Pagination total should match")
 
 		// Verify database counts
 		accountCount := suite.helpers.CountRecords("accounts")
@@ -157,7 +151,7 @@ func (suite *E2ETestSuite) TestConcurrentRequests() {
 					}
 
 					resp := suite.helpers.MakeRequest("POST", "/account", accountData, userData.Token)
-					results <- resp.StatusCode == http.StatusOK
+					results <- resp.StatusCode == http.StatusCreated
 				}(i)
 			}
 
@@ -175,12 +169,8 @@ func (suite *E2ETestSuite) TestConcurrentRequests() {
 			suite.Equal(numWorkers, successCount, "All concurrent account creations should succeed")
 
 			// Verify all accounts were created
-			resp := suite.helpers.MakeRequest("GET", "/account", nil, userData.Token)
+			accounts, resp := suite.helpers.ListAccounts(userData.Token)
 			suite.Equal(http.StatusOK, resp.StatusCode)
-
-			var accounts []map[string]interface{}
-			err := resp.AsJSON(&accounts)
-			suite.NoError(err)
 			suite.Len(accounts, numWorkers+1, "Should have all concurrent accounts plus initial one")
 		})
 
@@ -199,7 +189,7 @@ func (suite *E2ETestSuite) TestConcurrentRequests() {
 						Name        string  `json:"name"`
 						Description string  `json:"description"`
 						Amount      float64 `json:"amount"`
-						Type        string  `json:"type"`
+						Type        string  `json:"type_transation"`
 						AccountID   string  `json:"account_id"`
 						CategoryID  string  `json:"category_id"`
 					}{
@@ -212,7 +202,7 @@ func (suite *E2ETestSuite) TestConcurrentRequests() {
 					}
 
 					resp := suite.helpers.MakeRequest("POST", "/transaction", transactionData, userData.Token)
-					results <- resp.StatusCode == http.StatusOK
+					results <- resp.StatusCode == http.StatusCreated
 				}(i)
 			}
 
@@ -230,28 +220,28 @@ func (suite *E2ETestSuite) TestConcurrentRequests() {
 			suite.Equal(numWorkers, successCount, "All concurrent transaction creations should succeed")
 
 			// Verify account balance was updated correctly
-			resp := suite.helpers.MakeRequest("GET", "/account", nil, userData.Token)
+			accounts, resp := suite.helpers.ListAccounts(userData.Token)
 			suite.Equal(http.StatusOK, resp.StatusCode)
 
-			var accounts []map[string]interface{}
-			err := resp.AsJSON(&accounts)
-			suite.NoError(err)
-
 			// Find the main account
-			var mainAccount map[string]interface{}
+			var mainBalance string
+			found := false
 			for _, account := range accounts {
-				if account["id"].(string) == userData.AccountID {
-					mainAccount = account
+				if account.AccountInfo.ID == userData.AccountID {
+					mainBalance = account.CurrentBalance.String()
+					found = true
 					break
 				}
 			}
+			suite.Require().True(found, "Should find main account")
 
-			suite.NotNil(mainAccount, "Should find main account")
+			// Expected balance: initial 1000 - 20 transactions of 100 each (amounts are exact decimals)
+			suite.Equal("-1000", mainBalance, "Account balance should be updated correctly")
 
-			// Calculate expected balance (initial 1000 - 20 transactions of 100 each)
-			expectedBalance := 1000.0 - float64(numWorkers)*100.0
-			actualBalance := mainAccount["balance"].(float64)
-			suite.InDelta(expectedBalance, actualBalance, 0.01, "Account balance should be updated correctly")
+			// Every concurrent transaction must have been persisted exactly once
+			page, resp := suite.helpers.ListTransactions("/transaction/"+userData.AccountID+"?limit=100", userData.Token)
+			suite.Equal(http.StatusOK, resp.StatusCode)
+			suite.Len(page.Data, numWorkers, "All concurrent transactions should be stored")
 		})
 	})
 }
@@ -277,17 +267,30 @@ func (suite *E2ETestSuite) TestBoundaryValues() {
 				InitialBalance: 1000.0,
 			}
 
+			// Names longer than the 255-character column are invalid input (400),
+			// never a database error (500).
 			resp := suite.helpers.MakeRequest("POST", "/account", accountData, userData.Token)
-			// Should either succeed or return validation error (depends on implementation)
-			suite.True(resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusBadRequest,
-				"Should handle long strings gracefully")
+			suite.Equal(http.StatusBadRequest, resp.StatusCode, "Should reject a 1000-character name: %s", resp.AsString())
+			suite.Equal("INVALID_JSON", resp.ErrorCode(), "Overlong name should fail request binding")
+
+			// The longest accepted name is stored without truncation.
+			maxName := strings.Repeat("Ñ", 255)
+			accountData.Name = maxName
+			resp = suite.helpers.MakeRequest("POST", "/account", accountData, userData.Token)
+			suite.Equal(http.StatusCreated, resp.StatusCode, "Should accept a 255-character name: %s", resp.AsString())
+			accounts, _ := suite.helpers.ListAccounts(userData.Token)
+			stored := false
+			for _, account := range accounts {
+				stored = stored || account.AccountInfo.Name == maxName
+			}
+			suite.True(stored, "255-character account name should be stored without truncation")
 
 			// Test very long description
 			transactionData := &struct {
 				Name        string  `json:"name"`
 				Description string  `json:"description"`
 				Amount      float64 `json:"amount"`
-				Type        string  `json:"type"`
+				Type        string  `json:"type_transation"`
 				AccountID   string  `json:"account_id"`
 				CategoryID  string  `json:"category_id"`
 			}{
@@ -299,15 +302,15 @@ func (suite *E2ETestSuite) TestBoundaryValues() {
 				CategoryID:  userData.CategoryID,
 			}
 
+			// Descriptions are TEXT: a 10000-character description is accepted.
 			resp = suite.helpers.MakeRequest("POST", "/transaction", transactionData, userData.Token)
-			// Should either succeed or return validation error
-			suite.True(resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusBadRequest,
-				"Should handle very long descriptions gracefully")
+			suite.Equal(http.StatusCreated, resp.StatusCode,
+				"Should accept very long descriptions: %s", resp.AsString())
 		})
 
 		// Test large amounts
 		suite.Run("LargeAmounts", func() {
-			largeAmount := 999999999.99
+			largeAmount := 999999999.99 // max allowed initial balance
 
 			accountData := &struct {
 				Name           string  `json:"name"`
@@ -320,29 +323,23 @@ func (suite *E2ETestSuite) TestBoundaryValues() {
 			}
 
 			resp := suite.helpers.MakeRequest("POST", "/account", accountData, userData.Token)
-			suite.Equal(http.StatusOK, resp.StatusCode, "Should handle large amounts")
+			suite.Equal(http.StatusCreated, resp.StatusCode, "Should handle large amounts")
 
-			// Verify the account was created with correct balance
-			resp = suite.helpers.MakeRequest("GET", "/account", nil, userData.Token)
+			// Verify the account was created with the exact balance (no float rounding)
+			accounts, resp := suite.helpers.ListAccounts(userData.Token)
 			suite.Equal(http.StatusOK, resp.StatusCode)
 
-			var accounts []map[string]interface{}
-			err := resp.AsJSON(&accounts)
-			suite.NoError(err)
-
-			// Find the account with large balance
-			var largeAccount map[string]interface{}
+			found := false
 			for _, account := range accounts {
-				if account["name"].(string) == "Large Balance Account" {
-					largeAccount = account
-					break
+				if account.AccountInfo.Name == "Large Balance Account" {
+					found = true
+					suite.Equal("999999999.99", account.AccountInfo.InitialBalance.String(),
+						"Large initial balance should be stored exactly")
+					suite.Equal("999999999.99", account.CurrentBalance.String(),
+						"Large current balance should be reported exactly")
 				}
 			}
-
-			if largeAccount != nil {
-				suite.InDelta(largeAmount, largeAccount["balance"].(float64), 0.01,
-					"Large amount should be stored correctly")
-			}
+			suite.True(found, "Should find the large balance account")
 		})
 
 		// Test decimal precision
@@ -353,7 +350,7 @@ func (suite *E2ETestSuite) TestBoundaryValues() {
 				Name        string  `json:"name"`
 				Description string  `json:"description"`
 				Amount      float64 `json:"amount"`
-				Type        string  `json:"type"`
+				Type        string  `json:"type_transation"`
 				AccountID   string  `json:"account_id"`
 				CategoryID  string  `json:"category_id"`
 			}{
@@ -366,28 +363,26 @@ func (suite *E2ETestSuite) TestBoundaryValues() {
 			}
 
 			resp := suite.helpers.MakeRequest("POST", "/transaction", transactionData, userData.Token)
-			suite.Equal(http.StatusOK, resp.StatusCode, "Should handle precise amounts")
+			suite.Equal(http.StatusCreated, resp.StatusCode, "Should handle precise amounts: %s", resp.AsString())
 
 			// Verify the transaction was created with correct amount
-			resp = suite.helpers.MakeRequest("GET", "/transaction", nil, userData.Token)
+			page, resp := suite.helpers.ListTransactions("/transaction", userData.Token)
 			suite.Equal(http.StatusOK, resp.StatusCode)
 
-			var transactions []map[string]interface{}
-			err := resp.AsJSON(&transactions)
-			suite.NoError(err)
-
-			// Find the precise amount transaction
-			var preciseTransaction map[string]interface{}
-			for _, transaction := range transactions {
-				if transaction["name"].(string) == "Precise Amount Transaction" {
-					preciseTransaction = transaction
+			var stored string
+			found := false
+			for _, transaction := range page.Data {
+				if transaction.Name == "Precise Amount Transaction" {
+					stored = transaction.Amount.String()
+					found = true
 					break
 				}
 			}
 
-			suite.NotNil(preciseTransaction, "Should find precise amount transaction")
-			suite.InDelta(preciseAmount, preciseTransaction["amount"].(float64), 0.01,
-				"Precise amount should be stored with reasonable precision")
+			suite.True(found, "Should find precise amount transaction")
+			// Money columns are DECIMAL(19,4): PostgreSQL rounds the typed value to
+			// 4 places and the API returns the stored decimal exactly.
+			suite.Equal("123.4568", stored, "Precise amount should be stored at storage scale (4)")
 		})
 	})
 }
@@ -479,32 +474,23 @@ func (suite *E2ETestSuite) TestSpecialCharacters() {
 
 				resp := suite.helpers.MakeRequest("POST", "/account", accountData, userData.Token)
 
-				// Should either succeed or return validation error (not crash)
-				suite.True(resp.StatusCode == http.StatusOK || resp.StatusCode == http.StatusBadRequest,
-					"Should handle special characters gracefully: %s", specialString)
+				// Account names are free text: unicode, quotes, markup and SQL
+				// metacharacters are accepted and stored verbatim (queries are
+				// parameterized; escaping is the client's job when rendering).
+				suite.Equal(http.StatusCreated, resp.StatusCode,
+					"Should accept special characters: %q -> %s", specialString, resp.AsString())
 
-				// If successful, verify the data was stored correctly
-				if resp.StatusCode == http.StatusOK {
-					resp = suite.helpers.MakeRequest("GET", "/account", nil, userData.Token)
-					suite.Equal(http.StatusOK, resp.StatusCode)
+				accounts, resp := suite.helpers.ListAccounts(userData.Token)
+				suite.Equal(http.StatusOK, resp.StatusCode)
 
-					var accounts []map[string]interface{}
-					err := resp.AsJSON(&accounts)
-					suite.NoError(err)
-
-					// Find the account with special characters
-					found := false
-					for _, account := range accounts {
-						if account["name"].(string) == specialString {
-							found = true
-							break
-						}
-					}
-
-					if found {
-						suite.T().Logf("✅ Special string stored correctly: %s", specialString)
+				found := false
+				for _, account := range accounts {
+					if account.AccountInfo.Name == specialString {
+						found = true
+						break
 					}
 				}
+				suite.True(found, "Special string should round-trip unchanged: %q", specialString)
 			})
 		}
 	})
@@ -536,23 +522,20 @@ func (suite *E2ETestSuite) TestMemoryAndResourceUsage() {
 					}
 
 					resp := suite.helpers.MakeRequest("POST", "/account", accountData, userData.Token)
-					suite.Equal(http.StatusOK, resp.StatusCode)
+					suite.Equal(http.StatusCreated, resp.StatusCode)
 				}
 
 				// Get all accounts to collect IDs
-				resp := suite.helpers.MakeRequest("GET", "/account", nil, userData.Token)
+				accounts, resp := suite.helpers.ListAccounts(userData.Token)
 				suite.Equal(http.StatusOK, resp.StatusCode)
 
-				var accounts []map[string]interface{}
-				err := resp.AsJSON(&accounts)
-				suite.NoError(err)
-
+				prefix := fmt.Sprintf("Cycle %d Account ", cycle)
 				for _, account := range accounts {
-					name := account["name"].(string)
-					if strings.Contains(name, fmt.Sprintf("Cycle %d", cycle)) {
-						accountIDs = append(accountIDs, account["id"].(string))
+					if strings.HasPrefix(account.AccountInfo.Name, prefix) {
+						accountIDs = append(accountIDs, account.AccountInfo.ID)
 					}
 				}
+				suite.Len(accountIDs, numResourcesPerCycle, "Should find every account created in this cycle")
 
 				// Delete resources
 				for _, accountID := range accountIDs {
@@ -561,16 +544,13 @@ func (suite *E2ETestSuite) TestMemoryAndResourceUsage() {
 				}
 
 				// Verify resources were deleted
-				resp = suite.helpers.MakeRequest("GET", "/account", nil, userData.Token)
+				accounts, resp = suite.helpers.ListAccounts(userData.Token)
 				suite.Equal(http.StatusOK, resp.StatusCode)
-
-				err = resp.AsJSON(&accounts)
-				suite.NoError(err)
+				suite.Len(accounts, 1, "Only the CreateUserFlow account should remain")
 
 				// Should not find any accounts from this cycle
 				for _, account := range accounts {
-					name := account["name"].(string)
-					suite.False(strings.Contains(name, fmt.Sprintf("Cycle %d", cycle)),
+					suite.False(strings.HasPrefix(account.AccountInfo.Name, prefix),
 						"Deleted account should not be found")
 				}
 			}
