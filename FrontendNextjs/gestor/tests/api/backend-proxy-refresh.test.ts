@@ -154,6 +154,47 @@ describe('backend proxy with the real token refresh', () => {
 		expect(authorizations).toEqual([`Bearer ${rotatedAccessToken}`, `Bearer ${rotatedAccessToken}`])
 	})
 
+	it('SSE stream on reload with an expired token: reuses the rotation already made by the page render, no 401', async () => {
+		cookieToken = sessionWithTokenExpiringIn(-10)
+		// The Server Component render (auth()) refreshes first; its cookie cannot be persisted.
+		await request('account')
+		authorizations.length = 0
+		authCalls.mockReset()
+
+		// The stream still carries the old, expired cookie.
+		const res = (await GET(
+			new NextRequest('http://localhost:3000/api/backend/notifications', {
+				headers: { cookie: 'authjs.session-token=encrypted', accept: 'text/event-stream' },
+			}),
+			ctx(['notifications']),
+		)) as Response
+
+		expect(res.status).toBe(200)
+		expect(refreshCalls).toBe(1)
+		expect(authorizations).toEqual([`Bearer ${rotatedAccessToken}`])
+		expect(authCalls).not.toHaveBeenCalled()
+		expect(res.headers.get('set-cookie')).toBeNull()
+		expect(res.headers.get('x-session-refreshed')).toBe('1')
+		await res.body?.cancel()
+	})
+
+	it('concurrent stream and API calls with an expired cookie share one refresh', async () => {
+		cookieToken = sessionWithTokenExpiringIn(-10)
+		const stream = GET(
+			new NextRequest('http://localhost:3000/api/backend/notifications', {
+				headers: { cookie: 'authjs.session-token=encrypted', accept: 'text/event-stream' },
+			}),
+			ctx(['notifications']),
+		) as Promise<Response>
+
+		const responses = await Promise.all([stream, request('account'), request('category')])
+
+		expect(responses.map((r) => r.status)).toEqual([200, 200, 200])
+		expect(refreshCalls).toBe(1)
+		expect(new Set(authorizations)).toEqual(new Set([`Bearer ${rotatedAccessToken}`]))
+		await responses[0].body?.cancel()
+	})
+
 	it('expired token whose refresh fails: 401, the backend is never called with it', async () => {
 		cookieToken = sessionWithTokenExpiringIn(-10)
 		refreshStatus = 401

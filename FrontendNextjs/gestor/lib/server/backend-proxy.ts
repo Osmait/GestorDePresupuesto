@@ -2,7 +2,9 @@ import 'server-only'
 import http from 'node:http'
 import https from 'node:https'
 import type { NextRequest } from 'next/server'
+import { getBackendAccessToken } from '@/lib/auth/backend-token'
 import { readSessionJwt } from '@/lib/auth/session-cookie'
+import { SESSION_REFRESHED_HEADER } from '@/lib/auth/session-sync'
 import { getBackendUrl } from '@/lib/backend-url'
 import { LOCALE_COOKIE, resolveLocale } from '@/lib/i18n/locales'
 import { injectTraceContext, upstreamServerTiming } from '@/lib/server/trace-context'
@@ -138,21 +140,41 @@ export function isStreamingRequest(req: NextRequest, path: string[]): boolean {
 /** Margin under which an access token is considered too close to expiry to open a stream with. */
 const STREAM_TOKEN_MIN_VALIDITY_MS = 5 * 1000
 
+interface StreamCredentials {
+	accessToken: string
+	/** True when the token was refreshed for this request (the cookie still holds the old one). */
+	refreshed: boolean
+}
+
 /**
- * Access token for a streaming request, read straight from the session cookie.
- * It never refreshes: a stream's response cannot safely carry a rotated
- * session cookie (headers may only reach the browser minutes later, after the
- * cookie was rotated again by other requests, and the stale refresh token
- * would then be replayed). When the token is expired the client gets a 401,
- * re-fetches its session (which refreshes and persists the cookie) and
- * reconnects.
+ * Access token for a streaming request, read from the session cookie.
+ *
+ * A token that is still valid is used as is, even inside the refresh window:
+ * a stream's response cannot persist a rotated session cookie (no Set-Cookie,
+ * see `proxyStreamToBackend`), so it never rotates tokens it does not need to.
+ *
+ * An expired (or about to expire) token is refreshed through the same deduped
+ * `ensureFreshToken` as every other call, e.g. on a full reload after the token
+ * expired, where the Server Component render already rotated it: the stream
+ * then reuses that rotation from the shared grace store instead of answering
+ * 401. The caller tells the client to re-sync its session so the rotated
+ * cookie gets persisted.
  */
-async function getStreamAccessToken(headers: Headers): Promise<string | null> {
+async function getStreamCredentials(headers: Headers): Promise<StreamCredentials | null> {
 	const token = await readSessionJwt(headers)
-	if (!token || token.error || typeof token.accessToken !== 'string' || !token.accessToken) return null
+	if (!token || token.error) return null
 	const expiresAt = typeof token.accessTokenExpires === 'number' ? token.accessTokenExpires : 0
-	if (Date.now() >= expiresAt - STREAM_TOKEN_MIN_VALIDITY_MS) return null
-	return token.accessToken
+	if (
+		typeof token.accessToken === 'string' &&
+		token.accessToken &&
+		Date.now() < expiresAt - STREAM_TOKEN_MIN_VALIDITY_MS
+	) {
+		return { accessToken: token.accessToken, refreshed: false }
+	}
+
+	const accessToken = await getBackendAccessToken(headers, token)
+	if (!accessToken) return null
+	return { accessToken, refreshed: accessToken !== token.accessToken }
 }
 
 const NULL_BODY_STATUSES = new Set([101, 204, 205, 304])
@@ -270,17 +292,21 @@ function openUpstream(target: URL, { method, headers, body, signal, streaming }:
 /**
  * Proxies a long-lived Server-Sent Events stream. Unlike `proxyToBackend`, it
  * must NOT run behind next-auth's `auth()` wrapper: the response never carries
- * a Set-Cookie header, and the token is never refreshed here.
+ * a Set-Cookie header (headers of a stream may only reach the browser minutes
+ * later, after the cookie was rotated again by other requests, and the stale
+ * refresh token would then be replayed). An expired token is still refreshed
+ * (deduped, see `getStreamCredentials`); the response then carries
+ * `SESSION_REFRESHED_HEADER` so the client persists the rotated session.
  */
 export async function proxyStreamToBackend(req: NextRequest, path: string[]): Promise<Response> {
 	const target = buildTargetUrl(path, req.nextUrl.search)
 	if (!target) return jsonError(400, 'Invalid backend path')
 
-	const accessToken = await getStreamAccessToken(req.headers)
-	if (!accessToken) return jsonError(401, 'Unauthorized')
+	const credentials = await getStreamCredentials(req.headers)
+	if (!credentials) return jsonError(401, 'Unauthorized')
 
 	const headers = forwardedRequestHeaders(req, { acceptEncoding: false })
-	headers.set('authorization', `Bearer ${accessToken}`)
+	headers.set('authorization', `Bearer ${credentials.accessToken}`)
 
 	let upstream: Response
 	try {
@@ -291,5 +317,6 @@ export async function proxyStreamToBackend(req: NextRequest, path: string[]): Pr
 	}
 
 	// proxiedResponseHeaders already dropped any upstream Set-Cookie.
+	if (credentials.refreshed) upstream.headers.set(SESSION_REFRESHED_HEADER, '1')
 	return upstream
 }

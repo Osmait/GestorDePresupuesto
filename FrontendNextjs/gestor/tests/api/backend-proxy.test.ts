@@ -408,6 +408,7 @@ describe('backend proxy route: Server-Sent Events', () => {
 		// The cookie-rewriting auth() wrapper and the refreshing token path are bypassed.
 		expect(authWrapperCalls).not.toHaveBeenCalled()
 		expect(getBackendAccessTokenMock).not.toHaveBeenCalled()
+		expect(res.headers.get('x-session-refreshed')).toBeNull()
 		expect(upstreamRequests[0].url).toBe('/notifications')
 		expect(upstreamRequests[0].headers.authorization).toBe(`Bearer ${BACKEND_TOKEN}`)
 		expect(upstreamRequests[0].headers.cookie).toBeUndefined()
@@ -442,19 +443,61 @@ describe('backend proxy route: Server-Sent Events', () => {
 		await expect(upstreamClosed).resolves.toBeUndefined()
 	})
 
-	it('answers 401 without refreshing when the access token is expired', async () => {
+	it('refreshes an expired access token (deduped path) before opening the stream, without a Set-Cookie', async () => {
+		const expiredSession = {
+			accessToken: 'expired-access-token-placeholder',
+			refreshToken: 'refresh-current',
+			accessTokenExpires: Date.now() - 1000,
+		}
+		readSessionJwtMock.mockResolvedValue(expiredSession)
+		getBackendAccessTokenMock.mockResolvedValue('rotated-access-token-placeholder')
+
+		const res = await GET(sseRequest(), ctx(['notifications']))
+
+		expect(res.status).toBe(200)
+		expect(res.headers.get('content-type')).toBe('text/event-stream')
+		// Same refresh as every other call (ensureFreshToken), fed the already-decoded cookie.
+		expect(getBackendAccessTokenMock).toHaveBeenCalledTimes(1)
+		expect(getBackendAccessTokenMock.mock.calls[0][1]).toEqual(expiredSession)
+		expect(upstreamRequests).toHaveLength(1)
+		expect(upstreamRequests[0].headers.authorization).toBe('Bearer rotated-access-token-placeholder')
+		// Still no auth() wrapper and no cookie on a stream: the client is told to re-sync its session.
+		expect(authWrapperCalls).not.toHaveBeenCalled()
+		expect(res.headers.get('set-cookie')).toBeNull()
+		expect(res.headers.get('x-session-refreshed')).toBe('1')
+		await (res.body as ReadableStream<Uint8Array>).cancel()
+	})
+
+	it('does not refresh (nor flag a refresh) while the token is still valid', async () => {
+		readSessionJwtMock.mockResolvedValue({
+			accessToken: BACKEND_TOKEN,
+			refreshToken: 'refresh-current',
+			// inside the refresh window, but still valid: no rotation the stream could not persist
+			accessTokenExpires: Date.now() + 60 * 1000,
+		})
+
+		const res = await GET(sseRequest(), ctx(['notifications']))
+
+		expect(res.status).toBe(200)
+		expect(getBackendAccessTokenMock).not.toHaveBeenCalled()
+		expect(upstreamRequests[0].headers.authorization).toBe(`Bearer ${BACKEND_TOKEN}`)
+		expect(res.headers.get('x-session-refreshed')).toBeNull()
+		await (res.body as ReadableStream<Uint8Array>).cancel()
+	})
+
+	it('answers 401 when the expired access token cannot be refreshed', async () => {
 		readSessionJwtMock.mockResolvedValue({
 			accessToken: BACKEND_TOKEN,
 			refreshToken: 'refresh-current',
 			accessTokenExpires: Date.now() - 1000,
 		})
+		getBackendAccessTokenMock.mockResolvedValue(null)
 
 		const res = await GET(sseRequest(), ctx(['notifications']))
 
 		expect(res.status).toBe(401)
 		expect(res.headers.get('set-cookie')).toBeNull()
 		expect(upstreamRequests).toHaveLength(0)
-		expect(getBackendAccessTokenMock).not.toHaveBeenCalled()
 	})
 
 	it('answers 401 when there is no session or its refresh failed', async () => {
