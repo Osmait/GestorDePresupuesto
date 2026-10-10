@@ -214,17 +214,28 @@ func (r *CreditCardRepository) AdjustBalance(ctx context.Context, id string, use
 	return newBalance, nil
 }
 
-// ResetBalance atomically sets the current balance of balance `id` to zero and
-// returns the balance it had right before, read under the same row lock.
+// ResetBalance atomically zeroes the real balance of balance `id` and returns
+// the real balance it had right before, read under the same row lock.
+//
+// The real balance (what the API reports) is current_balance (initial debt and
+// payments) plus the card account's transactions (its charges, kept in
+// account_balances), so zeroing it stores current_balance = -transactions.
+// Zeroing only current_balance turned every past charge back into debt and
+// wiped out the payments that had covered them.
 func (r *CreditCardRepository) ResetBalance(ctx context.Context, id string, userId string) (money.Amount, error) {
 	query := `WITH previous AS (
-			SELECT id, current_balance FROM card_balances
+			SELECT id, card_id, currency, current_balance FROM card_balances
 			WHERE id = $1 AND ` + ownedCardClause("card_id", "$2") + `
 			FOR UPDATE
+		), ledger AS (
+			SELECT COALESCE(SUM(ab.balance), 0) AS total
+			FROM account_balances ab
+			JOIN previous p ON ab.account_id = p.card_id AND ab.currency = p.currency
+			WHERE ab.user_id = $2
 		)
-		UPDATE card_balances cb SET current_balance = 0, updated_at = $3
-		FROM previous WHERE cb.id = previous.id
-		RETURNING previous.current_balance`
+		UPDATE card_balances cb SET current_balance = -ledger.total, updated_at = $3
+		FROM previous, ledger WHERE cb.id = previous.id
+		RETURNING previous.current_balance + ledger.total`
 	var previous money.Amount
 	err := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, id, userId, time.Now()).Scan(&previous)
 	if err != nil {

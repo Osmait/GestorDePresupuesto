@@ -276,8 +276,9 @@ func (s *CreditCardService) ResetCardBalance(ctx context.Context, cardId string,
 		return nil, ErrBalanceNotFound
 	}
 
-	// Read the previous balance and zero it in one atomic statement, so a
-	// payment committed in between can neither be lost nor recorded twice.
+	// Read the previous real balance (stored balance + card transactions) and
+	// zero it in one atomic statement, so a payment committed in between can
+	// neither be lost nor recorded twice.
 	previousBalance, err := s.cardRepo.ResetBalance(ctx, balance.Id, userId)
 	if err != nil {
 		if isNotFound(err) {

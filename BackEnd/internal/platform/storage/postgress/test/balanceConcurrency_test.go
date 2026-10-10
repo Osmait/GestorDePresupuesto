@@ -238,6 +238,52 @@ func TestCreditCardResetBalance_DoesNotLosePaymentsCommittedConcurrently(t *test
 	moneytest.Equal(t, -900, previous.Add(balance.CurrentBalance))
 }
 
+// TestCreditCardResetBalance_ZeroesTheRealBalance resets a card whose charges
+// are transactions on the card account. The real balance (what the API
+// reports) is the stored balance plus those transactions; the reset must zero
+// that, not just the stored part, or every past charge becomes debt again.
+func TestCreditCardResetBalance_ZeroesTheRealBalance(t *testing.T) {
+	db := SetUpTest()
+	ctx := context.Background()
+	fx := seedCard(t, db, money.FromInt(1000))
+
+	cards := creditcardRepo.NewCreditCardRepository(db)
+	ledger := &ledgerTransactionService{repo: transactionRepo.NewTransactionRepository(db), categoryID: fx.categoryID}
+	service := creditcardService.NewCreditCardService(cards, accountRepo.NewAccountRepository(db), ledger)
+
+	charge := func(amount int64) {
+		t.Helper()
+		_, err := ledger.CreateTransactionWithID(ctx, "Compra", "", money.FromInt(amount), "bill", fx.cardID, fx.userID, "", "", "DOP", time.Now())
+		require.NoError(t, err)
+	}
+	realBalance := func() money.Amount {
+		t.Helper()
+		card, err := service.FindCardById(ctx, fx.cardID, fx.userID)
+		require.NoError(t, err)
+		require.Len(t, card.Balances, 1)
+		return card.Balances[0].CurrentBalance
+	}
+
+	// Initial debt 1000, charges 500, payments 800: the card owes 700.
+	charge(500)
+	_, err := cards.AdjustBalance(ctx, fx.balanceID, fx.userID, money.FromInt(800))
+	require.NoError(t, err)
+	moneytest.Equal(t, -700, realBalance())
+
+	var reset *creditcardDto.BalanceResetResponse
+	require.NoError(t, inRequestTx(ctx, db, func(ctx context.Context) error {
+		var err error
+		reset, err = service.ResetCardBalance(ctx, fx.cardID, fx.userID, &creditcardDto.ResetBalanceRequest{BalanceId: fx.balanceID})
+		return err
+	}))
+	moneytest.Equal(t, -700, reset.PreviousBalance)
+	moneytest.Equal(t, 0, realBalance())
+
+	// Charges after the reset are the only debt.
+	charge(100)
+	moneytest.Equal(t, -100, realBalance())
+}
+
 // TestLoanPayment_ConcurrentPaymentsAreSerialized pays a loan from many
 // requests at once. The loan row is locked (SELECT ... FOR UPDATE) before its
 // paid totals are recomputed, so no payment overwrites another.
