@@ -1,0 +1,39 @@
+package main
+
+// Perf-only file injected at build time with `go build -overlay` (see
+// perf/backend/scripts/build.sh). It is NOT part of the application source:
+// it exposes net/http/pprof plus a tiny DB-pool stats endpoint on
+// PPROF_ADDR (default 127.0.0.1:0 = disabled) so load tests can be profiled
+// without changing app code.
+
+import (
+	"encoding/json"
+	"net/http"
+	_ "net/http/pprof"
+	"os"
+	"runtime"
+)
+
+func init() {
+	addr := os.Getenv("PPROF_ADDR")
+	if addr == "" {
+		return
+	}
+	runtime.SetMutexProfileFraction(5)
+	runtime.SetBlockProfileRate(100000) // sample blocking events >= 100µs
+	http.HandleFunc("/debug/runtime", func(w http.ResponseWriter, _ *http.Request) {
+		var ms runtime.MemStats
+		runtime.ReadMemStats(&ms)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"goroutines":     runtime.NumGoroutine(),
+			"heap_alloc":     ms.HeapAlloc,
+			"heap_inuse":     ms.HeapInuse,
+			"total_alloc":    ms.TotalAlloc,
+			"mallocs":        ms.Mallocs,
+			"num_gc":         ms.NumGC,
+			"pause_total_ns": ms.PauseTotalNs,
+			"gomaxprocs":     runtime.GOMAXPROCS(0),
+		})
+	})
+	go func() { _ = http.ListenAndServe(addr, nil) }()
+}
