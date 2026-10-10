@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { getJwtExpiryMs } from '@/lib/auth/jwt-utils'
 import { ensureFreshToken } from '@/lib/auth/token-refresh'
 import { getBackendUrl } from '@/lib/backend-url'
+import { clientIpHeaders } from '@/lib/server/client-ip'
 
 const loginSchema = z.object({
 	email: z.string().email(),
@@ -17,13 +18,24 @@ const tokenSchema = z.string().min(1).max(4096)
  * Validates a backend access token by asking the backend who it belongs to and
  * builds the next-auth user from the answer. Expiry comes from the token's own
  * `exp` claim, never from client-supplied values.
+ *
+ * `requestHeaders` are the headers of the browser's sign-in request, used to
+ * pass its IP to the backend (`clientIpHeaders`).
  */
-export async function userFromAccessToken(accessToken: string, refreshToken: string): Promise<User | null> {
+export async function userFromAccessToken(
+	accessToken: string,
+	refreshToken: string,
+	requestHeaders?: Headers,
+): Promise<User | null> {
 	const accessTokenExpires = getJwtExpiryMs(accessToken)
 	if (!accessTokenExpires || accessTokenExpires <= Date.now()) return null
 
 	const response = await fetch(`${getBackendUrl()}/profile`, {
-		headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+		headers: {
+			'Content-Type': 'application/json',
+			Authorization: `Bearer ${accessToken}`,
+			...clientIpHeaders(requestHeaders),
+		},
 		cache: 'no-store',
 	})
 	if (!response.ok) return null
@@ -43,10 +55,11 @@ export async function userFromAccessToken(accessToken: string, refreshToken: str
 	}
 }
 
-async function loginWithPassword(email: string, password: string): Promise<User | null> {
+async function loginWithPassword(email: string, password: string, requestHeaders?: Headers): Promise<User | null> {
+	// The client IP keys the backend's login lockout and rate limits.
 	const response = await fetch(`${getBackendUrl()}/auth/login`, {
 		method: 'POST',
-		headers: { 'Content-Type': 'application/json' },
+		headers: { 'Content-Type': 'application/json', ...clientIpHeaders(requestHeaders) },
 		body: JSON.stringify({ email, password }),
 		cache: 'no-store',
 	})
@@ -54,7 +67,11 @@ async function loginWithPassword(email: string, password: string): Promise<User 
 
 	const tokens = await response.json()
 	if (typeof tokens?.access_token !== 'string') return null
-	return userFromAccessToken(tokens.access_token, typeof tokens.refresh_token === 'string' ? tokens.refresh_token : '')
+	return userFromAccessToken(
+		tokens.access_token,
+		typeof tokens.refresh_token === 'string' ? tokens.refresh_token : '',
+		requestHeaders,
+	)
 }
 
 export const authConfig = {
@@ -66,12 +83,16 @@ export const authConfig = {
 				accessToken: { type: 'text' },
 				refreshToken: { type: 'text' },
 			},
-			async authorize(credentials) {
+			async authorize(credentials, request) {
 				try {
 					const accessToken = tokenSchema.safeParse(credentials?.accessToken)
 					if (!accessToken.success) return null
 					const refreshToken = tokenSchema.safeParse(credentials?.refreshToken)
-					return await userFromAccessToken(accessToken.data, refreshToken.success ? refreshToken.data : '')
+					return await userFromAccessToken(
+						accessToken.data,
+						refreshToken.success ? refreshToken.data : '',
+						request?.headers,
+					)
 				} catch {
 					return null
 				}
@@ -84,18 +105,18 @@ export const authConfig = {
 				password: { label: 'Password', type: 'password' },
 				demoToken: { type: 'text' },
 			},
-			async authorize(credentials) {
+			async authorize(credentials, request) {
 				try {
 					// Demo login: the token issued by POST /auth/demo is only trusted
 					// after the backend confirms it (profile lookup + exp claim).
 					const demoToken = tokenSchema.safeParse(credentials?.demoToken)
 					if (demoToken.success) {
-						return await userFromAccessToken(demoToken.data, '')
+						return await userFromAccessToken(demoToken.data, '', request?.headers)
 					}
 
 					const parsed = loginSchema.safeParse(credentials)
 					if (!parsed.success) return null
-					return await loginWithPassword(parsed.data.email, parsed.data.password)
+					return await loginWithPassword(parsed.data.email, parsed.data.password, request?.headers)
 				} catch {
 					return null
 				}

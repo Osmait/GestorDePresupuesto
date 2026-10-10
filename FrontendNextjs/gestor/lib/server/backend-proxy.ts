@@ -7,6 +7,7 @@ import { readSessionJwt } from '@/lib/auth/session-cookie'
 import { SESSION_REFRESHED_HEADER } from '@/lib/auth/session-sync'
 import { getBackendUrl } from '@/lib/backend-url'
 import { LOCALE_COOKIE, resolveLocale } from '@/lib/i18n/locales'
+import { clientIpHeaders } from '@/lib/server/client-ip'
 import { injectTraceContext, upstreamServerTiming } from '@/lib/server/trace-context'
 
 /**
@@ -15,6 +16,11 @@ import { injectTraceContext, upstreamServerTiming } from '@/lib/server/trace-con
  * `traceparent`/`tracestate` from an upstream edge are passed through, and
  * overwritten with this server's span when OpenTelemetry is enabled.
  * `accept-encoding` is added for regular (non-streaming) requests only.
+ *
+ * The browser's `x-forwarded-for` / `x-real-ip` are not forwarded: the
+ * backend's edge overwrites X-Real-IP with this server's IP and never trusts a
+ * caller's X-Forwarded-For, so they had no effect. The client IP travels in
+ * `X-Client-IP`, authenticated by PROXY_SHARED_SECRET (see `clientIpHeaders`).
  */
 const FORWARDED_REQUEST_HEADERS = [
 	'accept',
@@ -23,8 +29,6 @@ const FORWARDED_REQUEST_HEADERS = [
 	'last-event-id',
 	'user-agent',
 	'x-request-id',
-	'x-forwarded-for',
-	'x-real-ip',
 	'traceparent',
 	'tracestate',
 ]
@@ -79,6 +83,8 @@ function forwardedRequestHeaders(req: NextRequest, { acceptEncoding }: { acceptE
 	// The backend localizes the names it generates (e.g. "Card payment") in the
 	// language the user picked in the UI, not the browser's preference list.
 	headers.set('accept-language', resolveLocale(req.cookies.get(LOCALE_COOKIE)?.value))
+	// The browser's IP for the backend's per-IP rate limits (only with PROXY_SHARED_SECRET).
+	for (const [name, value] of Object.entries(clientIpHeaders(req.headers))) headers.set(name, value)
 	// Continue the trace in the backend (no-op when OpenTelemetry is off).
 	return injectTraceContext(headers)
 }

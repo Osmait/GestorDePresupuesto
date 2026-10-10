@@ -6,6 +6,8 @@ import { NextRequest } from 'next/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const BACKEND_TOKEN = 'backend-access-token-secret'
+// Built at runtime: no secret-looking literal in the repo.
+const PROXY_SECRET = 'test-proxy-secret-'.padEnd(40, '0')
 let currentSession: Record<string, unknown> | null = null
 
 const authWrapperCalls = vi.fn()
@@ -134,12 +136,72 @@ describe('backend proxy route', () => {
 		expect(sent.method).toBe('GET')
 		expect(sent.headers.authorization).toBe(`Bearer ${BACKEND_TOKEN}`)
 		expect(sent.headers.cookie).toBeUndefined()
-		expect(sent.headers['x-forwarded-for']).toBe('203.0.113.7')
+		// The client IP travels only in the authenticated X-Client-IP (see below).
+		expect(sent.headers['x-forwarded-for']).toBeUndefined()
 
 		expect(res.status).toBe(200)
 		expect(res.headers.get('x-request-id')).toBe('req-1')
 		expect(res.headers.get('set-cookie')).toBeNull()
 		expect(await res.json()).toEqual([{ id: 'a1' }])
+	})
+
+	describe('client IP (PROXY_SHARED_SECRET)', () => {
+		afterEach(() => {
+			delete process.env.PROXY_SHARED_SECRET
+		})
+
+		it('sends the browser IP (x-real-ip first) with the shared secret when it is configured', async () => {
+			process.env.PROXY_SHARED_SECRET = PROXY_SECRET
+			await GET(
+				browserRequest('http://localhost:3000/api/backend/account', {
+					headers: { 'x-real-ip': '198.51.100.9', 'x-forwarded-for': '203.0.113.7, 10.0.0.1' },
+				}),
+				ctx(['account']),
+			)
+			const [sent] = upstream.requests
+			expect(sent.headers['x-client-ip']).toBe('198.51.100.9')
+			expect(sent.headers['x-proxy-secret']).toBe(PROXY_SECRET)
+			expect(sent.headers['x-real-ip']).toBeUndefined()
+			expect(sent.headers['x-forwarded-for']).toBeUndefined()
+		})
+
+		it('falls back to the first x-forwarded-for entry (public routes without a session too)', async () => {
+			process.env.PROXY_SHARED_SECRET = PROXY_SECRET
+			currentSession = null
+			await POST(
+				browserRequest('http://localhost:3000/api/backend/auth/demo', { method: 'POST', body: '{}' }),
+				ctx(['auth', 'demo']),
+			)
+			const [sent] = upstream.requests
+			expect(sent.headers.authorization).toBeUndefined()
+			expect(sent.headers['x-client-ip']).toBe('203.0.113.7')
+			expect(sent.headers['x-proxy-secret']).toBe(PROXY_SECRET)
+		})
+
+		it('sends neither header without PROXY_SHARED_SECRET, nor the ones the browser supplied', async () => {
+			await GET(
+				browserRequest('http://localhost:3000/api/backend/account', {
+					headers: { 'x-client-ip': '127.0.0.1', 'x-proxy-secret': 'guess' },
+				}),
+				ctx(['account']),
+			)
+			const [sent] = upstream.requests
+			expect(sent.headers['x-client-ip']).toBeUndefined()
+			expect(sent.headers['x-proxy-secret']).toBeUndefined()
+		})
+
+		it('never forwards a browser-supplied X-Client-IP, and omits the secret when the IP is unknown', async () => {
+			process.env.PROXY_SHARED_SECRET = PROXY_SECRET
+			await GET(
+				browserRequest('http://localhost:3000/api/backend/account', {
+					headers: { 'x-forwarded-for': 'not-an-ip', 'x-client-ip': '127.0.0.1' },
+				}),
+				ctx(['account']),
+			)
+			const [sent] = upstream.requests
+			expect(sent.headers['x-client-ip']).toBeUndefined()
+			expect(sent.headers['x-proxy-secret']).toBeUndefined()
+		})
 	})
 
 	it('sends the UI locale (locale cookie) as Accept-Language instead of the browser preference', async () => {
@@ -397,6 +459,26 @@ describe('backend proxy route: Server-Sent Events', () => {
 		}
 		return text
 	}
+
+	it('sends the browser IP with the shared secret on streams too', async () => {
+		process.env.PROXY_SHARED_SECRET = PROXY_SECRET
+		try {
+			const req = new NextRequest('http://localhost:3000/api/backend/notifications', {
+				headers: {
+					cookie: 'authjs.session-token=encrypted-session',
+					accept: 'text/event-stream',
+					'x-real-ip': '198.51.100.9',
+				},
+			})
+			const res = await GET(req, ctx(['notifications']))
+			expect(res.status).toBe(200)
+			await (res.body as ReadableStream<Uint8Array>).cancel()
+			expect(upstreamRequests[0].headers['x-client-ip']).toBe('198.51.100.9')
+			expect(upstreamRequests[0].headers['x-proxy-secret']).toBe(PROXY_SECRET)
+		} finally {
+			delete process.env.PROXY_SHARED_SECRET
+		}
+	})
 
 	it('streams events with the session token and never writes a session cookie', async () => {
 		const res = await GET(sseRequest(), ctx(['notifications']))

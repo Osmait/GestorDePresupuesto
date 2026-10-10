@@ -4,7 +4,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authConfig } from '@/lib/auth/config'
 import { getRefreshBufferMs, REFRESH_BUFFER_MS, resetRefreshStore } from '@/lib/auth/token-refresh'
 
+// The incoming request as seen through next/headers; null = outside a request scope.
+let incomingHeaders: Headers | null = null
+vi.mock('next/headers', () => ({
+	headers: async () => {
+		if (!incomingHeaders) throw new Error('`headers` was called outside a request scope')
+		return incomingHeaders
+	},
+}))
+
 const BACKEND = 'http://backend.test'
+// Built at runtime: no secret-looking literal in the repo.
+const PROXY_SECRET = 'test-proxy-secret-'.padEnd(40, '0')
 
 function makeJwt(expiresInSeconds: number, id = 'u1') {
 	const encode = (value: object) => Buffer.from(JSON.stringify(value)).toString('base64url')
@@ -25,7 +36,9 @@ const sessionCallback = (token: JWT) =>
 
 function provider(id: string) {
 	const found = authConfig.providers.find((p: any) => p.options?.id === id || (id === 'credentials' && !p.options?.id))
-	return (found as any).options as { authorize: (credentials: Record<string, unknown>) => Promise<unknown> }
+	return (found as any).options as {
+		authorize: (credentials: Record<string, unknown>, request?: Request) => Promise<unknown>
+	}
 }
 
 function expiringToken(): JWT {
@@ -72,6 +85,7 @@ describe('next-auth jwt callback token refresh', () => {
 
 		const token = expiringToken()
 		const pending = Array.from({ length: 6 }, () => jwtCallback({ ...token }))
+		await vi.waitFor(() => expect(fetchMock).toHaveBeenCalled())
 		release(jsonResponse({ access_token: newAccess, refresh_token: 'refresh-new', expires_in: 900 }))
 		const results = await Promise.all(pending)
 
@@ -87,6 +101,35 @@ describe('next-auth jwt callback token refresh', () => {
 			// expiry comes from the new token's exp claim
 			expect(result.accessTokenExpires).toBeGreaterThan(Date.now() + 14 * 60 * 1000)
 		}
+	})
+
+	describe('client IP (PROXY_SHARED_SECRET)', () => {
+		afterEach(() => {
+			incomingHeaders = null
+			delete process.env.PROXY_SHARED_SECRET
+		})
+
+		function refreshHeaders() {
+			return (fetchMock.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+		}
+
+		it('sends the browser IP of the current request with the refresh', async () => {
+			process.env.PROXY_SHARED_SECRET = PROXY_SECRET
+			incomingHeaders = new Headers({ 'x-real-ip': '198.51.100.9' })
+			fetchMock.mockResolvedValue(jsonResponse({ access_token: makeJwt(15 * 60), refresh_token: 'refresh-new' }))
+
+			await jwtCallback(expiringToken())
+			expect(refreshHeaders()).toMatchObject({ 'X-Client-IP': '198.51.100.9', 'X-Proxy-Secret': PROXY_SECRET })
+		})
+
+		it('sends neither header outside a request scope', async () => {
+			process.env.PROXY_SHARED_SECRET = PROXY_SECRET
+			fetchMock.mockResolvedValue(jsonResponse({ access_token: makeJwt(15 * 60), refresh_token: 'refresh-new' }))
+
+			await jwtCallback(expiringToken())
+			expect(refreshHeaders()['X-Client-IP']).toBeUndefined()
+			expect(refreshHeaders()['X-Proxy-Secret']).toBeUndefined()
+		})
 	})
 
 	it('serves late callers holding the rotated refresh token from the same result', async () => {
@@ -248,5 +291,57 @@ describe('credentials providers', () => {
 
 		const user = (await provider('credentials').authorize({ demoToken: makeJwt(3600, 'demo-1') })) as any
 		expect(user).toMatchObject({ id: 'demo-1', role: 'USER', refreshToken: '' })
+	})
+
+	describe('client IP (PROXY_SHARED_SECRET)', () => {
+		const signInRequest = () =>
+			new Request('http://localhost:3000/api/auth/callback/credentials', {
+				method: 'POST',
+				headers: { 'x-forwarded-for': '198.51.100.9, 10.0.0.1' },
+			})
+		const sentHeaders = (index: number) =>
+			(fetchMock.mock.calls[index][1] as RequestInit).headers as Record<string, string>
+
+		afterEach(() => {
+			delete process.env.PROXY_SHARED_SECRET
+		})
+
+		it('password login sends the browser IP with the secret to /auth/login and /profile', async () => {
+			process.env.PROXY_SHARED_SECRET = PROXY_SECRET
+			fetchMock
+				.mockResolvedValueOnce(jsonResponse({ access_token: makeJwt(15 * 60), refresh_token: 'r1' }))
+				.mockResolvedValueOnce(jsonResponse({ id: 'u1', email: 'a@b.c', name: 'A', last_name: 'B' }))
+
+			const user = await provider('credentials').authorize(
+				{ email: 'ana@example.com', password: 'pw' },
+				signInRequest(),
+			)
+			expect(user).toMatchObject({ id: 'u1' })
+			expect(fetchMock.mock.calls[0][0]).toBe(`${BACKEND}/auth/login`)
+			expect(fetchMock.mock.calls[1][0]).toBe(`${BACKEND}/profile`)
+			for (const index of [0, 1]) {
+				expect(sentHeaders(index)).toMatchObject({ 'X-Client-IP': '198.51.100.9', 'X-Proxy-Secret': PROXY_SECRET })
+			}
+		})
+
+		it('demo and passkey sign-ins send the browser IP with the profile check', async () => {
+			process.env.PROXY_SHARED_SECRET = PROXY_SECRET
+			fetchMock.mockImplementation(async () => jsonResponse({ id: 'u1', email: 'a@b.c', name: 'A', last_name: 'B' }))
+
+			await provider('credentials').authorize({ demoToken: makeJwt(3600) }, signInRequest())
+			await provider('passkey').authorize({ accessToken: makeJwt(3600), refreshToken: 'r1' }, signInRequest())
+			expect(sentHeaders(0)['X-Client-IP']).toBe('198.51.100.9')
+			expect(sentHeaders(1)['X-Client-IP']).toBe('198.51.100.9')
+		})
+
+		it('sends neither header without PROXY_SHARED_SECRET', async () => {
+			fetchMock
+				.mockResolvedValueOnce(jsonResponse({ access_token: makeJwt(15 * 60), refresh_token: 'r1' }))
+				.mockResolvedValueOnce(jsonResponse({ id: 'u1', email: 'a@b.c', name: 'A', last_name: 'B' }))
+
+			await provider('credentials').authorize({ email: 'ana@example.com', password: 'pw' }, signInRequest())
+			expect(sentHeaders(0)['X-Client-IP']).toBeUndefined()
+			expect(sentHeaders(0)['X-Proxy-Secret']).toBeUndefined()
+		})
 	})
 })

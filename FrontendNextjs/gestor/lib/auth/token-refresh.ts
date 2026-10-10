@@ -2,6 +2,7 @@ import 'server-only'
 import type { JWT } from 'next-auth/jwt'
 import { decodeJwtClaims, getJwtExpiryMs } from '@/lib/auth/jwt-utils'
 import { getBackendUrl } from '@/lib/backend-url'
+import { currentClientIpHeaders } from '@/lib/server/client-ip'
 
 /** Refresh proactively at most this long before the access token expires. */
 export const REFRESH_BUFFER_MS = 5 * 60 * 1000
@@ -64,9 +65,11 @@ function getRefreshStore(): Map<string, Promise<RefreshResult>> {
 
 async function callRefreshEndpoint(refreshToken: string): Promise<RefreshResult> {
 	try {
+		// Runs inside the next-auth jwt callback (no request argument): the
+		// browser's IP comes from next/headers when called within a request.
 		const response = await fetch(`${getBackendUrl()}/auth/refresh`, {
 			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
+			headers: { 'Content-Type': 'application/json', ...(await currentClientIpHeaders()) },
 			body: JSON.stringify({ refresh_token: refreshToken }),
 			cache: 'no-store',
 		})

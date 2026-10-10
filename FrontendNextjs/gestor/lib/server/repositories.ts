@@ -11,6 +11,7 @@ import { getBackendAccessToken } from '@/lib/auth/backend-token'
 import { getBackendUrl } from '@/lib/backend-url'
 import type { RepositoryOptions } from '@/lib/base-repository'
 import { LOCALE_COOKIE, resolveLocale } from '@/lib/i18n/locales'
+import { clientIpHeaders } from '@/lib/server/client-ip'
 import { traceContextHeaders } from '@/lib/server/trace-context'
 
 /**
@@ -22,12 +23,14 @@ const getServerAccessToken = cache(async () => getBackendAccessToken(await heade
 /**
  * Per-call headers: the user's UI locale, so the backend localizes the names
  * it generates (default es), and the W3C trace context of the current render
- * so the backend's spans join the page's trace (empty when OTel is off).
+ * so the backend's spans join the page's trace (empty when OTel is off), and
+ * the browser's IP for the backend's per-IP rate limits (`clientIpHeaders`).
  */
 export async function getServerRequestHeaders(): Promise<Record<string, string>> {
-	const cookieStore = await cookies()
+	const [cookieStore, requestHeaders] = await Promise.all([cookies(), headers()])
 	return {
 		...traceContextHeaders(),
+		...clientIpHeaders(requestHeaders),
 		'Accept-Language': resolveLocale(cookieStore.get(LOCALE_COOKIE)?.value),
 	}
 }
