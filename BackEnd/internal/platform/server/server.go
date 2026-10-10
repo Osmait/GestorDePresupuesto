@@ -5,9 +5,11 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"time"
 
@@ -16,11 +18,13 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	mcpPkg "github.com/osmait/gestorDePresupuesto/internal/platform/mcp"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
 	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
 	aiService "github.com/osmait/gestorDePresupuesto/internal/services/ai"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
@@ -83,6 +87,20 @@ type Server struct {
 	config              *config.Config
 	rateLimiter         *middleware.RateLimitService
 	featureFlags        *middleware.FeatureFlags
+	telemetry           *telemetry.Telemetry
+}
+
+// Option customizes a Server built by New.
+type Option func(*Server)
+
+// WithTelemetry enables the OpenTelemetry HTTP middleware and the /metrics
+// endpoint according to t (nil or disabled telemetry installs nothing).
+func WithTelemetry(t *telemetry.Telemetry) Option {
+	return func(s *Server) {
+		if t != nil {
+			s.telemetry = t
+		}
+	}
 }
 
 func New(ctx context.Context,
@@ -116,6 +134,7 @@ func New(ctx context.Context,
 	passkeySvc *passkey.PasskeyService,
 	mcpSrv *mcpPkg.MCPServer,
 	oauthSrv *oauth2.Server,
+	opts ...Option,
 ) (context.Context, *Server) {
 	srv := Server{
 		Engine:              gin.New(),
@@ -148,6 +167,10 @@ func New(ctx context.Context,
 		shutdownTimeout:     shutdownTimeout,
 		db:                  db,
 		config:              cfg,
+		telemetry:           telemetry.Disabled(),
+	}
+	for _, opt := range opts {
+		opt(&srv)
 	}
 	srv.featureFlags = middleware.NewFeatureFlags(db, cfg.Cache.FeatureFlagTTL)
 	srv.registerRoutes()
@@ -167,6 +190,28 @@ func (s *Server) registerRoutes() {
 		log.Printf("[security] WARNING: no TRUSTED_PROXIES / TRUSTED_PLATFORM_HEADER configured; " +
 			"behind a reverse proxy every client will share the proxy's IP for rate limiting")
 	}
+
+	// Observability (outermost so CORS preflights, 429s and recovered
+	// panics are all measured): request id → span + RED metrics → access log.
+	if s.telemetry.TracingEnabled() {
+		// Handlers pass the *gin.Context itself to services/repositories;
+		// with fallback its Value() resolves the request span, so DB and
+		// outgoing-HTTP spans nest under the HTTP span. Side effect (only
+		// with tracing on): Done()/Err() follow the request context, i.e.
+		// work for a disconnected client is cancelled.
+		s.Engine.ContextWithFallback = true
+	}
+	s.Engine.Use(middleware.RequestID())
+	s.Engine.Use(middleware.HTTPTelemetry(middleware.HTTPTelemetryConfig{
+		TracerProvider:  s.telemetry.TracerProvider(),
+		MeterProvider:   s.telemetry.MeterProvider(),
+		Tracing:         s.telemetry.TracingEnabled(),
+		Metrics:         s.telemetry.MetricsEnabled(),
+		SkipTracing:     middleware.DefaultSkipTracing(),
+		SkipMetrics:     map[string]bool{"/metrics": true},
+		StreamingRoutes: middleware.DefaultStreamingRoutes(),
+	}))
+	s.Engine.Use(middleware.AccessLog(s.config.Logging, observability.GetLogger().Logger()))
 
 	// CORS: explicit allow-list from CORS_ALLOWED_ORIGINS.
 	if s.config.IsProduction() && onlyLocalOrigins(s.config.CORS.AllowedOrigins) {
@@ -189,8 +234,12 @@ func (s *Server) registerRoutes() {
 	// Swagger documentation route (before authentication)
 	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Health routes (before authentication)
-	routes.HealthRoutes(s.Engine, s.db, version.Number, string(s.config.Server.Environment))
+	// Health routes (before authentication). /health/detailed only returns
+	// internals to callers presenting METRICS_TOKEN.
+	routes.HealthRoutes(s.Engine, s.db, version.Number, string(s.config.Server.Environment), s.config.Metrics.Token)
+
+	// Prometheus scrape endpoint on the public port: only with a bearer token.
+	s.registerMetricsRoute()
 	routes.QuoteRoutes(s.Engine, s.quoteService)
 	routes.ExchangeRoutes(s.Engine, s.exchangeService)
 
@@ -306,10 +355,63 @@ func (s *Server) registerRoutes() {
 	routes.APIKeyRoutes(s.Engine, s.apiKeyService)
 }
 
+// registerMetricsRoute mounts GET /metrics on the API port when metrics are
+// enabled with the prometheus exporter, no separate METRICS_PORT is set and a
+// METRICS_TOKEN protects it. It is never mounted unauthenticated here.
+func (s *Server) registerMetricsRoute() {
+	h := s.telemetry.MetricsHandler()
+	if h == nil || s.config.Metrics.Port != 0 {
+		return
+	}
+	if s.config.Metrics.Token == "" {
+		log.Printf("[metrics] METRICS_ENABLED but neither METRICS_TOKEN nor METRICS_PORT is set; /metrics is not exposed")
+		return
+	}
+	s.Engine.GET("/metrics", gin.WrapH(telemetry.BearerAuth(s.config.Metrics.Token, h)))
+}
+
+// metricsServer serves /metrics on the internal METRICS_PORT (e.g. Railway's
+// private network). The token is still enforced when configured.
+func (s *Server) metricsServer() *http.Server {
+	h := s.telemetry.MetricsHandler()
+	if h == nil || s.config.Metrics.Port == 0 {
+		return nil
+	}
+	if s.config.Metrics.Token != "" {
+		h = telemetry.BearerAuth(s.config.Metrics.Token, h)
+	}
+	mux := http.NewServeMux()
+	mux.Handle("GET /metrics", h)
+	host := s.config.Metrics.Host
+	if host == "" {
+		host = s.config.Server.Host
+	}
+	return &http.Server{
+		Addr:              net.JoinHostPort(host, strconv.FormatUint(uint64(s.config.Metrics.Port), 10)),
+		Handler:           mux,
+		ReadHeaderTimeout: 5 * time.Second,
+		WriteTimeout:      30 * time.Second,
+	}
+}
+
 func (s *Server) Run(ctx context.Context) error {
 	log.Println("Server running on", s.httpAddr)
 
 	srv := NewHTTPServer(s.httpAddr, s.Engine, s.config.Server)
+
+	if ms := s.metricsServer(); ms != nil {
+		log.Println("Metrics server running on", ms.Addr)
+		go func() {
+			if err := ms.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+				log.Printf("[metrics] server stopped: %v", err)
+			}
+		}()
+		defer func() {
+			shCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			_ = ms.Shutdown(shCtx)
+		}()
+	}
 
 	if s.rateLimiter != nil {
 		s.rateLimiter.StartCleanup(ctx, 0)

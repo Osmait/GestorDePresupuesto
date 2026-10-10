@@ -38,7 +38,8 @@ func TestShouldCheckToken(t *testing.T) {
 		{http.MethodGet, "/health", true},
 		{http.MethodHead, "/health", true},
 		{http.MethodGet, "/ping", true},
-		{http.MethodGet, "/metrics", true},
+		// /metrics is protected by METRICS_TOKEN (or served on METRICS_PORT), never JWT-public.
+		{http.MethodGet, "/metrics", false},
 		{http.MethodOptions, "/account", true}, // CORS preflight
 
 		// Regression: GET /user/:id used to be public via a "/user/" prefix match.

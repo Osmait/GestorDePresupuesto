@@ -7,10 +7,13 @@ import { getBackendAccessToken } from '@/lib/auth/backend-token'
 import { readSessionJwt } from '@/lib/auth/session-cookie'
 import { getBackendUrl } from '@/lib/backend-url'
 import { LOCALE_COOKIE, resolveLocale } from '@/lib/i18n/locales'
+import { injectTraceContext, upstreamServerTiming } from '@/lib/server/trace-context'
 
 /**
  * Request headers forwarded to the backend. Cookies and client Authorization
  * are never forwarded; Accept-Language is replaced by the UI locale.
+ * `traceparent`/`tracestate` from an upstream edge are passed through, and
+ * overwritten with this server's span when OpenTelemetry is enabled.
  */
 const FORWARDED_REQUEST_HEADERS = [
 	'accept',
@@ -21,6 +24,8 @@ const FORWARDED_REQUEST_HEADERS = [
 	'x-request-id',
 	'x-forwarded-for',
 	'x-real-ip',
+	'traceparent',
+	'tracestate',
 ]
 
 /** Hop-by-hop / body-encoding headers that must not be copied from the upstream response. */
@@ -56,14 +61,16 @@ function forwardedRequestHeaders(req: NextRequest): Headers {
 	// The backend localizes the names it generates (e.g. "Card payment") in the
 	// language the user picked in the UI, not the browser's preference list.
 	headers.set('accept-language', resolveLocale(req.cookies.get(LOCALE_COOKIE)?.value))
-	return headers
+	// Continue the trace in the backend (no-op when OpenTelemetry is off).
+	return injectTraceContext(headers)
 }
 
-function proxiedResponseHeaders(entries: [string, string][]): Headers {
+function proxiedResponseHeaders(entries: [string, string][], serverTiming?: string): Headers {
 	const responseHeaders = new Headers()
 	for (const [name, value] of entries) {
 		if (!STRIPPED_RESPONSE_HEADERS.has(name.toLowerCase())) responseHeaders.set(name, value)
 	}
+	if (serverTiming) responseHeaders.append('server-timing', serverTiming)
 	if (responseHeaders.get('content-type')?.includes('text/event-stream')) {
 		responseHeaders.set('cache-control', 'no-cache, no-transform')
 		responseHeaders.set('x-accel-buffering', 'no')
@@ -91,11 +98,14 @@ export async function proxyToBackend(req: NextRequest, path: string[], session: 
 
 	const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
 	let upstream: Response
+	let startedAt = 0
 	try {
+		const body = hasBody ? await req.arrayBuffer() : undefined
+		startedAt = performance.now()
 		upstream = await fetch(target, {
 			method: req.method,
 			headers,
-			body: hasBody ? await req.arrayBuffer() : undefined,
+			body,
 			signal: req.signal,
 			cache: 'no-store',
 			redirect: 'manual',
@@ -112,7 +122,7 @@ export async function proxyToBackend(req: NextRequest, path: string[], session: 
 	return new Response(upstream.body, {
 		status: upstream.status,
 		statusText: upstream.statusText,
-		headers: proxiedResponseHeaders(upstreamHeaders),
+		headers: proxiedResponseHeaders(upstreamHeaders, upstreamServerTiming(startedAt)),
 	})
 }
 
@@ -155,11 +165,15 @@ const NULL_BODY_STATUSES = new Set([101, 204, 205, 304])
 function openUpstreamStream(target: URL, headers: Headers, signal: AbortSignal): Promise<Response> {
 	return new Promise((resolve, reject) => {
 		const client = target.protocol === 'https:' ? https : http
+		const startedAt = performance.now()
 		const upstreamReq = client.request(
 			target,
+			// `headers` already carries the traceparent (forwardedRequestHeaders):
+			// fetch auto-instrumentation does not cover node:http.
 			{ method: 'GET', headers: Object.fromEntries(headers), signal },
 			(res) => {
 				const status = res.statusCode ?? 502
+				const serverTiming = upstreamServerTiming(startedAt)
 				const responseHeaders: [string, string][] = []
 				for (const [name, value] of Object.entries(res.headers)) {
 					if (value === undefined) continue
@@ -168,7 +182,7 @@ function openUpstreamStream(target: URL, headers: Headers, signal: AbortSignal):
 
 				if (NULL_BODY_STATUSES.has(status)) {
 					res.resume()
-					resolve(new Response(null, { status, headers: proxiedResponseHeaders(responseHeaders) }))
+					resolve(new Response(null, { status, headers: proxiedResponseHeaders(responseHeaders, serverTiming) }))
 					return
 				}
 
@@ -203,7 +217,7 @@ function openUpstreamStream(target: URL, headers: Headers, signal: AbortSignal):
 					new Response(body, {
 						status,
 						statusText: res.statusMessage,
-						headers: proxiedResponseHeaders(responseHeaders),
+						headers: proxiedResponseHeaders(responseHeaders, serverTiming),
 					}),
 				)
 			},

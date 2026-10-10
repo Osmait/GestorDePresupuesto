@@ -11,14 +11,22 @@ import { getBackendAccessToken } from '@/lib/auth/backend-token'
 import { getBackendUrl } from '@/lib/backend-url'
 import type { RepositoryOptions } from '@/lib/base-repository'
 import { LOCALE_COOKIE, resolveLocale } from '@/lib/i18n/locales'
+import { traceContextHeaders } from '@/lib/server/trace-context'
 
 /** One token lookup per request, shared by every repository call in a Server Component render. */
 const getServerAccessToken = cache(async () => getBackendAccessToken(await headers()))
 
-/** The user's UI locale, so the backend localizes the names it generates (default es). */
+/**
+ * Per-call headers: the user's UI locale, so the backend localizes the names
+ * it generates (default es), and the W3C trace context of the current render
+ * so the backend's spans join the page's trace (empty when OTel is off).
+ */
 export async function getServerRequestHeaders(): Promise<Record<string, string>> {
 	const cookieStore = await cookies()
-	return { 'Accept-Language': resolveLocale(cookieStore.get(LOCALE_COOKIE)?.value) }
+	return {
+		...traceContextHeaders(),
+		'Accept-Language': resolveLocale(cookieStore.get(LOCALE_COOKIE)?.value),
+	}
 }
 
 function serverOptions(): RepositoryOptions {

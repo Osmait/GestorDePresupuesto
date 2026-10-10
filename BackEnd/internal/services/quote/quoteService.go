@@ -1,18 +1,35 @@
 package quote
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
 )
 
-type QuoteService struct{}
+// quoteRequestTimeout bounds each upstream quote call. GetQuote tries up to
+// three upstreams sequentially, so the worst case stays well below the
+// server WriteTimeout.
+const quoteRequestTimeout = 8 * time.Second
+
+type QuoteService struct {
+	client *http.Client
+}
 
 func NewQuoteService() *QuoteService {
-	return &QuoteService{}
+	return &QuoteService{client: telemetry.NewHTTPClient(quoteRequestTimeout)}
+}
+
+func (s *QuoteService) httpClient() *http.Client {
+	if s.client == nil {
+		return &http.Client{Timeout: quoteRequestTimeout}
+	}
+	return s.client
 }
 
 // Nasdaq Response Structure
@@ -36,18 +53,25 @@ type BinanceResponse struct {
 	Price  string `json:"price"`
 }
 
+// GetQuote is GetQuoteContext without a caller context.
 func (s *QuoteService) GetQuote(symbol string) (money.Amount, string, string, error) {
+	return s.GetQuoteContext(context.Background(), symbol)
+}
+
+// GetQuoteContext fetches a quote; ctx cancels the upstream calls and parents
+// their client spans.
+func (s *QuoteService) GetQuoteContext(ctx context.Context, symbol string) (money.Amount, string, string, error) {
 	// Clean symbol
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
 
 	// Try Nasdaq first (Stocks)
-	price, currency, name, err := s.fetchNasdaq(symbol, "stocks")
+	price, currency, name, err := s.fetchNasdaq(ctx, symbol, "stocks")
 	if err == nil {
 		return price, currency, name, nil
 	}
 
 	// Try Nasdaq second (ETF)
-	price, currency, name, err = s.fetchNasdaq(symbol, "etf")
+	price, currency, name, err = s.fetchNasdaq(ctx, symbol, "etf")
 	if err == nil {
 		return price, currency, name, nil
 	}
@@ -59,7 +83,7 @@ func (s *QuoteService) GetQuote(symbol string) (money.Amount, string, string, er
 		binanceSymbol += "USDT"
 	}
 
-	price, currency, name, err = s.fetchBinance(binanceSymbol)
+	price, currency, name, err = s.fetchBinance(ctx, binanceSymbol)
 	if err == nil {
 		return price, currency, name, nil
 	}
@@ -67,9 +91,9 @@ func (s *QuoteService) GetQuote(symbol string) (money.Amount, string, string, er
 	return money.Zero, "", "", fmt.Errorf("quote not found")
 }
 
-func (s *QuoteService) fetchNasdaq(symbol, assetClass string) (money.Amount, string, string, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api.nasdaq.com/api/quote/"+symbol+"/info?assetclass="+assetClass, nil)
+func (s *QuoteService) fetchNasdaq(ctx context.Context, symbol, assetClass string) (money.Amount, string, string, error) {
+	client := s.httpClient()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.nasdaq.com/api/quote/"+symbol+"/info?assetclass="+assetClass, nil)
 	if err != nil {
 		return money.Zero, "", "", err
 	}
@@ -117,9 +141,9 @@ func (s *QuoteService) fetchNasdaq(symbol, assetClass string) (money.Amount, str
 	return price, curr, companyName, nil
 }
 
-func (s *QuoteService) fetchBinance(symbol string) (money.Amount, string, string, error) {
-	client := &http.Client{}
-	req, err := http.NewRequest("GET", "https://api.binance.com/api/v3/ticker/price?symbol="+symbol, nil)
+func (s *QuoteService) fetchBinance(ctx context.Context, symbol string) (money.Amount, string, string, error) {
+	client := s.httpClient()
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.binance.com/api/v3/ticker/price?symbol="+symbol, nil)
 	if err != nil {
 		return money.Zero, "", "", err
 	}

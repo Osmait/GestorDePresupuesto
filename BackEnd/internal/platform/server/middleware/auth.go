@@ -33,7 +33,6 @@ var publicRoutes = map[string]bool{
 	http.MethodPost + " /auth/passkey/login/finish": true,
 	http.MethodGet + " /health":                     true,
 	http.MethodGet + " /ping":                       true,
-	http.MethodGet + " /metrics":                    true,
 	http.MethodHead + " /health":                    true,
 }
 

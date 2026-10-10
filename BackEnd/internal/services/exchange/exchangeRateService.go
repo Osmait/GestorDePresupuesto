@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
 )
 
 type ExchangeRateService struct {
@@ -47,7 +48,7 @@ const (
 func NewExchangeRateService() *ExchangeRateService {
 	return &ExchangeRateService{
 		cacheDuration: 1 * time.Hour,
-		httpClient:    &http.Client{Timeout: 10 * time.Second},
+		httpClient:    telemetry.NewHTTPClient(10 * time.Second),
 	}
 }
 

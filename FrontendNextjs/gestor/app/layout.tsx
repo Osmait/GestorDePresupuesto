@@ -9,7 +9,9 @@ import { AuthSessionProvider } from '@/components/auth/session-provider'
 import { ProgressBarProvider } from '@/components/common/progress-bar-provider'
 import { ReactQueryProvider } from '@/components/common/react-query-provider'
 import { ThemeProvider } from '@/components/common/theme-provider'
+import { WebVitalsReporter } from '@/components/telemetry/web-vitals-reporter'
 import { Toaster } from '@/components/ui/sonner'
+import { parseSampleRate } from '@/lib/telemetry/web-vitals'
 import { cn } from '@/lib/utils'
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
@@ -72,6 +74,8 @@ const vercelAnalyticsEnabled = process.env.VERCEL === '1' || process.env.NEXT_PU
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
 	const locale = await getLocale()
 	const messages = await getMessages()
+	// Off by default; read at request time so it can be changed without a rebuild.
+	const webVitalsSampleRate = parseSampleRate(process.env.WEB_VITALS_SAMPLE_RATE)
 
 	return (
 		<html lang={locale} suppressHydrationWarning>
@@ -86,6 +90,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 					</ThemeProvider>
 				</AuthSessionProvider>
 				<Toaster />
+				{webVitalsSampleRate > 0 && <WebVitalsReporter sampleRate={webVitalsSampleRate} />}
 				{vercelAnalyticsEnabled && (
 					<>
 						<Analytics />

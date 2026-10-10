@@ -22,7 +22,7 @@ func (h *QuoteHandler) GetQuote(ctx *gin.Context) {
 		return
 	}
 
-	price, currency, name, err := h.quoteService.GetQuote(symbol)
+	price, currency, name, err := h.quoteService.GetQuoteContext(ctx.Request.Context(), symbol)
 	if err != nil {
 		if err.Error() == "quote not found" {
 			ctx.JSON(http.StatusNotFound, gin.H{"error": "quote not found"})

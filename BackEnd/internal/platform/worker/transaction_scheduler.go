@@ -46,7 +46,7 @@ func (s *TransactionScheduler) Start(ctx context.Context) {
 
 func (s *TransactionScheduler) runJob(ctx context.Context) {
 	log.Debug().Msg("Running scheduled transaction check")
-	if err := s.service.ProcessDueTransactions(ctx); err != nil {
+	if err := instrumentedRun(ctx, "transaction_scheduler", s.service.ProcessDueTransactions); err != nil {
 		log.Error().Err(err).Msg("Error running scheduled transaction check")
 	}
 }

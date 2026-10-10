@@ -11,6 +11,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+
+	"github.com/osmait/gestorDePresupuesto/internal/version"
 )
 
 // DatabaseType represents the type of database being used
@@ -161,6 +163,15 @@ type LoggingConfig struct {
 	Compress   bool   `json:"compress"`
 	Caller     bool   `json:"caller"`
 	StackTrace bool   `json:"stack_trace"`
+	// AccessLog controls the one-line-per-request access log: "all" logs
+	// every request (sampled by AccessLogSampleRate), "errors" only 5xx and
+	// slow requests, "off" disables it (ACCESS_LOG).
+	AccessLog string `json:"access_log" validate:"oneof=all errors off"`
+	// AccessLogSampleRate is the fraction (0..1) of fast, successful requests
+	// logged in "all" mode; errors and slow requests are always logged.
+	AccessLogSampleRate float64 `json:"access_log_sample_rate"`
+	// SlowRequestThreshold marks a request as slow in the access log.
+	SlowRequestThreshold time.Duration `json:"slow_request_threshold"`
 }
 
 // FeatureFlagsConfig holds feature flags configuration
@@ -186,8 +197,41 @@ type OpenTelemetryConfig struct {
 	MaxBatchSize      int               `json:"max_batch_size" validate:"min=1"`
 	MaxQueueSize      int               `json:"max_queue_size" validate:"min=1"`
 	EnableCompression bool              `json:"enable_compression"`
-	Headers           map[string]string `json:"headers"`
+	Headers           map[string]string `json:"-"` // may carry API keys
 	Attributes        map[string]string `json:"attributes"`
+	// OTLPProtocol is "grpc" or "http/protobuf" (OTEL_EXPORTER_OTLP_PROTOCOL).
+	OTLPProtocol string `json:"otlp_protocol"`
+}
+
+// MetricsConfig controls the OpenTelemetry MeterProvider and the Prometheus
+// /metrics endpoint. Everything is off unless METRICS_ENABLED=true.
+type MetricsConfig struct {
+	Enabled bool `json:"enabled"`
+	// Exporters is any of "prometheus" (pull, /metrics) and "otlp" (push to
+	// OTEL_EXPORTER_OTLP_ENDPOINT) (METRICS_EXPORTER, comma separated).
+	Exporters []string `json:"exporters"`
+	// Token is the bearer token required to scrape /metrics on the public
+	// port (METRICS_TOKEN). Without it /metrics is not mounted there.
+	Token string `json:"-"`
+	// Port, when non-zero, serves /metrics on a separate listener (e.g. the
+	// Railway private network) instead of the public API port (METRICS_PORT).
+	Port uint `json:"port"`
+	// Host is the interface the METRICS_PORT listener binds to (METRICS_HOST,
+	// default SERVER_HOST). E.g. "::" for Railway's private network or the
+	// Docker bridge IP for a local Prometheus container.
+	Host string `json:"host"`
+	// ExportInterval is the OTLP push interval (METRICS_EXPORT_INTERVAL).
+	ExportInterval time.Duration `json:"export_interval"`
+}
+
+// HasExporter reports whether the named metrics exporter is configured.
+func (m MetricsConfig) HasExporter(name string) bool {
+	for _, e := range m.Exporters {
+		if strings.EqualFold(strings.TrimSpace(e), name) {
+			return true
+		}
+	}
+	return false
 }
 
 // PrometheusConfig holds Prometheus configuration
@@ -262,6 +306,7 @@ type Config struct {
 	Logging       LoggingConfig       `json:"logging"`
 	FeatureFlags  FeatureFlagsConfig  `json:"feature_flags"`
 	OpenTelemetry OpenTelemetryConfig `json:"opentelemetry"`
+	Metrics       MetricsConfig       `json:"metrics"`
 	Prometheus    PrometheusConfig    `json:"prometheus"`
 	Middleware    MiddlewareConfig    `json:"middleware"`
 	Admin         AdminConfig         `json:"admin"`
@@ -399,6 +444,11 @@ func LoadConfig() (*Config, error) {
 			Compress:   getEnvBool("LOG_COMPRESS", true),
 			Caller:     getEnvBool("LOG_CALLER", false),
 			StackTrace: getEnvBool("LOG_STACK_TRACE", false),
+			// Development logs every request; other environments only log
+			// 5xx and slow requests unless ACCESS_LOG=all.
+			AccessLog:            strings.ToLower(getEnvString("ACCESS_LOG", defaultAccessLogMode())),
+			AccessLogSampleRate:  getEnvFloat("ACCESS_LOG_SAMPLE_RATE", 1.0),
+			SlowRequestThreshold: getDuration(getEnvString("ACCESS_LOG_SLOW_THRESHOLD", "1s")),
 		},
 
 		FeatureFlags: FeatureFlagsConfig{
@@ -411,19 +461,31 @@ func LoadConfig() (*Config, error) {
 		},
 
 		OpenTelemetry: OpenTelemetryConfig{
-			ServiceName:       getEnvString("OTEL_SERVICE_NAME", "gestor-de-presupuesto"),
-			ServiceVersion:    getEnvString("OTEL_SERVICE_VERSION", "1.0.0"),
-			Environment:       getEnvString("OTEL_ENVIRONMENT", "development"),
-			SamplingRate:      getEnvFloat("OTEL_SAMPLING_RATE", 1.0),
-			OTLPEndpoint:      getEnvString("OTEL_OTLP_ENDPOINT", "http://localhost:4317"),
+			ServiceName:    getEnvString("OTEL_SERVICE_NAME", "gestor-de-presupuesto"),
+			ServiceVersion: getEnvString("OTEL_SERVICE_VERSION", version.Number),
+			Environment:    getEnvString("OTEL_ENVIRONMENT", getEnvString("ENV", "development")),
+			SamplingRate:   getEnvFloat("OTEL_SAMPLING_RATE", 1.0),
+			// The standard OTEL_EXPORTER_OTLP_* variables win over the legacy
+			// OTEL_OTLP_ENDPOINT / OTEL_HEADERS names.
+			OTLPEndpoint:      getEnvString("OTEL_EXPORTER_OTLP_ENDPOINT", getEnvString("OTEL_OTLP_ENDPOINT", "http://localhost:4317")),
+			OTLPProtocol:      strings.ToLower(getEnvString("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")),
 			JaegerEndpoint:    getEnvString("OTEL_JAEGER_ENDPOINT", "http://localhost:14268"),
 			EnableStdout:      getEnvBool("OTEL_ENABLE_STDOUT", true),
 			BatchTimeout:      getDuration(getEnvString("OTEL_BATCH_TIMEOUT", "10s")),
 			MaxBatchSize:      getEnvInt("OTEL_MAX_BATCH_SIZE", 512),
 			MaxQueueSize:      getEnvInt("OTEL_MAX_QUEUE_SIZE", 1024),
 			EnableCompression: getEnvBool("OTEL_ENABLE_COMPRESSION", true),
-			Headers:           getEnvStringMap("OTEL_HEADERS", make(map[string]string)),
+			Headers:           otlpHeaders(),
 			Attributes:        getEnvStringMap("OTEL_ATTRIBUTES", make(map[string]string)),
+		},
+
+		Metrics: MetricsConfig{
+			Enabled:        getEnvBool("METRICS_ENABLED", false),
+			Exporters:      getEnvStringSlice("METRICS_EXPORTER", []string{"prometheus"}),
+			Token:          getEnvString("METRICS_TOKEN", ""),
+			Port:           uint(getEnvInt("METRICS_PORT", 0)),
+			Host:           getEnvString("METRICS_HOST", ""),
+			ExportInterval: getDuration(getEnvString("METRICS_EXPORT_INTERVAL", "30s")),
 		},
 
 		Prometheus: PrometheusConfig{
@@ -501,6 +563,7 @@ func (c *Config) Validate() error {
 		c.validateCORS,
 		c.validateLogging,
 		c.validateOpenTelemetry,
+		c.validateMetrics,
 		c.validatePrometheus,
 		c.validateEnvironmentSpecific,
 	}
@@ -724,6 +787,12 @@ func (c *Config) validateOpenTelemetry() error {
 		return fmt.Errorf("OpenTelemetry max queue size must be positive")
 	}
 
+	switch c.OpenTelemetry.OTLPProtocol {
+	case "", "grpc", "http/protobuf", "http":
+	default:
+		return fmt.Errorf("invalid OTEL_EXPORTER_OTLP_PROTOCOL %q (want grpc or http/protobuf)", c.OpenTelemetry.OTLPProtocol)
+	}
+
 	// Validate endpoints if provided
 	if c.OpenTelemetry.OTLPEndpoint != "" && !isValidURL(c.OpenTelemetry.OTLPEndpoint) {
 		return fmt.Errorf("invalid OTLP endpoint: %s", c.OpenTelemetry.OTLPEndpoint)
@@ -733,6 +802,54 @@ func (c *Config) validateOpenTelemetry() error {
 		return fmt.Errorf("invalid Jaeger endpoint: %s", c.OpenTelemetry.JaegerEndpoint)
 	}
 
+	return nil
+}
+
+// minMetricsTokenLength keeps METRICS_TOKEN from being guessable.
+const minMetricsTokenLength = 16
+
+// validateMetrics validates the metrics / access-log settings. A public,
+// unauthenticated /metrics is never allowed in production: either
+// METRICS_TOKEN or a separate METRICS_PORT is required there.
+func (c *Config) validateMetrics() error {
+	switch c.Logging.AccessLog {
+	case "", "all", "errors", "off":
+	default:
+		return fmt.Errorf("invalid ACCESS_LOG %q (want all, errors or off)", c.Logging.AccessLog)
+	}
+	if c.Logging.AccessLogSampleRate < 0 || c.Logging.AccessLogSampleRate > 1 {
+		return fmt.Errorf("ACCESS_LOG_SAMPLE_RATE must be between 0 and 1")
+	}
+
+	m := c.Metrics
+	if m.Token != "" && len(m.Token) < minMetricsTokenLength {
+		return fmt.Errorf("METRICS_TOKEN must be at least %d characters", minMetricsTokenLength)
+	}
+	if !m.Enabled {
+		return nil
+	}
+	if len(m.Exporters) == 0 {
+		return fmt.Errorf("METRICS_EXPORTER must list prometheus and/or otlp")
+	}
+	for _, e := range m.Exporters {
+		switch strings.ToLower(strings.TrimSpace(e)) {
+		case "prometheus", "otlp":
+		default:
+			return fmt.Errorf("invalid METRICS_EXPORTER %q (want prometheus and/or otlp)", e)
+		}
+	}
+	if m.Port > 65535 {
+		return fmt.Errorf("METRICS_PORT must be between 1 and 65535")
+	}
+	if m.Port != 0 && m.Port == c.Server.Port {
+		return fmt.Errorf("METRICS_PORT must differ from SERVER_PORT")
+	}
+	if m.HasExporter("otlp") && c.OpenTelemetry.OTLPEndpoint == "" {
+		return fmt.Errorf("METRICS_EXPORTER=otlp requires OTEL_EXPORTER_OTLP_ENDPOINT")
+	}
+	if c.IsProduction() && m.HasExporter("prometheus") && m.Port == 0 && m.Token == "" {
+		return fmt.Errorf("METRICS_ENABLED with the prometheus exporter requires METRICS_TOKEN or METRICS_PORT in production")
+	}
 	return nil
 }
 
@@ -999,6 +1116,33 @@ func getEnvStringMap(key string, defaultValue map[string]string) map[string]stri
 		return result
 	}
 	return defaultValue
+}
+
+// defaultAccessLogMode logs every request in development and only errors and
+// slow requests elsewhere (keeps production log volume unchanged by default).
+func defaultAccessLogMode() string {
+	if getEnvString("ENV", "development") == string(EnvironmentDevelopment) {
+		return "all"
+	}
+	return "errors"
+}
+
+// otlpHeaders reads the OTLP exporter headers. The standard
+// OTEL_EXPORTER_OTLP_HEADERS ("k1=v1,k2=v2", values URL-encoded per the OTel
+// spec, e.g. "Authorization=Basic%20abc") wins over the legacy OTEL_HEADERS.
+func otlpHeaders() map[string]string {
+	raw := getEnvStringMap("OTEL_EXPORTER_OTLP_HEADERS", nil)
+	if raw == nil {
+		return getEnvStringMap("OTEL_HEADERS", make(map[string]string))
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		if dec, err := url.PathUnescape(v); err == nil {
+			v = dec
+		}
+		out[k] = v
+	}
+	return out
 }
 
 // devJWTSecret is a stable fallback used ONLY in local development and test

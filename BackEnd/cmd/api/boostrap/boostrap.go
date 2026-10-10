@@ -39,6 +39,7 @@ import (
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/worker"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
@@ -91,11 +92,35 @@ func Run() error {
 		"port":        cfg.Server.Port,
 		"db_type":     cfg.Database.Type,
 		"tracing":     cfg.FeatureFlags.EnableTracing,
-		"metrics":     cfg.FeatureFlags.EnableMetrics,
+		"metrics":     cfg.Metrics.Enabled,
 	}).Info("Starting application")
 
+	// OpenTelemetry tracing/metrics: a no-op unless ENABLE_TRACING or
+	// METRICS_ENABLED is set.
+	tel, err := telemetry.Setup(ctx, cfg)
+	if err != nil {
+		return fmt.Errorf("failed to initialize telemetry: %w", err)
+	}
+	defer func() {
+		shCtx, shCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer shCancel()
+		if err := tel.Shutdown(shCtx); err != nil {
+			logger.WithError(err).Warn("Telemetry shutdown failed")
+		}
+	}()
+	if tel.Enabled() {
+		logger.WithFields(map[string]interface{}{
+			"tracing":       tel.TracingEnabled(),
+			"metrics":       tel.MetricsEnabled(),
+			"otlp_endpoint": cfg.OpenTelemetry.OTLPEndpoint,
+			"otlp_protocol": cfg.OpenTelemetry.OTLPProtocol,
+			"sampling_rate": cfg.OpenTelemetry.SamplingRate,
+			"exporters":     cfg.Metrics.Exporters,
+		}).Info("Telemetry enabled")
+	}
+
 	// Connect to database
-	db, err := initializeDatabase(ctx, cfg, logger)
+	db, err := initializeDatabase(ctx, cfg, tel, logger)
 	if err != nil {
 		return fmt.Errorf("failed to initialize database: %w", err)
 	}
@@ -111,7 +136,7 @@ func Run() error {
 	}
 
 	// Wire repositories, services and the HTTP router.
-	app, err := NewApp(ctx, cfg, db)
+	app, err := NewAppWithTelemetry(ctx, cfg, db, tel)
 	if err != nil {
 		return err
 	}
@@ -157,6 +182,11 @@ type App struct {
 // can serve app.Server.Engine through httptest and exercise the same
 // middleware chain (auth, RLS transactions, rate limiting, CORS) as production.
 func NewApp(ctx context.Context, cfg *config.Config, db *sql.DB) (*App, error) {
+	return NewAppWithTelemetry(ctx, cfg, db, telemetry.Disabled())
+}
+
+// NewAppWithTelemetry is NewApp with the HTTP server instrumented by tel.
+func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, tel *telemetry.Telemetry) (*App, error) {
 	repos := initializeRepositories(db)
 
 	svcs, err := initializeServices(repos, cfg)
@@ -220,6 +250,7 @@ func NewApp(ctx context.Context, cfg *config.Config, db *sql.DB) (*App, error) {
 		svcs.passkeyService,
 		mcpServer,
 		oauthSrv,
+		server.WithTelemetry(tel),
 	)
 
 	return &App{Ctx: serverCtx, Server: srv, repos: repos, services: svcs}, nil
@@ -237,12 +268,15 @@ func initializeLogger(cfg *config.Config) (*observability.Logger, error) {
 	}
 	logger := observability.NewLogger(loggerCfg)
 	observability.InitializeGlobalLogger(loggerCfg)
+	// Code using the zerolog global logger with .Ctx(ctx) gets
+	// request_id/trace_id/span_id too.
+	log.Logger = log.Logger.Hook(observability.TraceHook{})
 
 	return logger, nil
 }
 
 // initializeDatabase connects to the database
-func initializeDatabase(ctx context.Context, cfg *config.Config, logger *observability.Logger) (*sql.DB, error) {
+func initializeDatabase(ctx context.Context, cfg *config.Config, tel *telemetry.Telemetry, logger *observability.Logger) (*sql.DB, error) {
 	var databaseURL string
 	var driverName string
 
@@ -262,7 +296,9 @@ func initializeDatabase(ctx context.Context, cfg *config.Config, logger *observa
 		"type":   cfg.Database.Type,
 	}).Info("Connecting to database")
 
-	db, err := sql.Open(driverName, databaseURL)
+	// Plain sql.Open unless telemetry is enabled (then otelsql: query spans
+	// and pool metrics).
+	db, err := telemetry.OpenDB(tel, driverName, databaseURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to open database connection: %w", err)
 	}

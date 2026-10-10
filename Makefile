@@ -1,5 +1,5 @@
 
-.PHONY: frontend backend dev services help backend-check frontend-check full-check test-e2e lint-backend test-backend build-backend lint-frontend test-frontend build-frontend
+.PHONY: obs-up obs-down obs-logs frontend backend dev services help backend-check frontend-check full-check test-e2e lint-backend test-backend build-backend lint-frontend test-frontend build-frontend
 
 # Default target
 all: help
@@ -29,6 +29,8 @@ help:
 	@echo "  make frontend-check - Run Lint, Test and Build for Frontend"
 	@echo "  make test-e2e       - Run Playwright E2E tests"
 	@echo "  make full-check     - Run ALL checks (Backend, Frontend, E2E)"
+	@echo "  make obs-up         - Start local observability (Collector, Jaeger, Prometheus, Grafana)"
+	@echo "  make obs-down       - Stop it (add OBS_VOLUMES=1 to also drop Prometheus data)"
 
 # Aggregate Commands
 backend-check: lint-backend test-backend build-backend
@@ -70,3 +72,20 @@ test-frontend:
 build-frontend:
 	@echo "Building Frontend..."
 	cd FrontendNextjs/gestor && npm run build
+
+# Local observability stack (see observability/README.md). Ports and the
+# backend scrape target are configurable through observability/.env.
+OBS_COMPOSE := docker compose -f observability/docker-compose.yml
+
+obs-up:
+	$(OBS_COMPOSE) up -d
+	@echo "Grafana:    http://localhost:$${OBS_GRAFANA_PORT:-3001}"
+	@echo "Jaeger:     http://localhost:$${OBS_JAEGER_UI_PORT:-16686}"
+	@echo "Prometheus: http://localhost:$${OBS_PROMETHEUS_PORT:-9090}"
+	@echo "OTLP:       grpc localhost:$${OBS_OTLP_GRPC_PORT:-4317}, http localhost:$${OBS_OTLP_HTTP_PORT:-4318}"
+
+obs-down:
+	$(OBS_COMPOSE) down $(if $(OBS_VOLUMES),-v,)
+
+obs-logs:
+	$(OBS_COMPOSE) logs -f --tail=100

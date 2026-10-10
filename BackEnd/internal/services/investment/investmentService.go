@@ -272,7 +272,9 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 	results := make(chan quoteUpdate, len(stale))
 	for _, inv := range stale {
 		go func(i *investment.Investment) {
-			price, _, _, err := s.quoteService.GetQuote(i.Symbol)
+			// WithoutCancel: a quote may outlive the 2s wait below, but its client
+			// span stays in the request trace.
+			price, _, _, err := s.quoteService.GetQuoteContext(context.WithoutCancel(ctx), i.Symbol)
 			if err != nil || !price.IsPositive() {
 				price = money.Zero
 			}
