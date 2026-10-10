@@ -57,6 +57,11 @@ type ServerConfig struct {
 	// on Cloudflare) that is trusted as the client IP unconditionally. Only
 	// set it when the app is reachable exclusively through that proxy.
 	TrustedPlatformHeader string `json:"trusted_platform_header"`
+	// ProxySharedSecret (PROXY_SHARED_SECRET) authenticates the frontend
+	// server, which calls the backend on behalf of browsers: requests carrying
+	// it in X-Proxy-Secret have their X-Client-IP trusted as the client IP.
+	// Never serialized or logged.
+	ProxySharedSecret string `json:"-"`
 }
 
 // DatabaseConfig holds database-related configuration
@@ -344,6 +349,7 @@ func LoadConfig() (*Config, error) {
 			MaxHeaderBytes:        getEnvInt("SERVER_MAX_HEADER_BYTES", 1<<20), // 1MB
 			TrustedProxies:        getEnvStringSlice("TRUSTED_PROXIES", nil),
 			TrustedPlatformHeader: strings.TrimSpace(getEnvString("TRUSTED_PLATFORM_HEADER", "")),
+			ProxySharedSecret:     strings.TrimSpace(getEnvString("PROXY_SHARED_SECRET", "")),
 			Timezone:              getEnvString("APP_TIMEZONE", "America/Santo_Domingo"),
 		},
 
@@ -874,11 +880,19 @@ func (c *Config) validatePrometheus() error {
 	return nil
 }
 
+// minProxySharedSecretLength is the minimum PROXY_SHARED_SECRET length
+// accepted in production.
+const minProxySharedSecretLength = 32
+
 // validateEnvironmentSpecific validates environment-specific requirements
 func (c *Config) validateEnvironmentSpecific() error {
 	if c.Server.Environment == EnvironmentProduction {
 		if c.JWT.Secret == devJWTSecret {
 			return fmt.Errorf("default JWT secret cannot be used in production")
+		}
+
+		if c.Server.ProxySharedSecret != "" && len(c.Server.ProxySharedSecret) < minProxySharedSecretLength {
+			return fmt.Errorf("PROXY_SHARED_SECRET must be at least %d characters long in production", minProxySharedSecretLength)
 		}
 
 		for _, origin := range c.CORS.AllowedOrigins {

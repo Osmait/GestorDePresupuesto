@@ -178,17 +178,27 @@ func New(ctx context.Context,
 }
 
 func (s *Server) registerRoutes() {
-	// Client IP resolution: only trust forwarding headers from configured
-	// proxies (TRUSTED_PROXIES / TRUSTED_PLATFORM_HEADER). Must run before
-	// anything calls c.ClientIP() (rate limiting, login lockout, demo users).
+	// Client IP resolution: only trust the frontend server's X-Client-IP
+	// (PROXY_SHARED_SECRET) and forwarding headers from configured proxies
+	// (TRUSTED_PLATFORM_HEADER / TRUSTED_PROXIES). Must run first: it installs
+	// the middleware that strips X-Proxy-Secret before anything can log it,
+	// and runs before anything calls c.ClientIP() (rate limiting, login
+	// lockout, demo users).
 	if err := middleware.ConfigureClientIP(s.Engine, s.config.Server); err != nil {
 		log.Printf("[security] %v — falling back to trusting no proxies", err)
 		_ = s.Engine.SetTrustedProxies(nil)
 		s.Engine.TrustedPlatform = ""
 	}
-	if s.config.IsProduction() && len(s.config.Server.TrustedProxies) == 0 && s.config.Server.TrustedPlatformHeader == "" {
-		log.Printf("[security] WARNING: no TRUSTED_PROXIES / TRUSTED_PLATFORM_HEADER configured; " +
-			"behind a reverse proxy every client will share the proxy's IP for rate limiting")
+	if s.config.IsProduction() {
+		if len(s.config.Server.TrustedProxies) == 0 && s.config.Server.TrustedPlatformHeader == "" {
+			log.Printf("[security] WARNING: no TRUSTED_PROXIES / TRUSTED_PLATFORM_HEADER configured; " +
+				"behind a reverse proxy every client will share the proxy's IP for rate limiting")
+		}
+		if s.config.Server.ProxySharedSecret == "" {
+			log.Printf("[security] WARNING: PROXY_SHARED_SECRET not configured; requests relayed by the " +
+				"frontend server (Next.js proxy, Server Components, next-auth) all share its IP for " +
+				"rate limiting and login lockout. Set the same value on the backend and the frontend")
+		}
 	}
 
 	// Observability (outermost so CORS preflights, 429s and recovered

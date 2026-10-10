@@ -41,6 +41,9 @@ The application uses a comprehensive configuration system that supports:
 | `SERVER_WRITE_TIMEOUT` | `30s` | HTTP write timeout |
 | `SERVER_IDLE_TIMEOUT` | `60s` | HTTP idle timeout |
 | `SERVER_MAX_HEADER_BYTES` | `1048576` | Maximum header size (1MB) |
+| `TRUSTED_PROXIES` | (empty) | Comma-separated proxy IPs/CIDRs whose `X-Forwarded-For` / `X-Real-IP` are trusted for the client IP. Empty trusts nobody (TCP peer address). |
+| `TRUSTED_PLATFORM_HEADER` | (empty) | Header set by the hosting platform's edge with the client IP, trusted unconditionally (e.g. `X-Real-IP` on Railway). |
+| `PROXY_SHARED_SECRET` | (empty) | Shared with the Next.js frontend (same variable there). Requests carrying it in `X-Proxy-Secret` have their `X-Client-IP` trusted as the client IP, so per-IP rate limits and login lockout apply per browser instead of to the frontend server's egress IP. A missing/wrong secret falls back to the platform header / peer IP (no error). Both headers are stripped before logging. Must be at least 32 characters in production; never serialized or logged. |
 
 ### Database Configuration
 

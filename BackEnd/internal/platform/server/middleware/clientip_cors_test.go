@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -85,6 +86,197 @@ func TestConfigureClientIP(t *testing.T) {
 			assert.Equal(t, tc.want, w.Body.String())
 		})
 	}
+}
+
+// testProxySecret is built at runtime: no secret-looking literal in the repo.
+var testProxySecret = strings.Repeat("x", 40)
+
+func TestConfigureClientIP_ProxySharedSecret(t *testing.T) {
+	withSecret := config.ServerConfig{ProxySharedSecret: testProxySecret}
+	railway := config.ServerConfig{ProxySharedSecret: testProxySecret, TrustedPlatformHeader: "X-Real-IP"}
+
+	tests := []struct {
+		name       string
+		srv        config.ServerConfig
+		remoteAddr string
+		headers    map[string]string
+		want       string
+	}{
+		{
+			name:       "correct secret: X-Client-IP is the client IP",
+			srv:        railway,
+			remoteAddr: "100.64.1.2:4444",
+			headers: map[string]string{
+				"X-Real-IP":      "76.76.21.21", // the frontend's egress IP
+				"X-Proxy-Secret": testProxySecret,
+				"X-Client-IP":    "198.51.100.9",
+			},
+			want: "198.51.100.9",
+		},
+		{
+			name:       "correct secret without platform header",
+			srv:        withSecret,
+			remoteAddr: "100.64.1.2:4444",
+			headers:    map[string]string{"X-Proxy-Secret": testProxySecret, "X-Client-IP": "2001:db8::7"},
+			want:       "2001:db8::7",
+		},
+		{
+			name:       "IPv4-mapped IPv6 is normalized",
+			srv:        withSecret,
+			remoteAddr: "100.64.1.2:4444",
+			headers:    map[string]string{"X-Proxy-Secret": testProxySecret, "X-Client-IP": " ::ffff:198.51.100.9 "},
+			want:       "198.51.100.9",
+		},
+		{
+			name:       "wrong secret falls back to the platform header",
+			srv:        railway,
+			remoteAddr: "100.64.1.2:4444",
+			headers: map[string]string{
+				"X-Real-IP":      "203.0.113.7",
+				"X-Proxy-Secret": testProxySecret + "!",
+				"X-Client-IP":    "198.51.100.9",
+			},
+			want: "203.0.113.7",
+		},
+		{
+			name:       "missing secret falls back to the platform header",
+			srv:        railway,
+			remoteAddr: "100.64.1.2:4444",
+			headers:    map[string]string{"X-Real-IP": "203.0.113.7", "X-Client-IP": "198.51.100.9"},
+			want:       "203.0.113.7",
+		},
+		{
+			name:       "wrong secret without platform header falls back to the peer",
+			srv:        withSecret,
+			remoteAddr: "203.0.113.7:4444",
+			headers:    map[string]string{"X-Proxy-Secret": "guess", "X-Client-IP": "127.0.0.1"},
+			want:       "203.0.113.7",
+		},
+		{
+			name:       "X-Client-IP ignored when no secret is configured",
+			srv:        config.ServerConfig{TrustedPlatformHeader: "X-Real-IP"},
+			remoteAddr: "100.64.1.2:4444",
+			headers:    map[string]string{"X-Real-IP": "203.0.113.7", "X-Proxy-Secret": "", "X-Client-IP": "127.0.0.1"},
+			want:       "203.0.113.7",
+		},
+		{
+			name:       "invalid X-Client-IP ignored even with the right secret",
+			srv:        railway,
+			remoteAddr: "100.64.1.2:4444",
+			headers: map[string]string{
+				"X-Real-IP":      "203.0.113.7",
+				"X-Proxy-Secret": testProxySecret,
+				"X-Client-IP":    "198.51.100.9, 10.0.0.1",
+			},
+			want: "203.0.113.7",
+		},
+		{
+			name:       "spoofed internal header stripped (platform header)",
+			srv:        railway,
+			remoteAddr: "100.64.1.2:4444",
+			headers:    map[string]string{"X-Real-IP": "203.0.113.7", ResolvedClientIPHeader: "127.0.0.1"},
+			want:       "203.0.113.7",
+		},
+		{
+			name:       "spoofed internal header stripped (peer)",
+			srv:        withSecret,
+			remoteAddr: "203.0.113.7:4444",
+			headers:    map[string]string{ResolvedClientIPHeader: "127.0.0.1"},
+			want:       "203.0.113.7",
+		},
+		{
+			name:       "invalid platform header falls back to the peer",
+			srv:        config.ServerConfig{TrustedPlatformHeader: "X-Real-IP"},
+			remoteAddr: "203.0.113.7:4444",
+			headers:    map[string]string{"X-Real-IP": "not-an-ip"},
+			want:       "203.0.113.7",
+		},
+		{
+			name:       "trusted proxies still honoured when the secret does not match",
+			srv:        config.ServerConfig{ProxySharedSecret: testProxySecret, TrustedProxies: []string{"100.64.0.0/10"}},
+			remoteAddr: "100.64.1.2:4444",
+			headers:    map[string]string{"X-Forwarded-For": "198.51.100.9", "X-Client-IP": "127.0.0.1"},
+			want:       "198.51.100.9",
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r := newClientIPRouter(t, tc.srv)
+			req := httptest.NewRequest(http.MethodGet, "/ip", nil)
+			req.RemoteAddr = tc.remoteAddr
+			for k, v := range tc.headers {
+				req.Header.Set(k, v)
+			}
+			w := httptest.NewRecorder()
+			r.ServeHTTP(w, req)
+			assert.Equal(t, tc.want, w.Body.String())
+		})
+	}
+}
+
+// The proxy headers must not reach later middleware or handlers (access log,
+// telemetry, anything that dumps or forwards request headers).
+func TestConfigureClientIP_StripsProxyHeaders(t *testing.T) {
+	for _, srv := range []config.ServerConfig{
+		{ProxySharedSecret: testProxySecret},
+		{TrustedPlatformHeader: "X-Real-IP"},
+	} {
+		gin.SetMode(gin.TestMode)
+		r := gin.New()
+		require.NoError(t, ConfigureClientIP(r, srv))
+		var seen http.Header
+		r.Use(func(c *gin.Context) { seen = c.Request.Header.Clone() })
+		r.GET("/ip", func(c *gin.Context) { c.String(http.StatusOK, c.ClientIP()) })
+
+		req := httptest.NewRequest(http.MethodGet, "/ip", nil)
+		req.RemoteAddr = "100.64.1.2:4444"
+		req.Header.Set("X-Proxy-Secret", testProxySecret)
+		req.Header.Set("X-Client-IP", "198.51.100.9")
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+
+		require.NotNil(t, seen)
+		assert.Empty(t, seen.Get("X-Proxy-Secret"))
+		assert.Empty(t, seen.Get("X-Client-IP"))
+		for _, values := range seen {
+			for _, v := range values {
+				assert.NotContains(t, v, testProxySecret)
+			}
+		}
+	}
+}
+
+// With the shared secret, the per-IP limit applies to each browser behind the
+// frontend server instead of to the frontend's single egress IP.
+func TestRateLimit_PerClientBehindFrontendProxy(t *testing.T) {
+	cfg := &config.Config{
+		Server:    config.ServerConfig{ProxySharedSecret: testProxySecret, TrustedPlatformHeader: "X-Real-IP"},
+		RateLimit: config.RateLimitConfig{Enabled: true, Requests: 1, Window: time.Minute},
+	}
+	gin.SetMode(gin.TestMode)
+	r := gin.New()
+	require.NoError(t, ConfigureClientIP(r, cfg.Server))
+	r.Use(RateLimitMiddleware(cfg))
+	r.GET("/test", func(c *gin.Context) { c.Status(http.StatusOK) })
+
+	do := func(clientIP, secret string) int {
+		req := httptest.NewRequest(http.MethodGet, "/test", nil)
+		req.RemoteAddr = "100.64.1.2:5555"
+		req.Header.Set("X-Real-IP", "76.76.21.21")
+		req.Header.Set("X-Proxy-Secret", secret)
+		req.Header.Set("X-Client-IP", clientIP)
+		w := httptest.NewRecorder()
+		r.ServeHTTP(w, req)
+		return w.Code
+	}
+	assert.Equal(t, http.StatusOK, do("198.51.100.1", testProxySecret))
+	assert.Equal(t, http.StatusOK, do("198.51.100.2", testProxySecret), "separate quota per browser")
+	assert.Equal(t, http.StatusTooManyRequests, do("198.51.100.1", testProxySecret))
+	// Without the secret a caller cannot pick a fresh IP: it gets the
+	// frontend's (platform header) quota, which is not consumed yet.
+	assert.Equal(t, http.StatusOK, do("198.51.100.3", "wrong"))
+	assert.Equal(t, http.StatusTooManyRequests, do("198.51.100.4", "wrong"))
 }
 
 func TestConfigureClientIP_InvalidProxy(t *testing.T) {

@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -608,6 +610,27 @@ func TestHardeningValidation(t *testing.T) {
 			},
 			wantErr: "default JWT secret",
 		},
+		{
+			name: "short proxy shared secret rejected in production",
+			mutate: func(c *Config) {
+				c.Server.Environment = EnvironmentProduction
+				c.JWT.Secret = strings.Repeat("j", 40)
+				c.Server.ProxySharedSecret = strings.Repeat("p", 31)
+			},
+			wantErr: "PROXY_SHARED_SECRET",
+		},
+		{
+			name: "long proxy shared secret accepted in production",
+			mutate: func(c *Config) {
+				c.Server.Environment = EnvironmentProduction
+				c.JWT.Secret = strings.Repeat("j", 40)
+				c.Server.ProxySharedSecret = strings.Repeat("p", 32)
+			},
+		},
+		{
+			name:   "short proxy shared secret tolerated outside production",
+			mutate: func(c *Config) { c.Server.ProxySharedSecret = "p" },
+		},
 	}
 
 	for _, tc := range tests {
@@ -644,6 +667,20 @@ func TestLoadConfig_HardeningDefaults(t *testing.T) {
 	assert.NotEmpty(t, cfg.JWT.Issuer)
 	assert.NotEmpty(t, cfg.JWT.Audience)
 	assert.False(t, cfg.CORS.AllowCredentials, "bearer-token API must not allow credentialed CORS by default")
+}
+
+func TestLoadConfig_ProxySharedSecretNeverSerialized(t *testing.T) {
+	secret := strings.Repeat("s", 40)
+	t.Setenv("ENV", "test")
+	t.Setenv("PROXY_SHARED_SECRET", "  "+secret+" ")
+
+	cfg, err := LoadConfig()
+	require.NoError(t, err)
+	assert.Equal(t, secret, cfg.Server.ProxySharedSecret, "surrounding whitespace is trimmed")
+
+	out, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), secret)
 }
 
 // Benchmark tests
