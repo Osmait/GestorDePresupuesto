@@ -77,6 +77,26 @@ function withActiveSpan<T>(fn: () => Promise<T>): Promise<T> {
 
 const routeCtx = (path: string[]) => ({ params: Promise.resolve({ path }) })
 
+/** Real HTTP backend for the proxy (it calls the backend with node:http, not fetch). */
+async function withUpstream<T>(fn: (received: http.IncomingHttpHeaders[]) => Promise<T>): Promise<T> {
+	const received: http.IncomingHttpHeaders[] = []
+	const server = http.createServer((req, res) => {
+		received.push(req.headers)
+		res.writeHead(200, { 'content-type': 'application/json' })
+		res.end('[]')
+	})
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+	const previous = process.env.BACKEND_URL
+	process.env.BACKEND_URL = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+	try {
+		return await fn(received)
+	} finally {
+		process.env.BACKEND_URL = previous
+		server.closeAllConnections()
+		await new Promise<void>((resolve) => server.close(() => resolve()))
+	}
+}
+
 describe('W3C trace context propagation to the backend', () => {
 	const fetchMock = vi.fn()
 
@@ -95,14 +115,15 @@ describe('W3C trace context propagation to the backend', () => {
 	})
 	afterEach(() => vi.unstubAllGlobals())
 
-	it('proxy fetch carries the active span as traceparent and reports Server-Timing', async () => {
-		const res = (await withActiveSpan(() =>
-			GET(new NextRequest('http://localhost:3000/api/backend/account'), routeCtx(['account'])),
-		)) as Response
+	it('proxied requests carry the active span as traceparent and report Server-Timing', async () => {
+		await withUpstream(async (received) => {
+			const res = (await withActiveSpan(() =>
+				GET(new NextRequest('http://localhost:3000/api/backend/account'), routeCtx(['account'])),
+			)) as Response
 
-		const headers = fetchMock.mock.calls[0][1].headers as Headers
-		expect(headers.get('traceparent')).toBe(EXPECTED_TRACEPARENT)
-		expect(res.headers.get('server-timing')).toMatch(/^backend;desc="Go API";dur=\d+(\.\d)?$/)
+			expect(received[0].traceparent).toBe(EXPECTED_TRACEPARENT)
+			expect(res.headers.get('server-timing')).toMatch(/^backend;desc="Go API";dur=\d+(\.\d)?$/)
+		})
 	})
 
 	it('server component repositories send traceparent', async () => {
@@ -149,15 +170,17 @@ describe('without OpenTelemetry registered', () => {
 	afterEach(() => vi.unstubAllGlobals())
 
 	it('adds no trace headers but passes an upstream traceparent through', async () => {
-		await GET(new NextRequest('http://localhost:3000/api/backend/account'), routeCtx(['account']))
-		expect((fetchMock.mock.calls[0][1].headers as Headers).get('traceparent')).toBeNull()
+		await withUpstream(async (received) => {
+			await GET(new NextRequest('http://localhost:3000/api/backend/account'), routeCtx(['account']))
+			expect(received[0].traceparent).toBeUndefined()
 
-		await GET(
-			new NextRequest('http://localhost:3000/api/backend/account', {
-				headers: { traceparent: EXPECTED_TRACEPARENT },
-			}),
-			routeCtx(['account']),
-		)
-		expect((fetchMock.mock.calls[1][1].headers as Headers).get('traceparent')).toBe(EXPECTED_TRACEPARENT)
+			await GET(
+				new NextRequest('http://localhost:3000/api/backend/account', {
+					headers: { traceparent: EXPECTED_TRACEPARENT },
+				}),
+				routeCtx(['account']),
+			)
+			expect(received[1].traceparent).toBe(EXPECTED_TRACEPARENT)
+		})
 	})
 })

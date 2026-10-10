@@ -2,10 +2,10 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Calculator, ChevronDown, ChevronUp } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import * as z from 'zod'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -16,6 +16,12 @@ import { Switch } from '@/components/ui/switch'
 import { useAppLocale } from '@/lib/i18n/date-locale'
 import { formatCurrency } from '@/lib/utils'
 import { Certificate, InterestType } from '@/types/certificate'
+
+// Only shown after a simulation runs: load the chart code on demand.
+const SimulationLineChart = dynamic(() => import('@/components/charts/SimulationLineChart'), {
+	ssr: false,
+	loading: () => <div className='h-full w-full rounded bg-muted/20 animate-pulse' />,
+})
 
 function createSimulatorSchema(t: (key: string) => string) {
 	return z.object({
@@ -243,53 +249,15 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 						<div className='rounded-lg border p-3'>
 							<p className='mb-3 text-xs text-muted-foreground'>{t('monthlyEvolution')}</p>
 							<div className='h-56 w-full'>
-								<ResponsiveContainer width='100%' height='100%'>
-									<LineChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-										<CartesianGrid strokeDasharray='3 3' vertical={false} className='stroke-border' />
-										<XAxis
-											dataKey='month'
-											tickLine={false}
-											axisLine={false}
-											tick={{ fontSize: 11, fill: 'currentColor' }}
-										/>
-										<YAxis
-											tickLine={false}
-											axisLine={false}
-											tick={{ fontSize: 11, fill: 'currentColor' }}
-											tickFormatter={(value) => `${Math.round(Number(value) / 1000)}k`}
-										/>
-										<Tooltip
-											contentStyle={{
-												borderRadius: '8px',
-												border: '1px solid hsl(var(--border))',
-												background: 'hsl(var(--card))',
-											}}
-											formatter={(value: number | string | undefined, name: string | undefined) => {
-												const numericValue = typeof value === 'number' ? value : Number(value || 0)
-												if (name === 'capital') return [money(numericValue), t('capitalSeries')]
-												if (name === 'totalWithNet') return [money(numericValue), t('capitalPlusNet')]
-												return [String(value ?? ''), name || '']
-											}}
-											labelFormatter={(label) => t('monthLabel', { month: String(label) })}
-										/>
-										<Line
-											type='monotone'
-											dataKey='capital'
-											stroke='hsl(var(--success))'
-											strokeWidth={2}
-											dot={false}
-											name='capital'
-										/>
-										<Line
-											type='monotone'
-											dataKey='totalWithNet'
-											stroke='hsl(var(--primary))'
-											strokeWidth={2}
-											dot={false}
-											name='totalWithNet'
-										/>
-									</LineChart>
-								</ResponsiveContainer>
+								<SimulationLineChart
+									rows={chartData}
+									labels={{
+										capital: t('capitalSeries'),
+										totalWithNet: t('capitalPlusNet'),
+										month: (month) => t('monthLabel', { month: String(month) }),
+									}}
+									formatValue={money}
+								/>
 							</div>
 						</div>
 

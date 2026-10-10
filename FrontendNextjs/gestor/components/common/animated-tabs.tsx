@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -33,8 +33,6 @@ export function AnimatedTabs({
 	urlParam = 'tab',
 }: AnimatedTabsProps) {
 	const searchParams = useSearchParams()
-	const router = useRouter()
-	const pathname = usePathname()
 
 	const urlTab = urlParam ? searchParams.get(urlParam) : null
 	const validUrlTab = urlTab && tabs.some((t) => t.value === urlTab) ? urlTab : null
@@ -43,16 +41,20 @@ export function AnimatedTabs({
 	const updateUrl = useCallback(
 		(value: string) => {
 			if (!urlParam) return
-			const params = new URLSearchParams(searchParams.toString())
+			const params = new URLSearchParams(window.location.search)
 			if (value === defaultValue) {
 				params.delete(urlParam)
 			} else {
 				params.set(urlParam, value)
 			}
 			const query = params.toString()
-			router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+			const { pathname } = window.location
+			// The tab is client state (no server component reads it): update the URL
+			// without the RSC round trip that router.replace would cost per click.
+			// Next.js keeps useSearchParams in sync with history.replaceState.
+			window.history.replaceState(window.history.state, '', query ? `${pathname}?${query}` : pathname)
 		},
-		[urlParam, searchParams, defaultValue, router, pathname],
+		[urlParam, defaultValue],
 	)
 	const tabsRef = useRef<HTMLDivElement>(null)
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([])

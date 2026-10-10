@@ -3,6 +3,7 @@
 import { formatDistanceToNow } from 'date-fns'
 import { es } from 'date-fns/locale'
 import { Bell, Check, Trash2 } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import {
 	DropdownMenu,
@@ -17,8 +18,18 @@ import { NotificationItem, useNotificationContext } from '@/contexts/Notificatio
 import { cn } from '@/lib/utils'
 
 export function NotificationCenter() {
-	const { notifications, unreadCount, isConnected, markAsRead, markAllAsRead, clearNotifications } =
-		useNotificationContext()
+	const {
+		notifications,
+		unreadCount,
+		isConnected,
+		hasMore,
+		isLoadingMore,
+		loadMore,
+		markAsRead,
+		markAllAsRead,
+		clearNotifications,
+	} = useNotificationContext()
+	const tActions = useTranslations('common.actions')
 
 	return (
 		<DropdownMenu>
@@ -84,6 +95,20 @@ export function NotificationCenter() {
 							{notifications.map((notification) => (
 								<NotificationItemRow key={notification.id} item={notification} onRead={markAsRead} />
 							))}
+							{hasMore && (
+								<Button
+									variant='ghost'
+									size='sm'
+									className='m-2 text-xs'
+									disabled={isLoadingMore}
+									onClick={(e) => {
+										e.preventDefault()
+										loadMore()
+									}}
+								>
+									{isLoadingMore ? tActions('loading') : tActions('loadMore')}
+								</Button>
+							)}
 						</div>
 					)}
 				</ScrollArea>

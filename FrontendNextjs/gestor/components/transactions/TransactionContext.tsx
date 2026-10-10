@@ -1,7 +1,7 @@
 'use client'
 
-import { useRouter, useSearchParams } from 'next/navigation'
-import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { DateRange } from 'react-day-picker'
 import {
 	useCreateTransactionMutation,
@@ -83,31 +83,101 @@ export interface TransactionFiltersState {
 	sortOrder: 'asc' | 'desc'
 }
 
-interface TransactionContextType {
+const FILTER_URL_KEYS = [
+	'dateFrom',
+	'dateTo',
+	'type',
+	'account',
+	'category',
+	'budget',
+	'minAmount',
+	'maxAmount',
+	'search',
+	'sortBy',
+	'sortOrder',
+] as const
+
+function buildApiFilters(filters: TransactionFiltersState): TransactionFilters {
+	const apiFilters: TransactionFilters = {
+		page: 1,
+		limit: 50,
+		sort_by: (filters.sortBy as any) || 'created_at',
+		sort_order: filters.sortOrder || 'desc',
+		include_summary: true,
+	}
+
+	if (filters.dateRange.from && filters.dateRange.to) {
+		apiFilters.date_from = formatDateInTimeZone(filters.dateRange.from, SANTO_DOMINGO_TZ)
+		apiFilters.date_to = formatDateInTimeZone(filters.dateRange.to, SANTO_DOMINGO_TZ)
+	}
+	if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
+	if (filters.account !== 'all') apiFilters.account_id = filters.account
+	if (filters.category !== 'all') apiFilters.category_id = filters.category
+	if (filters.budget !== 'all') apiFilters.budget_id = filters.budget
+	if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
+	if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
+	if (filters.search) apiFilters.search = filters.search
+
+	return apiFilters
+}
+
+/**
+ * Writes the filters into the current query string. Only the filter keys are
+ * managed: other parameters (e.g. `highlight`/`open` deep links) are kept.
+ */
+function buildURLWithFilters(filters: TransactionFiltersState): string {
+	const params = new URLSearchParams(window.location.search)
+	for (const key of FILTER_URL_KEYS) params.delete(key)
+
+	if (filters.dateRange.from) params.set('dateFrom', formatDateInTimeZone(filters.dateRange.from, SANTO_DOMINGO_TZ))
+	if (filters.dateRange.to) params.set('dateTo', formatDateInTimeZone(filters.dateRange.to, SANTO_DOMINGO_TZ))
+	if (filters.type && filters.type !== 'all') params.set('type', filters.type)
+	if (filters.account && filters.account !== 'all') params.set('account', filters.account)
+	if (filters.category && filters.category !== 'all') params.set('category', filters.category)
+	if (filters.budget && filters.budget !== 'all') params.set('budget', filters.budget)
+	if (filters.minAmount) params.set('minAmount', filters.minAmount)
+	if (filters.maxAmount) params.set('maxAmount', filters.maxAmount)
+	if (filters.search) params.set('search', filters.search)
+	if (filters.sortBy && filters.sortBy !== 'created_at') params.set('sortBy', filters.sortBy)
+	if (filters.sortOrder && filters.sortOrder !== 'desc') params.set('sortOrder', filters.sortOrder)
+
+	const query = params.toString()
+	return query ? `${window.location.pathname}?${query}` : window.location.pathname
+}
+
+/** Values that change with the filters or the data. */
+export interface TransactionStateContextType {
 	filters: TransactionFiltersState
-	setFilters: React.Dispatch<React.SetStateAction<TransactionFiltersState>>
-	clearFilters: () => void
-	reloadCurrentView: () => void
-	// Data
 	transactions: any[]
 	pagination: any
 	summary: TransactionSummary | null
 	isLoading: boolean
 	error: string | null
+	editingTransaction: any | null
+	isModalOpen: boolean
+}
+
+/** Referentially stable callbacks: consumers of only these never re-render on data changes. */
+export interface TransactionActionsContextType {
+	setFilters: React.Dispatch<React.SetStateAction<TransactionFiltersState>>
+	clearFilters: () => void
+	reloadCurrentView: () => void
 	createTransaction: (..._args: any[]) => Promise<void>
 	updateTransaction: (_id: string, ..._args: any[]) => Promise<void>
 	deleteTransaction: (_id: string) => Promise<void>
-	editingTransaction: any | null
 	setEditingTransaction: (_tx: any | null) => void
-	isModalOpen: boolean
 	setModalOpen: (_open: boolean) => void
 }
 
-export const TransactionContext = createContext<TransactionContextType | undefined>(undefined)
+export type TransactionContextType = TransactionStateContextType & TransactionActionsContextType
+
+export const TransactionStateContext = createContext<TransactionStateContextType | undefined>(undefined)
+export const TransactionActionsContext = createContext<TransactionActionsContextType | undefined>(undefined)
 
 export function TransactionProvider({
 	children,
 	syncUrl = true,
+	fetchTransactions = true,
 }: {
 	children: ReactNode
 	/**
@@ -116,122 +186,93 @@ export function TransactionProvider({
 	 * would rewrite the URL of whatever page the user is on.
 	 */
 	syncUrl?: boolean
+	/** Load the filtered list. The global "+" modal only needs the mutations. */
+	fetchTransactions?: boolean
 }) {
-	const router = useRouter()
 	const searchParams = useSearchParams()
 
 	// Filter State
 	const [filters, setFilters] = useState<TransactionFiltersState>(() => buildInitialFiltersFromURL(searchParams))
 
-	// React Query Hooks
-	const [activeFilters, setActiveFilters] = useState<TransactionFilters>({})
+	// Context filters -> API filters. Derived during render (not in an effect), so
+	// the first request already carries the real filters.
+	const apiFilters = useMemo(() => buildApiFilters(filters), [filters])
 
-	const updateURLWithFilters = useCallback(
-		(newFilters: TransactionFiltersState) => {
-			const params = new URLSearchParams()
-
-			if (newFilters.dateRange.from)
-				params.set('dateFrom', formatDateInTimeZone(newFilters.dateRange.from, SANTO_DOMINGO_TZ))
-			if (newFilters.dateRange.to) params.set('dateTo', formatDateInTimeZone(newFilters.dateRange.to, SANTO_DOMINGO_TZ))
-			if (newFilters.type && newFilters.type !== 'all') params.set('type', newFilters.type)
-			if (newFilters.account && newFilters.account !== 'all') params.set('account', newFilters.account)
-			if (newFilters.category && newFilters.category !== 'all') params.set('category', newFilters.category)
-			if (newFilters.budget && newFilters.budget !== 'all') params.set('budget', newFilters.budget)
-			if (newFilters.minAmount) params.set('minAmount', newFilters.minAmount)
-			if (newFilters.maxAmount) params.set('maxAmount', newFilters.maxAmount)
-			if (newFilters.search) params.set('search', newFilters.search)
-			if (newFilters.sortBy && newFilters.sortBy !== 'created_at') params.set('sortBy', newFilters.sortBy)
-			if (newFilters.sortOrder && newFilters.sortOrder !== 'desc') params.set('sortOrder', newFilters.sortOrder)
-
-			const newURL = params.toString() ? `?${params.toString()}` : window.location.pathname
-			router.replace(newURL, { scroll: false })
-		},
-		[router],
-	)
-
-	// Map Context Filters -> API Filters
+	// Mirror the filters into the URL without a server round trip: Next.js syncs
+	// `window.history.replaceState` with useSearchParams, while router.replace
+	// would re-render the (dynamic) page on the server for every change.
 	useEffect(() => {
-		const apiFilters: TransactionFilters = {
-			page: 1,
-			limit: 50,
-			sort_by: (filters.sortBy as any) || 'created_at',
-			sort_order: filters.sortOrder || 'desc',
-			include_summary: true,
+		if (!syncUrl) return
+		const url = buildURLWithFilters(filters)
+		if (url !== `${window.location.pathname}${window.location.search}`) {
+			window.history.replaceState(window.history.state, '', url)
 		}
-
-		if (filters.dateRange.from && filters.dateRange.to) {
-			apiFilters.date_from = formatDateInTimeZone(filters.dateRange.from, SANTO_DOMINGO_TZ)
-			apiFilters.date_to = formatDateInTimeZone(filters.dateRange.to, SANTO_DOMINGO_TZ)
-		}
-		if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
-		if (filters.account !== 'all') apiFilters.account_id = filters.account
-		if (filters.category !== 'all') apiFilters.category_id = filters.category
-		if (filters.budget !== 'all') apiFilters.budget_id = filters.budget
-		if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
-		if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
-		if (filters.search) apiFilters.search = filters.search
-
-		setActiveFilters(apiFilters)
-		if (syncUrl) updateURLWithFilters(filters)
-	}, [filters, updateURLWithFilters, syncUrl])
+	}, [filters, syncUrl])
 
 	// Query Data
-	const { data, isLoading: isLoadingTx, error: errorTx, refetch } = useGetTransactions(activeFilters)
+	const {
+		data,
+		isLoading: isLoadingTx,
+		error: errorTx,
+		refetch,
+	} = useGetTransactions(apiFilters, { enabled: fetchTransactions })
 
-	// Mutations
-	const createMutation = useCreateTransactionMutation()
-	const deleteMutation = useDeleteTransactionMutation()
-	const updateMutation = useUpdateTransactionMutation()
+	// Mutations (mutateAsync is stable across renders)
+	const { mutateAsync: createAsync } = useCreateTransactionMutation()
+	const { mutateAsync: deleteAsync } = useDeleteTransactionMutation()
+	const { mutateAsync: updateAsync } = useUpdateTransactionMutation()
 
 	// Edit State
 	const [editingTransaction, setEditingTransaction] = useState<any | null>(null)
 	const [isModalOpen, setModalOpen] = useState(false)
 
-	// Adapters for Legacy Interface
-	const transactions = data?.transactions || []
-	const pagination = data?.pagination || null
-	const summary = data?.summary || null
+	const createTransaction = useCallback(
+		async (...args: any[]) => {
+			const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
+			await createAsync({
+				name,
+				description,
+				amount,
+				type,
+				accountId,
+				categoryId,
+				budgetId,
+				currency,
+				createdAt,
+			})
+		},
+		[createAsync],
+	)
 
-	const createTransaction = async (...args: any[]) => {
-		const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
-		await createMutation.mutateAsync({
-			name,
-			description,
-			amount,
-			type,
-			accountId,
-			categoryId,
-			budgetId,
-			currency,
-			createdAt,
-		})
-	}
+	const updateTransaction = useCallback(
+		async (id: string, ...args: any[]) => {
+			const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
+			await updateAsync({
+				id,
+				name,
+				description,
+				amount,
+				type,
+				accountId,
+				categoryId,
+				budgetId,
+				currency,
+				createdAt,
+			})
+			setEditingTransaction(null)
+		},
+		[updateAsync],
+	)
 
-	const updateTransaction = async (id: string, ...args: any[]) => {
-		const [name, description, amount, type, accountId, categoryId, budgetId, currency, createdAt] = args
-		await updateMutation.mutateAsync({
-			id,
-			name,
-			description,
-			amount,
-			type,
-			accountId,
-			categoryId,
-			budgetId,
-			currency,
-			createdAt,
-		})
-		setEditingTransaction(null)
-	}
-
-	const deleteTransaction = async (id: string) => {
-		await deleteMutation.mutateAsync(id)
-	}
-
-	const loadAllTransactions = useCallback(() => refetch(), [refetch])
+	const deleteTransaction = useCallback(
+		async (id: string) => {
+			await deleteAsync(id)
+		},
+		[deleteAsync],
+	)
 
 	const clearFilters = useCallback(() => {
-		const clearedFilters = {
+		setFilters({
 			dateRange: getCurrentMonthRangeInSantoDomingo(),
 			type: 'all',
 			account: 'all',
@@ -241,44 +282,70 @@ export function TransactionProvider({
 			maxAmount: '',
 			search: '',
 			sortBy: 'created_at',
-			sortOrder: 'desc' as 'asc' | 'desc',
-		}
-		setFilters(clearedFilters)
-		if (syncUrl) router.replace(window.location.pathname)
-	}, [router, syncUrl])
+			sortOrder: 'desc',
+		})
+	}, [])
 
 	const reloadCurrentView = useCallback(() => {
-		loadAllTransactions()
-	}, [loadAllTransactions])
+		refetch()
+	}, [refetch])
+
+	const actions = useMemo<TransactionActionsContextType>(
+		() => ({
+			setFilters,
+			clearFilters,
+			reloadCurrentView,
+			createTransaction,
+			updateTransaction,
+			deleteTransaction,
+			setEditingTransaction,
+			setModalOpen,
+		}),
+		[clearFilters, reloadCurrentView, createTransaction, updateTransaction, deleteTransaction],
+	)
+
+	const transactions = data?.transactions
+	const pagination = data?.pagination || null
+	const summary = data?.summary || null
+	const error = errorTx ? (errorTx as Error).message : null
+
+	const state = useMemo<TransactionStateContextType>(
+		() => ({
+			filters,
+			transactions: transactions || EMPTY_TRANSACTIONS,
+			pagination,
+			summary,
+			isLoading: isLoadingTx,
+			error,
+			editingTransaction,
+			isModalOpen,
+		}),
+		[filters, transactions, pagination, summary, isLoadingTx, error, editingTransaction, isModalOpen],
+	)
 
 	return (
-		<TransactionContext.Provider
-			value={{
-				filters,
-				setFilters,
-				clearFilters,
-				reloadCurrentView,
-				transactions,
-				pagination,
-				summary,
-				isLoading: isLoadingTx,
-				error: errorTx ? (errorTx as Error).message : null,
-				createTransaction,
-				updateTransaction,
-				deleteTransaction,
-				editingTransaction,
-				setEditingTransaction,
-				isModalOpen,
-				setModalOpen,
-			}}
-		>
-			{children}
-		</TransactionContext.Provider>
+		<TransactionActionsContext.Provider value={actions}>
+			<TransactionStateContext.Provider value={state}>{children}</TransactionStateContext.Provider>
+		</TransactionActionsContext.Provider>
 	)
 }
 
-export function useTransactionContext() {
-	const context = useContext(TransactionContext)
+const EMPTY_TRANSACTIONS: any[] = []
+
+/** Stable callbacks only (does not re-render when the list or the filters change). */
+export function useTransactionActions() {
+	const context = useContext(TransactionActionsContext)
+	if (!context) {
+		throw new Error('useTransactionActions must be used within a TransactionProvider')
+	}
+	return context
+}
+
+/** Filters, data and callbacks. Re-renders whenever the filters or the data change. */
+export function useTransactionContext(): TransactionContextType {
+	const state = useContext(TransactionStateContext)
+	const actions = useContext(TransactionActionsContext)
+	const context = useMemo(() => (state && actions ? { ...state, ...actions } : undefined), [state, actions])
 	if (!context) {
 		throw new Error('useTransactionContext must be used within a TransactionProvider')
 	}

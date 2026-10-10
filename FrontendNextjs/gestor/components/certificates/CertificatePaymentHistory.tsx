@@ -2,6 +2,7 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { Pencil } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -17,7 +18,12 @@ import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { hasAtMostDecimals } from '@/lib/money-validation'
 import { formatCurrency } from '@/lib/utils'
 import { CertificatePayment } from '@/types/certificate'
-import { CertificateChart } from './CertificateChart'
+
+// The chart lives in a secondary tab of the dialog: load Nivo only when it is shown.
+const CertificateChart = dynamic(() => import('./CertificateChart').then((mod) => mod.CertificateChart), {
+	ssr: false,
+	loading: () => <div className='h-[300px] w-full rounded bg-muted/20 animate-pulse' />,
+})
 
 function createEditPaymentSchema(t: (key: string) => string, tForms: (key: string) => string) {
 	// certificate_payments money columns are DECIMAL(15,2): the API rejects sub-cent amounts.

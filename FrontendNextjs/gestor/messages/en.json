@@ -657,7 +657,8 @@
       "filter": "Filter",
       "export": "Export",
       "import": "Import",
-      "viewAll": "View all"
+      "viewAll": "View all",
+      "loadMore": "Load more"
     },
     "messages": {
       "success": "Operation successful",

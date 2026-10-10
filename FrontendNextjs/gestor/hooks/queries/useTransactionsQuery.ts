@@ -11,8 +11,9 @@ export const TRANSACTION_KEYS = {
 }
 
 // Read Hook (Filtered/Paginated)
-export function useGetTransactions(filters?: TransactionFilters) {
+export function useGetTransactions(filters?: TransactionFilters, options: { enabled?: boolean } = {}) {
 	return useQuery({
+		enabled: options.enabled ?? true,
 		queryKey: TRANSACTION_KEYS.list(filters || {}),
 		queryFn: async () => {
 			const repo = await getTransactionRepository()

@@ -73,7 +73,7 @@ export function GlobalActionProvider({ children }: { children: ReactNode }) {
 
 			{/* Transaction Modal: Uses TransactionContext */}
 			{activeModal === 'TRANSACTION' && (
-				<TransactionProvider syncUrl={false}>
+				<TransactionProvider syncUrl={false} fetchTransactions={false}>
 					<TransactionModalWrapper isOpen={true} onClose={closeModal} onCreated={onDataChanged} />
 				</TransactionProvider>
 			)}

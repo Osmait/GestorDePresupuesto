@@ -2,7 +2,7 @@
 
 import { Filter, Lightbulb, Link2, PiggyBank, PlusCircle } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useRef, useState } from 'react'
+import { ComponentProps, useCallback, useEffect, useRef, useState } from 'react'
 import { AIExtractionButton, ReconciliationModal, SavingsPlanModal, SpendingInsightsModal } from '@/components/ai'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import TransactionFormModal from '@/components/transactions/TransactionFormModal'
@@ -14,6 +14,64 @@ import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { useTransactionContext } from './TransactionContext'
+
+/** Typing in the free-text filters only queries the API after this pause. */
+const FILTER_INPUT_DEBOUNCE_MS = 300
+
+type DebouncedInputProps = Omit<ComponentProps<typeof Input>, 'value' | 'onChange'> & {
+	value: string
+	onCommit: (_value: string) => void
+	delay?: number
+}
+
+/**
+ * Text input that keeps keystrokes local and commits the value after `delay` ms
+ * without typing (or when it unmounts, e.g. the drawer closes mid-typing).
+ * External changes to `value` (clear filters) replace the draft.
+ */
+function DebouncedInput({ value, onCommit, delay = FILTER_INPUT_DEBOUNCE_MS, ...props }: DebouncedInputProps) {
+	const [draft, setDraft] = useState(value)
+	const committedRef = useRef(value)
+	const draftRef = useRef(value)
+	const onCommitRef = useRef(onCommit)
+
+	useEffect(() => {
+		onCommitRef.current = onCommit
+	}, [onCommit])
+
+	const commit = useCallback((next: string) => {
+		if (next === committedRef.current) return
+		committedRef.current = next
+		onCommitRef.current(next)
+	}, [])
+
+	useEffect(() => {
+		if (value === committedRef.current) return
+		committedRef.current = value
+		draftRef.current = value
+		setDraft(value)
+	}, [value])
+
+	useEffect(() => {
+		if (draft === committedRef.current) return
+		const timeout = setTimeout(() => commit(draft), delay)
+		return () => clearTimeout(timeout)
+	}, [draft, delay, commit])
+
+	// Flush a pending value on unmount.
+	useEffect(() => () => commit(draftRef.current), [commit])
+
+	return (
+		<Input
+			{...props}
+			value={draft}
+			onChange={(event) => {
+				draftRef.current = event.target.value
+				setDraft(event.target.value)
+			}}
+		/>
+	)
+}
 
 export function TransactionActions() {
 	const t = useTranslations('transactions')
@@ -196,20 +254,20 @@ export function TransactionActions() {
 						<div className='flex gap-2'>
 							<div className='flex-1'>
 								<label className='block mb-1 text-sm'>{t('minAmount')}</label>
-								<Input
+								<DebouncedInput
 									type='number'
 									value={filters.minAmount}
-									onChange={(e) => setFilters((f) => ({ ...f, minAmount: e.target.value }))}
+									onCommit={(minAmount) => setFilters((f) => ({ ...f, minAmount }))}
 									placeholder='0'
 									min={0}
 								/>
 							</div>
 							<div className='flex-1'>
 								<label className='block mb-1 text-sm'>{t('maxAmount')}</label>
-								<Input
+								<DebouncedInput
 									type='number'
 									value={filters.maxAmount}
-									onChange={(e) => setFilters((f) => ({ ...f, maxAmount: e.target.value }))}
+									onCommit={(maxAmount) => setFilters((f) => ({ ...f, maxAmount }))}
 									placeholder='99999'
 									min={0}
 								/>
@@ -217,10 +275,10 @@ export function TransactionActions() {
 						</div>
 						<div>
 							<label className='block mb-1 text-sm'>{t('search')}</label>
-							<Input
+							<DebouncedInput
 								type='text'
 								value={filters.search}
-								onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}
+								onCommit={(search) => setFilters((f) => ({ ...f, search }))}
 								placeholder={t('searchPlaceholder')}
 							/>
 						</div>

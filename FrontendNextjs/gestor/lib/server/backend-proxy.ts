@@ -2,8 +2,6 @@ import 'server-only'
 import http from 'node:http'
 import https from 'node:https'
 import type { NextRequest } from 'next/server'
-import type { Session } from 'next-auth'
-import { getBackendAccessToken } from '@/lib/auth/backend-token'
 import { readSessionJwt } from '@/lib/auth/session-cookie'
 import { getBackendUrl } from '@/lib/backend-url'
 import { LOCALE_COOKIE, resolveLocale } from '@/lib/i18n/locales'
@@ -14,6 +12,7 @@ import { injectTraceContext, upstreamServerTiming } from '@/lib/server/trace-con
  * are never forwarded; Accept-Language is replaced by the UI locale.
  * `traceparent`/`tracestate` from an upstream edge are passed through, and
  * overwritten with this server's span when OpenTelemetry is enabled.
+ * `accept-encoding` is added for regular (non-streaming) requests only.
  */
 const FORWARDED_REQUEST_HEADERS = [
 	'accept',
@@ -28,12 +27,15 @@ const FORWARDED_REQUEST_HEADERS = [
 	'tracestate',
 ]
 
-/** Hop-by-hop / body-encoding headers that must not be copied from the upstream response. */
+/**
+ * Hop-by-hop headers that must not be copied from the upstream response.
+ * `content-encoding` is kept: the upstream body is passed through byte for byte
+ * (still compressed). `content-length` is dropped and the body is streamed.
+ */
 const STRIPPED_RESPONSE_HEADERS = new Set([
 	'connection',
 	'keep-alive',
 	'transfer-encoding',
-	'content-encoding',
 	'content-length',
 	'proxy-authenticate',
 	'trailer',
@@ -45,6 +47,15 @@ function jsonError(status: number, message: string) {
 	return Response.json({ error: message }, { status, headers: { 'cache-control': 'no-store' } })
 }
 
+/**
+ * 502 for a backend that could not be reached. The cause is logged server-side
+ * only: node:http errors name the internal backend address (e.g. ECONNREFUSED host:port).
+ */
+function backendUnavailable(error: unknown) {
+	console.error('[backend-proxy] backend unavailable:', error instanceof Error ? error.message : error)
+	return jsonError(502, 'Backend unavailable')
+}
+
 function buildTargetUrl(path: string[], search: string): URL | null {
 	if (path.length === 0 || path.some((segment) => !segment || segment === '.' || segment === '..')) return null
 	const url = new URL(`${getBackendUrl()}/${path.map(encodeURIComponent).join('/')}`)
@@ -52,12 +63,17 @@ function buildTargetUrl(path: string[], search: string): URL | null {
 	return url
 }
 
-function forwardedRequestHeaders(req: NextRequest): Headers {
+function forwardedRequestHeaders(req: NextRequest, { acceptEncoding }: { acceptEncoding: boolean }): Headers {
 	const headers = new Headers()
 	for (const name of FORWARDED_REQUEST_HEADERS) {
 		const value = req.headers.get(name)
 		if (value) headers.set(name, value)
 	}
+	// Compressed upstream bodies are streamed to the browser untouched, so the
+	// browser's own Accept-Encoding is what the backend must honour. Streams
+	// (SSE) always ask for identity: a compressing upstream would buffer events.
+	const encoding = acceptEncoding ? req.headers.get('accept-encoding') : null
+	headers.set('accept-encoding', encoding || 'identity')
 	// The backend localizes the names it generates (e.g. "Card payment") in the
 	// language the user picked in the UI, not the browser's preference list.
 	headers.set('accept-language', resolveLocale(req.cookies.get(LOCALE_COOKIE)?.value))
@@ -79,51 +95,37 @@ function proxiedResponseHeaders(entries: [string, string][], serverTiming?: stri
 }
 
 /**
+ * Credentials for a proxied call, resolved by the route from the session:
+ * `null` forwards the call anonymously (no session), `{ error }` answers 401
+ * without calling the backend.
+ */
+export type ProxyCredentials = { accessToken: string } | { error: string } | null
+
+/**
  * Forwards a browser request to the backend, attaching the session's access
  * token server-side. The token is never echoed back to the client.
  * Long-lived streams (SSE) go through `proxyStreamToBackend` instead.
  */
-export async function proxyToBackend(req: NextRequest, path: string[], session: Session | null): Promise<Response> {
+export async function proxyToBackend(
+	req: NextRequest,
+	path: string[],
+	credentials: ProxyCredentials,
+): Promise<Response> {
 	const target = buildTargetUrl(path, req.nextUrl.search)
 	if (!target) return jsonError(400, 'Invalid backend path')
+	if (credentials && 'error' in credentials) return jsonError(401, credentials.error)
 
-	const headers = forwardedRequestHeaders(req)
-
-	if (session) {
-		if (session.error) return jsonError(401, session.error)
-		const accessToken = await getBackendAccessToken(req.headers)
-		if (!accessToken) return jsonError(401, 'RefreshTokenError')
-		headers.set('authorization', `Bearer ${accessToken}`)
-	}
+	const headers = forwardedRequestHeaders(req, { acceptEncoding: true })
+	if (credentials) headers.set('authorization', `Bearer ${credentials.accessToken}`)
 
 	const hasBody = req.method !== 'GET' && req.method !== 'HEAD'
-	let upstream: Response
-	let startedAt = 0
 	try {
-		const body = hasBody ? await req.arrayBuffer() : undefined
-		startedAt = performance.now()
-		upstream = await fetch(target, {
-			method: req.method,
-			headers,
-			body,
-			signal: req.signal,
-			cache: 'no-store',
-			redirect: 'manual',
-		})
+		const body = hasBody ? new Uint8Array(await req.arrayBuffer()) : undefined
+		return await openUpstream(target, { method: req.method, headers, body, signal: req.signal, streaming: false })
 	} catch (error) {
 		if (req.signal?.aborted) return new Response(null, { status: 499 })
-		return jsonError(502, error instanceof Error ? `Backend unavailable: ${error.message}` : 'Backend unavailable')
+		return backendUnavailable(error)
 	}
-
-	const upstreamHeaders: [string, string][] = []
-	upstream.headers.forEach((value, name) => {
-		upstreamHeaders.push([name, value])
-	})
-	return new Response(upstream.body, {
-		status: upstream.status,
-		statusText: upstream.statusText,
-		headers: proxiedResponseHeaders(upstreamHeaders, upstreamServerTiming(startedAt)),
-	})
 }
 
 /** True for requests that open a long-lived Server-Sent Events stream. */
@@ -155,22 +157,46 @@ async function getStreamAccessToken(headers: Headers): Promise<string | null> {
 
 const NULL_BODY_STATUSES = new Set([101, 204, 205, 304])
 
+/** Keep-alive connections to the backend, shared by every proxied request. */
+const httpAgent = new http.Agent({ keepAlive: true })
+const httpsAgent = new https.Agent({ keepAlive: true })
+
 /**
- * Opens the upstream stream with node:http instead of fetch: undici's fetch
- * aborts a response body that stays idle for 300s (BodyTimeoutError), which
- * would cut long-lived SSE connections. node:http has no idle timeout by
- * default. Aborting `signal` (client disconnect) or cancelling the returned
- * body destroys the upstream request.
+ * Regular requests give up when the backend stays silent this long (the same
+ * 300s undici's fetch uses for headers and body). Streams have no idle timeout.
  */
-function openUpstreamStream(target: URL, headers: Headers, signal: AbortSignal): Promise<Response> {
+const UPSTREAM_IDLE_TIMEOUT_MS = 300 * 1000
+
+interface UpstreamRequest {
+	method: string
+	headers: Headers
+	body?: Uint8Array
+	signal: AbortSignal
+	/** Long-lived stream (SSE): no idle timeout. */
+	streaming: boolean
+}
+
+/**
+ * Calls the backend with node:http instead of fetch, for two reasons:
+ * - fetch (undici) always decompresses the body, while the proxy passes the
+ *   backend's compressed bytes through untouched (`content-encoding` is kept);
+ * - undici aborts a body that stays idle for 300s (BodyTimeoutError), which
+ *   would cut long-lived SSE connections.
+ * Aborting `signal` (client disconnect) or cancelling the returned body
+ * destroys the upstream request.
+ */
+function openUpstream(target: URL, { method, headers, body, signal, streaming }: UpstreamRequest): Promise<Response> {
 	return new Promise((resolve, reject) => {
-		const client = target.protocol === 'https:' ? https : http
+		const isHttps = target.protocol === 'https:'
+		const client = isHttps ? https : http
 		const startedAt = performance.now()
+		const requestHeaders = Object.fromEntries(headers)
+		if (body) requestHeaders['content-length'] = String(body.byteLength)
 		const upstreamReq = client.request(
 			target,
 			// `headers` already carries the traceparent (forwardedRequestHeaders):
 			// fetch auto-instrumentation does not cover node:http.
-			{ method: 'GET', headers: Object.fromEntries(headers), signal },
+			{ method, headers: requestHeaders, signal, agent: isHttps ? httpsAgent : httpAgent },
 			(res) => {
 				const status = res.statusCode ?? 502
 				const serverTiming = upstreamServerTiming(startedAt)
@@ -180,14 +206,14 @@ function openUpstreamStream(target: URL, headers: Headers, signal: AbortSignal):
 					responseHeaders.push([name, Array.isArray(value) ? value.join(', ') : value])
 				}
 
-				if (NULL_BODY_STATUSES.has(status)) {
+				if (NULL_BODY_STATUSES.has(status) || method === 'HEAD') {
 					res.resume()
 					resolve(new Response(null, { status, headers: proxiedResponseHeaders(responseHeaders, serverTiming) }))
 					return
 				}
 
 				let finished = false
-				const body = new ReadableStream<Uint8Array>({
+				const responseBody = new ReadableStream<Uint8Array>({
 					start(controller) {
 						const finish = (error?: unknown) => {
 							if (finished) return
@@ -200,12 +226,21 @@ function openUpstreamStream(target: URL, headers: Headers, signal: AbortSignal):
 							}
 						}
 						res.on('data', (chunk: Buffer) => {
-							if (!finished) controller.enqueue(new Uint8Array(chunk))
+							if (finished) return
+							controller.enqueue(new Uint8Array(chunk))
+							// Backpressure: stop reading from the backend until the consumer pulls again.
+							if ((controller.desiredSize ?? 1) <= 0) res.pause()
 						})
 						res.on('end', () => finish())
 						// A client disconnect ends the stream cleanly; other upstream failures surface as errors.
 						res.on('error', (error) => finish(signal.aborted ? undefined : error))
-						res.on('close', () => finish())
+						// A regular body cut short is an error (as with fetch); a stream that closes just ends.
+						res.on('close', () =>
+							finish(streaming || res.complete || signal.aborted ? undefined : new Error('Upstream closed')),
+						)
+					},
+					pull() {
+						res.resume()
 					},
 					cancel() {
 						finished = true
@@ -214,7 +249,7 @@ function openUpstreamStream(target: URL, headers: Headers, signal: AbortSignal):
 				})
 
 				resolve(
-					new Response(body, {
+					new Response(responseBody, {
 						status,
 						statusText: res.statusMessage,
 						headers: proxiedResponseHeaders(responseHeaders, serverTiming),
@@ -222,8 +257,13 @@ function openUpstreamStream(target: URL, headers: Headers, signal: AbortSignal):
 				)
 			},
 		)
+		if (!streaming) {
+			upstreamReq.setTimeout(UPSTREAM_IDLE_TIMEOUT_MS, () => {
+				upstreamReq.destroy(new Error('Upstream timeout'))
+			})
+		}
 		upstreamReq.on('error', reject)
-		upstreamReq.end()
+		upstreamReq.end(body)
 	})
 }
 
@@ -239,15 +279,15 @@ export async function proxyStreamToBackend(req: NextRequest, path: string[]): Pr
 	const accessToken = await getStreamAccessToken(req.headers)
 	if (!accessToken) return jsonError(401, 'Unauthorized')
 
-	const headers = forwardedRequestHeaders(req)
+	const headers = forwardedRequestHeaders(req, { acceptEncoding: false })
 	headers.set('authorization', `Bearer ${accessToken}`)
 
 	let upstream: Response
 	try {
-		upstream = await openUpstreamStream(target, headers, req.signal)
+		upstream = await openUpstream(target, { method: 'GET', headers, signal: req.signal, streaming: true })
 	} catch (error) {
 		if (req.signal?.aborted) return new Response(null, { status: 499 })
-		return jsonError(502, error instanceof Error ? `Backend unavailable: ${error.message}` : 'Backend unavailable')
+		return backendUnavailable(error)
 	}
 
 	// proxiedResponseHeaders already dropped any upstream Set-Cookie.

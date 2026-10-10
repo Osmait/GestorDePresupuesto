@@ -83,7 +83,7 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 						<Link href='/' className='group flex items-center gap-3 hover:scale-105 transition-transform duration-200'>
 							<div className='w-12 h-12 rounded-xl overflow-hidden border border-border/40 bg-background shadow-lg flex items-center justify-center'>
 								<Image
-									src='/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png'
+									src='/sbfinance-logo.webp'
 									alt='SBFinance logo'
 									width={48}
 									height={48}

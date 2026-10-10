@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { domAnimation, LazyMotion, m } from 'framer-motion'
 import { BarChart3, CalendarRange, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useRouter } from 'next/navigation'
@@ -64,7 +64,17 @@ const mockHeat = [
 	},
 ]
 
+// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
+// full feature bundle (layout, drag) is not needed.
 export function AnalysisDashboard() {
+	return (
+		<LazyMotion features={domAnimation}>
+			<AnalysisDashboardView />
+		</LazyMotion>
+	)
+}
+
+function AnalysisDashboardView() {
 	const { theme } = useTheme()
 	const router = useRouter()
 	const t = useTranslations('analysis')
@@ -386,12 +396,7 @@ export function AnalysisDashboard() {
 	}
 
 	return (
-		<motion.div
-			initial={{ opacity: 0 }}
-			animate={{ opacity: 1 }}
-			transition={{ duration: 0.5 }}
-			className='space-y-6 mb-10'
-		>
+		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className='space-y-6 mb-10'>
 			{activeFilterBadges.length > 0 && (
 				<Card>
 					<CardContent className='pt-6'>
@@ -755,6 +760,6 @@ export function AnalysisDashboard() {
 					</CardContent>
 				</Card>
 			</div>
-		</motion.div>
+		</m.div>
 	)
 }

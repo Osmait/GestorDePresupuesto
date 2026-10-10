@@ -17,6 +17,15 @@ const nextConfig = {
   eslint: {
     ignoreDuringBuilds: true,
   },
+  experimental: {
+    // Client router cache for dynamic pages (seconds): going back to the
+    // server-rendered dashboard within this window reuses its RSC payload
+    // instead of re-rendering it. Successful mutations call router.refresh(),
+    // which purges the cache (components/common/react-query-provider.tsx).
+    staleTimes: {
+      dynamic: 30,
+    },
+  },
 }
 
 module.exports = withBundleAnalyzer(withNextIntl(nextConfig))

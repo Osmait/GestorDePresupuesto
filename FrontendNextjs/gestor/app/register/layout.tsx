@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import '../../styles/globals.css'
+import { ScopedIntlMessages } from '@/components/i18n/ScopedIntlMessages'
 
 export const metadata: Metadata = {
 	title: 'Crear Cuenta - SBFinance',
@@ -7,5 +8,5 @@ export const metadata: Metadata = {
 }
 
 export default function RegisterLayout({ children }: { children: React.ReactNode }) {
-	return <>{children}</>
+	return <ScopedIntlMessages scope='auth'>{children}</ScopedIntlMessages>
 }

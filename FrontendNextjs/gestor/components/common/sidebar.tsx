@@ -57,7 +57,7 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 				<div className='flex items-center gap-2'>
 					<div className='w-8 h-8 rounded-lg overflow-hidden border border-border/40 bg-background flex items-center justify-center'>
 						<Image
-							src='/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png'
+							src='/sbfinance-logo.webp'
 							alt='SBFinance logo'
 							width={32}
 							height={32}
@@ -73,7 +73,7 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 			{!isExpanded && (
 				<div className='w-8 h-8 rounded-lg overflow-hidden border border-border/40 bg-background flex items-center justify-center'>
 					<Image
-						src='/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png'
+						src='/sbfinance-logo.webp'
 						alt='SBFinance logo'
 						width={32}
 						height={32}

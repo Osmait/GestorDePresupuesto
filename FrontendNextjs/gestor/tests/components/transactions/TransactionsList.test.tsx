@@ -35,6 +35,8 @@ vi.mock('@/components/transactions/TransactionContext', () => ({
 		],
 		pagination: { total_records: 2, current_page: 1, total_pages: 1 },
 		isLoading: false,
+	}),
+	useTransactionActions: () => ({
 		deleteTransaction: vi.fn(),
 		clearFilters: vi.fn(),
 		reloadCurrentView: vi.fn(),

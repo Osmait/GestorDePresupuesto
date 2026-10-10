@@ -1,23 +1,9 @@
 'use client'
 
 import { ArrowDownCircle, ArrowUpCircle, TrendingUp } from 'lucide-react'
+import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
-import {
-	Area,
-	AreaChart,
-	Bar,
-	BarChart,
-	CartesianGrid,
-	Cell,
-	Legend,
-	Pie,
-	PieChart,
-	ResponsiveContainer,
-	Tooltip,
-	XAxis,
-	YAxis,
-} from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { isInflowTransaction } from '@/lib/transaction-utils'
@@ -36,11 +22,21 @@ interface AccountAnalyticsProps {
 const COLORS = ['#10b981', '#ef4444'] // Green for Income, Red for Expense
 const TOP_CATEGORIES_COUNT = 5
 
-// Recharts measures its parent: a fixed numeric height (instead of "100%")
-// gives it a definite size from the first render and avoids the
-// "width(-1) and height(-1)" warning; min-w-0 lets grid items shrink.
-const CHART_HEIGHT = 200
-const HISTORY_CHART_HEIGHT = 250
+// Charts are client-only and load in their own chunk, after the summary cards.
+// The CardContent around each one has a fixed height, so nothing shifts.
+const chartLoading = () => <div className='h-full w-full rounded bg-muted/20 animate-pulse' />
+const HorizontalBarChart = dynamic(() => import('@/components/charts/HorizontalBarChart'), {
+	ssr: false,
+	loading: chartLoading,
+})
+const DonutLegendChart = dynamic(() => import('@/components/charts/DonutLegendChart'), {
+	ssr: false,
+	loading: chartLoading,
+})
+const AreaTrendChart = dynamic(() => import('@/components/charts/AreaTrendChart'), {
+	ssr: false,
+	loading: chartLoading,
+})
 
 export function AccountAnalytics({
 	transactions,
@@ -95,12 +91,11 @@ export function AccountAnalytics({
 			(a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
 		)
 
-		const historyPoints: { date: string; fullDate: Date; balance: number }[] = []
+		const historyPoints: { label: string; value: number }[] = []
 		// Push current state
 		historyPoints.push({
-			date: formatLocalDate(new Date(), locale, { month: 'short', day: 'numeric' }),
-			fullDate: new Date(),
-			balance: balanceTracker,
+			label: formatLocalDate(new Date(), locale, { month: 'short', day: 'numeric' }),
+			value: balanceTracker,
 		})
 
 		sortedTransactions.forEach((t) => {
@@ -114,9 +109,8 @@ export function AccountAnalytics({
 			}
 
 			historyPoints.push({
-				date: formatLocalDate(t.created_at, locale, { month: 'short', day: 'numeric' }),
-				fullDate: new Date(t.created_at),
-				balance: balanceTracker,
+				label: formatLocalDate(t.created_at, locale, { month: 'short', day: 'numeric' }),
+				value: balanceTracker,
 			})
 		})
 
@@ -148,30 +142,10 @@ export function AccountAnalytics({
 		}
 	}, [transactions, categories, currentBalance, locale, t])
 
-	const pieData = [
-		{ name: t('income'), value: stats.income },
-		{ name: t('expenses'), value: stats.expense },
+	const summaryData = [
+		{ name: t('income'), value: stats.income, color: COLORS[0] },
+		{ name: t('expenses'), value: stats.expense, color: COLORS[1] },
 	].filter((d) => d.value > 0)
-
-	const CustomTooltip = ({
-		active,
-		payload,
-		label,
-	}: {
-		active?: boolean
-		payload?: Array<{ name: string; value: number; payload: { name: string } }>
-		label?: string
-	}) => {
-		if (active && payload?.length) {
-			return (
-				<div className='bg-popover border border-border p-2 rounded shadow-md text-sm'>
-					<p className='font-semibold mb-1'>{payload[0].name === 'balance' ? label : payload[0].payload.name}</p>
-					<p className='tabular-nums'>{formatMoney(payload[0].value)}</p>
-				</div>
-			)
-		}
-		return null
-	}
 
 	return (
 		<div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8'>
@@ -203,18 +177,7 @@ export function AccountAnalytics({
 					<CardTitle>{t('financialSummary')}</CardTitle>
 				</CardHeader>
 				<CardContent className='h-[200px] min-w-0'>
-					<ResponsiveContainer width='100%' height={CHART_HEIGHT}>
-						<BarChart data={pieData} layout='vertical' margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-							<XAxis type='number' hide />
-							<YAxis dataKey='name' type='category' width={80} tick={{ fontSize: 12 }} />
-							<Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
-							<Bar dataKey='value' radius={[0, 4, 4, 0]}>
-								{pieData.map((entry) => (
-									<Cell key={`cell-${entry.name}`} fill={entry.name === t('income') ? COLORS[0] : COLORS[1]} />
-								))}
-							</Bar>
-						</BarChart>
-					</ResponsiveContainer>
+					<HorizontalBarChart data={summaryData} formatValue={formatMoney} labelWidth={80} />
 				</CardContent>
 			</Card>
 
@@ -224,25 +187,7 @@ export function AccountAnalytics({
 				</CardHeader>
 				<CardContent className='h-[200px] min-w-0'>
 					{stats.expenseByCategory.length > 0 ? (
-						<ResponsiveContainer width='100%' height={CHART_HEIGHT}>
-							<PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-								<Pie
-									data={stats.expenseByCategory}
-									cx='50%'
-									cy='50%'
-									innerRadius={40}
-									outerRadius={60}
-									paddingAngle={2}
-									dataKey='value'
-								>
-									{stats.expenseByCategory.map((entry) => (
-										<Cell key={`cell-${entry.name}`} fill={entry.color} />
-									))}
-								</Pie>
-								<Tooltip content={<CustomTooltip />} />
-								<Legend layout='vertical' verticalAlign='middle' align='right' wrapperStyle={{ fontSize: '12px' }} />
-							</PieChart>
-						</ResponsiveContainer>
+						<DonutLegendChart data={stats.expenseByCategory} formatValue={formatMoney} />
 					) : (
 						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
 					)}
@@ -255,25 +200,7 @@ export function AccountAnalytics({
 				</CardHeader>
 				<CardContent className='h-[200px] min-w-0'>
 					{stats.incomeByCategory.length > 0 ? (
-						<ResponsiveContainer width='100%' height={CHART_HEIGHT}>
-							<PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-								<Pie
-									data={stats.incomeByCategory}
-									cx='50%'
-									cy='50%'
-									innerRadius={40}
-									outerRadius={60}
-									paddingAngle={2}
-									dataKey='value'
-								>
-									{stats.incomeByCategory.map((entry) => (
-										<Cell key={`cell-${entry.name}`} fill={entry.color} />
-									))}
-								</Pie>
-								<Tooltip content={<CustomTooltip />} />
-								<Legend layout='vertical' verticalAlign='middle' align='right' wrapperStyle={{ fontSize: '12px' }} />
-							</PieChart>
-						</ResponsiveContainer>
+						<DonutLegendChart data={stats.incomeByCategory} formatValue={formatMoney} />
 					) : (
 						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
 					)}
@@ -286,14 +213,13 @@ export function AccountAnalytics({
 				</CardHeader>
 				<CardContent className='h-[200px] min-w-0'>
 					{stats.topExpenses.length > 0 ? (
-						<ResponsiveContainer width='100%' height={CHART_HEIGHT}>
-							<BarChart data={stats.topExpenses} layout='vertical' margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-								<XAxis type='number' hide />
-								<YAxis dataKey='name' type='category' width={90} tick={{ fontSize: 11 }} interval={0} />
-								<Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
-								<Bar dataKey='value' radius={[0, 4, 4, 0]} fill='#ef4444' barSize={20} />
-							</BarChart>
-						</ResponsiveContainer>
+						<HorizontalBarChart
+							data={stats.topExpenses}
+							formatValue={formatMoney}
+							labelWidth={100}
+							fontSize={11}
+							padding={0.4}
+						/>
 					) : (
 						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
 					)}
@@ -306,38 +232,12 @@ export function AccountAnalytics({
 					<TrendingUp className='h-4 w-4 text-muted-foreground' />
 				</CardHeader>
 				<CardContent className='h-[250px] min-w-0'>
-					<ResponsiveContainer width='100%' height={HISTORY_CHART_HEIGHT}>
-						<AreaChart data={stats.balanceHistory} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-							<defs>
-								<linearGradient id='colorBalance' x1='0' y1='0' x2='0' y2='1'>
-									<stop offset='5%' stopColor='#8884d8' stopOpacity={0.8} />
-									<stop offset='95%' stopColor='#8884d8' stopOpacity={0} />
-								</linearGradient>
-							</defs>
-							<CartesianGrid strokeDasharray='3 3' vertical={false} stroke='#e5e7eb' className='dark:stroke-gray-800' />
-							<XAxis
-								dataKey='date'
-								tickLine={false}
-								axisLine={false}
-								tick={{ fontSize: 12, fill: '#6b7280' }}
-								minTickGap={30}
-							/>
-							<YAxis hide domain={['auto', 'auto']} />
-							<Tooltip
-								contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-								labelStyle={{ fontWeight: 'bold', color: '#374151' }}
-								formatter={(value) => [formatMoney(Number(value)), t('balance')]}
-							/>
-							<Area
-								type='monotone'
-								dataKey='balance'
-								stroke='#8884d8'
-								strokeWidth={2}
-								fillOpacity={1}
-								fill='url(#colorBalance)'
-							/>
-						</AreaChart>
-					</ResponsiveContainer>
+					<AreaTrendChart
+						points={stats.balanceHistory}
+						color='#8884d8'
+						seriesLabel={t('balance')}
+						formatValue={formatMoney}
+					/>
 				</CardContent>
 			</Card>
 		</div>

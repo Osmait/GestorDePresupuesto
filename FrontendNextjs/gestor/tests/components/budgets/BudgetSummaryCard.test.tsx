@@ -56,7 +56,7 @@ describe('BudgetSummaryCard', () => {
 	]
 
 	it('calculates totals correctly', () => {
-		render(<BudgetSummaryCard budgets={mockBudgets} transactions={[]} />)
+		render(<BudgetSummaryCard budgets={mockBudgets} />)
 
 		// Total Budget: 1000 + 2000 = 3000
 		expect(screen.getByText('Total Budget')).toBeInTheDocument()

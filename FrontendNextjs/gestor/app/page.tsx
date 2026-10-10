@@ -1,6 +1,6 @@
 'use client'
 
-import { motion, useScroll, useTransform } from 'framer-motion'
+import { domAnimation, LazyMotion, m, useScroll, useTransform } from 'framer-motion'
 import {
 	ArrowDownUp,
 	ArrowRight,
@@ -80,7 +80,7 @@ function Navigation() {
 	}
 
 	return (
-		<motion.nav
+		<m.nav
 			initial={{ y: -100 }}
 			animate={{ y: 0 }}
 			transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
@@ -91,18 +91,18 @@ function Navigation() {
 			<div className='container mx-auto px-4'>
 				<div className='flex items-center justify-between h-16'>
 					<Link href='/' className='flex items-center gap-3 group'>
-						<motion.div
+						<m.div
 							whileHover={{ scale: 1.1, rotate: 5 }}
 							className='w-10 h-10 rounded-xl overflow-hidden border border-border/40 bg-background flex items-center justify-center shadow-lg'
 						>
 							<Image
-								src='/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png'
+								src='/sbfinance-logo.webp'
 								alt='SBFinance logo'
 								width={40}
 								height={40}
 								className='w-full h-full object-cover'
 							/>
-						</motion.div>
+						</m.div>
 						<span className='font-bold text-xl'>SBFinance</span>
 					</Link>
 
@@ -149,7 +149,7 @@ function Navigation() {
 					</div>
 				</div>
 			</div>
-		</motion.nav>
+		</m.nav>
 	)
 }
 
@@ -180,9 +180,9 @@ function HeroSection() {
 				<div className='absolute bottom-0 right-1/4 w-96 h-96 bg-purple-500/5 rounded-full blur-3xl' />
 			</div>
 
-			<motion.div style={{ y, opacity }} className='container mx-auto px-4 relative z-10'>
+			<m.div style={{ y, opacity }} className='container mx-auto px-4 relative z-10'>
 				<div className='text-center max-w-5xl mx-auto'>
-					<motion.div
+					<m.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.6 }}
@@ -190,9 +190,9 @@ function HeroSection() {
 					>
 						<Terminal className='w-4 h-4 text-primary' />
 						<span className='text-sm font-medium'>Technical Portfolio Project</span>
-					</motion.div>
+					</m.div>
 
-					<motion.h1
+					<m.h1
 						initial={{ opacity: 0, y: 30 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.8, delay: 0.2 }}
@@ -201,35 +201,35 @@ function HeroSection() {
 						<span className='bg-gradient-to-r from-foreground via-foreground to-foreground/70 bg-clip-text text-transparent'>
 							{PROJECT_CONFIG.name}
 						</span>
-					</motion.h1>
+					</m.h1>
 
-					<motion.p
+					<m.p
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.8, delay: 0.4 }}
 						className='text-xl md:text-2xl text-muted-foreground mb-6 font-medium'
 					>
 						{PROJECT_CONFIG.tagline}
-					</motion.p>
+					</m.p>
 
-					<motion.p
+					<m.p
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.8, delay: 0.5 }}
 						className='text-lg text-muted-foreground/80 mb-10 max-w-3xl mx-auto leading-relaxed'
 					>
 						{PROJECT_CONFIG.description}
-					</motion.p>
+					</m.p>
 
 					{/* Architecture Badges */}
-					<motion.div
+					<m.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.8, delay: 0.6 }}
 						className='flex flex-wrap justify-center gap-3 mb-12'
 					>
 						{techBadges.map((tech, i) => (
-							<motion.div
+							<m.div
 								key={tech.name}
 								initial={{ opacity: 0, scale: 0.8 }}
 								animate={{ opacity: 1, scale: 1 }}
@@ -239,12 +239,12 @@ function HeroSection() {
 							>
 								<tech.icon className='w-4 h-4 text-primary' />
 								{tech.name}
-							</motion.div>
+							</m.div>
 						))}
-					</motion.div>
+					</m.div>
 
 					{/* CTA Buttons */}
-					<motion.div
+					<m.div
 						initial={{ opacity: 0, y: 20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.8, delay: 1 }}
@@ -268,25 +268,25 @@ function HeroSection() {
 								View Source Code
 							</a>
 						</Button>
-					</motion.div>
+					</m.div>
 				</div>
-			</motion.div>
+			</m.div>
 
-			<motion.div
+			<m.div
 				initial={{ opacity: 0 }}
 				animate={{ opacity: 1 }}
 				transition={{ delay: 1.5 }}
 				className='absolute bottom-8 left-1/2 transform -translate-x-1/2'
 			>
-				<motion.div
+				<m.div
 					animate={{ y: [0, 10, 0] }}
 					transition={{ repeat: Infinity, duration: 2 }}
 					className='flex flex-col items-center gap-2 text-muted-foreground'
 				>
 					<span className='text-sm'>Scroll to explore architecture</span>
 					<ChevronDown className='h-5 w-5' />
-				</motion.div>
-			</motion.div>
+				</m.div>
+			</m.div>
 		</section>
 	)
 }
@@ -331,7 +331,7 @@ function ArchitectureSection() {
 			<div className='absolute inset-0 bg-gradient-to-b from-transparent via-muted/30 to-transparent' />
 
 			<div className='container mx-auto px-4 relative'>
-				<motion.div
+				<m.div
 					initial={{ opacity: 0, y: 30 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true }}
@@ -347,13 +347,13 @@ function ArchitectureSection() {
 						The backend follows Clean Architecture principles with clear separation of concerns. Dependencies point
 						inward, keeping the core domain independent of frameworks.
 					</p>
-				</motion.div>
+				</m.div>
 
 				{/* Architecture Diagram */}
 				<div className='max-w-4xl mx-auto mb-16'>
 					<div className='space-y-4'>
 						{layers.map((layer, i) => (
-							<motion.div
+							<m.div
 								key={layer.name}
 								initial={{ opacity: 0, x: -50 }}
 								whileInView={{ opacity: 1, x: 0 }}
@@ -378,13 +378,13 @@ function ArchitectureSection() {
 										</div>
 									</CardContent>
 								</Card>
-							</motion.div>
+							</m.div>
 						))}
 					</div>
 				</div>
 
 				{/* Dependency Rule */}
-				<motion.div
+				<m.div
 					initial={{ opacity: 0, y: 30 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true }}
@@ -395,7 +395,7 @@ function ArchitectureSection() {
 						<ArrowDownUp className='w-5 h-5 text-primary' />
 						<span className='font-medium'>Dependencies always point inward → Domain never depends on outer layers</span>
 					</div>
-				</motion.div>
+				</m.div>
 			</div>
 		</section>
 	)
@@ -449,7 +449,7 @@ function DesignPatternsSection() {
 	return (
 		<section id='patterns' className='py-32 relative'>
 			<div className='container mx-auto px-4'>
-				<motion.div
+				<m.div
 					initial={{ opacity: 0, y: 30 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true }}
@@ -464,11 +464,11 @@ function DesignPatternsSection() {
 					<p className='text-xl text-muted-foreground max-w-2xl mx-auto'>
 						Industry-standard design patterns ensuring maintainability, testability, and clean code.
 					</p>
-				</motion.div>
+				</m.div>
 
 				<div className='grid grid-cols-1 md:grid-cols-2 gap-6'>
 					{patterns.map((pattern, i) => (
-						<motion.div
+						<m.div
 							key={pattern.name}
 							initial={{ opacity: 0, y: 30 }}
 							whileInView={{ opacity: 1, y: 0 }}
@@ -490,7 +490,7 @@ function DesignPatternsSection() {
 									</div>
 								</CardContent>
 							</Card>
-						</motion.div>
+						</m.div>
 					))}
 				</div>
 			</div>
@@ -614,7 +614,7 @@ function TechStackSection() {
 			<div className='absolute inset-0 bg-gradient-to-b from-transparent via-muted/30 to-transparent' />
 
 			<div className='container mx-auto px-4 relative'>
-				<motion.div
+				<m.div
 					initial={{ opacity: 0, y: 30 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true }}
@@ -629,10 +629,10 @@ function TechStackSection() {
 					<p className='text-xl text-muted-foreground max-w-2xl mx-auto'>
 						A modern, production-ready stack optimized for performance, developer experience, and scalability.
 					</p>
-				</motion.div>
+				</m.div>
 
 				{/* Frontend Stack */}
-				<motion.div
+				<m.div
 					initial={{ opacity: 0, y: 30 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true }}
@@ -645,7 +645,7 @@ function TechStackSection() {
 					</h3>
 					<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4'>
 						{frontend.map((tech, i) => (
-							<motion.div
+							<m.div
 								key={tech.name}
 								initial={{ opacity: 0, y: 20 }}
 								whileInView={{ opacity: 1, y: 0 }}
@@ -662,13 +662,13 @@ function TechStackSection() {
 										<p className='text-sm text-muted-foreground'>{tech.description}</p>
 									</CardContent>
 								</Card>
-							</motion.div>
+							</m.div>
 						))}
 					</div>
-				</motion.div>
+				</m.div>
 
 				{/* Backend Stack */}
-				<motion.div
+				<m.div
 					initial={{ opacity: 0, y: 30 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true }}
@@ -680,7 +680,7 @@ function TechStackSection() {
 					</h3>
 					<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4'>
 						{backend.map((tech, i) => (
-							<motion.div
+							<m.div
 								key={tech.name}
 								initial={{ opacity: 0, y: 20 }}
 								whileInView={{ opacity: 1, y: 0 }}
@@ -697,10 +697,10 @@ function TechStackSection() {
 										<p className='text-sm text-muted-foreground'>{tech.description}</p>
 									</CardContent>
 								</Card>
-							</motion.div>
+							</m.div>
 						))}
 					</div>
-				</motion.div>
+				</m.div>
 			</div>
 		</section>
 	)
@@ -746,7 +746,7 @@ function TechnicalHighlightsSection() {
 	return (
 		<section id='highlights' className='py-32 relative'>
 			<div className='container mx-auto px-4'>
-				<motion.div
+				<m.div
 					initial={{ opacity: 0, y: 30 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true }}
@@ -761,11 +761,11 @@ function TechnicalHighlightsSection() {
 					<p className='text-xl text-muted-foreground max-w-2xl mx-auto'>
 						Notable technical features and engineering decisions that make this project production-ready.
 					</p>
-				</motion.div>
+				</m.div>
 
 				<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
 					{highlights.map((item, i) => (
-						<motion.div
+						<m.div
 							key={item.title}
 							initial={{ opacity: 0, y: 30 }}
 							whileInView={{ opacity: 1, y: 0 }}
@@ -782,7 +782,7 @@ function TechnicalHighlightsSection() {
 									<p className='text-muted-foreground'>{item.description}</p>
 								</CardContent>
 							</Card>
-						</motion.div>
+						</m.div>
 					))}
 				</div>
 			</div>
@@ -799,7 +799,7 @@ function RepositorySection() {
 			<div className='absolute inset-0 bg-gradient-to-r from-primary/5 via-purple-500/5 to-primary/5' />
 
 			<div className='container mx-auto px-4 relative'>
-				<motion.div
+				<m.div
 					initial={{ opacity: 0, y: 30 }}
 					whileInView={{ opacity: 1, y: 0 }}
 					viewport={{ once: true }}
@@ -823,12 +823,12 @@ function RepositorySection() {
 							{/* Content */}
 							<div className='p-8 md:p-12'>
 								<div className='text-center mb-8'>
-									<motion.div
+									<m.div
 										whileHover={{ scale: 1.1, rotate: 5 }}
 										className='w-20 h-20 bg-gradient-to-br from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl'
 									>
 										<Github className='h-10 w-10 text-white dark:text-black' />
-									</motion.div>
+									</m.div>
 									<h3 className='text-3xl font-bold mb-4'>Open Source</h3>
 									<p className='text-muted-foreground text-lg max-w-xl mx-auto mb-8'>
 										Explore the code, learn from the implementation, or contribute to the project.
@@ -863,7 +863,7 @@ function RepositorySection() {
 							</div>
 						</CardContent>
 					</Card>
-				</motion.div>
+				</m.div>
 			</div>
 		</section>
 	)
@@ -902,16 +902,20 @@ function Footer() {
 // PÁGINA PRINCIPAL
 // ============================================
 export default function TechnicalPortfolioPage() {
+	// m + LazyMotion(domAnimation) instead of motion: the sections only use
+	// animate/whileInView/whileHover and motion values, not layout or drag.
 	return (
-		<main className='min-h-screen bg-background'>
-			<Navigation />
-			<HeroSection />
-			<ArchitectureSection />
-			<DesignPatternsSection />
-			<TechStackSection />
-			<TechnicalHighlightsSection />
-			<RepositorySection />
-			<Footer />
-		</main>
+		<LazyMotion features={domAnimation}>
+			<main className='min-h-screen bg-background'>
+				<Navigation />
+				<HeroSection />
+				<ArchitectureSection />
+				<DesignPatternsSection />
+				<TechStackSection />
+				<TechnicalHighlightsSection />
+				<RepositorySection />
+				<Footer />
+			</main>
+		</LazyMotion>
 	)
 }

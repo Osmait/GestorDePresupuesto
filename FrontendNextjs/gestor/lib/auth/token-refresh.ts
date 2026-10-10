@@ -127,6 +127,18 @@ function failedToken(token: JWT): JWT {
 }
 
 /**
+ * True when the session's access token is valid and outside the refresh window,
+ * i.e. `ensureFreshToken` (and therefore the next-auth `jwt` callback) would
+ * return the token unchanged. Callers can then use `token.accessToken` as is,
+ * without re-encoding the session cookie.
+ */
+export function hasFreshAccessToken(token: JWT): token is JWT & { accessToken: string } {
+	if (token.error || typeof token.accessToken !== 'string' || !token.accessToken) return false
+	const expiresAt = typeof token.accessTokenExpires === 'number' ? token.accessTokenExpires : 0
+	return Date.now() < expiresAt - getRefreshBufferMs(token.accessToken)
+}
+
+/**
  * Returns a token whose backend access token is valid, refreshing it when it is
  * about to expire. This is the only place in the app that refreshes tokens; it
  * runs inside the next-auth `jwt` callback.
@@ -134,8 +146,9 @@ function failedToken(token: JWT): JWT {
 export async function ensureFreshToken(token: JWT): Promise<JWT> {
 	if (token.error) return token
 
+	if (hasFreshAccessToken(token)) return token
+
 	const expiresAt = typeof token.accessTokenExpires === 'number' ? token.accessTokenExpires : 0
-	if (token.accessToken && Date.now() < expiresAt - getRefreshBufferMs(token.accessToken)) return token
 
 	if (!token.refreshToken) {
 		// No refresh token (demo sessions): usable until the access token expires.

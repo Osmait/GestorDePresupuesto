@@ -1,6 +1,6 @@
 import { ArrowDownRight, ArrowUpRight, Calendar, Edit, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useContext, useState } from 'react'
+import { memo, useContext, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
@@ -18,7 +18,7 @@ import { getSignedAmount, isInflowTransaction } from '@/lib/transaction-utils'
 import { formatCurrency } from '@/lib/utils'
 import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
-import { TransactionContext } from './TransactionContext'
+import { TransactionActionsContext } from './TransactionContext'
 
 interface TransactionItemProps {
 	transaction: Transaction
@@ -30,19 +30,20 @@ interface TransactionItemProps {
 
 const stopPropagation = (event: { stopPropagation: () => void }) => event.stopPropagation()
 
-export default function TransactionItem({
-	transaction,
-	category,
-	onTransactionDeleted,
-	onEdit,
-	onOpenDetails,
-}: TransactionItemProps) {
+function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, onOpenDetails }: TransactionItemProps) {
 	const t = useTranslations('transactions')
 	const locale = useAppLocale()
-	const context = useContext(TransactionContext)
-	const setEditingTransaction = context?.setEditingTransaction
-	const setModalOpen = context?.setModalOpen
+	// Only the stable callbacks: rows must not re-render when the list data or the filters change.
+	const actions = useContext(TransactionActionsContext)
+	const setEditingTransaction = actions?.setEditingTransaction
+	const setModalOpen = actions?.setModalOpen
+	// The menu content and the delete dialog are mounted on first use only (then kept,
+	// so their close animations still run): a list renders dozens of rows that are
+	// never opened.
+	const [menuOpen, setMenuOpen] = useState(false)
+	const [menuMounted, setMenuMounted] = useState(false)
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+	const [deleteDialogMounted, setDeleteDialogMounted] = useState(false)
 	const [isDeleting, setIsDeleting] = useState(false)
 
 	const isIncome = isInflowTransaction(transaction.type_transation)
@@ -160,7 +161,13 @@ export default function TransactionItem({
 									signDisplay: 'exceptZero',
 								})}
 							</p>
-							<DropdownMenu>
+							<DropdownMenu
+								open={menuOpen}
+								onOpenChange={(open) => {
+									if (open) setMenuMounted(true)
+									setMenuOpen(open)
+								}}
+							>
 								<DropdownMenuTrigger asChild>
 									<Button
 										variant='ghost'
@@ -173,35 +180,38 @@ export default function TransactionItem({
 									</Button>
 								</DropdownMenuTrigger>
 								{/* Content is portaled, but React events still bubble to the Card: stop them here. */}
-								<DropdownMenuContent align='end' onClick={stopPropagation}>
-									{canEdit ? (
+								{menuMounted && (
+									<DropdownMenuContent align='end' onClick={stopPropagation}>
+										{canEdit ? (
+											<DropdownMenuItem
+												className='flex items-center gap-2 cursor-pointer'
+												onClick={(event) => {
+													event.stopPropagation()
+													if (onEdit) {
+														onEdit(transaction)
+													} else if (setEditingTransaction && setModalOpen) {
+														setEditingTransaction(transaction)
+														setModalOpen(true)
+													}
+												}}
+											>
+												<Edit className='h-4 w-4' />
+												{t('edit')}
+											</DropdownMenuItem>
+										) : null}
 										<DropdownMenuItem
-											className='flex items-center gap-2 cursor-pointer'
+											className='flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400'
 											onClick={(event) => {
 												event.stopPropagation()
-												if (onEdit) {
-													onEdit(transaction)
-												} else if (setEditingTransaction && setModalOpen) {
-													setEditingTransaction(transaction)
-													setModalOpen(true)
-												}
+												setDeleteDialogMounted(true)
+												setShowDeleteDialog(true)
 											}}
 										>
-											<Edit className='h-4 w-4' />
-											{t('edit')}
+											<Trash2 className='h-4 w-4' />
+											{t('delete')}
 										</DropdownMenuItem>
-									) : null}
-									<DropdownMenuItem
-										className='flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400'
-										onClick={(event) => {
-											event.stopPropagation()
-											setShowDeleteDialog(true)
-										}}
-									>
-										<Trash2 className='h-4 w-4' />
-										{t('delete')}
-									</DropdownMenuItem>
-								</DropdownMenuContent>
+									</DropdownMenuContent>
+								)}
 							</DropdownMenu>
 						</div>
 					</div>
@@ -214,24 +224,28 @@ export default function TransactionItem({
 			 * on "Eliminar" inside the Card would also fire the Card's onClick and
 			 * open the details of the transaction being deleted.
 			 */}
-			<Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-				<DialogContent onClick={stopPropagation}>
-					<DialogHeader>
-						<DialogTitle>{t('deleteTitle')}</DialogTitle>
-						<DialogDescription>
-							{t('deleteDescription', { name: transaction.name?.trim() || transaction.description })}
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button variant='outline' onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
-							{t('cancel')}
-						</Button>
-						<Button variant='destructive' onClick={handleDeleteTransaction} disabled={isDeleting}>
-							{isDeleting ? t('deleting') : t('delete')}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			{deleteDialogMounted && (
+				<Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+					<DialogContent onClick={stopPropagation}>
+						<DialogHeader>
+							<DialogTitle>{t('deleteTitle')}</DialogTitle>
+							<DialogDescription>
+								{t('deleteDescription', { name: transaction.name?.trim() || transaction.description })}
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<Button variant='outline' onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
+								{t('cancel')}
+							</Button>
+							<Button variant='destructive' onClick={handleDeleteTransaction} disabled={isDeleting}>
+								{isDeleting ? t('deleting') : t('delete')}
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
+			)}
 		</>
 	)
 }
+
+export default memo(TransactionItem)

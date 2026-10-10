@@ -6,15 +6,8 @@ import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAppLocale } from '@/lib/i18n/date-locale'
 import { Budget } from '@/types/budget'
-import { Transaction } from '@/types/transaction'
 
-export function BudgetSummaryCard({
-	budgets,
-	transactions: _transactions,
-}: {
-	budgets: Budget[]
-	transactions: Transaction[]
-}) {
+export function BudgetSummaryCard({ budgets }: { budgets: Budget[] }) {
 	const t = useTranslations('budgets')
 	const locale = useAppLocale()
 	const totalBudget = budgets?.reduce((sum, budget) => sum + budget.amount, 0) || 0

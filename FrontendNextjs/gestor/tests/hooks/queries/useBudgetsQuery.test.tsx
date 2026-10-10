@@ -2,10 +2,11 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { renderHook, waitFor } from '@testing-library/react'
 import React from 'react'
 import { vi } from 'vitest'
-import { BUDGET_KEYS, useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
+import { BUDGET_KEYS, useBudgetTransactionCounts, useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 
 // Mock the repository
 const mockFindAll = vi.fn()
+const mockCount = vi.fn()
 
 vi.mock('@/lib/repositoryConfig', () => ({
 	getBudgetRepository: () =>
@@ -15,6 +16,7 @@ vi.mock('@/lib/repositoryConfig', () => ({
 			update: vi.fn(),
 			delete: vi.fn(),
 		}),
+	getTransactionRepository: () => Promise.resolve({ count: mockCount }),
 }))
 
 // Wrapper for TanStack Query
@@ -68,6 +70,26 @@ describe('useBudgetsQuery', () => {
 
 			await waitFor(() => expect(result.current.isSuccess).toBe(true))
 			expect(result.current.data).toEqual([])
+		})
+	})
+
+	describe('useBudgetTransactionCounts', () => {
+		it('asks for one expense count per budget instead of every transaction', async () => {
+			mockCount.mockImplementation(async ({ budget_id }: { budget_id: string }) => (budget_id === 'b1' ? 3 : 7))
+
+			const { result } = renderHook(() => useBudgetTransactionCounts(['b2', 'b1']), { wrapper: createWrapper() })
+
+			await waitFor(() => expect(result.current.isSuccess).toBe(true))
+			expect(result.current.data).toEqual({ b1: 3, b2: 7 })
+			expect(mockCount).toHaveBeenCalledTimes(2)
+			expect(mockCount).toHaveBeenCalledWith({ budget_id: 'b1', type: 'bill' })
+		})
+
+		it('does nothing without budgets and lives under the budgets root key', () => {
+			const { result } = renderHook(() => useBudgetTransactionCounts([]), { wrapper: createWrapper() })
+			expect(result.current.fetchStatus).toBe('idle')
+			expect(mockCount).not.toHaveBeenCalled()
+			expect(BUDGET_KEYS.transactionCounts(['b1'])[0]).toBe('budgets')
 		})
 	})
 })

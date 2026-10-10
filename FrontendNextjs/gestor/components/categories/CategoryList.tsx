@@ -1,6 +1,6 @@
 'use client'
 
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { Tag } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
@@ -14,7 +14,17 @@ import { Category } from '@/types/category'
 import { CategoryCard } from './CategoryCard'
 import { CategorySummaryCard } from './CategorySummaryCard'
 
+// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
+// full feature bundle (layout, drag) is not needed.
 export function CategoryList() {
+	return (
+		<LazyMotion features={domAnimation}>
+			<CategoryListView />
+		</LazyMotion>
+	)
+}
+
+function CategoryListView() {
 	const t = useTranslations('categories')
 	const { data: categoriesData, isLoading: isLoadingCategories } = useGetCategories()
 	const { data: dashboardSummary, isLoading: isLoadingDashboardSummary } = useGetDashboardSummary()
@@ -50,7 +60,7 @@ export function CategoryList() {
 	}
 
 	return (
-		<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
 			<div className='mb-8'>
 				<CategorySummaryCard categories={categories} categoryExpenses={categoryExpenses} />
 			</div>
@@ -66,7 +76,7 @@ export function CategoryList() {
 							<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
 								<AnimatePresence mode='popLayout' initial={false}>
 									{categories.map((category) => (
-										<motion.div
+										<m.div
 											key={category.id}
 											id={`category-card-${category.id}`}
 											initial={{ opacity: 0, y: 15 }}
@@ -85,7 +95,7 @@ export function CategoryList() {
 												onDelete={() => handleDeleteCategory(category.id!)}
 												onEdit={() => handleEditCategory(category)}
 											/>
-										</motion.div>
+										</m.div>
 									))}
 								</AnimatePresence>
 							</div>
@@ -93,6 +103,6 @@ export function CategoryList() {
 					},
 				]}
 			/>
-		</motion.div>
+		</m.div>
 	)
 }

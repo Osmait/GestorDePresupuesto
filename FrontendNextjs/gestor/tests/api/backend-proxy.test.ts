@@ -1,6 +1,7 @@
 // @vitest-environment node
 import http from 'node:http'
 import type { AddressInfo } from 'node:net'
+import { gunzipSync, gzipSync } from 'node:zlib'
 import { NextRequest } from 'next/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -58,41 +59,82 @@ async function readAll(response: Response) {
 	return new TextDecoder().decode(await response.arrayBuffer())
 }
 
-describe('backend proxy route', () => {
-	const fetchMock = vi.fn()
+interface UpstreamRequest {
+	method?: string
+	url?: string
+	headers: http.IncomingHttpHeaders
+	body: Buffer
+}
 
-	beforeEach(() => {
-		process.env.BACKEND_URL = 'http://backend.test'
+/** A real HTTP backend: the proxy talks to it with node:http. */
+async function startUpstream(respond: (req: UpstreamRequest, res: http.ServerResponse) => void) {
+	const requests: UpstreamRequest[] = []
+	const server = http.createServer((req, res) => {
+		const chunks: Buffer[] = []
+		req.on('data', (chunk: Buffer) => chunks.push(chunk))
+		req.on('end', () => {
+			const captured = { method: req.method, url: req.url, headers: req.headers, body: Buffer.concat(chunks) }
+			requests.push(captured)
+			respond(captured, res)
+		})
+	})
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+	const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`
+	return {
+		url,
+		requests,
+		close: async () => {
+			server.closeAllConnections()
+			await new Promise<void>((resolve) => server.close(() => resolve()))
+		},
+	}
+}
+
+const FRESH_SESSION = () => ({
+	accessToken: BACKEND_TOKEN,
+	refreshToken: 'refresh-current',
+	// 10 minutes left: outside the min(5 min, 50% lifetime) refresh window
+	accessTokenExpires: Date.now() + 10 * 60 * 1000,
+})
+
+describe('backend proxy route', () => {
+	let upstream: Awaited<ReturnType<typeof startUpstream>>
+	let respond: (req: UpstreamRequest, res: http.ServerResponse) => void
+
+	beforeEach(async () => {
+		respond = (_req, res) => {
+			res.writeHead(200, { 'content-type': 'application/json' })
+			res.end('[]')
+		}
+		upstream = await startUpstream((req, res) => respond(req, res))
+		process.env.BACKEND_URL = upstream.url
 		currentSession = { user: { id: 'u1', role: 'USER' }, expires: '2099-01-01' }
+		authSetsCookie = false
 		getBackendAccessTokenMock.mockReset().mockResolvedValue(BACKEND_TOKEN)
 		authWrapperCalls.mockReset()
-		readSessionJwtMock.mockReset()
-		fetchMock.mockReset()
-		vi.stubGlobal('fetch', fetchMock)
+		// No decodable cookie by default: requests take the auth() (refresh) path.
+		readSessionJwtMock.mockReset().mockResolvedValue(null)
 	})
 
-	afterEach(() => {
-		vi.unstubAllGlobals()
+	afterEach(async () => {
+		await upstream.close()
 	})
 
 	it('forwards method, path and query with the session token attached server-side', async () => {
-		fetchMock.mockResolvedValue(
-			new Response(JSON.stringify([{ id: 'a1' }]), {
-				status: 200,
-				headers: { 'content-type': 'application/json', 'set-cookie': 'backend=1', 'x-request-id': 'req-1' },
-			}),
-		)
+		respond = (_req, res) => {
+			res.writeHead(200, { 'content-type': 'application/json', 'set-cookie': 'backend=1', 'x-request-id': 'req-1' })
+			res.end(JSON.stringify([{ id: 'a1' }]))
+		}
 
 		const res = await GET(browserRequest('http://localhost:3000/api/backend/account?limit=5'), ctx(['account']))
 
-		expect(fetchMock).toHaveBeenCalledTimes(1)
-		const [target, init] = fetchMock.mock.calls[0]
-		expect(String(target)).toBe('http://backend.test/account?limit=5')
-		expect(init.method).toBe('GET')
-		const headers = init.headers as Headers
-		expect(headers.get('authorization')).toBe(`Bearer ${BACKEND_TOKEN}`)
-		expect(headers.get('cookie')).toBeNull()
-		expect(headers.get('x-forwarded-for')).toBe('203.0.113.7')
+		expect(upstream.requests).toHaveLength(1)
+		const [sent] = upstream.requests
+		expect(sent.url).toBe('/account?limit=5')
+		expect(sent.method).toBe('GET')
+		expect(sent.headers.authorization).toBe(`Bearer ${BACKEND_TOKEN}`)
+		expect(sent.headers.cookie).toBeUndefined()
+		expect(sent.headers['x-forwarded-for']).toBe('203.0.113.7')
 
 		expect(res.status).toBe(200)
 		expect(res.headers.get('x-request-id')).toBe('req-1')
@@ -101,7 +143,10 @@ describe('backend proxy route', () => {
 	})
 
 	it('sends the UI locale (locale cookie) as Accept-Language instead of the browser preference', async () => {
-		fetchMock.mockResolvedValue(new Response(null, { status: 204 }))
+		respond = (_req, res) => {
+			res.writeHead(204)
+			res.end()
+		}
 		const cases: [string, string][] = [
 			['authjs.session-token=encrypted-session; locale=en', 'en'],
 			['authjs.session-token=encrypted-session; locale=es', 'es'],
@@ -111,30 +156,38 @@ describe('backend proxy route', () => {
 		]
 
 		for (const [cookie, expected] of cases) {
-			fetchMock.mockClear()
+			upstream.requests.length = 0
 			await GET(
 				browserRequest('http://localhost:3000/api/backend/account', {
 					headers: { cookie, 'accept-language': 'fr-FR,fr;q=0.9,de;q=0.8' },
 				}),
 				ctx(['account']),
 			)
-			const headers = fetchMock.mock.calls[0][1].headers as Headers
-			expect(headers.get('accept-language')).toBe(expected)
+			expect(upstream.requests[0].headers['accept-language']).toBe(expected)
 		}
 	})
 
 	it('never leaks the backend token back to the browser', async () => {
-		fetchMock.mockResolvedValue(new Response('{"ok":true}', { headers: { 'content-type': 'application/json' } }))
+		respond = (_req, res) => {
+			res.writeHead(200, { 'content-type': 'application/json' })
+			res.end('{"ok":true}')
+		}
 
-		const res = await GET(browserRequest('http://localhost:3000/api/backend/profile'), ctx(['profile']))
+		for (const session of [null, FRESH_SESSION()]) {
+			readSessionJwtMock.mockResolvedValue(session)
+			const res = await GET(browserRequest('http://localhost:3000/api/backend/profile'), ctx(['profile']))
 
-		const headerDump = JSON.stringify(Array.from(res.headers.entries()))
-		expect(headerDump).not.toContain(BACKEND_TOKEN)
-		expect(await readAll(res)).not.toContain(BACKEND_TOKEN)
+			const headerDump = JSON.stringify(Array.from(res.headers.entries()))
+			expect(headerDump).not.toContain(BACKEND_TOKEN)
+			expect(await readAll(res)).not.toContain(BACKEND_TOKEN)
+		}
 	})
 
 	it('forwards the request body for writes', async () => {
-		fetchMock.mockResolvedValue(new Response(null, { status: 201 }))
+		respond = (_req, res) => {
+			res.writeHead(201)
+			res.end()
+		}
 		const body = JSON.stringify({ name: 'Savings' })
 
 		const res = await POST(
@@ -142,20 +195,23 @@ describe('backend proxy route', () => {
 			ctx(['account']),
 		)
 
-		const [, init] = fetchMock.mock.calls[0]
-		expect(init.method).toBe('POST')
-		expect(new TextDecoder().decode(init.body)).toBe(body)
+		const [sent] = upstream.requests
+		expect(sent.method).toBe('POST')
+		expect(sent.body.toString()).toBe(body)
+		expect(sent.headers['content-type']).toBe('application/json')
 		expect(res.status).toBe(201)
 	})
 
 	it('forwards public calls without credentials when there is no session', async () => {
 		currentSession = null
-		fetchMock.mockResolvedValue(new Response('"demo-token"', { headers: { 'content-type': 'application/json' } }))
+		respond = (_req, res) => {
+			res.writeHead(200, { 'content-type': 'application/json' })
+			res.end('"demo-token"')
+		}
 
 		await POST(browserRequest('http://localhost:3000/api/backend/auth/demo', { method: 'POST' }), ctx(['auth', 'demo']))
 
-		const headers = fetchMock.mock.calls[0][1].headers as Headers
-		expect(headers.get('authorization')).toBeNull()
+		expect(upstream.requests[0].headers.authorization).toBeUndefined()
 		expect(getBackendAccessTokenMock).not.toHaveBeenCalled()
 	})
 
@@ -165,14 +221,119 @@ describe('backend proxy route', () => {
 		const res = await GET(browserRequest('http://localhost:3000/api/backend/account'), ctx(['account']))
 
 		expect(res.status).toBe(401)
-		expect(fetchMock).not.toHaveBeenCalled()
+		expect(upstream.requests).toHaveLength(0)
 	})
 
 	it('rejects path traversal segments', async () => {
 		const res = await GET(browserRequest('http://localhost:3000/api/backend/x'), ctx(['..', 'admin']))
 
 		expect(res.status).toBe(400)
-		expect(fetchMock).not.toHaveBeenCalled()
+		expect(upstream.requests).toHaveLength(0)
+	})
+
+	it('answers 502 without revealing the internal backend address', async () => {
+		await upstream.close()
+
+		const res = await GET(browserRequest('http://localhost:3000/api/backend/account'), ctx(['account']))
+
+		expect(res.status).toBe(502)
+		const text = await readAll(res)
+		expect(text).not.toContain('127.0.0.1')
+		expect(text).not.toContain(new URL(upstream.url).port)
+		// reopen so afterEach can close it again
+		upstream = await startUpstream((req, r) => respond(req, r))
+	})
+
+	describe('session fast path (cookie decoded once)', () => {
+		it('forwards with the decoded token and no auth()/jwt callback/Set-Cookie while the token is fresh', async () => {
+			authSetsCookie = true
+			readSessionJwtMock.mockResolvedValue({ ...FRESH_SESSION(), accessToken: 'decoded-fresh-token' })
+
+			const res = await GET(browserRequest('http://localhost:3000/api/backend/account'), ctx(['account']))
+
+			expect(res.status).toBe(200)
+			expect(upstream.requests[0].headers.authorization).toBe('Bearer decoded-fresh-token')
+			expect(res.headers.get('set-cookie')).toBeNull()
+			expect(authWrapperCalls).not.toHaveBeenCalled()
+			expect(getBackendAccessTokenMock).not.toHaveBeenCalled()
+			expect(readSessionJwtMock).toHaveBeenCalledTimes(1)
+		})
+
+		it('takes the auth() refresh path (and persists the cookie) inside the refresh window', async () => {
+			authSetsCookie = true
+			const decoded = { ...FRESH_SESSION(), accessTokenExpires: Date.now() + 60 * 1000 }
+			readSessionJwtMock.mockResolvedValue(decoded)
+			getBackendAccessTokenMock.mockResolvedValue('rotated-access-token')
+
+			const res = await GET(browserRequest('http://localhost:3000/api/backend/account'), ctx(['account']))
+
+			expect(authWrapperCalls).toHaveBeenCalledTimes(1)
+			expect(res.headers.get('set-cookie')).toContain('authjs.session-token=rotated')
+			expect(upstream.requests[0].headers.authorization).toBe('Bearer rotated-access-token')
+			// The token decoded by the route is reused: no second cookie decrypt.
+			expect(readSessionJwtMock).toHaveBeenCalledTimes(1)
+			expect(getBackendAccessTokenMock).toHaveBeenCalledWith(expect.any(Headers), decoded)
+		})
+
+		it('takes the refresh path for expired tokens and sessions flagged with an error', async () => {
+			for (const decoded of [
+				{ ...FRESH_SESSION(), accessTokenExpires: Date.now() - 1000 },
+				{ ...FRESH_SESSION(), error: 'RefreshTokenError' },
+				{ ...FRESH_SESSION(), accessToken: '' },
+			]) {
+				authWrapperCalls.mockClear()
+				readSessionJwtMock.mockResolvedValue(decoded)
+				await GET(browserRequest('http://localhost:3000/api/backend/account'), ctx(['account']))
+				expect(authWrapperCalls).toHaveBeenCalledTimes(1)
+			}
+		})
+
+		it('returns 401 when the refresh path cannot produce a token', async () => {
+			readSessionJwtMock.mockResolvedValue({ ...FRESH_SESSION(), accessTokenExpires: Date.now() + 1000 })
+			getBackendAccessTokenMock.mockResolvedValue(null)
+
+			const res = await GET(browserRequest('http://localhost:3000/api/backend/account'), ctx(['account']))
+
+			expect(res.status).toBe(401)
+			expect(upstream.requests).toHaveLength(0)
+		})
+	})
+
+	describe('compression', () => {
+		it("forwards the browser's Accept-Encoding and streams the compressed body through untouched", async () => {
+			const payload = JSON.stringify(Array.from({ length: 200 }, (_, i) => ({ id: i, name: `item ${i}` })))
+			const gz = gzipSync(payload)
+			respond = (_req, res) => {
+				res.writeHead(200, {
+					'content-type': 'application/json',
+					'content-encoding': 'gzip',
+					'content-length': String(gz.length),
+					vary: 'Accept-Encoding',
+				})
+				res.end(gz)
+			}
+			readSessionJwtMock.mockResolvedValue(FRESH_SESSION())
+
+			const res = await GET(
+				browserRequest('http://localhost:3000/api/backend/transaction', {
+					headers: { 'accept-encoding': 'gzip, deflate, br, zstd' },
+				}),
+				ctx(['transaction']),
+			)
+
+			expect(upstream.requests[0].headers['accept-encoding']).toBe('gzip, deflate, br, zstd')
+			expect(res.headers.get('content-encoding')).toBe('gzip')
+			expect(res.headers.get('content-length')).toBeNull()
+			const bytes = Buffer.from(await res.arrayBuffer())
+			expect(bytes.equals(gz)).toBe(true)
+			expect(gunzipSync(bytes).toString()).toBe(payload)
+		})
+
+		it('asks for identity when the browser sends no Accept-Encoding', async () => {
+			readSessionJwtMock.mockResolvedValue(FRESH_SESSION())
+			await GET(browserRequest('http://localhost:3000/api/backend/account'), ctx(['account']))
+			expect(upstream.requests[0].headers['accept-encoding']).toBe('identity')
+		})
 	})
 })
 
@@ -305,11 +466,32 @@ describe('backend proxy route: Server-Sent Events', () => {
 		expect(upstreamRequests).toHaveLength(0)
 	})
 
-	it('keeps regular requests on the auth() path', async () => {
-		vi.stubGlobal(
-			'fetch',
-			vi.fn().mockResolvedValue(new Response('[]', { headers: { 'content-type': 'application/json' } })),
+	it('asks the backend for an uncompressed stream', async () => {
+		const res = await GET(
+			new NextRequest('http://localhost:3000/api/backend/notifications', {
+				headers: {
+					cookie: 'authjs.session-token=encrypted-session',
+					accept: 'text/event-stream',
+					'accept-encoding': 'gzip, br',
+				},
+			}),
+			ctx(['notifications']),
 		)
+		expect(upstreamRequests[0].headers['accept-encoding']).toBe('identity')
+		await (res.body as ReadableStream<Uint8Array>).cancel()
+	})
+
+	it('keeps regular requests that need a token refresh on the auth() path', async () => {
+		onUpstreamRequest = (res) => {
+			res.writeHead(200, { 'content-type': 'application/json' })
+			res.end('[]')
+		}
+		readSessionJwtMock.mockResolvedValue({
+			accessToken: BACKEND_TOKEN,
+			refreshToken: 'refresh-current',
+			// inside the refresh window
+			accessTokenExpires: Date.now() + 60 * 1000,
+		})
 		getBackendAccessTokenMock.mockResolvedValue(BACKEND_TOKEN)
 		currentSession = { user: { id: 'u1' }, expires: '2099-01-01' }
 
@@ -322,6 +504,24 @@ describe('backend proxy route: Server-Sent Events', () => {
 
 		expect(authWrapperCalls).toHaveBeenCalledTimes(1)
 		expect(res.headers.get('set-cookie')).toContain('authjs.session-token=rotated')
-		vi.unstubAllGlobals()
+	})
+
+	it('serves regular requests with a fresh token without auth() or Set-Cookie', async () => {
+		onUpstreamRequest = (res) => {
+			res.writeHead(200, { 'content-type': 'application/json' })
+			res.end('[]')
+		}
+
+		const res = await GET(
+			new NextRequest('http://localhost:3000/api/backend/notifications/history', {
+				headers: { cookie: 'authjs.session-token=encrypted-session' },
+			}),
+			ctx(['notifications', 'history']),
+		)
+
+		expect(res.status).toBe(200)
+		expect(authWrapperCalls).not.toHaveBeenCalled()
+		expect(res.headers.get('set-cookie')).toBeNull()
+		expect(upstreamRequests[0].headers.authorization).toBe(`Bearer ${BACKEND_TOKEN}`)
 	})
 })

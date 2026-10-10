@@ -11,6 +11,8 @@ import { ReactQueryProvider } from '@/components/common/react-query-provider'
 import { ThemeProvider } from '@/components/common/theme-provider'
 import { WebVitalsReporter } from '@/components/telemetry/web-vitals-reporter'
 import { Toaster } from '@/components/ui/sonner'
+import { CLIENT_NAMESPACES, pickMessages } from '@/lib/i18n/client-messages'
+import { getServerSession } from '@/lib/server/session'
 import { parseSampleRate } from '@/lib/telemetry/web-vitals'
 import { cn } from '@/lib/utils'
 
@@ -74,15 +76,18 @@ const vercelAnalyticsEnabled = process.env.VERCEL === '1' || process.env.NEXT_PU
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
 	const locale = await getLocale()
 	const messages = await getMessages()
+	// Hydrates the client session without a /api/auth/session round trip on load.
+	const session = await getServerSession()
 	// Off by default; read at request time so it can be changed without a rebuild.
 	const webVitalsSampleRate = parseSampleRate(process.env.WEB_VITALS_SAMPLE_RATE)
 
 	return (
 		<html lang={locale} suppressHydrationWarning>
 			<body className={cn(inter.variable, plusJakarta.variable, 'font-sans antialiased')}>
-				<AuthSessionProvider>
+				<AuthSessionProvider session={session}>
 					<ThemeProvider attribute='class' defaultTheme='system' enableSystem disableTransitionOnChange>
-						<NextIntlClientProvider messages={messages}>
+						{/* Only what client components need; route segments add theirs (ScopedIntlMessages). */}
+						<NextIntlClientProvider messages={pickMessages(messages, CLIENT_NAMESPACES.root)}>
 							<ProgressBarProvider>
 								<ReactQueryProvider>{children}</ReactQueryProvider>
 							</ProgressBarProvider>

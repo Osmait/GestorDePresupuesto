@@ -1,10 +1,10 @@
 'use client'
 
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { CreditCard, TrendingDown, TrendingUp } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect, useMemo, useState } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import TransactionItem from '@/components/transactions/TransactionItem'
 import TransactionSummaryCard from '@/components/transactions/TransactionSummaryCard'
@@ -16,22 +16,75 @@ import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { getSignedAmount, getTransactionTypeKey, isInflowTransaction } from '@/lib/transaction-utils'
 import { formatCurrency } from '@/lib/utils'
+import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
-import { useTransactionContext } from './TransactionContext'
+import { useTransactionActions, useTransactionContext } from './TransactionContext'
 import { TransactionSort } from './TransactionSort'
 
+interface TransactionRowProps {
+	transaction: Transaction
+	category?: Category
+	highlighted: boolean
+	onOpenDetails: (_transaction: Transaction) => void
+	onDelete: (_id: string) => Promise<void>
+}
+
+const ROW_INITIAL = { opacity: 0, scale: 0.95 }
+const ROW_ANIMATE = { opacity: 1, scale: 1 }
+const ROW_TRANSITION = { duration: 0.2, ease: 'easeOut' } as const
+
+/**
+ * Memoized row: with stable callbacks from the list, a row only re-renders when
+ * its own transaction/category/highlight changes (not on every filter change or
+ * when other rows change).
+ */
+const TransactionRow = memo(function TransactionRow({
+	transaction,
+	category,
+	highlighted,
+	onOpenDetails,
+	onDelete,
+}: TransactionRowProps) {
+	const transactionId = transaction.id!
+	const handleDeleted = useCallback(() => onDelete(transactionId), [onDelete, transactionId])
+
+	return (
+		<m.li
+			id={`transaction-item-${transactionId}`}
+			initial={ROW_INITIAL}
+			animate={ROW_ANIMATE}
+			exit={ROW_INITIAL}
+			transition={ROW_TRANSITION}
+			className={
+				highlighted ? 'list-none rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background' : 'list-none'
+			}
+		>
+			<TransactionItem
+				transaction={transaction}
+				category={category}
+				onOpenDetails={onOpenDetails}
+				onTransactionDeleted={handleDeleted}
+			/>
+		</m.li>
+	)
+})
+
+// m + LazyMotion(domAnimation) instead of motion: the full feature bundle (layout,
+// drag) is not needed for fades.
 export default function TransactionsList() {
+	return (
+		<LazyMotion features={domAnimation}>
+			<TransactionsListView />
+		</LazyMotion>
+	)
+}
+
+function TransactionsListView() {
 	const t = useTranslations('transactions')
 	const tCommon = useTranslations('common')
 	const locale = useAppLocale()
-	const {
-		transactions,
-		pagination,
-		summary,
-		isLoading: isLoadingTx,
-		deleteTransaction,
-		clearFilters,
-	} = useTransactionContext()
+	const { transactions, pagination, summary, isLoading: isLoadingTx } = useTransactionContext()
+	const { deleteTransaction, clearFilters } = useTransactionActions()
 
 	const { data: categories = [], isLoading: isLoadingCat } = useGetCategories()
 	const { data: accounts = [], isLoading: isLoadingAcc } = useGetAccounts()
@@ -41,6 +94,20 @@ export default function TransactionsList() {
 
 	const [currentFilter, setCurrentFilter] = useState('all')
 	const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null)
+	// Deep link (`?highlight=<id>&open=details`): open the details once per id, so
+	// closing the dialog does not reopen it while the parameters stay in the URL.
+	const autoOpenedIdRef = useRef<string | null>(null)
+
+	const categoriesById = useMemo(() => new Map(categories.map((category) => [category.id, category])), [categories])
+
+	const handleDelete = useCallback(
+		async (id: string) => {
+			// The delete mutation invalidates every list/balance query.
+			await deleteTransaction(id)
+			setSelectedTransaction((current) => (current?.id === id ? null : current))
+		},
+		[deleteTransaction],
+	)
 
 	const incomeTransactions = useMemo(
 		() => transactions.filter((t) => t.type_transation === TypeTransaction.INCOME),
@@ -76,44 +143,21 @@ export default function TransactionsList() {
                 while "sync" only animates the entering/exiting element.
                 The `layout` prop is intentionally omitted for the same reason. */}
 			<AnimatePresence mode='sync' initial={false}>
-				{transactionList.map((transaction) => {
-					const category = categories.find((c) => c.id === transaction.category_id)
-					return (
-						<motion.li
-							key={transaction.id}
-							id={`transaction-item-${transaction.id}`}
-							initial={{ opacity: 0, scale: 0.95 }}
-							animate={{ opacity: 1, scale: 1 }}
-							exit={{ opacity: 0, scale: 0.95 }}
-							transition={{ duration: 0.2, ease: 'easeOut' }}
-							className={
-								highlightedTransactionId === transaction.id
-									? 'list-none rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background'
-									: 'list-none'
-							}
-						>
-							<TransactionItem
-								transaction={transaction}
-								category={category}
-								onOpenDetails={(item) => setSelectedTransaction(item)}
-								onTransactionDeleted={async () => {
-									// The delete mutation invalidates every list/balance query.
-									await deleteTransaction(transaction.id!)
-									setSelectedTransaction((current) => (current?.id === transaction.id ? null : current))
-								}}
-							/>
-						</motion.li>
-					)
-				})}
+				{transactionList.map((transaction) => (
+					<TransactionRow
+						key={transaction.id}
+						transaction={transaction}
+						category={categoriesById.get(transaction.category_id)}
+						highlighted={highlightedTransactionId === transaction.id}
+						onOpenDetails={setSelectedTransaction}
+						onDelete={handleDelete}
+					/>
+				))}
 			</AnimatePresence>
 			{transactionList.length === 0 && (
-				<motion.div
-					initial={{ opacity: 0 }}
-					animate={{ opacity: 1 }}
-					className='text-center py-10 text-muted-foreground'
-				>
+				<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className='text-center py-10 text-muted-foreground'>
 					{t('noTransactions')}
-				</motion.div>
+				</m.div>
 			)}
 		</ul>
 	)
@@ -132,19 +176,20 @@ export default function TransactionsList() {
 	}, [highlightedTransactionId])
 
 	useEffect(() => {
-		if (!shouldOpenDetails || !highlightedTransactionId || selectedTransaction) return
+		if (!shouldOpenDetails || !highlightedTransactionId || autoOpenedIdRef.current === highlightedTransactionId) return
 		const match = transactions.find((item) => item.id === highlightedTransactionId)
 		if (match) {
+			autoOpenedIdRef.current = highlightedTransactionId
 			setSelectedTransaction(match)
 		}
-	}, [shouldOpenDetails, highlightedTransactionId, selectedTransaction, transactions])
+	}, [shouldOpenDetails, highlightedTransactionId, transactions])
 
 	if (isLoadingTx || isLoadingCat || isLoadingAcc) {
 		return <TransactionsPageSkeleton />
 	}
 
 	return (
-		<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
 			<div className='mb-8'>
 				<TransactionSummaryCard transactions={transactions} summary={summary} />
 			</div>
@@ -230,6 +275,6 @@ export default function TransactionsList() {
 					)}
 				</DialogContent>
 			</Dialog>
-		</motion.div>
+		</m.div>
 	)
 }

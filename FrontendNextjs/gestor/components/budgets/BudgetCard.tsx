@@ -21,17 +21,17 @@ import { useAppLocale } from '@/lib/i18n/date-locale'
 import { formatCurrency } from '@/lib/utils'
 import { Budget } from '@/types/budget'
 import { Category } from '@/types/category'
-import { Transaction } from '@/types/transaction'
 
 export interface BudgetCardProps {
 	budget: Budget
 	category?: Category
-	transactions: Transaction[]
+	/** Expenses linked to the budget; undefined while loading. */
+	transactionCount?: number
 	onDelete: (_id: string) => void
 	onEdit: (_budget: Budget) => void
 }
 
-export function BudgetCard({ budget, category, transactions, onDelete, onEdit }: BudgetCardProps) {
+export function BudgetCard({ budget, category, transactionCount, onDelete, onEdit }: BudgetCardProps) {
 	const t = useTranslations('budgets')
 	const tForms = useTranslations('forms')
 	const locale = useAppLocale()
@@ -199,7 +199,7 @@ export function BudgetCard({ budget, category, transactions, onDelete, onEdit }:
 						<div className='flex justify-between items-center pt-2 border-t border-border/50'>
 							<span className='text-xs text-muted-foreground'>{t('transactions')}</span>
 							<span className='text-xs text-muted-foreground'>
-								{transactions.length} {t('registered')}
+								{transactionCount ?? '–'} {t('registered')}
 							</span>
 						</div>
 					</div>

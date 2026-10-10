@@ -13,7 +13,10 @@ import type { RepositoryOptions } from '@/lib/base-repository'
 import { LOCALE_COOKIE, resolveLocale } from '@/lib/i18n/locales'
 import { traceContextHeaders } from '@/lib/server/trace-context'
 
-/** One token lookup per request, shared by every repository call in a Server Component render. */
+/**
+ * One token lookup per request, shared by every repository call in a Server
+ * Component render (React `cache`: the cookie is decrypted once per render).
+ */
 const getServerAccessToken = cache(async () => getBackendAccessToken(await headers()))
 
 /**

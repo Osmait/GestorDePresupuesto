@@ -55,20 +55,19 @@ describe('BudgetCard', () => {
 		updated_at: '',
 	}
 
-	const mockTransactions = [] as any[]
-
 	it('renders budget details correctly', () => {
 		render(
 			<BudgetCard
 				budget={mockBudget}
 				category={mockCategory}
-				transactions={mockTransactions}
+				transactionCount={3}
 				onDelete={vi.fn()}
 				onEdit={vi.fn()}
 			/>,
 		)
 
 		expect(screen.getByText('Budget For Groceries')).toBeInTheDocument()
+		expect(screen.getByText((content) => content.startsWith('3 '))).toBeInTheDocument()
 		// $1,000 budget and $800 spent - use getAllByText since formatCurrency may match multiple elements
 		expect(screen.getAllByText((content) => content.includes('1,000')).length).toBeGreaterThan(0)
 		expect(screen.getAllByText((content) => content.includes('800')).length).toBeGreaterThan(0)
@@ -80,7 +79,7 @@ describe('BudgetCard', () => {
 			<BudgetCard
 				budget={criticalBudget}
 				category={mockCategory}
-				transactions={mockTransactions}
+				transactionCount={3}
 				onDelete={vi.fn()}
 				onEdit={vi.fn()}
 			/>,
@@ -97,7 +96,7 @@ describe('BudgetCard', () => {
 			<BudgetCard
 				budget={mockBudget}
 				category={mockCategory}
-				transactions={mockTransactions}
+				transactionCount={3}
 				onDelete={vi.fn()}
 				onEdit={onEdit}
 			/>,

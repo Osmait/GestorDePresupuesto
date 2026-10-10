@@ -1,32 +1,37 @@
 'use client'
 
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { AlertTriangle, PiggyBank, PlusCircle } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useEffect } from 'react'
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
 import { Button } from '@/components/ui/button'
+import { useBudgetTransactionCounts } from '@/hooks/queries/useBudgetsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
-import { useGetAllTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { Budget } from '@/types/budget'
-import { Transaction } from '@/types/transaction'
 import { BudgetCard } from './BudgetCard'
 import { BudgetFormModal } from './BudgetFormModal'
 import { BudgetSummaryCard } from './BudgetSummaryCard'
 import { BudgetsPageSkeleton } from './BudgetsPageSkeleton'
 
+// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
+// full feature bundle (layout, drag) is not needed.
 export function BudgetList() {
+	return (
+		<LazyMotion features={domAnimation}>
+			<BudgetListView />
+		</LazyMotion>
+	)
+}
+
+function BudgetListView() {
 	const t = useTranslations('budgets')
 	const router = useRouter()
 	const searchParams = useSearchParams()
 	const { budgets, isLoading, error, deleteBudget, setEditingBudget, isModalOpen, setModalOpen } = useBudgetContext()
 	const { data: categories = [] } = useGetCategories()
-	const { data: transactions = [] } = useGetAllTransactions()
-
-	function getBudgetTransactions(budgetId: string) {
-		return transactions?.filter((t: Transaction) => t.budget_id === budgetId && t.type_transation === 'bill') || []
-	}
+	const { data: transactionCounts } = useBudgetTransactionCounts((budgets ?? []).map((budget) => budget.id))
 
 	const handleEdit = (budget: Budget) => {
 		setEditingBudget(budget)
@@ -90,18 +95,17 @@ export function BudgetList() {
 	}
 
 	return (
-		<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
 			<div className='mb-8'>
-				<BudgetSummaryCard budgets={budgets} transactions={transactions} />
+				<BudgetSummaryCard budgets={budgets} />
 			</div>
 
 			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
 				<AnimatePresence mode='popLayout' initial={false}>
 					{budgets.map((budget) => {
 						const category = categories?.find((c) => c.id === budget.category_id)
-						const txs = getBudgetTransactions(budget.id)
 						return (
-							<motion.div
+							<m.div
 								key={budget.id}
 								id={`budget-card-${budget.id}`}
 								initial={{ opacity: 0, y: 15 }}
@@ -117,11 +121,11 @@ export function BudgetList() {
 								<BudgetCard
 									budget={budget}
 									category={category}
-									transactions={txs}
+									transactionCount={transactionCounts?.[budget.id]}
 									onDelete={deleteBudget}
 									onEdit={handleEdit}
 								/>
-							</motion.div>
+							</m.div>
 						)
 					})}
 				</AnimatePresence>
@@ -129,6 +133,6 @@ export function BudgetList() {
 
 			{/* Context-controlled Modal for Edit/Create */}
 			<BudgetFormModal open={isModalOpen} setOpen={setModalOpen} initialCategoryId={suggestedCategoryId} />
-		</motion.div>
+		</m.div>
 	)
 }
