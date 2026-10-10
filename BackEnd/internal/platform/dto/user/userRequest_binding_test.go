@@ -12,7 +12,6 @@ import (
 
 func bindUserRequest(t *testing.T, body string) error {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodPost, "/user", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
@@ -50,3 +49,6 @@ func TestUserRequestBinding(t *testing.T) {
 		})
 	}
 }
+
+// gin.SetMode is not safe to call from parallel subtests: set it once.
+func init() { gin.SetMode(gin.TestMode) }

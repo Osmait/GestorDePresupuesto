@@ -13,7 +13,6 @@ import (
 
 func bindAccountRequest(t *testing.T, body string) (AccountRequest, error) {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
 	c.Request = httptest.NewRequest(http.MethodPost, "/account", strings.NewReader(body))
 	c.Request.Header.Set("Content-Type", "application/json")
@@ -68,7 +67,6 @@ func TestAccountUpdateRequestBinding_MaxLength(t *testing.T) {
 	t.Parallel()
 
 	bind := func(body string) error {
-		gin.SetMode(gin.TestMode)
 		c, _ := gin.CreateTestContext(httptest.NewRecorder())
 		c.Request = httptest.NewRequest(http.MethodPut, "/account/a1", strings.NewReader(body))
 		c.Request.Header.Set("Content-Type", "application/json")
@@ -80,3 +78,6 @@ func TestAccountUpdateRequestBinding_MaxLength(t *testing.T) {
 	require.Error(t, bind(fmt.Sprintf(`{"name":%q,"bank":"Wallet"}`, strings.Repeat("A", 256))))
 	require.Error(t, bind(fmt.Sprintf(`{"name":"Cash","bank":%q}`, strings.Repeat("A", 256))))
 }
+
+// gin.SetMode is not safe to call from parallel subtests: set it once.
+func init() { gin.SetMode(gin.TestMode) }

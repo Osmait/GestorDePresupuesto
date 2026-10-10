@@ -1,8 +1,11 @@
 package notification
 
 import (
+	"errors"
+	"fmt"
 	"log"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -116,6 +119,20 @@ func (h *NotificationHandler) SendTestNotification(ctx *gin.Context) {
 	ctx.JSON(http.StatusOK, gin.H{"message": "Notification sent"})
 }
 
+// GetHistory serves GET /notifications/history.
+//
+// Without query parameters it keeps the legacy response: a JSON array with
+// the whole history, newest first (null when empty).
+//
+// With `limit` and/or `cursor` it returns one page, newest first
+// (created_at DESC, id DESC):
+//
+//	GET /notifications/history?limit=<1..100, default 50>&cursor=<opaque>
+//	200 {"items": [Notification...], "next_cursor": "<opaque>" | null}
+//
+// next_cursor is null on the last page; pass it back verbatim as `cursor` to
+// get the next one. An out-of-range or non-numeric limit, or a cursor this
+// server did not issue, is a 400.
 func (h *NotificationHandler) GetHistory(ctx *gin.Context) {
 	userID, exists := ctx.Get("X-User-Id")
 	if !exists {
@@ -124,14 +141,40 @@ func (h *NotificationHandler) GetHistory(ctx *gin.Context) {
 	}
 	userIDStr := userID.(string)
 
-	history, err := h.service.GetHistory(ctx.Request.Context(), userIDStr)
+	limitParam, hasLimit := ctx.GetQuery("limit")
+	cursor, hasCursor := ctx.GetQuery("cursor")
+	if !hasLimit && !hasCursor {
+		history, err := h.service.GetHistory(ctx.Request.Context(), userIDStr)
+		if err != nil {
+			log.Printf("Error getting notification history: %v", err)
+			_ = ctx.Error(err)
+			return
+		}
+		ctx.JSON(http.StatusOK, history)
+		return
+	}
+
+	limit := notification.DefaultHistoryLimit
+	if limitParam != "" {
+		n, err := strconv.Atoi(limitParam)
+		if err != nil || n < 1 || n > notification.MaxHistoryLimit {
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("limit must be an integer between 1 and %d", notification.MaxHistoryLimit)})
+			return
+		}
+		limit = n
+	}
+
+	page, err := h.service.GetHistoryPage(ctx.Request.Context(), userIDStr, limit, cursor)
+	if errors.Is(err, notification.ErrInvalidCursor) {
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid cursor"})
+		return
+	}
 	if err != nil {
 		log.Printf("Error getting notification history: %v", err)
 		_ = ctx.Error(err)
 		return
 	}
-
-	ctx.JSON(http.StatusOK, history)
+	ctx.JSON(http.StatusOK, page)
 }
 
 func (h *NotificationHandler) MarkAsRead(ctx *gin.Context) {

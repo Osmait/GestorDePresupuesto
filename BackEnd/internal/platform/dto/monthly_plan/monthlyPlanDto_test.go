@@ -27,7 +27,6 @@ func newTestItem(currency string, amount money.Amount) *monthly_plan.MonthlyPlan
 // same validation the handlers rely on.
 func bindRequest[T any](t *testing.T, payload string) (*T, error) {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(payload))
@@ -211,3 +210,6 @@ func TestMonthlyPlanItemRequest_RejectsSubCentAmount(t *testing.T) {
 	assert.Contains(t, err.Error(), "amount must have at most 2 decimal places")
 	assert.NoError(t, (&MonthlyPlanItemRequest{Amount: money.MustParse("12.34")}).Validate())
 }
+
+// gin.SetMode is not safe to call from parallel subtests: set it once.
+func init() { gin.SetMode(gin.TestMode) }

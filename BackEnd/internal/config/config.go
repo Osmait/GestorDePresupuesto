@@ -945,9 +945,18 @@ func NewConfigSQLite(dbName string) *Config {
 	}
 }
 
-// GetPostgresUrl returns the PostgreSQL connection string
+// GetPostgresUrl returns the PostgreSQL connection string.
+//
+// binary_parameters=yes makes lib/pq send a parameterised query as
+// Parse+Bind+Execute in ONE round trip; without it every query with arguments
+// first waits for a Parse/Describe reply (2 round trips, ~14% of the API's CPU
+// and most of its per-query latency under load). The trade-off: every []byte
+// argument is then sent in binary format, which is only right for BYTEA
+// columns. JSON/text held in a []byte must be passed as a string (see
+// passkeyRepository.jsonText); money.Amount, time.Time, numbers, strings and
+// pq.Array values are unaffected (sent as text either way).
 func (c *Config) GetPostgresUrl() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&binary_parameters=no",
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&binary_parameters=yes",
 		c.Database.User, c.Database.Password, c.Database.Host, c.Database.Port, c.Database.Name, c.Database.SSLMode)
 }
 

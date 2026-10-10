@@ -74,7 +74,7 @@ func (h *RecurringTransactionHandler) Create(ctx *gin.Context) {
 		req.DayOfMonth,
 	)
 
-	if err := h.service.Create(ctx, rt); err != nil {
+	if err := h.service.Create(ctx.Request.Context(), rt); err != nil {
 		writeError(ctx, err)
 		return
 	}
@@ -87,7 +87,7 @@ func (h *RecurringTransactionHandler) FindAll(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	results, err := h.service.FindAllByUser(ctx, userId)
+	results, err := h.service.FindAllByUser(ctx.Request.Context(), userId)
 	if err != nil {
 		writeError(ctx, err)
 		return
@@ -120,7 +120,7 @@ func (h *RecurringTransactionHandler) Delete(ctx *gin.Context) {
 	if !ok {
 		return
 	}
-	if err := h.service.Delete(ctx, ctx.Param("id"), userId); err != nil {
+	if err := h.service.Delete(ctx.Request.Context(), ctx.Param("id"), userId); err != nil {
 		writeError(ctx, err)
 		return
 	}
@@ -155,7 +155,7 @@ func (h *RecurringTransactionHandler) Update(ctx *gin.Context) {
 		req.DayOfMonth,
 	)
 
-	if err := h.service.Update(ctx, rt); err != nil {
+	if err := h.service.Update(ctx.Request.Context(), rt); err != nil {
 		writeError(ctx, err)
 		return
 	}

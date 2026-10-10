@@ -24,7 +24,7 @@ func CreateCertificate(certificateService *certificate.CertificateService) gin.H
 			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
-		err := certificateService.CreateCertificate(ctx, &req, userId)
+		err := certificateService.CreateCertificate(ctx.Request.Context(), &req, userId)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userId).Interface("request", req).Msg("Failed to create certificate")
 			_ = ctx.Error(err)
@@ -37,7 +37,7 @@ func CreateCertificate(certificateService *certificate.CertificateService) gin.H
 func FindAllCertificates(certificateService *certificate.CertificateService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		certificates, err := certificateService.FindAll(ctx, userId)
+		certificates, err := certificateService.FindAll(ctx.Request.Context(), userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -50,7 +50,7 @@ func FindCertificateById(certificateService *certificate.CertificateService) gin
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
 		id := ctx.Param("id")
-		certificate, err := certificateService.FindById(ctx, id, userId)
+		certificate, err := certificateService.FindById(ctx.Request.Context(), id, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -70,7 +70,7 @@ func UpdateCertificate(certificateService *certificate.CertificateService) gin.H
 			return
 		}
 
-		err := certificateService.UpdateCertificate(ctx, id, &req, userId)
+		err := certificateService.UpdateCertificate(ctx.Request.Context(), id, &req, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -83,7 +83,7 @@ func DeleteCertificate(certificateService *certificate.CertificateService) gin.H
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
 		id := ctx.Param("id")
-		err := certificateService.DeleteCertificate(ctx, id, userId)
+		err := certificateService.DeleteCertificate(ctx.Request.Context(), id, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -103,7 +103,7 @@ func SimulateCertificate(certificateService *certificate.CertificateService) gin
 			return
 		}
 
-		result, err := certificateService.Simulate(ctx, id, &req, userId)
+		result, err := certificateService.Simulate(ctx.Request.Context(), id, &req, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -123,7 +123,7 @@ func UpdateCertificatePayment(certificateService *certificate.CertificateService
 			return
 		}
 
-		err := certificateService.UpdatePayment(ctx, paymentId, &req, userId)
+		err := certificateService.UpdatePayment(ctx.Request.Context(), paymentId, &req, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -135,7 +135,7 @@ func UpdateCertificatePayment(certificateService *certificate.CertificateService
 func GetCertificateSummary(certificateService *certificate.CertificateService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		summary, err := certificateService.GetSummary(ctx, userId)
+		summary, err := certificateService.GetSummary(ctx.Request.Context(), userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return

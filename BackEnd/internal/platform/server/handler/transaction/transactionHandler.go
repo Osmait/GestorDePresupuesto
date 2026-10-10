@@ -76,7 +76,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			Msg("Creating transaction")
 
 		err := transactionservice.CreateTransaction(
-			ctx,
+			ctx.Request.Context(),
 			transactionRequest.Name,
 			transactionRequest.Description,
 			transactionRequest.Amount,
@@ -160,7 +160,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 		includeSummary := ctx.Query("include_summary") == "true"
 
 		// Get filtered and paginated transactions
-		result, err := transactionService.FindAllOfAllAccountsWithFilters(ctx, userID, filter, includeSummary)
+		result, err := transactionService.FindAllOfAllAccountsWithFilters(ctx.Request.Context(), userID, filter, includeSummary)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -251,7 +251,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 		includeSummary := ctx.Query("include_summary") == "true"
 
 		// Get filtered and paginated transactions
-		result, err := transactionService.FindAllWithFilters(ctx, userID, filter, includeSummary)
+		result, err := transactionService.FindAllWithFilters(ctx.Request.Context(), userID, filter, includeSummary)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -303,7 +303,7 @@ func DeleteTransaction(transactionService *transaction.TransactionService) gin.H
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		userId := ctx.GetString("X-User-Id")
-		if err := transactionService.DeleteTransaction(ctx, id, userId); err != nil {
+		if err := transactionService.DeleteTransaction(ctx.Request.Context(), id, userId); err != nil {
 			_ = ctx.Error(err)
 			return
 		}
@@ -341,7 +341,7 @@ func UpdateTransaction(s *transaction.TransactionService) gin.HandlerFunc {
 		transactionObj.UserId = userId
 		transactionObj.Currency = transactionRequest.Currency
 
-		if err := s.UpdateTransaction(ctx, id, transactionObj); err != nil {
+		if err := s.UpdateTransaction(ctx.Request.Context(), id, transactionObj); err != nil {
 			_ = ctx.Error(err)
 			return
 		}

@@ -193,14 +193,21 @@ func (s *Server) registerRoutes() {
 
 	// Observability (outermost so CORS preflights, 429s and recovered
 	// panics are all measured): request id → span + RED metrics → access log.
-	if s.telemetry.TracingEnabled() {
-		// Handlers pass the *gin.Context itself to services/repositories;
-		// with fallback its Value() resolves the request span, so DB and
-		// outgoing-HTTP spans nest under the HTTP span. Side effect (only
-		// with tracing on): Done()/Err() follow the request context, i.e.
-		// work for a disconnected client is cancelled.
-		s.Engine.ContextWithFallback = true
-	}
+	// Request-scoped work runs on c.Request.Context(), never on the
+	// *gin.Context (gin recycles it once the handler returns). Fallback is
+	// enabled unconditionally so that any *gin.Context still used as a
+	// context.Context behaves exactly like the request context, with or
+	// without telemetry: Value() resolves the request span / tx / locale and
+	// Done()/Err() follow the request.
+	//
+	// Cancellation policy (identical with telemetry on and off): a client
+	// disconnect cancels the in-flight work. This is the safe choice because
+	// the RLS transaction is opened with BeginTx(c.Request.Context()), so
+	// database/sql already rolls it back on disconnect — continuing would only
+	// burn a pooled connection on a doomed transaction, and nothing is
+	// committed. Work that must outlive the request (notifications) uses
+	// context.WithoutCancel plus explicit values, never the gin context.
+	s.Engine.ContextWithFallback = true
 	s.Engine.Use(middleware.RequestID())
 	s.Engine.Use(middleware.HTTPTelemetry(middleware.HTTPTelemetryConfig{
 		TracerProvider:  s.telemetry.TracerProvider(),
@@ -219,6 +226,12 @@ func (s *Server) registerRoutes() {
 			"browser calls from the production frontend will be blocked")
 	}
 	s.Engine.Use(middleware.CORS(s.config.CORS))
+
+	// gzip for JSON/text responses >= 1 KB when the client accepts it. It
+	// wraps everything below, including RLSMiddleware, so the body is
+	// compressed when the RLS buffer is written out after the commit. SSE,
+	// MCP and /metrics are excluded.
+	s.Engine.Use(middleware.Compression(middleware.DefaultCompressionConfig()))
 
 	// Error handling middleware (must be first)
 	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))

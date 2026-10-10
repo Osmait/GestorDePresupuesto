@@ -37,8 +37,15 @@ export function login(email, tags) {
   return res.json();
 }
 
+// ACCEPT_ENCODING (e.g. "gzip") is sent on every authenticated request, like
+// the Next.js proxy forwarding the browser's header; k6 sends none by default
+// and transparently decodes gzip responses.
+const ACCEPT_ENCODING = __ENV.ACCEPT_ENCODING || '';
+
 export function auth(token, extra) {
-  return { headers: Object.assign({ Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }, extra || {}) };
+  const base = { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' };
+  if (ACCEPT_ENCODING) base['Accept-Encoding'] = ACCEPT_ENCODING;
+  return { headers: Object.assign(base, extra || {}) };
 }
 
 function ymd(d) {

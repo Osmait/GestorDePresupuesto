@@ -357,7 +357,7 @@ func TestDatabaseURLGeneration(t *testing.T) {
 			},
 		}
 
-		expected := "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable&binary_parameters=no"
+		expected := "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable&binary_parameters=yes"
 		assert.Equal(t, expected, config.GetDatabaseUrl())
 	})
 

@@ -64,6 +64,7 @@ func bufferOnly() gin.HandlerFunc {
 		c.Next()
 		c.Writer = original
 		bw.flushTo(original)
+		releaseBufferedResponseWriter(bw)
 	}
 }
 

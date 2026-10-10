@@ -25,12 +25,23 @@ func (r *PasskeyRepository) Save(ctx context.Context, pk *passkey.Passkey) error
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`
 	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query,
 		pk.Id, pk.UserId, pk.CredentialId, pk.PublicKey, pk.SignCount, pk.AAGUID,
-		pq.Array(pk.Transports), pk.Name, pk.CredentialJSON, pk.LastUsedAt, pk.CreatedAt,
+		pq.Array(pk.Transports), pk.Name, jsonText(pk.CredentialJSON), pk.LastUsedAt, pk.CreatedAt,
 	)
 	if err != nil {
 		log.Error().Err(err).Str("user_id", pk.UserId).Msg("Failed to save passkey")
 	}
 	return err
+}
+
+// jsonText passes JSON held in a []byte as text (NULL when empty). With
+// binary_parameters=yes lib/pq sends every []byte argument in binary format,
+// which is right for BYTEA columns but not for JSONB (its binary format starts
+// with a version byte: "unsupported jsonb version number 123").
+func jsonText(b []byte) any {
+	if len(b) == 0 {
+		return nil
+	}
+	return string(b)
 }
 
 func (r *PasskeyRepository) FindByCredentialId(ctx context.Context, credentialId []byte) (*passkey.Passkey, error) {

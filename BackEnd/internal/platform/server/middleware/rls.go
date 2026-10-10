@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -61,7 +62,9 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 //     not buffered: the writer switches to pass-through and the transaction
 //     is finalised after the handler returns.
 //   - Callbacks registered with txhelper.AfterTx (cache invalidation) run
-//     after the transaction has been committed or rolled back.
+//     after the transaction has been committed or rolled back; those
+//     registered with txhelper.AfterCommit (notifications) only after a
+//     successful commit.
 //
 // Must be registered AFTER AuthMiddleware.
 // Long-lived SSE endpoints, and handlers that manage their own transactions
@@ -110,12 +113,18 @@ func RLSMiddlewareWithTimeout(db *sql.DB, acquireTimeout time.Duration) gin.Hand
 		hooks := txhelper.NewTxHooks()
 		original := c.Writer
 		finished := false
+		var bw *bufferedResponseWriter
 		defer func() {
 			if !finished {
 				// Error / panic path: never leak the transaction or the
 				// pooled connection.
 				_ = tx.Rollback()
 				c.Writer = original
+			}
+			if bw != nil {
+				// The buffered body has been copied out (or discarded) and
+				// c.Writer no longer points at bw.
+				releaseBufferedResponseWriter(bw)
 			}
 			// The transaction is over (committed or rolled back): return the
 			// connection to the pool, then run post-transaction callbacks.
@@ -141,7 +150,7 @@ func RLSMiddlewareWithTimeout(db *sql.DB, acquireTimeout time.Duration) gin.Hand
 		txhelper.SetGinTxHooks(c, hooks)
 		c.Request = c.Request.WithContext(txhelper.WithTxHooks(txhelper.WithTx(reqCtx, tx), hooks))
 
-		bw := newBufferedResponseWriter(original)
+		bw = newBufferedResponseWriter(original)
 		c.Writer = bw
 
 		c.Next()
@@ -169,6 +178,7 @@ func RLSMiddlewareWithTimeout(db *sql.DB, acquireTimeout time.Duration) gin.Hand
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "could not commit transaction"})
 			return
 		}
+		hooks.MarkCommitted()
 
 		bw.flushTo(original)
 	}
@@ -198,12 +208,47 @@ type bufferedResponseWriter struct {
 	streaming   bool
 }
 
+const (
+	// initialResponseBufferSize pre-sizes a fresh buffer: most JSON
+	// responses fit, so the buffer does not regrow (and copy) several times.
+	initialResponseBufferSize = 4 << 10
+	// maxPooledResponseBuffer caps the buffers returned to the pool, so a
+	// rare multi-megabyte response does not stay pinned in memory.
+	maxPooledResponseBuffer = 256 << 10
+)
+
+// bufferedWriterPool recycles bufferedResponseWriters and their buffers: one
+// per authenticated request was a top allocation source under load.
+var bufferedWriterPool = sync.Pool{
+	New: func() any {
+		w := &bufferedResponseWriter{}
+		w.buf.Grow(initialResponseBufferSize)
+		return w
+	},
+}
+
 func newBufferedResponseWriter(w gin.ResponseWriter) *bufferedResponseWriter {
+	bw := bufferedWriterPool.Get().(*bufferedResponseWriter)
+	bw.ResponseWriter = w
 	// Start from the status already set on the real writer instead of a fixed
 	// 200: for unmatched routes gin presets 404 (405 for wrong methods) before
 	// running the global middleware chain, and resetting it here turned those
 	// responses into an empty 200.
-	return &bufferedResponseWriter{ResponseWriter: w, status: w.Status()}
+	bw.status = w.Status()
+	return bw
+}
+
+// releaseBufferedResponseWriter returns w to the pool. w must not be used
+// afterwards.
+func releaseBufferedResponseWriter(w *bufferedResponseWriter) {
+	buf := w.buf
+	buf.Reset()
+	if buf.Cap() > maxPooledResponseBuffer {
+		buf = bytes.Buffer{}
+		buf.Grow(initialResponseBufferSize)
+	}
+	*w = bufferedResponseWriter{buf: buf}
+	bufferedWriterPool.Put(w)
 }
 
 func (w *bufferedResponseWriter) isEventStream() bool {

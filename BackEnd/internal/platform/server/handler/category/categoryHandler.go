@@ -32,7 +32,7 @@ func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
-		err = categoryServices.CreateCategory(c, &categoryRequest, userId)
+		err = categoryServices.CreateCategory(c.Request.Context(), &categoryRequest, userId)
 
 		if err != nil {
 			_ = c.Error(err)
@@ -57,7 +57,7 @@ func CreateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 func FindAllCategories(categoryServices *category.CategoryServices) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userId := c.GetString("X-User-Id")
-		categorys, err := categoryServices.FindAll(c, userId)
+		categorys, err := categoryServices.FindAll(c.Request.Context(), userId)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -84,7 +84,7 @@ func DeleteCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 	return func(c *gin.Context) {
 		id := c.Param("id")
 		userId := c.GetString("X-User-Id")
-		err := categoryServices.Delete(c, id, userId)
+		err := categoryServices.Delete(c.Request.Context(), id, userId)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -118,7 +118,7 @@ func UpdateCategory(categoryServices *category.CategoryServices) gin.HandlerFunc
 			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
-		err = categoryServices.UpdateCategory(c, &categoryRequest, id, userId)
+		err = categoryServices.UpdateCategory(c.Request.Context(), &categoryRequest, id, userId)
 		if err != nil {
 			_ = c.Error(err)
 			return

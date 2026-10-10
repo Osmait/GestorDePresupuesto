@@ -28,7 +28,7 @@ func GetUser(userService *user.UserService) gin.HandlerFunc {
 				return
 			}
 		}
-		user, err := userService.FindUserById(c, id)
+		user, err := userService.FindUserById(c.Request.Context(), id)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -40,7 +40,7 @@ func GetUser(userService *user.UserService) gin.HandlerFunc {
 func GetProfile(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userid := c.GetString("X-User-Id")
-		user, err := userService.FindUserById(c, userid)
+		user, err := userService.FindUserById(c.Request.Context(), userid)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -58,7 +58,7 @@ func CreateUser(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		err = userService.CreateUser(c, &user)
+		err = userService.CreateUser(c.Request.Context(), &user)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -71,7 +71,7 @@ func CreateUser(userService *user.UserService) gin.HandlerFunc {
 func CleanupDemoUsers(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Pass 0 to delete all demo users immediately (regardless of age)
-		err := userService.DeleteDemoUsers(c, 0)
+		err := userService.DeleteDemoUsers(c.Request.Context(), 0)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -96,7 +96,7 @@ func GetUsers(userService *user.UserService) gin.HandlerFunc {
 			}
 		}
 
-		users, err := userService.GetUsersFiltered(c, query, limit, offset)
+		users, err := userService.GetUsersFiltered(c.Request.Context(), query, limit, offset)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -113,7 +113,7 @@ func UpdateUsers(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.BatchUpdateUsers(c, users); err != nil {
+		if err := userService.BatchUpdateUsers(c.Request.Context(), users); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -132,7 +132,7 @@ func SoftDeleteUser(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.SoftDeleteUser(c, id); err != nil {
+		if err := userService.SoftDeleteUser(c.Request.Context(), id); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -157,7 +157,7 @@ func CreateUserByAdmin(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.CreateUser(c, &userReq); err != nil {
+		if err := userService.CreateUser(c.Request.Context(), &userReq); err != nil {
 			_ = c.Error(err)
 			return
 		}

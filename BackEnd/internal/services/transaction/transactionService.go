@@ -16,6 +16,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
 const (
@@ -51,6 +52,21 @@ func NewTransactionService(transactionRepository transactionRepo.TransactionRepo
 		aiCache:               aiCache,
 		usdToDopRateFn:        usdToDopRateFn,
 	}
+}
+
+// listCachePrefix is the cache invalidation group of userId's transaction
+// lists (see cache.InMemoryCache: invalidating it is O(1)).
+func listCachePrefix(userId string) string {
+	return "transactions:user:" + userId + ":"
+}
+
+// invalidateLists drops userId's cached transaction lists now and once more
+// after the request transaction ends: a list read concurrently, before this
+// write commits, could otherwise put pre-write data back for the whole TTL.
+func (s TransactionService) invalidateLists(ctx context.Context, userId string) {
+	prefix := listCachePrefix(userId)
+	s.cache.DeleteByPrefix(prefix)
+	txhelper.AfterTx(ctx, func() { s.cache.DeleteByPrefix(prefix) })
 }
 
 // CreateTransaction records a new transaction, checks for budget thresholds, and triggers alerts if necessary.
@@ -93,7 +109,7 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 	if err != nil {
 		return "", err
 	}
-	s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", userId))
+	s.invalidateLists(ctx, userId)
 
 	if s.aiCache != nil {
 		s.aiCache.InvalidateUserAnalysis(userId)
@@ -113,15 +129,13 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 		// transaction. Reading it from a goroutine with a detached context used
 		// a second pooled connection while the request held one (pool deadlock
 		// pressure) and raced the commit (the new bill could be missing).
-		// Only the notification (DB insert + SSE push) is sent asynchronously.
+		// Only the notification (DB insert + SSE push) is sent asynchronously,
+		// after the commit.
 		s.checkBudgetThreshold(ctx, budget.Id, budget.Amount, userId, amount, resolvedCurrency)
 	}
 
 	return id, nil
 }
-
-// budgetAlertTimeout bounds the asynchronous budget-alert notification.
-const budgetAlertTimeout = 10 * time.Second
 
 func (s TransactionService) checkBudgetThreshold(ctx context.Context, budgetID string, budgetAmount money.Amount, userId string, amount money.Amount, resolvedCurrency string) {
 	usdToDop := money.FromInt(60)
@@ -178,11 +192,10 @@ func (s TransactionService) checkBudgetThreshold(ctx context.Context, budgetID s
 				"amount":  spentPositive.RoundCents(),
 			}
 			payloadBytes, _ := json.Marshal(notificationPayload)
-			go func() {
-				notifyCtx, cancel := context.WithTimeout(context.Background(), budgetAlertTimeout)
-				defer cancel()
-				s.notificationService.SendToUser(notifyCtx, userId, string(payloadBytes))
-			}()
+			// Sent asynchronously once the request transaction commits, on a
+			// detached context (never the request/gin context, never the
+			// request transaction); see NotificationService.SendToUserAsync.
+			s.notificationService.SendToUserAsync(ctx, userId, string(payloadBytes))
 		} else {
 			log.Debug().Msg("no alert threshold crossed")
 		}
@@ -249,19 +262,18 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 	filter *dto.TransactionFilter,
 	includeSummary bool,
 ) (interface{}, error) {
-	// Get total count first
-	totalCount, err := s.transactionRepository.CountWithFilters(ctx, userId, filter)
-	if err != nil {
-		return nil, err
-	}
-
-	// Cache Key Generation
+	// Cache first: a cached response already carries its total count.
 	filterBytes, _ := json.Marshal(filter)
-	cacheKey := fmt.Sprintf("transactions:user:%s:filter:%s:summary:%v", userId, string(filterBytes), includeSummary)
+	cacheKey := fmt.Sprintf("%sfilter:%s:summary:%v", listCachePrefix(userId), string(filterBytes), includeSummary)
 
 	if cachedResponse, found := s.cache.Get(cacheKey); found {
 		log.Debug().Msg("Serving transactions from cache")
 		return cachedResponse, nil
+	}
+
+	totalCount, err := s.transactionRepository.CountWithFilters(ctx, userId, filter)
+	if err != nil {
+		return nil, err
 	}
 
 	// Get filtered and paginated transactions
@@ -415,7 +427,7 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 	if err := s.transactionRepository.Update(ctx, id, transaction); err != nil {
 		return err
 	}
-	s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", transaction.UserId))
+	s.invalidateLists(ctx, transaction.UserId)
 
 	if s.aiCache != nil {
 		s.aiCache.InvalidateUserAnalysis(transaction.UserId)
@@ -428,7 +440,7 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {
 	err := s.transactionRepository.Delete(ctx, id, userId)
 	if err == nil {
-		s.cache.DeleteByPrefix(fmt.Sprintf("transactions:user:%s", userId))
+		s.invalidateLists(ctx, userId)
 
 		if s.aiCache != nil {
 			s.aiCache.InvalidateUserAnalysis(userId)

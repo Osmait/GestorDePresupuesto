@@ -35,7 +35,7 @@ func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
-		err := accountService.CreateAccount(ctx, req.Name, req.Bank, req.InitialBalance, userId)
+		err := accountService.CreateAccount(ctx.Request.Context(), req.Name, req.Bank, req.InitialBalance, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -59,7 +59,7 @@ func CreateAccount(accountService *account.AccountService) gin.HandlerFunc {
 func FindAllAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		accounts, err := accountService.FindAll(ctx, userId)
+		accounts, err := accountService.FindAll(ctx.Request.Context(), userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -87,7 +87,7 @@ func DeleteAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		userId := ctx.GetString("X-User-Id")
-		err := accountService.DeleteAccount(ctx, id, userId)
+		err := accountService.DeleteAccount(ctx.Request.Context(), id, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -123,7 +123,7 @@ func UpdateAccount(accountService *account.AccountService) gin.HandlerFunc {
 			return
 		}
 
-		err := accountService.UpdateAccount(ctx, id, &updateRequest, userId)
+		err := accountService.UpdateAccount(ctx.Request.Context(), id, &updateRequest, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -149,7 +149,7 @@ func FindAccount(accountService *account.AccountService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		id := ctx.Param("id")
 		userId := ctx.GetString("X-User-Id")
-		account, err := accountService.FindById(ctx, id, userId)
+		account, err := accountService.FindById(ctx.Request.Context(), id, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return

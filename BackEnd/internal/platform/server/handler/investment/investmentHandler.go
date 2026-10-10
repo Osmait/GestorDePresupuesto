@@ -62,7 +62,7 @@ func (h *InvestmentHandler) Create(ctx *gin.Context) {
 	// The id is always generated server side.
 	id := ksuid.New().String()
 
-	if err := h.service.Create(ctx, id, userId, req.Type, req.Name, req.Symbol, req.Quantity, req.PurchasePrice, req.CurrentPrice, req.SettlementCurrency); err != nil {
+	if err := h.service.Create(ctx.Request.Context(), id, userId, req.Type, req.Name, req.Symbol, req.Quantity, req.PurchasePrice, req.CurrentPrice, req.SettlementCurrency); err != nil {
 		_ = ctx.Error(err)
 		return
 	}
@@ -91,7 +91,7 @@ func (h *InvestmentHandler) FundBroker(ctx *gin.Context) {
 		return
 	}
 
-	if err := h.service.FundBroker(ctx, userId, investmentService.FundingRequest{
+	if err := h.service.FundBroker(ctx.Request.Context(), userId, investmentService.FundingRequest{
 		SourceAccountID: req.SourceAccountID,
 		SourceAmount:    req.SourceAmount,
 		TargetCurrency:  req.TargetCurrency,
@@ -113,7 +113,7 @@ func (h *InvestmentHandler) GetFundingBalances(ctx *gin.Context) {
 		return
 	}
 
-	balances, err := h.service.GetFundingBalances(ctx, userId)
+	balances, err := h.service.GetFundingBalances(ctx.Request.Context(), userId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -129,7 +129,7 @@ func (h *InvestmentHandler) FindAll(ctx *gin.Context) {
 		return
 	}
 
-	investments, err := h.service.FindAll(ctx, userId)
+	investments, err := h.service.FindAll(ctx.Request.Context(), userId)
 	if err != nil {
 		_ = ctx.Error(err)
 		return
@@ -164,7 +164,7 @@ func (h *InvestmentHandler) Update(ctx *gin.Context) {
 		return
 	}
 
-	updated, err := h.service.Update(ctx, id, userId, investmentService.UpdateInput{
+	updated, err := h.service.Update(ctx.Request.Context(), id, userId, investmentService.UpdateInput{
 		Type:               req.Type,
 		Name:               req.Name,
 		Symbol:             req.Symbol,
@@ -189,7 +189,7 @@ func (h *InvestmentHandler) Delete(ctx *gin.Context) {
 	}
 
 	id := ctx.Param("id")
-	if err := h.service.Delete(ctx, id, userId); err != nil {
+	if err := h.service.Delete(ctx.Request.Context(), id, userId); err != nil {
 		_ = ctx.Error(err)
 		return
 	}

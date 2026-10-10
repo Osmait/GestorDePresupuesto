@@ -200,12 +200,21 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	return transactions, nil
 }
 
+// currentMonthPredicate selects the transactions of the current calendar
+// month in the session time zone. It is the sargable form of
+// date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE): both
+// bounds are computed once per statement (date_trunc on timestamptz and the
+// one-month step use the session time zone, exactly like the old filter), so
+// the (user_id, created_at) / (budget_id, created_at) indexes can range-scan
+// instead of evaluating date_trunc on every row of the user/budget.
+const currentMonthPredicate = "created_at >= date_trunc('month', CURRENT_DATE) AND created_at < date_trunc('month', CURRENT_DATE) + interval '1 month'"
+
 func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string, userId string, usdToDop money.Amount) (money.Amount, error) {
 	if !usdToDop.IsPositive() {
 		usdToDop = money.FromInt(60)
 	}
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
-		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND user_id = $3 AND type_transation = 'bill' AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)", budgetID, usdToDop, userId)
+		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND user_id = $3 AND type_transation = 'bill' AND "+currentMonthPredicate, budgetID, usdToDop, userId)
 	if err != nil {
 		return money.Zero, err
 	}
@@ -250,7 +259,7 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 	}
 	query := `SELECT budget_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions
 		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill'
-		AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)
+		AND ` + currentMonthPredicate + `
 		GROUP BY budget_id`
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, usdToDop)
 	if err != nil {

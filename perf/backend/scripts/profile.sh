@@ -17,7 +17,7 @@ DUR=75
 docker exec "$PGC" psql -Atq -U postgres -d perf -c "SELECT pg_stat_statements_reset();" >/dev/null
 docker run --rm -i --user "$(id -u):$(id -g)" --network host -v "$HERE/k6:/scripts:ro" -v "$D:/out" \
   grafana/k6 run -q --no-color -e PASSWORD="$PERF_USER_PASSWORD" -e BASE="$BASE" -e EP="$EP" -e RATES="$RATE" -e STEP="$DUR" -e WARMUP=5 \
-  -e LIGHT_USERS=50 -e OUT=/out/k6.json /scripts/ladder.js >"$D/k6.log" 2>&1 &
+  -e LIGHT_USERS=50 -e ACCEPT_ENCODING="${ACCEPT_ENCODING:-}" -e OUT=/out/k6.json /scripts/ladder.js >"$D/k6.log" 2>&1 &
 k6pid=$!
 sleep 30   # setup (logins) + warm-up
 (
