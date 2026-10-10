@@ -3,6 +3,7 @@
 import { AlertTriangle, CalendarClock } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAppLocale } from '@/lib/i18n/date-locale'
 import { buildTimeline, formatDop, runningBalance } from '@/lib/monthlyPlanUtils'
 import { MonthlyPlanItem } from '@/types/monthlyPlan'
 
@@ -14,6 +15,7 @@ import { MonthlyPlanItem } from '@/types/monthlyPlan'
  */
 export function MonthlyPlanTimeline({ items }: { items: MonthlyPlanItem[] }) {
 	const t = useTranslations('monthlyPlan')
+	const locale = useAppLocale()
 	const timeline = buildTimeline(items)
 	const balances = runningBalance(timeline)
 	const balanceByDay = new Map(balances.map((entry) => [entry.day, entry.balance]))
@@ -61,7 +63,7 @@ export function MonthlyPlanTimeline({ items }: { items: MonthlyPlanItem[] }) {
 												className={`text-xs ${item.type === 'income' ? 'text-emerald-600' : 'text-orange-600'}`}
 											>
 												{item.name} {item.type === 'income' ? '+' : '−'}
-												{formatDop(item.amount_dop)}
+												{formatDop(item.amount_dop, locale)}
 											</span>
 										))}
 									</div>
@@ -70,7 +72,7 @@ export function MonthlyPlanTimeline({ items }: { items: MonthlyPlanItem[] }) {
 								<div className='shrink-0 text-right'>
 									<p className='text-xs text-muted-foreground'>{t('runningBalance')}</p>
 									<p className={`text-sm font-semibold ${balance < 0 ? 'text-red-600' : 'text-emerald-600'}`}>
-										{formatDop(balance)}
+										{formatDop(balance, locale)}
 									</p>
 								</div>
 							</div>

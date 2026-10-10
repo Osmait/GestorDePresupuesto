@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/mock"
@@ -29,19 +30,19 @@ func (m *MockAccountRepository) Delete(ctx context.Context, id string, userId st
 	return args.Error(0)
 }
 
-func (m *MockAccountRepository) Balance(ctx context.Context, id string) (float64, error) {
-	args := m.Called(ctx, id)
-	return args.Get(0).(float64), args.Error(1)
+func (m *MockAccountRepository) Balance(ctx context.Context, id string, userId string) (money.Amount, error) {
+	args := m.Called(ctx, id, userId)
+	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockAccountRepository) BalanceByCurrency(ctx context.Context, id string, currency string) (float64, error) {
-	args := m.Called(ctx, id, currency)
-	return args.Get(0).(float64), args.Error(1)
+func (m *MockAccountRepository) BalanceByCurrency(ctx context.Context, id string, userId string, currency string) (money.Amount, error) {
+	args := m.Called(ctx, id, userId, currency)
+	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockAccountRepository) Balances(ctx context.Context, userId string) (map[string]float64, error) {
+func (m *MockAccountRepository) Balances(ctx context.Context, userId string) (map[string]money.Amount, error) {
 	args := m.Called(ctx, userId)
-	return args.Get(0).(map[string]float64), args.Error(1)
+	return args.Get(0).(map[string]money.Amount), args.Error(1)
 }
 
 func (m *MockAccountRepository) Update(ctx context.Context, id string, name string, bank string, userId string) error {
@@ -54,8 +55,8 @@ func (m *MockAccountRepository) FindByIdAndUserId(ctx context.Context, id string
 	return args.Get(0).(*account.Account), args.Error(1)
 }
 
-func (m *MockAccountRepository) FindById(ctx context.Context, id string) (*account.Account, error) {
-	args := m.Called(ctx, id)
+func (m *MockAccountRepository) FindByIdAndUserIdForUpdate(ctx context.Context, id string, userId string) (*account.Account, error) {
+	args := m.Called(ctx, id, userId)
 	return args.Get(0).(*account.Account), args.Error(1)
 }
 
@@ -102,11 +103,11 @@ func TestFindAll(t *testing.T) {
 	mockRepo := &MockAccountRepository{}
 
 	expectedAccounts := []*account.Account{}
-	expectedBalances := make(map[string]float64)
+	expectedBalances := make(map[string]money.Amount)
 	for i := 0; i < 10; i++ {
 		acc := utils.GetNewRandomAccount()
 		expectedAccounts = append(expectedAccounts, acc)
-		expectedBalances[acc.Id] = 1000.00
+		expectedBalances[acc.Id] = money.FromInt(1000)
 	}
 
 	mockRepo.On("Balances", context.Background(), mock.Anything).Return(expectedBalances, nil)

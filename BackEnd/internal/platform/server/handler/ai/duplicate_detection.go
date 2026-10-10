@@ -8,6 +8,7 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	"github.com/rs/zerolog/log"
@@ -121,7 +122,7 @@ func compareTransactionsForDuplicate(extracted *transaction.Transaction, existin
 
 	extractedAmount := extracted.Amount
 	existingAmount := existing.Amount
-	amountDiff := math.Abs(extractedAmount - existingAmount)
+	amountDiff := extractedAmount.Sub(existingAmount).Abs()
 
 	dateDiffDays := daysBetween(extracted.CreatedAt, existing.CreatedAt)
 	nameSimilarity := nameSimilarityScore(extracted.Name, existing.Name)
@@ -130,17 +131,17 @@ func compareTransactionsForDuplicate(extracted *transaction.Transaction, existin
 	currencyB := normalizeCurrency(existing.Currency)
 	sameCurrency := currencyA == currencyB
 
-	exactDuplicate := amountDiff <= 0.01 && dateDiffDays == 0 && sameCurrency && nameSimilarity >= 0.9
+	exactDuplicate := amountDiff.LessThanOrEqual(money.New(1, -2)) && dateDiffDays == 0 && sameCurrency && nameSimilarity >= 0.9
 	if exactDuplicate {
 		return "duplicate", 1
 	}
 
 	score := 0.0
-	if amountDiff <= 0.5 {
+	if amountDiff.LessThanOrEqual(money.New(5, -1)) {
 		score += 0.45
-	} else if amountDiff <= 2 {
+	} else if amountDiff.LessThanOrEqual(money.FromInt(2)) {
 		score += 0.3
-	} else if amountDiff <= 5 {
+	} else if amountDiff.LessThanOrEqual(money.FromInt(5)) {
 		score += 0.15
 	}
 

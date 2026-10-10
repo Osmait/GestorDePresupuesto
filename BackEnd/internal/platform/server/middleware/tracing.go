@@ -3,6 +3,7 @@ package middleware
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -11,170 +12,167 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/propagation"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.37.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
 )
 
-// TracingMiddleware creates a new tracing middleware
-func TracingMiddleware(serviceName string) gin.HandlerFunc {
-	// Get tracer and meter
-	tracer := otel.Tracer(serviceName)
-	meter := otel.Meter(serviceName)
+// UnmatchedRoute is the http.route label for requests that matched no route
+// (404/405). The raw path is never used as a label or span name.
+const UnmatchedRoute = "unmatched"
 
-	// Create metrics instruments
-	requestDuration, _ := meter.Float64Histogram(
-		"http_request_duration_seconds",
-		metric.WithDescription("Duration of HTTP requests in seconds"),
+// StatusClassKey is the low-cardinality status label ("2xx", "5xx", ...).
+const StatusClassKey = attribute.Key("http.response.status_class")
+
+// HTTPTelemetryConfig configures HTTPTelemetry.
+type HTTPTelemetryConfig struct {
+	TracerProvider trace.TracerProvider
+	MeterProvider  metric.MeterProvider
+	// Propagator extracts the caller's W3C traceparent (defaults to the
+	// global propagator).
+	Propagator propagation.TextMapPropagator
+	// Tracing / Metrics toggle each signal.
+	Tracing bool
+	Metrics bool
+	// SkipTracing lists route templates that never get a span (health
+	// checks, the scrape endpoint) — they are polled constantly.
+	SkipTracing map[string]bool
+	// SkipMetrics lists route templates excluded from all HTTP metrics.
+	SkipMetrics map[string]bool
+	// StreamingRoutes lists long-lived routes (SSE). They count as in-flight
+	// requests but are excluded from the duration histogram so they do not
+	// distort latency percentiles.
+	StreamingRoutes map[string]bool
+}
+
+// DefaultSkipTracing are the routes polled by load balancers / Prometheus.
+func DefaultSkipTracing() map[string]bool {
+	return map[string]bool{
+		"/health": true, "/health/live": true, "/health/ready": true,
+		"/health/detailed": true, "/ping": true, "/metrics": true,
+	}
+}
+
+// DefaultStreamingRoutes are the SSE endpoints.
+func DefaultStreamingRoutes() map[string]bool {
+	return map[string]bool{"/notifications": true, "/mcp/sse": true}
+}
+
+// HTTPTelemetry is the server-side OpenTelemetry middleware.
+//
+// Span names and the http.route label are always the gin route template
+// ("GET /transaction/:id"), never the raw path, so ids do not explode
+// cardinality; unmatched requests use "unmatched". No client IP, user agent,
+// query string or user id is recorded.
+//
+// Metrics (RED):
+//   - http.server.request.duration  histogram (s) {method, route, status_class}
+//   - http.server.active_requests   up/down counter {method, route}
+func HTTPTelemetry(cfg HTTPTelemetryConfig) gin.HandlerFunc {
+	if !cfg.Tracing && !cfg.Metrics {
+		return func(c *gin.Context) { c.Next() }
+	}
+	if cfg.TracerProvider == nil {
+		cfg.TracerProvider = otel.GetTracerProvider()
+	}
+	if cfg.MeterProvider == nil {
+		cfg.MeterProvider = otel.GetMeterProvider()
+	}
+	if cfg.Propagator == nil {
+		cfg.Propagator = otel.GetTextMapPropagator()
+	}
+
+	tracer := cfg.TracerProvider.Tracer(telemetry.ScopeName + "/http")
+	meter := cfg.MeterProvider.Meter(telemetry.ScopeName + "/http")
+
+	duration, _ := meter.Float64Histogram(
+		"http.server.request.duration",
+		metric.WithDescription("Duration of HTTP server requests."),
 		metric.WithUnit("s"),
+		metric.WithExplicitBucketBoundaries(telemetry.LatencyBuckets...),
 	)
-
-	requestCount, _ := meter.Int64Counter(
-		"http_requests_total",
-		metric.WithDescription("Total number of HTTP requests"),
-	)
-
-	activeRequests, _ := meter.Int64UpDownCounter(
-		"http_active_requests",
-		metric.WithDescription("Number of active HTTP requests"),
-	)
-
-	requestSize, _ := meter.Int64Histogram(
-		"http_request_size_bytes",
-		metric.WithDescription("Size of HTTP request in bytes"),
-		metric.WithUnit("By"),
-	)
-
-	responseSize, _ := meter.Int64Histogram(
-		"http_response_size_bytes",
-		metric.WithDescription("Size of HTTP response in bytes"),
-		metric.WithUnit("By"),
+	active, _ := meter.Int64UpDownCounter(
+		"http.server.active_requests",
+		metric.WithDescription("Number of in-flight HTTP server requests."),
+		metric.WithUnit("{request}"),
 	)
 
 	return func(c *gin.Context) {
-		// Extract context from headers
-		ctx := otel.GetTextMapPropagator().Extract(c.Request.Context(), propagation.HeaderCarrier(c.Request.Header))
+		route := c.FullPath()
+		if route == "" {
+			route = UnmatchedRoute
+		}
+		method := normalizeMethod(c.Request.Method)
 
-		// Create span
-		spanName := c.Request.Method + " " + c.FullPath()
-		if spanName == "" {
-			spanName = c.Request.Method + " " + c.Request.URL.Path
+		doTrace := cfg.Tracing && !cfg.SkipTracing[route]
+		doMetrics := cfg.Metrics && !cfg.SkipMetrics[route]
+
+		var span trace.Span
+		if doTrace {
+			ctx := cfg.Propagator.Extract(c.Request.Context(), propagation.HeaderCarrier(c.Request.Header))
+			attrs := []attribute.KeyValue{
+				semconv.HTTPRequestMethodKey.String(method),
+				semconv.HTTPRoute(route),
+				semconv.URLScheme(scheme(c.Request)),
+			}
+			if rid := observability.RequestIDFromContext(ctx); rid != "" {
+				attrs = append(attrs, attribute.String("http.request.id", rid))
+			}
+			ctx, span = tracer.Start(ctx, method+" "+route,
+				trace.WithSpanKind(trace.SpanKindServer),
+				trace.WithAttributes(attrs...),
+			)
+			c.Request = c.Request.WithContext(ctx)
+			if sc := span.SpanContext(); sc.IsSampled() {
+				// Lets a developer jump from a response in devtools to Jaeger.
+				c.Header("X-Trace-ID", sc.TraceID().String())
+			}
 		}
 
-		ctx, span := tracer.Start(ctx, spanName,
-			trace.WithSpanKind(trace.SpanKindServer),
-			trace.WithAttributes(
-				attribute.String("http.method", c.Request.Method),
-				attribute.String("http.url", c.Request.URL.String()),
-				semconv.HTTPRoute(c.FullPath()),
-				attribute.String("http.scheme", c.Request.URL.Scheme),
-				attribute.String("http.host", c.Request.Host),
-				attribute.String("http.user_agent", c.Request.UserAgent()),
-				attribute.Int64("http.request_content_length", c.Request.ContentLength),
-				attribute.String("http.client_ip", c.ClientIP()),
-				attribute.String("http.remote_addr", c.Request.RemoteAddr),
-			),
-		)
-		defer span.End()
-
-		// Set context in gin context
-		c.Request = c.Request.WithContext(ctx)
-
-		// Metrics: Record request start
-		startTime := time.Now()
-
-		// Common attributes for metrics
-		attrs := []attribute.KeyValue{
-			attribute.String("method", c.Request.Method),
-			attribute.String("route", c.FullPath()),
-			attribute.String("host", c.Request.Host),
+		var metricAttrs []attribute.KeyValue
+		if doMetrics {
+			metricAttrs = []attribute.KeyValue{
+				semconv.HTTPRequestMethodKey.String(method),
+				semconv.HTTPRoute(route),
+			}
+			set := metric.WithAttributeSet(attribute.NewSet(metricAttrs...))
+			active.Add(c.Request.Context(), 1, set)
+			defer active.Add(context.WithoutCancel(c.Request.Context()), -1, set)
 		}
 
-		// Record active requests
-		activeRequests.Add(ctx, 1, metric.WithAttributes(attrs...))
-		defer activeRequests.Add(ctx, -1, metric.WithAttributes(attrs...))
-
-		// Record request size
-		if c.Request.ContentLength > 0 {
-			requestSize.Record(ctx, c.Request.ContentLength, metric.WithAttributes(attrs...))
-		}
-
-		// Create response writer wrapper to capture response size
-		wrappedWriter := &responseWriterWrapper{
-			ResponseWriter: c.Writer,
-			size:           0,
-		}
-		c.Writer = wrappedWriter
-
-		// Process request
+		start := time.Now()
 		c.Next()
-
-		// Record metrics after request completion
-		duration := time.Since(startTime).Seconds()
+		elapsed := time.Since(start)
 		status := c.Writer.Status()
 
-		// Add status code to attributes
-		finalAttrs := append(attrs,
-			attribute.Int("status_code", status),
-			attribute.String("status_class", getStatusClass(status)),
-		)
-
-		// Record metrics
-		requestDuration.Record(ctx, duration, metric.WithAttributes(finalAttrs...))
-		requestCount.Add(ctx, 1, metric.WithAttributes(finalAttrs...))
-
-		if wrappedWriter.size > 0 {
-			responseSize.Record(ctx, int64(wrappedWriter.size), metric.WithAttributes(finalAttrs...))
+		if doMetrics && !cfg.StreamingRoutes[route] {
+			duration.Record(c.Request.Context(), elapsed.Seconds(), metric.WithAttributeSet(attribute.NewSet(
+				append(metricAttrs, StatusClassKey.String(StatusClass(status)))...,
+			)))
 		}
 
-		// Set span status and attributes
-		span.SetAttributes(
-			semconv.HTTPResponseStatusCode(status),
-			attribute.Int64("http.response_content_length", int64(wrappedWriter.size)),
-		)
-
-		// Set span status based on HTTP status code
-		if status >= 400 {
-			span.SetStatus(codes.Error, "HTTP "+http.StatusText(status))
-			span.RecordError(gin.Error{
-				Err:  http.ErrAbortHandler,
-				Meta: "HTTP " + http.StatusText(status),
-			})
-		} else {
-			span.SetStatus(codes.Ok, "")
-		}
-
-		// Add trace ID to response headers for correlation
-		if traceID := span.SpanContext().TraceID(); traceID.IsValid() {
-			c.Header("X-Trace-ID", traceID.String())
-		}
-
-		// Add span ID to response headers
-		if spanID := span.SpanContext().SpanID(); spanID.IsValid() {
-			c.Header("X-Span-ID", spanID.String())
+		if span != nil {
+			span.SetAttributes(semconv.HTTPResponseStatusCode(status))
+			if size := c.Writer.Size(); size >= 0 {
+				span.SetAttributes(semconv.HTTPResponseBodySize(size))
+			}
+			if status >= http.StatusInternalServerError {
+				// Per HTTP semconv only 5xx marks a server span as failed.
+				span.SetStatus(codes.Error, http.StatusText(status))
+				span.SetAttributes(semconv.ErrorTypeKey.String(StatusClass(status)))
+			}
+			if len(c.Errors) > 0 {
+				span.AddEvent("handler.errors", trace.WithAttributes(attribute.Int("count", len(c.Errors))))
+			}
+			span.End()
 		}
 	}
 }
 
-// responseWriterWrapper wraps gin.ResponseWriter to capture response size
-type responseWriterWrapper struct {
-	gin.ResponseWriter
-	size int
-}
-
-func (w *responseWriterWrapper) Write(data []byte) (int, error) {
-	size, err := w.ResponseWriter.Write(data)
-	w.size += size
-	return size, err
-}
-
-func (w *responseWriterWrapper) WriteString(s string) (int, error) {
-	size, err := w.ResponseWriter.WriteString(s)
-	w.size += size
-	return size, err
-}
-
-// getStatusClass returns the status class (1xx, 2xx, 3xx, 4xx, 5xx)
-func getStatusClass(status int) string {
+// StatusClass returns "1xx".."5xx".
+func StatusClass(status int) string {
 	switch {
 	case status < 200:
 		return "1xx"
@@ -189,9 +187,30 @@ func getStatusClass(status int) string {
 	}
 }
 
-// StartSpan starts a new span with the given name and context
+// normalizeMethod bounds the method label to the standard verbs.
+func normalizeMethod(m string) string {
+	switch m {
+	case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodPatch,
+		http.MethodDelete, http.MethodHead, http.MethodOptions:
+		return m
+	default:
+		return "_OTHER"
+	}
+}
+
+func scheme(r *http.Request) string {
+	if r.TLS != nil {
+		return "https"
+	}
+	if p := strings.ToLower(r.Header.Get("X-Forwarded-Proto")); p == "https" {
+		return p
+	}
+	return "http"
+}
+
+// StartSpan starts an internal span with the application tracer.
 func StartSpan(ctx context.Context, name string, opts ...trace.SpanStartOption) (context.Context, trace.Span) {
-	return otel.Tracer("gestor-de-presupuesto").Start(ctx, name, opts...)
+	return otel.Tracer(telemetry.ScopeName).Start(ctx, name, opts...)
 }
 
 // SpanFromContext returns the span from the context
@@ -201,22 +220,17 @@ func SpanFromContext(ctx context.Context) trace.Span {
 
 // AddSpanEvent adds an event to the span in the context
 func AddSpanEvent(ctx context.Context, name string, attrs ...attribute.KeyValue) {
-	if span := trace.SpanFromContext(ctx); span != nil {
-		span.AddEvent(name, trace.WithAttributes(attrs...))
-	}
+	trace.SpanFromContext(ctx).AddEvent(name, trace.WithAttributes(attrs...))
 }
 
 // AddSpanError records an error in the span
 func AddSpanError(ctx context.Context, err error, attrs ...attribute.KeyValue) {
-	if span := trace.SpanFromContext(ctx); span != nil {
-		span.RecordError(err, trace.WithAttributes(attrs...))
-		span.SetStatus(codes.Error, err.Error())
-	}
+	span := trace.SpanFromContext(ctx)
+	span.RecordError(err, trace.WithAttributes(attrs...))
+	span.SetStatus(codes.Error, err.Error())
 }
 
 // AddSpanAttributes adds attributes to the span
 func AddSpanAttributes(ctx context.Context, attrs ...attribute.KeyValue) {
-	if span := trace.SpanFromContext(ctx); span != nil {
-		span.SetAttributes(attrs...)
-	}
+	trace.SpanFromContext(ctx).SetAttributes(attrs...)
 }

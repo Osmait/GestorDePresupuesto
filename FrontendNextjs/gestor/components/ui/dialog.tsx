@@ -3,6 +3,7 @@
 import * as React from "react"
 import * as DialogPrimitive from "@radix-ui/react-dialog"
 import { X } from "lucide-react"
+import { useTranslations } from "next-intl"
 
 import { cn } from "@/lib/utils"
 
@@ -29,28 +30,108 @@ const DialogOverlay = React.forwardRef<
 ))
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName
 
+type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & {
+  /**
+   * Optional accessible description, rendered visually hidden through
+   * DialogPrimitive.Description. Use it when the dialog has no visible
+   * <DialogDescription />.
+   */
+  description?: React.ReactNode
+  /**
+   * Accessible label of the built-in close button. Defaults to the translated
+   * `common.actions.close` message.
+   */
+  closeLabel?: string
+}
+
+const FALLBACK_CLOSE_LABEL = "Close"
+
+/**
+ * Translated label for the close button. Dialogs are also rendered outside a
+ * NextIntlClientProvider (isolated component tests, error boundaries), where
+ * `useTranslations` throws; fall back to English there instead of crashing.
+ * The provider never appears or disappears for a mounted dialog, so the hook
+ * call order stays stable between renders.
+ */
+function useCloseLabel(): string {
+  try {
+    const label = useTranslations("common.actions")("close")
+    return typeof label === "string" && label ? label : FALLBACK_CLOSE_LABEL
+  } catch {
+    return FALLBACK_CLOSE_LABEL
+  }
+}
+
+/**
+ * Radix always points `aria-describedby` at its description id and warns
+ * ("Missing `Description` or `aria-describedby={undefined}`") when no
+ * Description is rendered. Instead of forcing every dialog to pass
+ * `aria-describedby={undefined}` (which would also unlink real descriptions),
+ * we keep the attribute only while the referenced element exists in the DOM.
+ * The check runs from the content's ref callback (the Portal mounts the content
+ * after DialogContent's own first commit) and again after every render; both
+ * happen before Radix's passive warning effect.
+ */
+function syncDescribedBy(node: HTMLElement, descriptionIdRef: React.MutableRefObject<string | null>) {
+  const id = node.getAttribute("aria-describedby") ?? descriptionIdRef.current
+  if (!id) return
+  descriptionIdRef.current = id
+  if (node.ownerDocument.getElementById(id)) {
+    node.setAttribute("aria-describedby", id)
+  } else {
+    node.removeAttribute("aria-describedby")
+  }
+}
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
-  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
+  DialogContentProps
+>(({ className, children, description, closeLabel, ...props }, forwardedRef) => {
+  const defaultCloseLabel = useCloseLabel()
+  const contentRef = React.useRef<HTMLDivElement | null>(null)
+  const descriptionIdRef = React.useRef<string | null>(null)
+  // Respect an explicit aria-describedby from the caller.
+  const managesDescription = !("aria-describedby" in props)
+  const setRefs = React.useCallback(
+    (node: HTMLDivElement | null) => {
+      contentRef.current = node
+      if (node && managesDescription) syncDescribedBy(node, descriptionIdRef)
+      if (typeof forwardedRef === "function") forwardedRef(node)
+      else if (forwardedRef) forwardedRef.current = node
+    },
+    [forwardedRef, managesDescription]
+  )
+  React.useLayoutEffect(() => {
+    if (managesDescription && contentRef.current) {
+      syncDescribedBy(contentRef.current, descriptionIdRef)
+    }
+  })
+
+  return (
   <DialogPortal>
     <DialogOverlay />
     <DialogPrimitive.Content
-      ref={ref}
+      ref={setRefs}
       className={cn(
         "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg",
         className
       )}
       {...props}
     >
+      {description ? (
+        <DialogPrimitive.Description className="sr-only">
+          {description}
+        </DialogPrimitive.Description>
+      ) : null}
       {children}
       <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
         <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
+        <span className="sr-only">{closeLabel ?? defaultCloseLabel}</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>
   </DialogPortal>
-))
+  )
+})
 DialogContent.displayName = DialogPrimitive.Content.displayName
 
 const DialogHeader = ({

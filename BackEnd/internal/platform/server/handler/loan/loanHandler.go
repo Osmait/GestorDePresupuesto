@@ -19,7 +19,7 @@ func CreateLoan(service *loanService.LoanService) gin.HandlerFunc {
 			return
 		}
 
-		response, err := service.CreateLoan(ctx, &req, userId)
+		response, err := service.CreateLoan(ctx.Request.Context(), &req, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -32,7 +32,7 @@ func CreateLoan(service *loanService.LoanService) gin.HandlerFunc {
 func FindAllLoans(service *loanService.LoanService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		response, err := service.FindAll(ctx, userId)
+		response, err := service.FindAll(ctx.Request.Context(), userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -46,7 +46,7 @@ func FindLoanById(service *loanService.LoanService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		id := ctx.Param("id")
 
-		response, err := service.FindById(ctx, id, userId)
+		response, err := service.FindById(ctx.Request.Context(), id, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -67,7 +67,7 @@ func RegisterPayment(service *loanService.LoanService) gin.HandlerFunc {
 			return
 		}
 
-		response, err := service.RegisterPayment(ctx, id, userId, &req)
+		response, err := service.RegisterPayment(ctx.Request.Context(), id, userId, &req)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -93,7 +93,7 @@ func UpdateLoanStatus(service *loanService.LoanService) gin.HandlerFunc {
 			return
 		}
 
-		if err := service.UpdateStatus(ctx, id, userId, req.Status); err != nil {
+		if err := service.UpdateStatus(ctx.Request.Context(), id, userId, req.Status); err != nil {
 			_ = ctx.Error(err)
 			return
 		}
@@ -107,7 +107,7 @@ func CancelLoan(service *loanService.LoanService) gin.HandlerFunc {
 		userId := ctx.GetString("X-User-Id")
 		id := ctx.Param("id")
 
-		if err := service.CancelLoan(ctx, id, userId); err != nil {
+		if err := service.CancelLoan(ctx.Request.Context(), id, userId); err != nil {
 			_ = ctx.Error(err)
 			return
 		}
@@ -119,7 +119,7 @@ func CancelLoan(service *loanService.LoanService) gin.HandlerFunc {
 func GetLoanSummary(service *loanService.LoanService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		summary, err := service.GetSummary(ctx, userId)
+		summary, err := service.GetSummary(ctx.Request.Context(), userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return

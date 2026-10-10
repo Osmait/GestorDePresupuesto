@@ -1,9 +1,8 @@
 package config
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
+	"net"
 	"net/url"
 	"os"
 	"regexp"
@@ -12,6 +11,8 @@ import (
 	"time"
 
 	"github.com/joho/godotenv"
+
+	"github.com/osmait/gestorDePresupuesto/internal/version"
 )
 
 // DatabaseType represents the type of database being used
@@ -41,6 +42,26 @@ type ServerConfig struct {
 	WriteTimeout    time.Duration `json:"write_timeout"`
 	IdleTimeout     time.Duration `json:"idle_timeout"`
 	MaxHeaderBytes  int           `json:"max_header_bytes"`
+	// Timezone is the IANA zone used for calendar-day logic such as
+	// recurring transaction scheduling (APP_TIMEZONE).
+	Timezone string `json:"timezone"`
+	// ReadHeaderTimeout bounds how long the server waits for request headers
+	// (slowloris protection).
+	ReadHeaderTimeout time.Duration `json:"read_header_timeout"`
+	// TrustedProxies is the list of proxy IPs/CIDRs whose X-Forwarded-For /
+	// X-Real-IP headers are trusted when resolving the client IP. Empty (the
+	// default) trusts nobody: the TCP peer address is used as the client IP.
+	TrustedProxies []string `json:"trusted_proxies"`
+	// TrustedPlatformHeader, when set, names a header injected by the hosting
+	// platform's edge proxy (e.g. "X-Real-IP" on Railway, "CF-Connecting-IP"
+	// on Cloudflare) that is trusted as the client IP unconditionally. Only
+	// set it when the app is reachable exclusively through that proxy.
+	TrustedPlatformHeader string `json:"trusted_platform_header"`
+	// ProxySharedSecret (PROXY_SHARED_SECRET) authenticates the frontend
+	// server, which calls the backend on behalf of browsers: requests carrying
+	// it in X-Proxy-Secret have their X-Client-IP trusted as the client IP.
+	// Never serialized or logged.
+	ProxySharedSecret string `json:"-"`
 }
 
 // DatabaseConfig holds database-related configuration
@@ -55,7 +76,25 @@ type DatabaseConfig struct {
 	MaxIdleConns    int           `json:"max_idle_conns" validate:"min=1"`
 	ConnMaxLifetime time.Duration `json:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time"`
-	SSLMode         string        `json:"ssl_mode"`
+	// TxAcquireTimeout bounds how long an authenticated request waits for a
+	// pooled connection to open its RLS transaction (DB_TX_ACQUIRE_TIMEOUT).
+	// When the pool stays exhausted that long the request fails fast with
+	// 503 instead of queueing indefinitely. 0 disables the bound.
+	TxAcquireTimeout time.Duration `json:"tx_acquire_timeout"`
+	SSLMode          string        `json:"ssl_mode"`
+}
+
+// CacheConfig holds the TTLs of the small in-process caches that keep
+// per-request middleware off the database. A TTL of 0 disables the cache.
+type CacheConfig struct {
+	// AuthUserTTL caches the auth middleware's "user exists and is active"
+	// lookup (AUTH_USER_CACHE_TTL). Role changes and deactivations made
+	// through this instance invalidate it immediately; other instances
+	// converge within the TTL, so keep it short.
+	AuthUserTTL time.Duration `json:"auth_user_ttl"`
+	// FeatureFlagTTL caches feature-flag evaluations used by route gates
+	// (FEATURE_FLAG_CACHE_TTL). Admin updates invalidate it on this instance.
+	FeatureFlagTTL time.Duration `json:"feature_flag_ttl"`
 }
 
 // JWTConfig holds JWT-related configuration
@@ -64,7 +103,13 @@ type JWTConfig struct {
 	Expiration        time.Duration `json:"expiration" validate:"required"`
 	RefreshExpiration time.Duration `json:"refresh_expiration"`
 	Issuer            string        `json:"issuer"`
+	Audience          string        `json:"audience"`
 	Algorithm         string        `json:"algorithm"`
+	// RefreshReuseGrace is the window after a refresh token was rotated during
+	// which presenting it again is rejected (401) WITHOUT revoking every
+	// session of the user. It absorbs legitimate parallel refreshes (two tabs,
+	// app + widget). Reuse after the window is treated as token theft.
+	RefreshReuseGrace time.Duration `json:"refresh_reuse_grace"`
 }
 
 // SecurityConfig holds security-related configuration
@@ -123,6 +168,15 @@ type LoggingConfig struct {
 	Compress   bool   `json:"compress"`
 	Caller     bool   `json:"caller"`
 	StackTrace bool   `json:"stack_trace"`
+	// AccessLog controls the one-line-per-request access log: "all" logs
+	// every request (sampled by AccessLogSampleRate), "errors" only 5xx and
+	// slow requests, "off" disables it (ACCESS_LOG).
+	AccessLog string `json:"access_log" validate:"oneof=all errors off"`
+	// AccessLogSampleRate is the fraction (0..1) of fast, successful requests
+	// logged in "all" mode; errors and slow requests are always logged.
+	AccessLogSampleRate float64 `json:"access_log_sample_rate"`
+	// SlowRequestThreshold marks a request as slow in the access log.
+	SlowRequestThreshold time.Duration `json:"slow_request_threshold"`
 }
 
 // FeatureFlagsConfig holds feature flags configuration
@@ -148,8 +202,41 @@ type OpenTelemetryConfig struct {
 	MaxBatchSize      int               `json:"max_batch_size" validate:"min=1"`
 	MaxQueueSize      int               `json:"max_queue_size" validate:"min=1"`
 	EnableCompression bool              `json:"enable_compression"`
-	Headers           map[string]string `json:"headers"`
+	Headers           map[string]string `json:"-"` // may carry API keys
 	Attributes        map[string]string `json:"attributes"`
+	// OTLPProtocol is "grpc" or "http/protobuf" (OTEL_EXPORTER_OTLP_PROTOCOL).
+	OTLPProtocol string `json:"otlp_protocol"`
+}
+
+// MetricsConfig controls the OpenTelemetry MeterProvider and the Prometheus
+// /metrics endpoint. Everything is off unless METRICS_ENABLED=true.
+type MetricsConfig struct {
+	Enabled bool `json:"enabled"`
+	// Exporters is any of "prometheus" (pull, /metrics) and "otlp" (push to
+	// OTEL_EXPORTER_OTLP_ENDPOINT) (METRICS_EXPORTER, comma separated).
+	Exporters []string `json:"exporters"`
+	// Token is the bearer token required to scrape /metrics on the public
+	// port (METRICS_TOKEN). Without it /metrics is not mounted there.
+	Token string `json:"-"`
+	// Port, when non-zero, serves /metrics on a separate listener (e.g. the
+	// Railway private network) instead of the public API port (METRICS_PORT).
+	Port uint `json:"port"`
+	// Host is the interface the METRICS_PORT listener binds to (METRICS_HOST,
+	// default SERVER_HOST). E.g. "::" for Railway's private network or the
+	// Docker bridge IP for a local Prometheus container.
+	Host string `json:"host"`
+	// ExportInterval is the OTLP push interval (METRICS_EXPORT_INTERVAL).
+	ExportInterval time.Duration `json:"export_interval"`
+}
+
+// HasExporter reports whether the named metrics exporter is configured.
+func (m MetricsConfig) HasExporter(name string) bool {
+	for _, e := range m.Exporters {
+		if strings.EqualFold(strings.TrimSpace(e), name) {
+			return true
+		}
+	}
+	return false
 }
 
 // PrometheusConfig holds Prometheus configuration
@@ -224,12 +311,14 @@ type Config struct {
 	Logging       LoggingConfig       `json:"logging"`
 	FeatureFlags  FeatureFlagsConfig  `json:"feature_flags"`
 	OpenTelemetry OpenTelemetryConfig `json:"opentelemetry"`
+	Metrics       MetricsConfig       `json:"metrics"`
 	Prometheus    PrometheusConfig    `json:"prometheus"`
 	Middleware    MiddlewareConfig    `json:"middleware"`
 	Admin         AdminConfig         `json:"admin"`
 	AI            AIConfig            `json:"ai"`
 	MCP           MCPConfig           `json:"mcp"`
 	WebAuthn      WebAuthnConfig      `json:"webauthn"`
+	Cache         CacheConfig         `json:"cache"`
 }
 
 // LoadConfig loads configuration from environment variables with comprehensive validation
@@ -249,10 +338,19 @@ func LoadConfig() (*Config, error) {
 			Port:            uint(getEnvInt("SERVER_PORT", 8080)),
 			ShutdownTimeout: getDuration(getEnvString("SHUTDOWN_TIMEOUT", "30s")),
 			Environment:     Environment(getEnvString("ENV", "development")),
-			ReadTimeout:     getDuration(getEnvString("SERVER_READ_TIMEOUT", "30s")),
-			WriteTimeout:    getDuration(getEnvString("SERVER_WRITE_TIMEOUT", "30s")),
-			IdleTimeout:     getDuration(getEnvString("SERVER_IDLE_TIMEOUT", "60s")),
-			MaxHeaderBytes:  getEnvInt("SERVER_MAX_HEADER_BYTES", 1<<20), // 1MB
+			// ReadTimeout covers headers + body (AI uploads can be several MB).
+			ReadTimeout: getDuration(getEnvString("SERVER_READ_TIMEOUT", "60s")),
+			// WriteTimeout must exceed the slowest non-streaming handler (AI
+			// extraction with retries). Streaming endpoints (SSE) clear their
+			// own deadlines.
+			WriteTimeout:          getDuration(getEnvString("SERVER_WRITE_TIMEOUT", "120s")),
+			IdleTimeout:           getDuration(getEnvString("SERVER_IDLE_TIMEOUT", "120s")),
+			ReadHeaderTimeout:     getDuration(getEnvString("SERVER_READ_HEADER_TIMEOUT", "10s")),
+			MaxHeaderBytes:        getEnvInt("SERVER_MAX_HEADER_BYTES", 1<<20), // 1MB
+			TrustedProxies:        getEnvStringSlice("TRUSTED_PROXIES", nil),
+			TrustedPlatformHeader: strings.TrimSpace(getEnvString("TRUSTED_PLATFORM_HEADER", "")),
+			ProxySharedSecret:     strings.TrimSpace(getEnvString("PROXY_SHARED_SECRET", "")),
+			Timezone:              getEnvString("APP_TIMEZONE", "America/Santo_Domingo"),
 		},
 
 		Database: DatabaseConfig{
@@ -266,7 +364,15 @@ func LoadConfig() (*Config, error) {
 			MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNS", 25),
 			ConnMaxLifetime: getDuration(getEnvString("DB_CONN_MAX_LIFETIME", "5m")),
 			ConnMaxIdleTime: getDuration(getEnvString("DB_CONN_MAX_IDLE_TIME", "5m")),
-			SSLMode:         getEnvString("DB_SSL_MODE", "disable"),
+			// Each authenticated request holds exactly one connection for its
+			// RLS transaction; this bounds the wait for it.
+			TxAcquireTimeout: getEnvDuration("DB_TX_ACQUIRE_TIMEOUT", 5*time.Second),
+			SSLMode:          getEnvString("DB_SSL_MODE", "disable"),
+		},
+
+		Cache: CacheConfig{
+			AuthUserTTL:    getEnvDuration("AUTH_USER_CACHE_TTL", 15*time.Second),
+			FeatureFlagTTL: getEnvDuration("FEATURE_FLAG_CACHE_TTL", 30*time.Second),
 		},
 
 		JWT: JWTConfig{
@@ -274,7 +380,9 @@ func LoadConfig() (*Config, error) {
 			Expiration:        getDuration(getEnvString("JWT_EXPIRATION", "24h")),
 			RefreshExpiration: getDuration(getEnvString("JWT_REFRESH_EXPIRATION", "168h")), // 7 days
 			Issuer:            getEnvString("JWT_ISSUER", "gestor-de-presupuesto"),
+			Audience:          getEnvString("JWT_AUDIENCE", "gestor-de-presupuesto-api"),
 			Algorithm:         getEnvString("JWT_ALGORITHM", "HS256"),
+			RefreshReuseGrace: getDuration(getEnvString("JWT_REFRESH_REUSE_GRACE", "30s")),
 		},
 
 		Security: SecurityConfig{
@@ -318,10 +426,16 @@ func LoadConfig() (*Config, error) {
 				"GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH",
 			}),
 			AllowedHeaders: getEnvStringSlice("CORS_ALLOWED_HEADERS", []string{
-				"Origin", "Content-Type", "Authorization", "X-Requested-With", "X-Trace-ID",
+				"Origin", "Content-Type", "Accept", "Authorization", "X-Requested-With",
+				"X-Trace-ID", "X-Request-ID", "Last-Event-ID", "Cache-Control",
 			}),
-			ExposedHeaders:   getEnvStringSlice("CORS_EXPOSED_HEADERS", []string{"X-Trace-ID"}),
-			AllowCredentials: getEnvBool("CORS_ALLOW_CREDENTIALS", true),
+			ExposedHeaders: getEnvStringSlice("CORS_EXPOSED_HEADERS", []string{
+				"X-Trace-ID", "X-Request-ID", "Retry-After",
+				"X-RateLimit-Limit", "X-RateLimit-Remaining", "X-RateLimit-Window",
+			}),
+			// Clients authenticate with Bearer tokens, not cookies, so
+			// credentialed CORS requests are not needed.
+			AllowCredentials: getEnvBool("CORS_ALLOW_CREDENTIALS", false),
 			MaxAge:           getEnvInt("CORS_MAX_AGE", 86400), // 24 hours
 		},
 
@@ -336,6 +450,11 @@ func LoadConfig() (*Config, error) {
 			Compress:   getEnvBool("LOG_COMPRESS", true),
 			Caller:     getEnvBool("LOG_CALLER", false),
 			StackTrace: getEnvBool("LOG_STACK_TRACE", false),
+			// Development logs every request; other environments only log
+			// 5xx and slow requests unless ACCESS_LOG=all.
+			AccessLog:            strings.ToLower(getEnvString("ACCESS_LOG", defaultAccessLogMode())),
+			AccessLogSampleRate:  getEnvFloat("ACCESS_LOG_SAMPLE_RATE", 1.0),
+			SlowRequestThreshold: getDuration(getEnvString("ACCESS_LOG_SLOW_THRESHOLD", "1s")),
 		},
 
 		FeatureFlags: FeatureFlagsConfig{
@@ -348,19 +467,31 @@ func LoadConfig() (*Config, error) {
 		},
 
 		OpenTelemetry: OpenTelemetryConfig{
-			ServiceName:       getEnvString("OTEL_SERVICE_NAME", "gestor-de-presupuesto"),
-			ServiceVersion:    getEnvString("OTEL_SERVICE_VERSION", "1.0.0"),
-			Environment:       getEnvString("OTEL_ENVIRONMENT", "development"),
-			SamplingRate:      getEnvFloat("OTEL_SAMPLING_RATE", 1.0),
-			OTLPEndpoint:      getEnvString("OTEL_OTLP_ENDPOINT", "http://localhost:4317"),
+			ServiceName:    getEnvString("OTEL_SERVICE_NAME", "gestor-de-presupuesto"),
+			ServiceVersion: getEnvString("OTEL_SERVICE_VERSION", version.Number),
+			Environment:    getEnvString("OTEL_ENVIRONMENT", getEnvString("ENV", "development")),
+			SamplingRate:   getEnvFloat("OTEL_SAMPLING_RATE", 1.0),
+			// The standard OTEL_EXPORTER_OTLP_* variables win over the legacy
+			// OTEL_OTLP_ENDPOINT / OTEL_HEADERS names.
+			OTLPEndpoint:      getEnvString("OTEL_EXPORTER_OTLP_ENDPOINT", getEnvString("OTEL_OTLP_ENDPOINT", "http://localhost:4317")),
+			OTLPProtocol:      strings.ToLower(getEnvString("OTEL_EXPORTER_OTLP_PROTOCOL", "grpc")),
 			JaegerEndpoint:    getEnvString("OTEL_JAEGER_ENDPOINT", "http://localhost:14268"),
 			EnableStdout:      getEnvBool("OTEL_ENABLE_STDOUT", true),
 			BatchTimeout:      getDuration(getEnvString("OTEL_BATCH_TIMEOUT", "10s")),
 			MaxBatchSize:      getEnvInt("OTEL_MAX_BATCH_SIZE", 512),
 			MaxQueueSize:      getEnvInt("OTEL_MAX_QUEUE_SIZE", 1024),
 			EnableCompression: getEnvBool("OTEL_ENABLE_COMPRESSION", true),
-			Headers:           getEnvStringMap("OTEL_HEADERS", make(map[string]string)),
+			Headers:           otlpHeaders(),
 			Attributes:        getEnvStringMap("OTEL_ATTRIBUTES", make(map[string]string)),
+		},
+
+		Metrics: MetricsConfig{
+			Enabled:        getEnvBool("METRICS_ENABLED", false),
+			Exporters:      getEnvStringSlice("METRICS_EXPORTER", []string{"prometheus"}),
+			Token:          getEnvString("METRICS_TOKEN", ""),
+			Port:           uint(getEnvInt("METRICS_PORT", 0)),
+			Host:           getEnvString("METRICS_HOST", ""),
+			ExportInterval: getDuration(getEnvString("METRICS_EXPORT_INTERVAL", "30s")),
 		},
 
 		Prometheus: PrometheusConfig{
@@ -438,6 +569,7 @@ func (c *Config) Validate() error {
 		c.validateCORS,
 		c.validateLogging,
 		c.validateOpenTelemetry,
+		c.validateMetrics,
 		c.validatePrometheus,
 		c.validateEnvironmentSpecific,
 	}
@@ -574,8 +706,14 @@ func (c *Config) validateRateLimit() error {
 
 	// Validate IP whitelist
 	for _, ip := range c.RateLimit.IPWhitelist {
-		if !isValidIP(ip) {
+		if !isValidIP(ip) && !isValidCIDR(ip) {
 			return fmt.Errorf("invalid IP in whitelist: %s", ip)
+		}
+	}
+
+	for _, proxy := range c.Server.TrustedProxies {
+		if net.ParseIP(proxy) == nil && !isValidCIDR(proxy) {
+			return fmt.Errorf("invalid entry in TRUSTED_PROXIES: %s", proxy)
 		}
 	}
 
@@ -592,6 +730,9 @@ func (c *Config) validateCORS() error {
 	for _, origin := range c.CORS.AllowedOrigins {
 		if origin != "*" && !isValidURL(origin) {
 			return fmt.Errorf("invalid CORS origin: %s", origin)
+		}
+		if origin == "*" && c.CORS.AllowCredentials {
+			return fmt.Errorf("CORS wildcard origin cannot be combined with CORS_ALLOW_CREDENTIALS=true")
 		}
 	}
 
@@ -652,6 +793,12 @@ func (c *Config) validateOpenTelemetry() error {
 		return fmt.Errorf("OpenTelemetry max queue size must be positive")
 	}
 
+	switch c.OpenTelemetry.OTLPProtocol {
+	case "", "grpc", "http/protobuf", "http":
+	default:
+		return fmt.Errorf("invalid OTEL_EXPORTER_OTLP_PROTOCOL %q (want grpc or http/protobuf)", c.OpenTelemetry.OTLPProtocol)
+	}
+
 	// Validate endpoints if provided
 	if c.OpenTelemetry.OTLPEndpoint != "" && !isValidURL(c.OpenTelemetry.OTLPEndpoint) {
 		return fmt.Errorf("invalid OTLP endpoint: %s", c.OpenTelemetry.OTLPEndpoint)
@@ -661,6 +808,54 @@ func (c *Config) validateOpenTelemetry() error {
 		return fmt.Errorf("invalid Jaeger endpoint: %s", c.OpenTelemetry.JaegerEndpoint)
 	}
 
+	return nil
+}
+
+// minMetricsTokenLength keeps METRICS_TOKEN from being guessable.
+const minMetricsTokenLength = 16
+
+// validateMetrics validates the metrics / access-log settings. A public,
+// unauthenticated /metrics is never allowed in production: either
+// METRICS_TOKEN or a separate METRICS_PORT is required there.
+func (c *Config) validateMetrics() error {
+	switch c.Logging.AccessLog {
+	case "", "all", "errors", "off":
+	default:
+		return fmt.Errorf("invalid ACCESS_LOG %q (want all, errors or off)", c.Logging.AccessLog)
+	}
+	if c.Logging.AccessLogSampleRate < 0 || c.Logging.AccessLogSampleRate > 1 {
+		return fmt.Errorf("ACCESS_LOG_SAMPLE_RATE must be between 0 and 1")
+	}
+
+	m := c.Metrics
+	if m.Token != "" && len(m.Token) < minMetricsTokenLength {
+		return fmt.Errorf("METRICS_TOKEN must be at least %d characters", minMetricsTokenLength)
+	}
+	if !m.Enabled {
+		return nil
+	}
+	if len(m.Exporters) == 0 {
+		return fmt.Errorf("METRICS_EXPORTER must list prometheus and/or otlp")
+	}
+	for _, e := range m.Exporters {
+		switch strings.ToLower(strings.TrimSpace(e)) {
+		case "prometheus", "otlp":
+		default:
+			return fmt.Errorf("invalid METRICS_EXPORTER %q (want prometheus and/or otlp)", e)
+		}
+	}
+	if m.Port > 65535 {
+		return fmt.Errorf("METRICS_PORT must be between 1 and 65535")
+	}
+	if m.Port != 0 && m.Port == c.Server.Port {
+		return fmt.Errorf("METRICS_PORT must differ from SERVER_PORT")
+	}
+	if m.HasExporter("otlp") && c.OpenTelemetry.OTLPEndpoint == "" {
+		return fmt.Errorf("METRICS_EXPORTER=otlp requires OTEL_EXPORTER_OTLP_ENDPOINT")
+	}
+	if c.IsProduction() && m.HasExporter("prometheus") && m.Port == 0 && m.Token == "" {
+		return fmt.Errorf("METRICS_ENABLED with the prometheus exporter requires METRICS_TOKEN or METRICS_PORT in production")
+	}
 	return nil
 }
 
@@ -685,11 +880,25 @@ func (c *Config) validatePrometheus() error {
 	return nil
 }
 
+// minProxySharedSecretLength is the minimum PROXY_SHARED_SECRET length
+// accepted in production.
+const minProxySharedSecretLength = 32
+
 // validateEnvironmentSpecific validates environment-specific requirements
 func (c *Config) validateEnvironmentSpecific() error {
 	if c.Server.Environment == EnvironmentProduction {
-		if c.JWT.Secret == "development-secret-key-change-in-production-please-use-env-var" {
+		if c.JWT.Secret == devJWTSecret {
 			return fmt.Errorf("default JWT secret cannot be used in production")
+		}
+
+		if c.Server.ProxySharedSecret != "" && len(c.Server.ProxySharedSecret) < minProxySharedSecretLength {
+			return fmt.Errorf("PROXY_SHARED_SECRET must be at least %d characters long in production", minProxySharedSecretLength)
+		}
+
+		for _, origin := range c.CORS.AllowedOrigins {
+			if origin == "*" {
+				return fmt.Errorf("CORS wildcard origin cannot be used in production; set CORS_ALLOWED_ORIGINS")
+			}
 		}
 
 		// if !c.Security.EnableTLS {
@@ -750,9 +959,18 @@ func NewConfigSQLite(dbName string) *Config {
 	}
 }
 
-// GetPostgresUrl returns the PostgreSQL connection string
+// GetPostgresUrl returns the PostgreSQL connection string.
+//
+// binary_parameters=yes makes lib/pq send a parameterised query as
+// Parse+Bind+Execute in ONE round trip; without it every query with arguments
+// first waits for a Parse/Describe reply (2 round trips, ~14% of the API's CPU
+// and most of its per-query latency under load). The trade-off: every []byte
+// argument is then sent in binary format, which is only right for BYTEA
+// columns. JSON/text held in a []byte must be passed as a string (see
+// passkeyRepository.jsonText); money.Amount, time.Time, numbers, strings and
+// pq.Array values are unaffected (sent as text either way).
 func (c *Config) GetPostgresUrl() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&binary_parameters=no",
+	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&binary_parameters=yes",
 		c.Database.User, c.Database.Password, c.Database.Host, c.Database.Port, c.Database.Name, c.Database.SSLMode)
 }
 
@@ -875,10 +1093,35 @@ func getDuration(value string) time.Duration {
 	return 24 * time.Hour // default to 24 hours
 }
 
+// getEnvDuration returns the environment variable parsed as a
+// time.Duration ("5s", "250ms", "0" to disable), or defaultValue when it is
+// unset or invalid. Negative values are treated as 0.
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return defaultValue
+	}
+	if d < 0 {
+		return 0
+	}
+	return d
+}
+
 // getEnvStringSlice returns the environment variable value as string slice
 func getEnvStringSlice(key string, defaultValue []string) []string {
 	if value := os.Getenv(key); value != "" {
-		return strings.Split(value, ",")
+		parts := strings.Split(value, ",")
+		out := make([]string, 0, len(parts))
+		for _, p := range parts {
+			if p = strings.TrimSpace(p); p != "" {
+				out = append(out, p)
+			}
+		}
+		return out
 	}
 	return defaultValue
 }
@@ -896,6 +1139,33 @@ func getEnvStringMap(key string, defaultValue map[string]string) map[string]stri
 		return result
 	}
 	return defaultValue
+}
+
+// defaultAccessLogMode logs every request in development and only errors and
+// slow requests elsewhere (keeps production log volume unchanged by default).
+func defaultAccessLogMode() string {
+	if getEnvString("ENV", "development") == string(EnvironmentDevelopment) {
+		return "all"
+	}
+	return "errors"
+}
+
+// otlpHeaders reads the OTLP exporter headers. The standard
+// OTEL_EXPORTER_OTLP_HEADERS ("k1=v1,k2=v2", values URL-encoded per the OTel
+// spec, e.g. "Authorization=Basic%20abc") wins over the legacy OTEL_HEADERS.
+func otlpHeaders() map[string]string {
+	raw := getEnvStringMap("OTEL_EXPORTER_OTLP_HEADERS", nil)
+	if raw == nil {
+		return getEnvStringMap("OTEL_HEADERS", make(map[string]string))
+	}
+	out := make(map[string]string, len(raw))
+	for k, v := range raw {
+		if dec, err := url.PathUnescape(v); err == nil {
+			v = dec
+		}
+		out[k] = v
+	}
+	return out
 }
 
 // devJWTSecret is a stable fallback used ONLY in local development and test
@@ -929,15 +1199,6 @@ func getJWTSecret() string {
 	panic(fmt.Sprintf(
 		"JWT_SECRET environment variable is required (ENV=%q). "+
 			"Set it to a random string of at least 32 characters.", env))
-}
-
-// generateSecureSecret generates a cryptographically secure secret
-func generateSecureSecret() string {
-	bytes := make([]byte, 32)
-	if _, err := rand.Read(bytes); err != nil {
-		return ""
-	}
-	return hex.EncodeToString(bytes)
 }
 
 // isProduction checks if running in production environment
@@ -982,6 +1243,12 @@ func isValidIP(ip string) bool {
 	// IPv6 validation (basic)
 	ipv6Regex := regexp.MustCompile(`^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$|^::1$|^::$`)
 	return ipv6Regex.MatchString(ip)
+}
+
+// isValidCIDR checks if string is a valid CIDR range (e.g. 10.0.0.0/8)
+func isValidCIDR(s string) bool {
+	_, _, err := net.ParseCIDR(s)
+	return err == nil
 }
 
 // toStringSlice converts any slice to string slice for validation

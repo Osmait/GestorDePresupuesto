@@ -4,6 +4,7 @@ import { ArrowDownCircle, ArrowUpCircle, PlusCircle } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAppLocale } from '@/lib/i18n/date-locale'
 import { formatDop, shareOfTotal, sumActiveDop } from '@/lib/monthlyPlanUtils'
 import { MonthlyPlanItem, MonthlyPlanItemType } from '@/types/monthlyPlan'
 import { MonthlyPlanItemRow } from './MonthlyPlanItemRow'
@@ -28,6 +29,7 @@ export function MonthlyPlanColumn({
 	onDelete,
 }: MonthlyPlanColumnProps) {
 	const t = useTranslations('monthlyPlan')
+	const locale = useAppLocale()
 	const isIncome = type === 'income'
 	// Paused items are shown but excluded from the total, matching the backend.
 	const total = sumActiveDop(items)
@@ -81,7 +83,7 @@ export function MonthlyPlanColumn({
 								className={`text-lg font-bold ${isIncome ? 'text-emerald-600' : 'text-orange-600'}`}
 								data-testid={`column-total-${type}`}
 							>
-								{formatDop(total)}
+								{formatDop(total, locale)}
 							</span>
 						</div>
 					</>

@@ -5,182 +5,166 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/osmait/gestorDePresupuesto/internal/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
-const testSecret = "test-secret-for-jwt-testing"
+const testSecret = "test-secret-for-jwt-testing-at-least-32-chars"
 
-func TestJwtCreate(t *testing.T) {
-	id := "user123"
-	tokenString, err := JwtCreate(id, testSecret)
-
-	assert.NoError(t, err, "Expected no errors")
-	assert.NotEmpty(t, tokenString, "Expected the token not to be empty")
-
-	token, err := jwt.ParseWithClaims(*tokenString, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(testSecret), nil
-	})
-
-	assert.NoError(t, err, "Error decoding the token")
-	assert.True(t, token.Valid, "The token is not valid")
-
-	claims, ok := token.Claims.(*AppClaims)
-	assert.True(t, ok, "Error getting claims from the token")
-	assert.Equal(t, id, claims.UserId, "UserId in the token does not match the expected value")
-}
-
-func TestJwtCreate_EmptyUserId(t *testing.T) {
-	// Test with empty user ID
-	tokenString, err := JwtCreate("", testSecret)
-
-	assert.Error(t, err, "Expected error for empty user ID")
-	assert.Nil(t, tokenString, "Token should be nil for empty user ID")
-	assert.Equal(t, "id is void", err.Error(), "Error message should match expected")
-}
-
-func TestJwtCreate_EmptySecret(t *testing.T) {
-	// Test with empty secret
-	tokenString, err := JwtCreate("user123", "")
-
-	assert.Error(t, err, "Expected error for empty secret")
-	assert.Nil(t, tokenString, "Token should be nil for empty secret")
-	assert.Equal(t, "secret is required", err.Error(), "Error message should match expected")
-}
-
-func TestJwtCreate_ValidUserId_DifferentFormats(t *testing.T) {
-	testCases := []struct {
-		name   string
-		userId string
-	}{
-		{"UUID format", "550e8400-e29b-41d4-a716-446655440000"},
-		{"Numeric ID", "12345"},
-		{"Alphanumeric", "user_123_abc"},
-		{"Long ID", "very_long_user_id_that_could_happen_in_real_scenarios_12345"},
-		{"Special characters", "user@domain.com"},
+func testJWTConfig() config.JWTConfig {
+	return config.JWTConfig{
+		Secret:     testSecret,
+		Expiration: 15 * time.Minute,
+		Issuer:     "test-issuer",
+		Audience:   "test-audience",
 	}
+}
 
-	for _, tc := range testCases {
+func TestCreateAccessToken_RoundTrip(t *testing.T) {
+	cfg := testJWTConfig()
+	tokenString, err := CreateAccessToken("user123", cfg)
+	require.NoError(t, err)
+	require.NotEmpty(t, *tokenString)
+
+	claims, err := ParseAccessToken(*tokenString, cfg)
+	require.NoError(t, err)
+	assert.Equal(t, "user123", claims.UserId)
+	assert.Equal(t, "user123", claims.Subject)
+	assert.Equal(t, "test-issuer", claims.Issuer)
+	assert.Equal(t, jwt.ClaimStrings{"test-audience"}, claims.Audience)
+}
+
+func TestCreateAccessToken_UsesConfiguredExpiration(t *testing.T) {
+	tests := []struct {
+		name       string
+		expiration time.Duration
+		want       time.Duration
+	}{
+		{"configured 15m", 15 * time.Minute, 15 * time.Minute},
+		{"configured 1h", time.Hour, time.Hour},
+		{"zero falls back to default", 0, defaultAccessTokenTTL},
+	}
+	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			tokenString, err := JwtCreate(tc.userId, testSecret)
-
-			assert.NoError(t, err, "Should not error for valid user ID")
-			assert.NotNil(t, tokenString, "Token should not be nil")
-			assert.NotEmpty(t, *tokenString, "Token should not be empty")
-
-			// Verify token can be parsed
-			token, err := jwt.ParseWithClaims(*tokenString, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
-				return []byte(testSecret), nil
-			})
-
-			assert.NoError(t, err, "Token should be parseable")
-			assert.True(t, token.Valid, "Token should be valid")
-
-			claims, ok := token.Claims.(*AppClaims)
-			assert.True(t, ok, "Should be able to extract claims")
-			assert.Equal(t, tc.userId, claims.UserId, "UserID should match")
+			cfg := testJWTConfig()
+			cfg.Expiration = tc.expiration
+			tokenString, err := CreateAccessToken("u", cfg)
+			require.NoError(t, err)
+			claims, err := ParseAccessToken(*tokenString, cfg)
+			require.NoError(t, err)
+			assert.InDelta(t, time.Now().Add(tc.want).Unix(), claims.ExpiresAt.Unix(), 5)
 		})
 	}
 }
 
-func TestJwtCreate_TokenExpiration(t *testing.T) {
-	id := "test_user"
-	tokenString, err := JwtCreate(id, testSecret)
-
-	assert.NoError(t, err)
-	assert.NotNil(t, tokenString)
-
-	// Parse token to check expiration
-	token, err := jwt.ParseWithClaims(*tokenString, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(testSecret), nil
-	})
-
-	assert.NoError(t, err)
-	claims, ok := token.Claims.(*AppClaims)
-	assert.True(t, ok)
-
-	// Check that expiration is set to approximately 72 hours from now
-	expectedExpiration := time.Now().Add(time.Hour * 72).Unix()
-	actualExpiration := claims.ExpiresAt.Unix()
-
-	// Allow 60 second tolerance for test execution time
-	assert.InDelta(t, expectedExpiration, actualExpiration, 60, "Expiration should be approximately 72 hours from now")
-
-	// Verify expiration is in the future
-	assert.Greater(t, actualExpiration, time.Now().Unix(), "Token expiration should be in the future")
+func TestCreateAccessToken_InvalidInput(t *testing.T) {
+	tests := []struct {
+		name    string
+		id      string
+		secret  string
+		wantErr string
+	}{
+		{"empty id", "", testSecret, "id is void"},
+		{"empty secret", "user", "", "secret is required"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			cfg := testJWTConfig()
+			cfg.Secret = tc.secret
+			tok, err := CreateAccessToken(tc.id, cfg)
+			assert.Nil(t, tok)
+			require.Error(t, err)
+			assert.Equal(t, tc.wantErr, err.Error())
+		})
+	}
 }
 
-func TestJwtCreate_TokenStructure(t *testing.T) {
-	id := "test_structure"
-	tokenString, err := JwtCreate(id, testSecret)
+func TestParseAccessToken_Rejections(t *testing.T) {
+	good := testJWTConfig()
 
-	assert.NoError(t, err)
-	assert.NotNil(t, tokenString)
-
-	// JWT tokens should have 3 parts separated by dots
-	parts := len([]rune(*tokenString))
-	assert.Greater(t, parts, 20, "Token should be reasonably long")
-
-	// Verify token starts with expected JWT header for HS256
-	// (This is a basic check - full validation happens in parsing)
-	assert.Contains(t, *tokenString, ".", "Token should contain dots as separators")
-}
-
-func TestJwtCreate_MultipleTokensAreDifferent(t *testing.T) {
-	id := "same_user"
-
-	// Create multiple tokens for the same user
-	token1, err1 := JwtCreate(id, testSecret)
-	time.Sleep(time.Millisecond) // Small delay to ensure different timestamps
-	token2, err2 := JwtCreate(id, testSecret)
-
-	assert.NoError(t, err1)
-	assert.NoError(t, err2)
-	assert.NotNil(t, token1)
-	assert.NotNil(t, token2)
-
-	// Tokens should be different due to different IssuedAt times
-	// Note: This might not always be true if the system is very fast, but generally should be
-	// In production, this would typically use a nonce or issued-at timestamp
-	// For this test, we'll just verify both tokens are valid but don't require them to be different
-	assert.NotEmpty(t, *token1)
-	assert.NotEmpty(t, *token2)
-}
-
-func TestJwtCreate_DifferentSecrets(t *testing.T) {
-	id := "test_user"
-	secret1 := "secret1"
-	secret2 := "secret2"
-
-	// Create tokens with different secrets
-	token1, err1 := JwtCreate(id, secret1)
-	token2, err2 := JwtCreate(id, secret2)
-
-	assert.NoError(t, err1)
-	assert.NoError(t, err2)
-	assert.NotNil(t, token1)
-	assert.NotNil(t, token2)
-
-	// Token created with secret1 should not be valid with secret2
-	_, err := jwt.ParseWithClaims(*token1, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(secret2), nil
-	})
-	assert.Error(t, err, "Token created with secret1 should not be valid with secret2")
-
-	// Token created with secret2 should not be valid with secret1
-	_, err = jwt.ParseWithClaims(*token2, &AppClaims{}, func(token *jwt.Token) (interface{}, error) {
-		return []byte(secret1), nil
-	})
-	assert.Error(t, err, "Token created with secret2 should not be valid with secret1")
-}
-
-func TestAppClaims_Structure(t *testing.T) {
-	claims := AppClaims{
-		UserId: "test_user_123",
-		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
-		},
+	sign := func(claims jwt.Claims, method jwt.SigningMethod, key interface{}) string {
+		s, err := jwt.NewWithClaims(method, claims).SignedString(key)
+		require.NoError(t, err)
+		return s
+	}
+	validClaims := func() AppClaims {
+		return AppClaims{
+			UserId: "u1",
+			RegisteredClaims: jwt.RegisteredClaims{
+				Issuer:    good.Issuer,
+				Audience:  jwt.ClaimStrings{good.Audience},
+				ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Hour)),
+				IssuedAt:  jwt.NewNumericDate(time.Now()),
+			},
+		}
 	}
 
-	assert.Equal(t, "test_user_123", claims.UserId)
-	assert.Greater(t, claims.ExpiresAt.Unix(), time.Now().Unix())
+	tests := []struct {
+		name  string
+		token func() string
+	}{
+		{"wrong secret", func() string {
+			return sign(validClaims(), jwt.SigningMethodHS256, []byte("another-secret-another-secret-123"))
+		}},
+		{"wrong issuer", func() string {
+			c := validClaims()
+			c.Issuer = "evil"
+			return sign(c, jwt.SigningMethodHS256, []byte(testSecret))
+		}},
+		{"wrong audience", func() string {
+			c := validClaims()
+			c.Audience = jwt.ClaimStrings{"other-service"}
+			return sign(c, jwt.SigningMethodHS256, []byte(testSecret))
+		}},
+		{"missing issuer and audience (legacy token)", func() string {
+			c := validClaims()
+			c.Issuer = ""
+			c.Audience = nil
+			return sign(c, jwt.SigningMethodHS256, []byte(testSecret))
+		}},
+		{"expired", func() string {
+			c := validClaims()
+			c.ExpiresAt = jwt.NewNumericDate(time.Now().Add(-time.Minute))
+			return sign(c, jwt.SigningMethodHS256, []byte(testSecret))
+		}},
+		{"no expiration", func() string {
+			c := validClaims()
+			c.ExpiresAt = nil
+			return sign(c, jwt.SigningMethodHS256, []byte(testSecret))
+		}},
+		{"HS512 not allowed", func() string {
+			return sign(validClaims(), jwt.SigningMethodHS512, []byte(testSecret))
+		}},
+		{"none algorithm", func() string {
+			return sign(validClaims(), jwt.SigningMethodNone, jwt.UnsafeAllowNoneSignatureType)
+		}},
+		{"empty user id", func() string {
+			c := validClaims()
+			c.UserId = ""
+			return sign(c, jwt.SigningMethodHS256, []byte(testSecret))
+		}},
+		{"garbage", func() string { return "not.a.jwt" }},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			claims, err := ParseAccessToken(tc.token(), good)
+			assert.Error(t, err)
+			assert.Nil(t, claims)
+		})
+	}
+}
+
+func TestCreateTokenPair(t *testing.T) {
+	cfg := testJWTConfig()
+	pair, err := CreateTokenPair("user-1", cfg)
+	require.NoError(t, err)
+	assert.NotEmpty(t, pair.AccessToken)
+	assert.Len(t, pair.RefreshToken, 43) // 32 bytes base64url without padding
+	assert.Equal(t, int64(cfg.Expiration.Seconds()), pair.ExpiresIn)
+
+	other, err := CreateTokenPair("user-1", cfg)
+	require.NoError(t, err)
+	assert.NotEqual(t, pair.RefreshToken, other.RefreshToken)
 }

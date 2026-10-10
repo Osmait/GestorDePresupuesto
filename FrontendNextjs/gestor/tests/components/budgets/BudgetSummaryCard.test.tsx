@@ -15,14 +15,23 @@ vi.mock('next-intl', () => ({
 	},
 }))
 
-vi.mock('@/components/ui/animated-counter', () => ({
-	AnimatedCounter: ({ value, prefix = '' }: { value: number; prefix?: string }) => (
-		<span>
-			{prefix}
-			{value}
-		</span>
-	),
-}))
+// Render the final value synchronously, formatted like the real component.
+vi.mock('@/components/ui/animated-counter', async () => {
+	const { formatCurrency } = await vi.importActual<typeof import('@/lib/utils')>('@/lib/utils')
+	return {
+		AnimatedCounter: ({
+			value,
+			prefix = '',
+			currency,
+			signDisplay,
+		}: {
+			value: number
+			prefix?: string
+			currency?: string
+			signDisplay?: 'exceptZero'
+		}) => <span>{currency ? formatCurrency(value, currency, { signDisplay }) : `${prefix}${value}`}</span>,
+	}
+})
 
 describe('BudgetSummaryCard', () => {
 	const mockBudgets = [
@@ -47,19 +56,19 @@ describe('BudgetSummaryCard', () => {
 	]
 
 	it('calculates totals correctly', () => {
-		render(<BudgetSummaryCard budgets={mockBudgets} transactions={[]} />)
+		render(<BudgetSummaryCard budgets={mockBudgets} />)
 
 		// Total Budget: 1000 + 2000 = 3000
 		expect(screen.getByText('Total Budget')).toBeInTheDocument()
-		expect(screen.getByText('$3000')).toBeInTheDocument()
+		expect(screen.getByText('RD$3,000.00')).toBeInTheDocument()
 
 		// Total Spent: 500 + 2100 = 2600
 		expect(screen.getByText('Total Spent')).toBeInTheDocument()
-		expect(screen.getByText('$2600')).toBeInTheDocument()
+		expect(screen.getByText('RD$2,600.00')).toBeInTheDocument()
 
 		// Total Remaining: 3000 - 2600 = 400
 		expect(screen.getByText('Total Remaining')).toBeInTheDocument()
-		expect(screen.getByText('$400')).toBeInTheDocument()
+		expect(screen.getByText('RD$400.00')).toBeInTheDocument()
 
 		// Exceeded: 1 (budget 2 has current_amount > amount)
 		expect(screen.getByText('Exceeded Budgets')).toBeInTheDocument()

@@ -1,6 +1,6 @@
 'use client'
 
-import { motion } from 'framer-motion'
+import { domAnimation, LazyMotion, m } from 'framer-motion'
 import { AlertTriangle, CalendarClock, PlusCircle } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
@@ -21,7 +21,17 @@ import { MonthlyPlanSkeleton } from './MonthlyPlanSkeleton'
 import { MonthlyPlanSummaryCard } from './MonthlyPlanSummaryCard'
 import { MonthlyPlanTimeline } from './MonthlyPlanTimeline'
 
+// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
+// full feature bundle (layout, drag) is not needed.
 export function MonthlyPlanBoard() {
+	return (
+		<LazyMotion features={domAnimation}>
+			<MonthlyPlanBoardView />
+		</LazyMotion>
+	)
+}
+
+function MonthlyPlanBoardView() {
 	const t = useTranslations('monthlyPlan')
 	const { data: items = [], isLoading, isError } = useMonthlyPlanItems()
 	const { data: summary } = useMonthlyPlanSummary()
@@ -87,7 +97,7 @@ export function MonthlyPlanBoard() {
 	}
 
 	return (
-		<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className='space-y-8'>
+		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.4 }} className='space-y-8'>
 			{summary && <MonthlyPlanSummaryCard summary={summary} />}
 
 			<div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
@@ -117,6 +127,6 @@ export function MonthlyPlanBoard() {
 			</div>
 
 			<MonthlyPlanFormModal />
-		</motion.div>
+		</m.div>
 	)
 }

@@ -126,6 +126,13 @@ func handleErrors(c *gin.Context, errors []*gin.Error, config ErrorHandlerConfig
 			WithCause(lastError.Err).
 			WithContext(ctx).
 			WithOperation(c.Request.Method + " " + c.Request.URL.Path)
+	} else if dbErr, ok := apperrors.FromPostgresError(lastError.Err); ok {
+		// Data/constraint errors from Postgres (e.g. "value too long for type
+		// character varying(32)") become 4xx with a stable code; the driver
+		// text is only logged.
+		appErr = dbErr.
+			WithContext(ctx).
+			WithOperation(c.Request.Method + " " + c.Request.URL.Path)
 	} else {
 		// Wrap unknown errors
 		appErr = apperrors.NewInternalError("Internal server error", lastError.Err).

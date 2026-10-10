@@ -12,17 +12,17 @@ This is a **Budget Management System (Gestor de Presupuesto)** built with a Go b
 
 - **Framework**: Gin HTTP router
 - **Architecture**: Clean Architecture with domain-driven design
-- **Database**: PostgreSQL (production), SQLite (testing)
+- **Database**: PostgreSQL (production and tests, via testcontainers)
 - **Authentication**: JWT-based
 - **Observability**: OpenTelemetry for tracing, metrics, and logging
 
 ### Frontend (Next.js)
 
-- **Framework**: Next.js 14 with App Router
+- **Framework**: Next.js 15 (React 19) with App Router
 - **UI Components**: Shadcn/UI + Radix UI primitives
 - **Styling**: Tailwind CSS with dark mode support
-- **Charts**: Nivo charts for data visualization
-- **State Management**: Zustand for global state
+- **Charts**: Nivo (plus Recharts in a few components)
+- **Server State**: TanStack Query (hooks/queries); global UI state via React Context (no Zustand)
 - **Authentication**: NextAuth.js
 
 ## Development Commands
@@ -160,13 +160,13 @@ FrontendNextjs/gestor/
 ### Backend
 
 - **Unit Tests**: Mock external dependencies, focus on business logic
-- **Integration Tests**: Use SQLite in-memory for repository testing
+- **Integration Tests**: Real PostgreSQL via testcontainers (requires Docker)
 - **E2E Tests**: Full application testing with Docker containers
 - **Benchmarks**: Performance testing for critical paths
 
 ### Frontend
 
-- **Unit Tests**: Jest + React Testing Library
+- **Unit Tests**: Vitest + React Testing Library; E2E with Playwright in /e2e-test
 - **Integration Tests**: User workflow testing
 - **Type Checking**: TypeScript strict mode
 
@@ -206,7 +206,7 @@ make dev-stop
 - **Transactions**: `/transaction`
 - **Categories**: `/category`
 - **Budgets**: `/budget`
-- **Investments**: `/invesment`
+- **Investments**: `/investments`
 
 ## Important Notes
 
@@ -219,7 +219,7 @@ make dev-stop
 ### Database
 
 - PostgreSQL for production
-- SQLite for testing (faster test execution)
+- PostgreSQL in tests too (testcontainers; there is no SQLite driver)
 - Use migrations for schema changes
 - Repository pattern for data access
 

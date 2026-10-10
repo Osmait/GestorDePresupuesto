@@ -6,6 +6,7 @@ import (
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/monthly_plan"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/monthly_plan"
 	monthlyPlanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/monthly_plan"
@@ -14,18 +15,18 @@ import (
 
 // fallbackUsdToDopRate is used when the exchange service is unreachable. It
 // matches the fallback already used by the budget and transaction services.
-const fallbackUsdToDopRate = 60.0
+var fallbackUsdToDopRate = money.FromInt(60)
 
 // MonthlyPlanService owns the business logic of the user's monthly plan: the
 // fixed expenses they committed to and the incomes they expect.
 type MonthlyPlanService struct {
 	repository     monthlyPlanRepo.MonthlyPlanRepoInterface
-	usdToDopRateFn func(context.Context) (float64, error)
+	usdToDopRateFn func(context.Context) (money.Amount, error)
 }
 
 func NewMonthlyPlanService(
 	repo monthlyPlanRepo.MonthlyPlanRepoInterface,
-	usdToDopRateFn func(context.Context) (float64, error),
+	usdToDopRateFn func(context.Context) (money.Amount, error),
 ) *MonthlyPlanService {
 	return &MonthlyPlanService{
 		repository:     repo,
@@ -140,9 +141,9 @@ func (s *MonthlyPlanService) Summary(ctx context.Context, userID string) (*dto.M
 	}
 
 	summary := &monthly_plan.Summary{
-		TotalIncome:         totals.TotalIncome,
-		TotalExpenses:       totals.TotalExpenses,
-		Available:           totals.TotalIncome - totals.TotalExpenses,
+		TotalIncome:         totals.TotalIncome.RoundCents(),
+		TotalExpenses:       totals.TotalExpenses.RoundCents(),
+		Available:           totals.TotalIncome.Sub(totals.TotalExpenses).RoundCents(),
 		CommittedPercentage: committedPercentage(totals.TotalIncome, totals.TotalExpenses),
 		UsdToDopRate:        usdToDop,
 		IncomeCount:         totals.IncomeCount,
@@ -154,23 +155,24 @@ func (s *MonthlyPlanService) Summary(ctx context.Context, userID string) (*dto.M
 
 // committedPercentage is the share of the expected income already taken by fixed
 // expenses. With no income there is nothing to divide by, so it reports 0 rather
-// than infinity.
-func committedPercentage(totalIncome float64, totalExpenses float64) float64 {
-	if totalIncome <= 0 {
+// than infinity. It is a display-only ratio: computed in decimal, rounded
+// half-even to 2 places, returned as float64.
+func committedPercentage(totalIncome money.Amount, totalExpenses money.Amount) float64 {
+	if !totalIncome.IsPositive() {
 		return 0
 	}
-	return (totalExpenses / totalIncome) * 100
+	return money.Percent(totalExpenses, totalIncome)
 }
 
 // resolveRate fetches the USD→DOP rate, falling back to a fixed value when the
 // exchange service is unavailable so the plan still renders.
-func (s *MonthlyPlanService) resolveRate(ctx context.Context) float64 {
+func (s *MonthlyPlanService) resolveRate(ctx context.Context) money.Amount {
 	if s.usdToDopRateFn == nil {
 		return fallbackUsdToDopRate
 	}
 
 	rate, err := s.usdToDopRateFn(ctx)
-	if err != nil || rate <= 0 {
+	if err != nil || !rate.IsPositive() {
 		log.Warn().Msg("exchange rate unavailable for monthly plan, using fallback rate")
 		return fallbackUsdToDopRate
 	}

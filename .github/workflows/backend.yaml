@@ -44,3 +44,29 @@ jobs:
 
       - name: Test
         run: make test
+
+  # API end-to-end suite (build tag `e2e`): the real router from
+  # cmd/api/boostrap against a PostgreSQL started by testcontainers (Docker is
+  # available on GitHub-hosted ubuntu runners).
+  backend-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    defaults:
+      run:
+        working-directory: ./BackEnd
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.25'
+          cache-dependency-path: BackEnd/go.sum
+
+      - name: Vet E2E
+        run: go vet -tags e2e ./internal/e2e/...
+
+      - name: E2E Tests
+        run: make e2e-api

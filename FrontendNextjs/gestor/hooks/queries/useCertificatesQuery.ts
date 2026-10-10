@@ -11,6 +11,7 @@ import {
 	UpdateCertificateDTO,
 	UpdateCertificatePaymentDTO,
 } from '@/types/certificate'
+import { invalidateFinancialData } from './invalidateFinancialData'
 
 export const CERTIFICATE_KEYS = {
 	all: ['certificates'] as const,
@@ -58,6 +59,7 @@ export function useCreateCertificateMutation() {
 			return repo.create(data)
 		},
 		onSuccess: () => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.summary() })
 		},
@@ -72,6 +74,7 @@ export function useUpdateCertificateMutation() {
 			return repo.update(id, data)
 		},
 		onSuccess: (_, { id }) => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.detail(id) })
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.summary() })
@@ -87,6 +90,7 @@ export function useDeleteCertificateMutation() {
 			return repo.delete(id)
 		},
 		onSuccess: () => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.summary() })
 		},
@@ -101,6 +105,7 @@ export function useUpdateCertificatePaymentMutation() {
 			return repo.updatePayment(paymentId, data)
 		},
 		onSuccess: () => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CERTIFICATE_KEYS.all })
 		},
 	})

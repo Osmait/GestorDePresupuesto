@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
@@ -13,6 +14,8 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 )
@@ -23,6 +26,11 @@ func (h *Handler) ReconciliationPreview(c *gin.Context) {
 	var req dto.ReconciliationPreviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		return
+	}
+
+	if err := h.verifyAccountOwnership(c.Request.Context(), userID, req.AccountID); err != nil {
+		_ = c.Error(err)
 		return
 	}
 
@@ -108,7 +116,7 @@ func (h *Handler) GetReconciliationSession(c *gin.Context) {
 
 	data, err := h.loadReconciliationSession(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("RECONCILIATION_NOT_FOUND", "Reconciliation session not found"))
 			return
 		}
@@ -131,7 +139,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 
 	data, err := h.loadReconciliationSession(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("RECONCILIATION_NOT_FOUND", "Reconciliation session not found"))
 			return
 		}
@@ -141,7 +149,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 
 	sessionAccountID, err := h.getReconciliationSessionAccountID(c.Request.Context(), userID, sessionID)
 	if err != nil {
-		if err == sql.ErrNoRows {
+		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("RECONCILIATION_NOT_FOUND", "Reconciliation session not found"))
 			return
 		}
@@ -187,7 +195,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 
 		switch action.Action {
 		case "ignore":
-			err = h.updateReconciliationItemAction(c.Request.Context(), sessionID, action.ExtractedTransactionID, "ignore", "", "")
+			err = h.updateReconciliationItemAction(c.Request.Context(), userID, sessionID, action.ExtractedTransactionID, "ignore", "", "")
 			if err != nil {
 				addFailure(action.ExtractedTransactionID, action.Action, "UPDATE_FAILED", "Failed to mark item as ignored", err)
 				continue
@@ -202,7 +210,11 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 				addFailure(action.ExtractedTransactionID, action.Action, "MISSING_LINKED_TRANSACTION", "No linked transaction was provided for link action", nil)
 				continue
 			}
-			err = h.updateReconciliationItemAction(c.Request.Context(), sessionID, action.ExtractedTransactionID, "link", linkedID, "")
+			if refErr := ownership.VerifyReference(c.Request.Context(), h.q(c.Request.Context()), userID, ownership.Transaction, linkedID); refErr != nil {
+				addFailure(action.ExtractedTransactionID, action.Action, "INVALID_LINKED_TRANSACTION", "Linked transaction was not found", refErr)
+				continue
+			}
+			err = h.updateReconciliationItemAction(c.Request.Context(), userID, sessionID, action.ExtractedTransactionID, "link", linkedID, "")
 			if err != nil {
 				addFailure(action.ExtractedTransactionID, action.Action, "UPDATE_FAILED", "Failed to save link action", err)
 				continue
@@ -258,7 +270,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 				continue
 			}
 
-			err = h.updateReconciliationItemAction(c.Request.Context(), sessionID, action.ExtractedTransactionID, "create", "", createdID)
+			err = h.updateReconciliationItemAction(c.Request.Context(), userID, sessionID, action.ExtractedTransactionID, "create", "", createdID)
 			if err != nil {
 				addFailure(action.ExtractedTransactionID, action.Action, "UPDATE_FAILED", "Transaction was created but reconciliation item update failed", err)
 				continue
@@ -269,7 +281,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 		}
 	}
 
-	if err := h.markReconciliationSessionApplied(c.Request.Context(), sessionID); err != nil {
+	if err := h.markReconciliationSessionApplied(c.Request.Context(), userID, sessionID); err != nil {
 		log.Warn().Err(err).Str("session_id", sessionID).Msg("failed to mark reconciliation session as applied")
 	}
 
@@ -292,88 +304,76 @@ func (h *Handler) saveReconciliationSession(
 	sessionID := ksuid.New().String()
 	now := time.Now()
 
-	tx, err := h.db.BeginTx(ctx, nil)
-	if err != nil {
-		return "", err
-	}
-
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
-		}
-	}()
-
-	_, err = tx.ExecContext(
-		ctx,
-		`INSERT INTO reconciliation_sessions
-			(id, user_id, account_id, document_type, status, extracted_count, exact_count, similar_count, unmatched_count, created_at, updated_at)
-		 VALUES ($1, $2, $3, $4, 'previewed', $5, $6, $7, $8, $9, $10)`,
-		sessionID,
-		userID,
-		accountID,
-		documentType,
-		len(exactMatches)+len(similarMatches)+len(unmatched),
-		len(exactMatches),
-		len(similarMatches),
-		len(unmatched),
-		now,
-		now,
-	)
-	if err != nil {
-		return "", err
-	}
-
-	allItems := append(append(exactMatches, similarMatches...), unmatched...)
-	for _, item := range allItems {
-		if item.Extracted == nil {
-			continue
-		}
-
-		itemID := ksuid.New().String()
-		extractedData, marshalErr := json.Marshal(item.Extracted)
-		if marshalErr != nil {
-			err = marshalErr
-			return "", err
-		}
-		candidateData, marshalErr := json.Marshal(item.Candidates)
-		if marshalErr != nil {
-			err = marshalErr
-			return "", err
-		}
-
-		action := "pending"
-		if item.Status == "exact" {
-			action = "link"
-		}
-
-		linkedID := ""
-		if item.Status == "exact" && len(item.Candidates) > 0 {
-			linkedID = item.Candidates[0].ID
-		}
-
-		_, err = tx.ExecContext(
+	// Runs on the request transaction when there is one (no second pooled
+	// connection); standalone it opens and commits its own transaction.
+	err := txhelper.InTx(ctx, h.db, func(tx txhelper.Querier) error {
+		if _, err := tx.ExecContext(
 			ctx,
-			`INSERT INTO reconciliation_items
-				(id, session_id, extracted_transaction_id, extracted_data, candidate_data, match_status, score, action, linked_transaction_id, created_transaction_id, created_at, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), NULL, $10, $11)`,
-			itemID,
+			`INSERT INTO reconciliation_sessions
+				(id, user_id, account_id, document_type, status, extracted_count, exact_count, similar_count, unmatched_count, created_at, updated_at)
+			 VALUES ($1, $2, $3, $4, 'previewed', $5, $6, $7, $8, $9, $10)`,
 			sessionID,
-			item.Extracted.Id,
-			string(extractedData),
-			string(candidateData),
-			item.Status,
-			item.Score,
-			action,
-			linkedID,
+			userID,
+			accountID,
+			documentType,
+			len(exactMatches)+len(similarMatches)+len(unmatched),
+			len(exactMatches),
+			len(similarMatches),
+			len(unmatched),
 			now,
 			now,
-		)
-		if err != nil {
-			return "", err
+		); err != nil {
+			return err
 		}
-	}
 
-	err = tx.Commit()
+		allItems := append(append(exactMatches, similarMatches...), unmatched...)
+		for _, item := range allItems {
+			if item.Extracted == nil {
+				continue
+			}
+
+			itemID := ksuid.New().String()
+			extractedData, err := json.Marshal(item.Extracted)
+			if err != nil {
+				return err
+			}
+			candidateData, err := json.Marshal(item.Candidates)
+			if err != nil {
+				return err
+			}
+
+			action := "pending"
+			if item.Status == "exact" {
+				action = "link"
+			}
+
+			linkedID := ""
+			if item.Status == "exact" && len(item.Candidates) > 0 {
+				linkedID = item.Candidates[0].ID
+			}
+
+			if _, err := tx.ExecContext(
+				ctx,
+				`INSERT INTO reconciliation_items
+					(id, session_id, extracted_transaction_id, extracted_data, candidate_data, match_status, score, action, linked_transaction_id, created_transaction_id, created_at, updated_at)
+				 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NULLIF($9, ''), NULL, $10, $11)`,
+				itemID,
+				sessionID,
+				item.Extracted.Id,
+				string(extractedData),
+				string(candidateData),
+				item.Status,
+				item.Score,
+				action,
+				linkedID,
+				now,
+				now,
+			); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		return "", err
 	}
@@ -387,7 +387,7 @@ func (h *Handler) loadReconciliationSession(ctx context.Context, userID string, 
 	}
 
 	var data dto.ReconciliationPreviewData
-	err := h.db.QueryRowContext(
+	err := h.q(ctx).QueryRowContext(
 		ctx,
 		`SELECT id, extracted_count FROM reconciliation_sessions WHERE id = $1 AND user_id = $2`,
 		sessionID,
@@ -397,13 +397,15 @@ func (h *Handler) loadReconciliationSession(ctx context.Context, userID string, 
 		return dto.ReconciliationPreviewData{}, err
 	}
 
-	rows, err := h.db.QueryContext(
+	rows, err := h.q(ctx).QueryContext(
 		ctx,
 		`SELECT extracted_data, candidate_data, match_status, score
 		 FROM reconciliation_items
 		 WHERE session_id = $1
+		   AND session_id IN (SELECT id FROM reconciliation_sessions WHERE user_id = $2)
 		 ORDER BY created_at ASC`,
 		sessionID,
+		userID,
 	)
 	if err != nil {
 		return dto.ReconciliationPreviewData{}, err
@@ -460,7 +462,7 @@ func (h *Handler) getReconciliationSessionAccountID(ctx context.Context, userID 
 	}
 
 	var accountID string
-	err := h.db.QueryRowContext(
+	err := h.q(ctx).QueryRowContext(
 		ctx,
 		`SELECT account_id FROM reconciliation_sessions WHERE id = $1 AND user_id = $2`,
 		sessionID,
@@ -489,51 +491,67 @@ func classifyReconciliationCreateError(err error) (string, string) {
 		return "CARD_BALANCE_CURRENCY_NOT_ENABLED", message
 	}
 
+	if errors.Is(err, ownership.ErrReferenceNotOwned) {
+		if strings.Contains(lowerMessage, "(category)") {
+			return "INVALID_CATEGORY_ID", "Category was not found"
+		}
+		if strings.Contains(lowerMessage, "(account)") {
+			return "INVALID_ACCOUNT_ID", "Account was not found"
+		}
+		return "INVALID_REFERENCE", "Referenced resource was not found"
+	}
+
 	if strings.Contains(lowerMessage, "violates foreign key constraint") {
 		if strings.Contains(lowerMessage, "category") {
-			return "INVALID_CATEGORY_ID", message
+			return "INVALID_CATEGORY_ID", "Category was not found"
 		}
 		if strings.Contains(lowerMessage, "account") {
-			return "INVALID_ACCOUNT_ID", message
+			return "INVALID_ACCOUNT_ID", "Account was not found"
 		}
 	}
 
-	return "CREATE_TRANSACTION_FAILED", message
+	// Never echo raw database errors back to the client.
+	return "CREATE_TRANSACTION_FAILED", "Failed to create transaction"
 }
 
-func (h *Handler) updateReconciliationItemAction(ctx context.Context, sessionID string, extractedTransactionID string, action string, linkedID string, createdID string) error {
+// updateReconciliationItemAction records the action taken on an item of a
+// session owned by userID; items of other users' sessions are never touched.
+func (h *Handler) updateReconciliationItemAction(ctx context.Context, userID string, sessionID string, extractedTransactionID string, action string, linkedID string, createdID string) error {
 	if h.db == nil {
 		return fmt.Errorf("database connection not available")
 	}
 
-	_, err := h.db.ExecContext(
+	_, err := h.q(ctx).ExecContext(
 		ctx,
 		`UPDATE reconciliation_items
 		 SET action = $1,
 		     linked_transaction_id = NULLIF($2, ''),
 		     created_transaction_id = NULLIF($3, ''),
 		     updated_at = $4
-		 WHERE session_id = $5 AND extracted_transaction_id = $6`,
+		 WHERE session_id = $5 AND extracted_transaction_id = $6
+		   AND session_id IN (SELECT id FROM reconciliation_sessions WHERE user_id = $7)`,
 		action,
 		linkedID,
 		createdID,
 		time.Now(),
 		sessionID,
 		extractedTransactionID,
+		userID,
 	)
 	return err
 }
 
-func (h *Handler) markReconciliationSessionApplied(ctx context.Context, sessionID string) error {
+func (h *Handler) markReconciliationSessionApplied(ctx context.Context, userID string, sessionID string) error {
 	if h.db == nil {
 		return fmt.Errorf("database connection not available")
 	}
 
-	_, err := h.db.ExecContext(
+	_, err := h.q(ctx).ExecContext(
 		ctx,
-		`UPDATE reconciliation_sessions SET status = 'applied', updated_at = $1 WHERE id = $2`,
+		`UPDATE reconciliation_sessions SET status = 'applied', updated_at = $1 WHERE id = $2 AND user_id = $3`,
 		time.Now(),
 		sessionID,
+		userID,
 	)
 	return err
 }

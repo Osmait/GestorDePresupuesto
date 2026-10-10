@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -33,8 +33,6 @@ export function AnimatedTabs({
 	urlParam = 'tab',
 }: AnimatedTabsProps) {
 	const searchParams = useSearchParams()
-	const router = useRouter()
-	const pathname = usePathname()
 
 	const urlTab = urlParam ? searchParams.get(urlParam) : null
 	const validUrlTab = urlTab && tabs.some((t) => t.value === urlTab) ? urlTab : null
@@ -43,16 +41,20 @@ export function AnimatedTabs({
 	const updateUrl = useCallback(
 		(value: string) => {
 			if (!urlParam) return
-			const params = new URLSearchParams(searchParams.toString())
+			const params = new URLSearchParams(window.location.search)
 			if (value === defaultValue) {
 				params.delete(urlParam)
 			} else {
 				params.set(urlParam, value)
 			}
 			const query = params.toString()
-			router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false })
+			const { pathname } = window.location
+			// The tab is client state (no server component reads it): update the URL
+			// without the RSC round trip that router.replace would cost per click.
+			// Next.js keeps useSearchParams in sync with history.replaceState.
+			window.history.replaceState(window.history.state, '', query ? `${pathname}?${query}` : pathname)
 		},
-		[urlParam, searchParams, defaultValue, router, pathname],
+		[urlParam, defaultValue],
 	)
 	const tabsRef = useRef<HTMLDivElement>(null)
 	const tabRefs = useRef<(HTMLButtonElement | null)[]>([])
@@ -125,7 +127,8 @@ export function AnimatedTabs({
 				aria-orientation={orientation}
 				className={cn(
 					'relative inline-flex h-10 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground backdrop-blur-sm border border-border/50 w-full sm:w-auto',
-					orientation === 'horizontal' && 'flex-row',
+					// Many tabs (e.g. the dashboard's 5) don't fit at 390px: scroll instead of overflowing the page.
+					orientation === 'horizontal' && 'flex-row max-w-full justify-start overflow-x-auto sm:justify-center',
 					orientation === 'vertical' && 'flex-col h-auto',
 				)}
 			>
@@ -184,18 +187,21 @@ export function AnimatedTabs({
 
 					return (
 						<button
+							type='button'
 							key={tab.value}
 							ref={(el) => {
 								tabRefs.current[index] = el
 							}}
 							role='tab'
+							// On mobile only the icon is visible: keep an accessible name (same text as the sm+ label).
+							aria-label={tab.icon ? tab.label : undefined}
 							aria-selected={isActive}
 							aria-controls={`tabpanel-${tab.value}`}
 							id={`tab-${tab.value}`}
 							onClick={() => handleTabClick(tab.value)}
 							disabled={isDisabled}
 							className={cn(
-								'relative inline-flex items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group z-20',
+								'relative inline-flex shrink-0 items-center justify-center whitespace-nowrap rounded-md px-3 py-1.5 text-sm font-medium ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 group z-20',
 								isActive ? 'text-primary font-semibold' : 'text-muted-foreground hover:text-foreground',
 								isDisabled && 'opacity-50 cursor-not-allowed',
 							)}
@@ -206,6 +212,7 @@ export function AnimatedTabs({
 							{/* Icono */}
 							{tab.icon && (
 								<span
+									aria-hidden='true'
 									className={cn(
 										'transition-all duration-200 relative z-10',
 										isActive ? 'text-primary' : 'group-hover:text-foreground',

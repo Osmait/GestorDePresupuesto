@@ -2,7 +2,6 @@
 
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, Eye, EyeOff, Loader2, Lock, LogIn, Mail } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { useTranslations } from 'next-intl'
@@ -15,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { getCallbackUrlFromLocation } from '@/lib/auth/callback-url'
 
 interface LoginFormProps {
 	onToggleForm?: () => void
@@ -31,7 +31,8 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 	// Schema de validación con Zod (con mensajes traducidos)
 	const loginSchema = z.object({
 		email: z.string().min(1, t('emailRequired')).email(t('emailInvalid')),
-		password: z.string().min(6, t('passwordMinLength')).max(100, 'Password too long'),
+		// Login only checks presence: the password policy is enforced at registration.
+		password: z.string().min(1, t('passwordRequired')).max(100, t('passwordTooLong')),
 	})
 
 	type LoginFormValues = z.infer<typeof loginSchema>
@@ -39,8 +40,8 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 	const form = useForm<LoginFormValues>({
 		resolver: zodResolver(loginSchema),
 		defaultValues: {
-			email: 'juan.perez@example.com',
-			password: 'password123',
+			email: '',
+			password: '',
 		},
 	})
 
@@ -49,7 +50,6 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 			setIsLoading(true)
 			setError(null)
 
-			console.log('🔐 Iniciando login...')
 			const result = await signIn('credentials', {
 				email: values.email,
 				password: values.password,
@@ -61,11 +61,9 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 				return
 			}
 
-			console.log('✅ Login exitoso')
-			router.push('/app')
+			router.push(getCallbackUrlFromLocation())
 			router.refresh()
 		} catch (err) {
-			console.error('❌ Error en login:', err)
 			setError(err instanceof Error ? err.message : t('error'))
 		} finally {
 			setIsLoading(false)
@@ -179,7 +177,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 						<span className='w-full border-t border-border/50' />
 					</div>
 					<div className='relative flex justify-center text-xs uppercase'>
-						<span className='bg-card px-2 text-muted-foreground'>or</span>
+						<span className='bg-card px-2 text-muted-foreground'>{t('or')}</span>
 					</div>
 				</div>
 
@@ -202,17 +200,6 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 						</p>
 					</div>
 				)}
-
-				{/* Enlaces adicionales */}
-				<div className='flex justify-center space-x-4 text-xs text-muted-foreground'>
-					<Link href='/simple-test' className='hover:text-primary transition-colors'>
-						{t('testSimple')}
-					</Link>
-					<span>•</span>
-					<Link href='/debug' className='hover:text-primary transition-colors'>
-						{t('debug')}
-					</Link>
-				</div>
 			</CardContent>
 		</Card>
 	)

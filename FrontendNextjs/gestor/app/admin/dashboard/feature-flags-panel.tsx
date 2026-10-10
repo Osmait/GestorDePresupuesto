@@ -1,36 +1,30 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import type { AdminFeatureItem } from '@/app/repository/adminRepository'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
+import { getAdminRepository } from '@/lib/repositoryConfig'
 import { UserResponse } from '@/types/user'
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080'
-
-interface FeatureItem {
-	key: string
-	name: string
-	description: string
-	scope: string
-	default_enabled: boolean
-	enabled: boolean
-	has_override: boolean
-	has_global_override: boolean
-	global_enabled?: boolean
-	user_override_enabled?: boolean
-	source?: 'global' | 'user' | 'default'
-	blocked_by_global?: boolean
-}
+type FeatureItem = AdminFeatureItem
 
 interface FeatureFlagsPanelProps {
 	users: UserResponse[]
-	token: string
 }
 
-export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
+export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
+	const t = useTranslations('admin.flags')
+	const onOff = (value: boolean) => (value ? t('on') : t('off'))
+	const yesNo = (value: boolean) => (value ? t('yes') : t('no'))
+	const sourceLabel = (source?: string) =>
+		source === 'global' || source === 'user' || source === 'default'
+			? t(`sources.${source}`)
+			: (source ?? t('sources.default'))
 	const [selectedUserId, setSelectedUserId] = useState('')
 	const [userSearch, setUserSearch] = useState('')
 	const [availableUsers, setAvailableUsers] = useState<UserResponse[]>(users)
@@ -60,21 +54,14 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 	const loadCatalog = useCallback(async () => {
 		setIsLoading(true)
 		try {
-			const response = await fetch(`${BASE_URL}/admin/features`, {
-				headers: { Authorization: `Bearer ${token}` },
-			})
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
-			const data = await response.json()
-			setCatalogFeatures(data?.data || [])
+			setCatalogFeatures(await getAdminRepository().getFeatureCatalog())
 			setPendingGlobal({})
 		} catch (error: any) {
-			toast.error(`Error loading feature catalog: ${error.message}`)
+			toast.error(t('toasts.catalogError', { message: error.message }))
 		} finally {
 			setIsLoading(false)
 		}
-	}, [token])
+	}, [t])
 
 	const loadUserFlags = useCallback(
 		async (userID: string) => {
@@ -86,22 +73,15 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 
 			setIsLoading(true)
 			try {
-				const response = await fetch(`${BASE_URL}/admin/users/${userID}/features`, {
-					headers: { Authorization: `Bearer ${token}` },
-				})
-				if (!response.ok) {
-					throw new Error(`failed: ${response.status}`)
-				}
-				const data = await response.json()
-				setFeatures(data?.data || [])
+				setFeatures(await getAdminRepository().getUserFeatures(userID))
 				setPending({})
 			} catch (error: any) {
-				toast.error(`Error loading feature flags: ${error.message}`)
+				toast.error(t('toasts.flagsError', { message: error.message }))
 			} finally {
 				setIsLoading(false)
 			}
 		},
-		[token],
+		[t],
 	)
 
 	useEffect(() => {
@@ -112,30 +92,21 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		const timeout = setTimeout(async () => {
 			setIsSearchingUsers(true)
 			try {
-				const params = new URLSearchParams()
-				params.set('limit', '25')
-				if (userSearch.trim().length >= 2) {
-					params.set('q', userSearch.trim())
-				}
-
-				const response = await fetch(`${BASE_URL}/users?${params.toString()}`, {
-					headers: { Authorization: `Bearer ${token}` },
+				const query = userSearch.trim()
+				const found = await getAdminRepository().listUsers({
+					limit: 25,
+					q: query.length >= 2 ? query : undefined,
 				})
-				if (!response.ok) {
-					throw new Error(`failed: ${response.status}`)
-				}
-
-				const data = await response.json()
-				setAvailableUsers(data || [])
+				setAvailableUsers(found)
 			} catch (error: any) {
-				toast.error(`Error searching users: ${error.message}`)
+				toast.error(t('toasts.searchError', { message: error.message }))
 			} finally {
 				setIsSearchingUsers(false)
 			}
 		}, 350)
 
 		return () => clearTimeout(timeout)
-	}, [userSearch, token])
+	}, [userSearch, t])
 
 	useEffect(() => {
 		if (selectedUserId) {
@@ -191,23 +162,12 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 				reason: 'admin toggle',
 			}))
 
-			const response = await fetch(`${BASE_URL}/admin/users/${selectedUserId}/features`, {
-				method: 'PUT',
-				headers: {
-					'Content-Type': 'application/json',
-					Authorization: `Bearer ${token}`,
-				},
-				body: JSON.stringify({ overrides }),
-			})
+			await getAdminRepository().updateUserFeatures(selectedUserId, overrides)
 
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
-
-			toast.success('Feature flags updated')
+			toast.success(t('toasts.saveSuccess'))
 			await loadUserFlags(selectedUserId)
 		} catch (error: any) {
-			toast.error(`Error saving feature flags: ${error.message}`)
+			toast.error(t('toasts.saveError', { message: error.message }))
 		} finally {
 			setIsSaving(false)
 		}
@@ -223,26 +183,16 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		try {
 			for (const featureKey of keys) {
 				const enabled = pendingGlobal[featureKey]
-				const response = await fetch(`${BASE_URL}/admin/features/${featureKey}/global`, {
-					method: 'PATCH',
-					headers: {
-						'Content-Type': 'application/json',
-						Authorization: `Bearer ${token}`,
-					},
-					body: JSON.stringify({ enabled, reason: 'admin global toggle' }),
-				})
-				if (!response.ok) {
-					throw new Error(`failed: ${response.status}`)
-				}
+				await getAdminRepository().setGlobalFeature(featureKey, enabled, 'admin global toggle')
 			}
 
-			toast.success('Global feature overrides updated')
+			toast.success(t('toasts.globalSuccess'))
 			await loadCatalog()
 			if (selectedUserId) {
 				await loadUserFlags(selectedUserId)
 			}
 		} catch (error: any) {
-			toast.error(`Error saving global feature overrides: ${error.message}`)
+			toast.error(t('toasts.globalError', { message: error.message }))
 		} finally {
 			setIsSaving(false)
 		}
@@ -250,21 +200,15 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 
 	const resetGlobalOverride = async (featureKey: string) => {
 		try {
-			const response = await fetch(`${BASE_URL}/admin/features/${featureKey}/global`, {
-				method: 'DELETE',
-				headers: { Authorization: `Bearer ${token}` },
-			})
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
+			await getAdminRepository().resetGlobalFeature(featureKey)
 
-			toast.success(`Reset global override for ${featureKey}`)
+			toast.success(t('toasts.resetGlobalSuccess', { key: featureKey }))
 			await loadCatalog()
 			if (selectedUserId) {
 				await loadUserFlags(selectedUserId)
 			}
 		} catch (error: any) {
-			toast.error(`Error resetting global override: ${error.message}`)
+			toast.error(t('toasts.resetGlobalError', { message: error.message }))
 		}
 	}
 
@@ -274,43 +218,43 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 		}
 
 		try {
-			const response = await fetch(`${BASE_URL}/admin/users/${selectedUserId}/features/${featureKey}`, {
-				method: 'DELETE',
-				headers: { Authorization: `Bearer ${token}` },
-			})
-			if (!response.ok) {
-				throw new Error(`failed: ${response.status}`)
-			}
+			await getAdminRepository().resetUserFeature(selectedUserId, featureKey)
 
-			toast.success(`Reset ${featureKey} to default`)
+			toast.success(t('toasts.resetSuccess', { key: featureKey }))
 			await loadUserFlags(selectedUserId)
 		} catch (error: any) {
-			toast.error(`Error resetting override: ${error.message}`)
+			toast.error(t('toasts.resetError', { message: error.message }))
 		}
 	}
 
 	return (
 		<Card className='border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden'>
 			<CardHeader>
-				<CardTitle>Feature Flags by User</CardTitle>
-				<CardDescription>Enable or disable features per user account.</CardDescription>
+				<CardTitle>{t('title')}</CardTitle>
+				<CardDescription>{t('description')}</CardDescription>
 			</CardHeader>
 			<CardContent className='space-y-4'>
 				<div className='space-y-2'>
-					<div className='text-sm font-medium'>Global Overrides</div>
+					<div className='text-sm font-medium'>{t('globalOverrides')}</div>
 					{catalogFeatures.map((feature) => (
-						<div key={`global-${feature.key}`} className='rounded border p-3 flex items-center justify-between gap-3'>
+						<div
+							key={`global-${feature.key}`}
+							className='rounded border p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+						>
 							<div className='min-w-0'>
 								<div className='text-sm font-medium'>{feature.name}</div>
 								<div className='text-xs text-muted-foreground truncate'>{feature.description || feature.key}</div>
 								<div className='text-[11px] text-muted-foreground mt-1'>
-									default: {feature.default_enabled ? 'ON' : 'OFF'} | global override:{' '}
-									{feature.has_global_override ? 'YES' : 'NO'}
+									{t('globalMeta', {
+										defaultState: onOff(feature.default_enabled),
+										overrideState: yesNo(feature.has_global_override),
+									})}
 								</div>
 							</div>
 							<div className='flex items-center gap-2'>
 								<Switch
 									checked={feature.has_global_override ? !!feature.global_enabled : feature.default_enabled}
+									aria-label={feature.name}
 									onCheckedChange={(value) => handleGlobalToggle(feature.key, value)}
 								/>
 								<Button
@@ -319,14 +263,14 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 									onClick={() => resetGlobalOverride(feature.key)}
 									disabled={!feature.has_global_override}
 								>
-									Reset Global
+									{t('resetGlobal')}
 								</Button>
 							</div>
 						</div>
 					))}
 					<div className='flex justify-end'>
 						<Button onClick={saveGlobalChanges} disabled={isSaving || Object.keys(pendingGlobal).length === 0}>
-							{isSaving ? 'Saving...' : `Save ${Object.keys(pendingGlobal).length} global changes`}
+							{isSaving ? t('saving') : t('saveGlobal', { count: Object.keys(pendingGlobal).length })}
 						</Button>
 					</div>
 				</div>
@@ -337,7 +281,8 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 					<Input
 						value={userSearch}
 						onChange={(e) => setUserSearch(e.target.value)}
-						placeholder='Buscar usuario por nombre o email'
+						placeholder={t('searchPlaceholder')}
+						aria-label={t('searchPlaceholder')}
 					/>
 				</div>
 
@@ -346,9 +291,9 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 						<table className='w-full text-sm'>
 							<thead className='sticky top-0 bg-background border-b'>
 								<tr className='text-left text-xs text-muted-foreground'>
-									<th className='px-3 py-2 font-medium'>Nombre</th>
-									<th className='px-3 py-2 font-medium'>Email</th>
-									<th className='px-3 py-2 font-medium w-28'>Seleccionar</th>
+									<th className='px-3 py-2 font-medium'>{t('columns.name')}</th>
+									<th className='px-3 py-2 font-medium'>{t('columns.email')}</th>
+									<th className='px-3 py-2 font-medium w-28'>{t('columns.select')}</th>
 								</tr>
 							</thead>
 							<tbody>
@@ -362,14 +307,14 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 											<td className='px-3 py-2 font-medium'>
 												{user.name} {user.last_name}
 											</td>
-											<td className='px-3 py-2 text-muted-foreground'>{user.email}</td>
+											<td className='px-3 py-2 text-muted-foreground break-all'>{user.email}</td>
 											<td className='px-3 py-2'>
 												<Button
 													size='sm'
 													variant={isSelected ? 'default' : 'outline'}
 													onClick={() => setSelectedUserId(user.id)}
 												>
-													{isSelected ? 'Activo' : 'Elegir'}
+													{isSelected ? t('selected') : t('choose')}
 												</Button>
 											</td>
 										</tr>
@@ -378,7 +323,7 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 								{!isSearchingUsers && usersForSelect.length === 0 && (
 									<tr>
 										<td colSpan={3} className='px-3 py-3 text-sm text-muted-foreground'>
-											No se encontraron usuarios
+											{t('noUsers')}
 										</td>
 									</tr>
 								)}
@@ -386,13 +331,13 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 						</table>
 					</div>
 					{isSearchingUsers && (
-						<div className='px-3 py-2 text-xs text-muted-foreground border-t'>Buscando usuarios...</div>
+						<div className='px-3 py-2 text-xs text-muted-foreground border-t'>{t('searchingUsers')}</div>
 					)}
 				</div>
 
 				{selectedUser && (
 					<div className='text-sm text-muted-foreground'>
-						Managing flags for:{' '}
+						{t('managingFor')}{' '}
 						<span className='font-medium text-foreground'>
 							{selectedUser.name} {selectedUser.last_name}
 						</span>
@@ -400,31 +345,38 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 				)}
 
 				<div className='space-y-2'>
-					{isLoading && <div className='text-sm text-muted-foreground'>Loading feature flags...</div>}
+					{isLoading && <div className='text-sm text-muted-foreground'>{t('loadingFlags')}</div>}
 					{!isLoading && selectedUserId && features.length === 0 && (
-						<div className='text-sm text-muted-foreground'>No feature flags found.</div>
+						<div className='text-sm text-muted-foreground'>{t('noFlags')}</div>
 					)}
 
 					{features.map((feature) => (
-						<div key={feature.key} className='rounded border p-3 flex items-center justify-between gap-3'>
+						<div
+							key={feature.key}
+							className='rounded border p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+						>
 							<div className='min-w-0'>
 								<div className='text-sm font-medium'>{feature.name}</div>
 								<div className='text-xs text-muted-foreground truncate'>{feature.description || feature.key}</div>
 								<div className='text-[11px] text-muted-foreground mt-1'>
-									default: {feature.default_enabled ? 'ON' : 'OFF'} | user override:{' '}
-									{feature.has_override ? 'YES' : 'NO'} | source: {feature.source || 'default'}
+									{t('userMeta', {
+										defaultState: onOff(feature.default_enabled),
+										overrideState: yesNo(!!feature.has_override),
+										source: sourceLabel(feature.source),
+									})}
 								</div>
 								{feature.blocked_by_global && (
-									<div className='text-[11px] text-amber-600 mt-1'>Overridden by global setting</div>
+									<div className='text-[11px] text-amber-600 mt-1'>{t('blockedByGlobal')}</div>
 								)}
 							</div>
 							<div className='flex items-center gap-2'>
 								<Switch
 									checked={pending[feature.key] ?? feature.user_override_enabled ?? feature.enabled}
 									onCheckedChange={(value) => handleToggle(feature.key, value)}
+									aria-label={feature.name}
 								/>
 								<Button size='sm' variant='outline' onClick={() => resetOverride(feature.key)}>
-									Reset
+									{t('reset')}
 								</Button>
 							</div>
 						</div>
@@ -433,7 +385,7 @@ export function FeatureFlagsPanel({ users, token }: FeatureFlagsPanelProps) {
 
 				<div className='flex justify-end'>
 					<Button onClick={saveChanges} disabled={isSaving || Object.keys(pending).length === 0}>
-						{isSaving ? 'Saving...' : `Save ${Object.keys(pending).length} changes`}
+						{isSaving ? t('saving') : t('saveChanges', { count: Object.keys(pending).length })}
 					</Button>
 				</div>
 			</CardContent>

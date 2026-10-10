@@ -25,10 +25,13 @@ interface BudgetFormModalProps {
 	open: boolean
 	setOpen: (_v: boolean) => void
 	initialCategoryId?: string
+	/** Called after a successful create/update (e.g. to refresh server-rendered pages). */
+	onSaved?: () => void
 }
 
-export function BudgetFormModal({ open, setOpen, initialCategoryId }: BudgetFormModalProps) {
+export function BudgetFormModal({ open, setOpen, initialCategoryId, onSaved }: BudgetFormModalProps) {
 	const t = useTranslations('forms')
+	const tBudgets = useTranslations('budgets')
 	const { createBudget, updateBudget, editingBudget, setEditingBudget, isLoading, error } = useBudgetContext()
 	const { data: categories = [] } = useGetCategories()
 	const isEditing = !!editingBudget
@@ -49,6 +52,10 @@ export function BudgetFormModal({ open, setOpen, initialCategoryId }: BudgetForm
 				await createBudget(values.category_id, values.amount)
 			}
 			form.reset({ category_id: '', amount: 0 })
+			// The context closes its own modal state; also close whoever owns `open`
+			// (the global "+" menu passes its own setter).
+			setOpen(false)
+			onSaved?.()
 		} catch {
 			// Error handling is done via the error prop from context
 		}
@@ -108,6 +115,7 @@ export function BudgetFormModal({ open, setOpen, initialCategoryId }: BudgetForm
 									<FormControl>
 										<Input type='number' {...field} min={1} step={0.01} />
 									</FormControl>
+									<p className='text-xs text-muted-foreground'>{tBudgets('spentHint')}</p>
 									<FormMessage />
 								</FormItem>
 							)}

@@ -10,7 +10,6 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
-	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	aiService "github.com/osmait/gestorDePresupuesto/internal/services/ai"
 	"github.com/osmait/gestorDePresupuesto/internal/services/ai/tasks"
 	"github.com/rs/zerolog/log"
@@ -114,8 +113,8 @@ func (h *Handler) ExtractTransactions(c *gin.Context) {
 	duplicates := h.detectPotentialDuplicates(c.Request.Context(), userID, response.Data.Transactions)
 	response.Data.PotentialDuplicates = duplicates
 	response.Data.CategorySuggestions = []dto.CategorySuggestion{}
-	if h.db != nil {
-		if enabled, flagErr := middleware.IsFeatureEnabled(c, h.db, userID, "ai_category_suggestions"); flagErr == nil && enabled {
+	if h.flags != nil {
+		if enabled, flagErr := h.flags.Enabled(c.Request.Context(), userID, "ai_category_suggestions"); flagErr == nil && enabled {
 			response.Data.CategorySuggestions = h.suggestCategoriesForTransactions(
 				c.Request.Context(),
 				userID,

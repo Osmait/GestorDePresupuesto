@@ -35,7 +35,10 @@ func (w *DemoCleanupWorker) Start(ctx context.Context) {
 			case <-ticker.C:
 				log.Info().Msg("Running scheduled demo user cleanup")
 				// Worker keeps 24h retention
-				if err := w.userService.DeleteDemoUsers(ctx, 24*time.Hour); err != nil {
+				err := instrumentedRun(ctx, "demo_cleanup", func(ctx context.Context) error {
+					return w.userService.DeleteDemoUsers(ctx, 24*time.Hour)
+				})
+				if err != nil {
 					log.Error().Err(err).Msg("Failed to cleanup demo users")
 				} else {
 					log.Info().Msg("Demo user cleanup completed successfully")

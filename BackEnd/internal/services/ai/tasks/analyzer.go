@@ -9,6 +9,7 @@ import (
 	"time"
 
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 )
@@ -17,12 +18,13 @@ import (
 var spendingAnalysisPrompt string
 
 type AnalyzerInput struct {
-	DateFrom          string
-	DateTo            string
-	Days              int
-	TotalExpenses     float64
-	TotalIncome       float64
-	NetSavings        float64
+	DateFrom      string
+	DateTo        string
+	Days          int
+	TotalExpenses money.Amount
+	TotalIncome   money.Amount
+	NetSavings    money.Amount
+	// SavingsRate is a display-only percentage for the prompt.
 	SavingsRate       float64
 	CategoryBreakdown []CategoryBreakdownInput
 	Transactions      []TransactionInput
@@ -31,8 +33,9 @@ type AnalyzerInput struct {
 }
 
 type CategoryBreakdownInput struct {
-	Category   string
-	Amount     float64
+	Category string
+	Amount   money.Amount
+	// Percentage is a display-only share of expenses for the prompt.
 	Percentage float64
 }
 
@@ -41,7 +44,7 @@ type TransactionInput struct {
 	Type        string
 	Category    string
 	Description string
-	Amount      float64
+	Amount      money.Amount
 }
 
 type SpendingAnalyzer struct {
@@ -92,29 +95,27 @@ func (a *SpendingAnalyzer) ParseResponse(rawJSON string) (interface{}, error) {
 	if err := json.Unmarshal([]byte(cleaned), &insights); err != nil {
 		return nil, fmt.Errorf("%w: %v", domain.ErrInvalidJSON, err)
 	}
+	insights.RoundAmounts()
 
 	return insights, nil
 }
 
 func PrepareAnalyzerInput(transactions []*transaction.Transaction, dateFrom, dateTo time.Time) *AnalyzerInput {
-	totalExpenses := 0.0
-	totalIncome := 0.0
-	categoryTotals := make(map[string]float64)
+	totalExpenses := money.Zero
+	totalIncome := money.Zero
+	categoryTotals := make(map[string]money.Amount)
 
 	txnInputs := make([]TransactionInput, 0, len(transactions))
 	for _, txn := range transactions {
-		amount := txn.Amount
-		if amount < 0 {
-			amount = -amount
-		}
+		amount := txn.Amount.Abs()
 
 		category := getCategoryName(txn.CategoryId)
 
 		if txn.TypeTransation == "bill" {
-			totalExpenses += amount
-			categoryTotals[category] += amount
+			totalExpenses = totalExpenses.Add(amount)
+			categoryTotals[category] = categoryTotals[category].Add(amount)
 		} else {
-			totalIncome += amount
+			totalIncome = totalIncome.Add(amount)
 		}
 
 		txnInputs = append(txnInputs, TransactionInput{
@@ -128,10 +129,7 @@ func PrepareAnalyzerInput(transactions []*transaction.Transaction, dateFrom, dat
 
 	categoryBreakdown := make([]CategoryBreakdownInput, 0)
 	for cat, amount := range categoryTotals {
-		percentage := 0.0
-		if totalExpenses > 0 {
-			percentage = (amount / totalExpenses) * 100
-		}
+		percentage := money.Percent(amount, totalExpenses)
 		categoryBreakdown = append(categoryBreakdown, CategoryBreakdownInput{
 			Category:   cat,
 			Amount:     amount,
@@ -139,10 +137,10 @@ func PrepareAnalyzerInput(transactions []*transaction.Transaction, dateFrom, dat
 		})
 	}
 
-	netSavings := totalIncome - totalExpenses
+	netSavings := totalIncome.Sub(totalExpenses)
 	savingsRate := 0.0
-	if totalIncome > 0 {
-		savingsRate = (netSavings / totalIncome) * 100
+	if totalIncome.IsPositive() {
+		savingsRate = money.Percent(netSavings, totalIncome)
 	}
 
 	days := int(dateTo.Sub(dateFrom).Hours() / 24)

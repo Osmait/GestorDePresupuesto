@@ -1,11 +1,14 @@
 'use client'
 
 import { ResponsiveLine } from '@nivo/line'
+import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { Certificate, CertificatePayment, formatCurrency } from '@/types/certificate'
+import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
+import { formatCurrency } from '@/lib/utils'
+import { Certificate, CertificatePayment } from '@/types/certificate'
 
 interface ChartDataPoint {
 	x: string
@@ -19,10 +22,10 @@ interface CertificateChartProps {
 }
 
 const PROJECTION_OPTIONS = [
-	{ value: '6', label: '6 meses' },
-	{ value: '12', label: '12 meses' },
-	{ value: 'maturity', label: 'Hasta vencimiento' },
-]
+	{ value: '6', labelKey: 'sixMonths' },
+	{ value: '12', labelKey: 'twelveMonths' },
+	{ value: 'maturity', labelKey: 'untilMaturity' },
+] as const
 
 function addMonths(date: Date, months: number): Date {
 	const result = new Date(date)
@@ -30,8 +33,8 @@ function addMonths(date: Date, months: number): Date {
 	return result
 }
 
-function formatDate(date: Date): string {
-	return date.toLocaleDateString('es-DO', { month: 'short', year: '2-digit' })
+function formatDate(date: Date, locale: string): string {
+	return date.toLocaleDateString(getIntlLocale(locale), { month: 'short', year: '2-digit' })
 }
 
 function getMonthsUntilMaturity(maturityDate: string | undefined): number {
@@ -43,6 +46,10 @@ function getMonthsUntilMaturity(maturityDate: string | undefined): number {
 }
 
 export function CertificateChart({ certificate, payments }: CertificateChartProps) {
+	const t = useTranslations('certificates.chart')
+	const locale = useAppLocale()
+	const currency = certificate.currency || 'DOP'
+	const money = (value: number) => formatCurrency(value, currency, { locale })
 	const [projectionMonths, setProjectionMonths] = useState<string>('12')
 	const [showCapitalBase, setShowCapitalBase] = useState(true)
 
@@ -67,12 +74,12 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 		historicalPayments.forEach((payment) => {
 			accumulatedNet += payment.net_interest
 			data.totalValue.push({
-				x: formatDate(new Date(payment.payment_date)),
+				x: formatDate(new Date(payment.payment_date), locale),
 				y: certificate.base_capital + accumulatedNet,
 				isProjection: false,
 			})
 			data.capitalBase.push({
-				x: formatDate(new Date(payment.payment_date)),
+				x: formatDate(new Date(payment.payment_date), locale),
 				y: certificate.base_capital,
 				isProjection: false,
 			})
@@ -96,12 +103,12 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 			const projectionDate = addMonths(lastPaymentDate, i)
 
 			data.totalValue.push({
-				x: formatDate(projectionDate),
+				x: formatDate(projectionDate, locale),
 				y: certificate.base_capital + accumulatedNet,
 				isProjection: true,
 			})
 			data.capitalBase.push({
-				x: formatDate(projectionDate),
+				x: formatDate(projectionDate, locale),
 				y: certificate.base_capital,
 				isProjection: true,
 			})
@@ -112,18 +119,18 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 		}
 
 		return data
-	}, [certificate, payments, monthsToShow])
+	}, [certificate, payments, monthsToShow, locale])
 
 	const nivoData = [
 		{
-			id: 'Valor Total',
+			id: t('totalValue'),
 			data: chartData.totalValue,
 			color: 'hsl(142, 76%, 36%)',
 		},
 		...(showCapitalBase
 			? [
 					{
-						id: 'Capital Base',
+						id: t('capitalBase'),
 						data: chartData.capitalBase,
 						color: 'hsl(215, 16%, 47%)',
 					},
@@ -134,10 +141,10 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 	return (
 		<div className='space-y-4'>
 			<div className='flex flex-wrap items-center justify-between gap-4'>
-				<div className='flex items-center gap-4'>
-					<div className='flex items-center gap-2'>
+				<div className='flex flex-wrap items-center gap-4'>
+					<div className='flex flex-wrap items-center gap-2'>
 						<Label htmlFor='projection' className='text-sm'>
-							Proyección:
+							{t('projection')}
 						</Label>
 						<Select value={projectionMonths} onValueChange={setProjectionMonths}>
 							<SelectTrigger className='w-[160px]'>
@@ -146,7 +153,7 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 							<SelectContent>
 								{PROJECTION_OPTIONS.map((opt) => (
 									<SelectItem key={opt.value} value={opt.value}>
-										{opt.label}
+										{t(opt.labelKey)}
 									</SelectItem>
 								))}
 							</SelectContent>
@@ -156,7 +163,7 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 				<div className='flex items-center gap-2'>
 					<Switch id='showCapitalBase' checked={showCapitalBase} onCheckedChange={setShowCapitalBase} />
 					<Label htmlFor='showCapitalBase' className='text-sm font-normal'>
-						Mostrar Capital Base
+						{t('showCapitalBase')}
 					</Label>
 				</div>
 			</div>
@@ -180,14 +187,14 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 						tickSize: 5,
 						tickPadding: 5,
 						tickRotation: 0,
-						format: (value) => formatCurrency(value),
+						format: (value) => money(Number(value)),
 					}}
 					enablePoints={true}
 					pointSize={6}
 					pointColor={{ from: 'color' }}
 					pointBorderWidth={2}
 					pointBorderColor={{ from: 'serieColor' }}
-					pointLabel={(d) => formatCurrency(d.y)}
+					pointLabel={(d) => money(Number(d.y))}
 					useMesh={true}
 					colors={{ datum: 'color' }}
 					legends={[
@@ -210,7 +217,7 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 					tooltip={({ point }) => (
 						<div className='bg-background border rounded-md px-3 py-2 shadow-md'>
 							<p className='text-xs text-muted-foreground'>{point.data.xFormatted}</p>
-							<p className='text-sm font-semibold'>{formatCurrency(point.data.y as number)}</p>
+							<p className='text-sm font-semibold'>{money(point.data.y as number)}</p>
 						</div>
 					)}
 					theme={{
@@ -232,15 +239,15 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 				/>
 			</div>
 
-			<div className='flex justify-center gap-6 text-xs text-muted-foreground'>
+			<div className='flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground'>
 				<div className='flex items-center gap-2'>
 					<div className='w-8 h-0.5 bg-green-600' />
-					<span>Valor Total (Capital + Intereses)</span>
+					<span>{t('totalValueLegend')}</span>
 				</div>
 				{showCapitalBase && (
 					<div className='flex items-center gap-2'>
 						<div className='w-8 h-0.5 border-t-2 border-dashed border-slate-400' />
-						<span>Capital Base</span>
+						<span>{t('capitalBase')}</span>
 					</div>
 				)}
 			</div>

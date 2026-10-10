@@ -10,6 +10,7 @@ import (
 	"unicode"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
@@ -41,7 +42,7 @@ func (h *Handler) SuggestCategory(c *gin.Context) {
 		Id:             "manual-preview",
 		Name:           req.Name,
 		Description:    req.Description,
-		Amount:         float64(req.Amount),
+		Amount:         req.Amount,
 		TypeTransation: strings.ToLower(strings.TrimSpace(req.Type)),
 		AccountId:      req.AccountID,
 		Currency:       req.Currency,
@@ -78,7 +79,7 @@ func (h *Handler) SuggestCategoriesBatch(c *gin.Context) {
 			Id:             fmt.Sprintf("manual-batch-%d", idx),
 			Name:           item.Name,
 			Description:    item.Description,
-			Amount:         float64(item.Amount),
+			Amount:         item.Amount,
 			TypeTransation: strings.ToLower(strings.TrimSpace(item.Type)),
 			AccountId:      item.AccountID,
 			Currency:       item.Currency,
@@ -148,17 +149,17 @@ func (h *Handler) suggestCategoryForTransaction(
 		}
 
 		nameSim := nameSimilarityScore(txn.Name+" "+txn.Description, existing.Name+" "+existing.Description)
-		amountDiff := math.Abs(targetAmount - existing.Amount)
+		amountDiff := targetAmount.Sub(existing.Amount).Abs()
 
 		entryScore := 0.0
 		if nameSim >= 0.65 {
 			entryScore += nameSim * 0.55
 		}
-		if amountDiff <= 1 {
+		if amountDiff.LessThanOrEqual(money.FromInt(1)) {
 			entryScore += 0.25
-		} else if amountDiff <= 5 {
+		} else if amountDiff.LessThanOrEqual(money.FromInt(5)) {
 			entryScore += 0.15
-		} else if amountDiff <= 20 {
+		} else if amountDiff.LessThanOrEqual(money.FromInt(20)) {
 			entryScore += 0.08
 		}
 		if txn.AccountId != "" && existing.AccountId == txn.AccountId {

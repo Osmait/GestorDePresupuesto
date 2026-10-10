@@ -3,7 +3,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, Edit, Loader2, PlusCircle } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { Alert, AlertDescription } from '@/components/ui/alert'
@@ -15,28 +15,37 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useCreateMonthlyPlanItem, useUpdateMonthlyPlanItem } from '@/hooks/queries/useMonthlyPlanQuery'
+import { hasAtMostDecimals } from '@/lib/money-validation'
 import { MonthlyPlanItemRequest } from '@/types/monthlyPlan'
 import { useMonthlyPlanContext } from './MonthlyPlanContext'
 
 /** Sentinel for the "no category / no account" option, since Select needs a value. */
 const NONE = '__none__'
 
-const planItemSchema = z.object({
-	name: z.string().min(1),
-	description: z.string().optional(),
-	amount: z.coerce.number().positive(),
-	currency: z.enum(['DOP', 'USD']),
-	type: z.enum(['income', 'bill']),
-	category_id: z.string().optional(),
-	account_id: z.string().optional(),
-	// Empty means "no fixed day", which the backend stores as NULL.
-	day_of_month: z.union([z.coerce.number().int().min(1).max(31), z.literal('')]).optional(),
-})
+function createPlanItemSchema(maxTwoDecimals: string) {
+	return z.object({
+		name: z.string().min(1),
+		description: z.string().optional(),
+		// monthly_plan_items.amount is NUMERIC(15,2): the API rejects sub-cent amounts.
+		amount: z.coerce
+			.number()
+			.positive()
+			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals),
+		currency: z.enum(['DOP', 'USD']),
+		type: z.enum(['income', 'bill']),
+		category_id: z.string().optional(),
+		account_id: z.string().optional(),
+		// Empty means "no fixed day", which the backend stores as NULL.
+		day_of_month: z.union([z.coerce.number().int().min(1).max(31), z.literal('')]).optional(),
+	})
+}
 
-type PlanItemFormValues = z.infer<typeof planItemSchema>
+type PlanItemFormValues = z.infer<ReturnType<typeof createPlanItemSchema>>
 
 export function MonthlyPlanFormModal() {
 	const t = useTranslations('monthlyPlan')
+	const tForms = useTranslations('forms')
+	const planItemSchema = useMemo(() => createPlanItemSchema(tForms('maxTwoDecimals')), [tForms])
 	const { isModalOpen, editingItem, defaultType, closeModal, setModalOpen } = useMonthlyPlanContext()
 	const { data: categories = [] } = useGetCategories()
 	const { data: accounts = [] } = useGetAccounts()

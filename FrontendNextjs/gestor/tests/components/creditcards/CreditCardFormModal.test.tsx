@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModal'
+import { renderWithIntl } from '@/tests/utils/intl'
 import { CreditCard } from '@/types/creditcard'
 
 // Polyfill for Radix UI
@@ -15,10 +16,6 @@ beforeAll(() => {
 	} as unknown as typeof globalThis.ResizeObserver
 })
 
-vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string) => key,
-}))
-
 describe('CreditCardFormModal', () => {
 	const mockOnClose = vi.fn()
 	const mockOnSubmit = vi.fn().mockResolvedValue(undefined)
@@ -28,7 +25,7 @@ describe('CreditCardFormModal', () => {
 	})
 
 	function renderModal(card?: CreditCard | null) {
-		return render(<CreditCardFormModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} card={card} />)
+		return renderWithIntl(<CreditCardFormModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} card={card} />)
 	}
 
 	it('renders create mode', () => {
@@ -41,6 +38,19 @@ describe('CreditCardFormModal', () => {
 		expect(screen.getByText('Cut Day (1-28)')).toBeInTheDocument()
 		expect(screen.getByText('Due Day (1-28)')).toBeInTheDocument()
 		expect(screen.getByText('Create')).toBeInTheDocument()
+	})
+
+	it('renders Spanish labels and validation for the es locale', async () => {
+		const user = userEvent.setup()
+		renderWithIntl(<CreditCardFormModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} />, {
+			locale: 'es',
+		})
+
+		expect(screen.getByText('Agregar tarjeta de crédito')).toBeInTheDocument()
+		await user.click(screen.getByText('Crear'))
+		await waitFor(() => {
+			expect(screen.getByText('El nombre de la tarjeta es obligatorio')).toBeInTheDocument()
+		})
 	})
 
 	it('renders edit mode with card data', () => {
@@ -208,5 +218,20 @@ describe('CreditCardFormModal', () => {
 				}),
 			)
 		})
+	})
+
+	it('rejects a credit limit with more than 2 decimal places', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
+		const limitInput = screen.getByRole('spinbutton', { name: 'Credit Limit DOP' })
+		await user.clear(limitInput)
+		await user.type(limitInput, '1000.005')
+		await user.click(screen.getByText('Create'))
+
+		expect(await screen.findByText('Use at most 2 decimal places')).toBeInTheDocument()
+		expect(mockOnSubmit).not.toHaveBeenCalled()
 	})
 })

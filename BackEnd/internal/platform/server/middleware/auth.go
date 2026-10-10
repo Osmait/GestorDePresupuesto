@@ -1,63 +1,57 @@
 package middleware
 
 import (
-	"fmt"
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
 
-// publicRoutes is the authoritative set of paths that bypass authentication.
-// IMPORTANT: use EXACT path matches only.
-// Substring matching (strings.Contains) is a security risk — a route like
-// "/account/login-history" would accidentally bypass auth if "login" were
-// matched as a substring.
+// publicRoutes is the authoritative set of METHOD + PATH pairs that bypass
+// authentication. These are exactly the endpoints the web and iOS clients
+// call without a bearer token.
+//
+// IMPORTANT: exact matches only. Prefix/substring matching is a security
+// risk — e.g. "/user/*" once exposed GET /user/:id (any user's profile) to
+// anonymous callers, and a substring match on "login" would expose
+// "/account/login-history".
 var publicRoutes = map[string]bool{
-	"/login":                     true, // legacy single-token login
-	"/auth/login":                true,
-	"/auth/refresh":              true,
-	"/auth/logout":               true,
-	"/auth/demo":                 true,
-	"/auth/passkey/login/begin":  true,
-	"/auth/passkey/login/finish": true,
-	"/health":                    true,
-	"/ping":                      true,
-	"/metrics":                   true,
+	http.MethodPost + " /user":                      true, // registration
+	http.MethodPost + " /login":                     true, // legacy single-token login
+	http.MethodPost + " /auth/login":                true,
+	http.MethodPost + " /auth/refresh":              true,
+	http.MethodPost + " /auth/logout":               true, // authenticated by the refresh token in the body
+	http.MethodPost + " /auth/demo":                 true,
+	http.MethodPost + " /auth/passkey/login/begin":  true,
+	http.MethodPost + " /auth/passkey/login/finish": true,
+	http.MethodGet + " /health":                     true,
+	http.MethodGet + " /ping":                       true,
+	http.MethodHead + " /health":                    true,
 }
 
-// shouldCheckToken reports whether the given route path requires a valid JWT.
-func shouldCheckToken(route string) bool {
-	// Exact match against the public routes set.
-	if publicRoutes[route] {
+// shouldCheckToken reports whether a request with the given method and path
+// requires a valid JWT. CORS preflights (OPTIONS) never carry credentials and
+// are answered by the CORS middleware, so they are not authenticated.
+func shouldCheckToken(method, route string) bool {
+	if method == http.MethodOptions {
 		return false
 	}
-
-	// /user  (registration) and /user/:id (lookup by ID) are public.
-	// We guard against over-broad matches: only the exact path or a
-	// single path segment beneath it is allowed without auth.
-	if route == "/user" || strings.HasPrefix(route, "/user/") {
-		return false
-	}
-
-	return true
+	return !publicRoutes[method+" "+route]
 }
 
-// AppClaims represents the JWT claims structure
-type AppClaims struct {
-	UserId string `json:"id"`
-	jwt.RegisteredClaims
-}
-
-// AuthMiddleware provides JWT-based authentication with configurable secret
-func AuthMiddleware(userService *user.UserService, config *config.Config) gin.HandlerFunc {
+// AuthMiddleware provides JWT-based authentication. Tokens must be HS256,
+// unexpired, and carry the configured issuer and audience.
+func AuthMiddleware(userService *user.UserService, cfg *config.Config) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Skip authentication for certain routes
-		if !shouldCheckToken(c.Request.URL.Path) {
+		// Skip authentication for public routes
+		if !shouldCheckToken(c.Request.Method, c.Request.URL.Path) {
 			c.Next()
 			return
 		}
@@ -65,106 +59,74 @@ func AuthMiddleware(userService *user.UserService, config *config.Config) gin.Ha
 		// Extract Authorization header
 		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
 		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "authorization header is required",
 			})
-			c.Abort()
 			return
 		}
 
 		// Validate Authorization header format
 		tokenParts := strings.Split(authHeader, " ")
 		if len(tokenParts) != 2 || tokenParts[0] != "Bearer" {
-			c.JSON(http.StatusUnauthorized, gin.H{
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid authorization header format",
 			})
-			c.Abort()
 			return
 		}
 
-		// Parse and validate JWT token
-		token, err := jwt.ParseWithClaims(tokenParts[1], &AppClaims{}, func(t *jwt.Token) (interface{}, error) {
-			// Validate signing method
-			if _, ok := t.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, fmt.Errorf("unexpected signing method: %v", t.Header["alg"])
-			}
-			// Use configurable secret from environment
-			return []byte(config.JWT.Secret), nil
-		})
-
+		claims, err := utils.ParseAccessToken(tokenParts[1], cfg.JWT)
 		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "invalid or expired token",
 			})
-			c.Abort()
 			return
 		}
 
-		// Extract claims
-		claims, ok := token.Claims.(*AppClaims)
-		if !ok || !token.Valid {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "invalid token claims",
+		// Validate user exists and is active. This runs before RLSMiddleware,
+		// so it holds no other pooled connection; it is the most frequent query
+		// of the API, hence the short-TTL cache (AUTH_USER_CACHE_TTL), and its
+		// wait is bounded like the request transaction (DB_TX_ACQUIRE_TIMEOUT)
+		// so pool exhaustion fails fast instead of queueing every request.
+		lookupCtx := c.Request.Context()
+		if timeout := cfg.Database.TxAcquireTimeout; timeout > 0 {
+			var cancel context.CancelFunc
+			lookupCtx, cancel = context.WithTimeout(lookupCtx, timeout)
+			defer cancel()
+		}
+		u, err := userService.FindActiveUserForAuth(lookupCtx, claims.UserId)
+		if err != nil && isTransientLookupError(err) {
+			// A database outage or an exhausted pool is not a reason to log
+			// the user out: answer 503 so clients retry instead.
+			c.Header("Retry-After", "1")
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
+				"error": "authentication temporarily unavailable, please retry",
 			})
-			c.Abort()
 			return
 		}
-
-		// Validate user exists and is active
-		user, err := userService.FindUserById(c, claims.UserId)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
+		if err != nil || u == nil {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "user not found or inactive",
 			})
-			c.Abort()
-			return
-		}
-
-		if user == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "user not found",
-			})
-			c.Abort()
 			return
 		}
 
 		// Set user context for downstream handlers
 		c.Set("X-User-Id", claims.UserId)
-		c.Set("User", user)
+		c.Set("User", u)
 		c.Next()
 	}
 }
 
-// RequireAuth is a helper middleware that enforces authentication
-func RequireAuth(userService *user.UserService, config *config.Config) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
-		if authHeader == "" {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "authentication required",
-			})
-			c.Abort()
-			return
-		}
-
-		// Use the main auth middleware logic
-		AuthMiddleware(userService, config)(c)
+// isTransientLookupError reports whether a user lookup failed because of the
+// database (unavailable, pool exhausted, timeout) rather than because the
+// user does not exist or is inactive.
+func isTransientLookupError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
 	}
-}
-
-// OptionalAuth provides optional authentication (doesn't fail if no token)
-func OptionalAuth(userService *user.UserService, config *config.Config) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		authHeader := strings.TrimSpace(c.GetHeader("Authorization"))
-		if authHeader == "" {
-			// No auth header, continue without user context
-			c.Next()
-			return
-		}
-
-		// If header exists, validate it
-		AuthMiddleware(userService, config)(c)
-	}
+	return apperrors.IsErrorType(err, apperrors.ErrorTypeDatabase) ||
+		apperrors.IsErrorType(err, apperrors.ErrorTypeTimeout) ||
+		apperrors.IsErrorType(err, apperrors.ErrorTypeUnavailable)
 }
 
 // RequireRole enforces role-based access control

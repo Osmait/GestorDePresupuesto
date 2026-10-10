@@ -1,5 +1,5 @@
 'use client'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
@@ -11,7 +11,17 @@ import { AccountUpdateModal } from '@/components/accounts/AccountUpdateModal'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { Account } from '@/types/account'
 
+// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
+// full feature bundle (layout, drag) is not needed.
 export default function AccountsClient() {
+	return (
+		<LazyMotion features={domAnimation}>
+			<AccountsClientView />
+		</LazyMotion>
+	)
+}
+
+function AccountsClientView() {
 	const t = useTranslations('accounts')
 	const { accounts, isLoading, updateAccount, deleteAccount, error } = useAccountContext()
 	const [updateModalOpen, setUpdateModalOpen] = useState(false)
@@ -60,7 +70,7 @@ export default function AccountsClient() {
 			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
 				<AnimatePresence mode='popLayout' initial={false}>
 					{filteredAccounts.map((account) => (
-						<motion.div
+						<m.div
 							key={account.id}
 							initial={{ opacity: 0, y: 15 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -72,7 +82,7 @@ export default function AccountsClient() {
 								onAccountDeleted={() => deleteAccount(account.id!)}
 								onAccountEdit={handleEditAccount}
 							/>
-						</motion.div>
+						</m.div>
 					))}
 				</AnimatePresence>
 			</div>
@@ -101,7 +111,7 @@ export default function AccountsClient() {
 	]
 
 	return (
-		<motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
+		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
 			<div className='mb-8'>
 				{Array.isArray(accounts) && accounts.length > 0 ? (
 					<AccountSummaryCard accounts={accounts} />
@@ -130,6 +140,6 @@ export default function AccountsClient() {
 				isLoading={isLoading}
 				error={error}
 			/>
-		</motion.div>
+		</m.div>
 	)
 }

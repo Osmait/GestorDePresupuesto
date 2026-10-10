@@ -1,18 +1,20 @@
 'use client'
 
-import { Loader2, LogIn, Play, UserPlus } from 'lucide-react'
+import { Clock, Loader2, LogIn, Play, UserPlus } from 'lucide-react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { AuthRepository } from '@/app/repository/authRepository'
 import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
 import { ModeToggle } from '@/components/common/ToggleMode'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
 import { Card } from '@/components/ui/card'
+import { SESSION_EXPIRED_REASON } from '@/lib/auth/callback-url'
 import { LoginForm } from './login-form'
 import { RegisterForm } from './register-form'
 
@@ -22,10 +24,22 @@ interface AuthContainerProps {
 
 export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 	const t = useTranslations('auth')
+	const tCommon = useTranslations('common')
 	const [mode, setMode] = useState<'login' | 'register'>(initialMode)
 	const [isLoading, setIsLoading] = useState(false)
+	const [sessionExpired, setSessionExpired] = useState(false)
 	const router = useRouter()
 	const authRepo = new AuthRepository()
+	const isDevelopment = process.env.NODE_ENV === 'development'
+
+	// `/login?reason=session_expired` comes from the session-expired sign-out.
+	// Read from window.location (not useSearchParams) so the page stays static.
+	useEffect(() => {
+		if (new URLSearchParams(window.location.search).get('reason') === SESSION_EXPIRED_REASON) {
+			setSessionExpired(true)
+			setMode('login')
+		}
+	}, [])
 
 	const toggleMode = () => {
 		setMode(mode === 'login' ? 'register' : 'login')
@@ -69,7 +83,7 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 						<Link href='/' className='group flex items-center gap-3 hover:scale-105 transition-transform duration-200'>
 							<div className='w-12 h-12 rounded-xl overflow-hidden border border-border/40 bg-background shadow-lg flex items-center justify-center'>
 								<Image
-									src='/Gemini_Generated_Image_sbh8m9sbh8m9sbh8.png'
+									src='/sbfinance-logo.webp'
 									alt='SBFinance logo'
 									width={48}
 									height={48}
@@ -78,7 +92,7 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 							</div>
 							<div className='text-left'>
 								<h1 className='text-2xl font-bold text-foreground'>SBFinance</h1>
-								<p className='text-sm text-muted-foreground'>Gestor Personal</p>
+								<p className='text-sm text-muted-foreground'>{tCommon('appTagline')}</p>
 							</div>
 						</Link>
 					</div>
@@ -125,15 +139,23 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 						</button>
 					</div>
 
-					{/* Badge de modo de desarrollo */}
 					<div className='flex items-center justify-center gap-2'>
-						<Badge variant='outline' className='text-xs border-border/50 bg-muted/30'>
-							{t('container.devMode')}
-						</Badge>
+						{isDevelopment && (
+							<Badge variant='outline' className='text-xs border-border/50 bg-muted/30'>
+								{t('container.devMode')}
+							</Badge>
+						)}
 						<ModeToggle />
 						<LanguageSwitcher />
 					</div>
 				</div>
+
+				{sessionExpired && mode === 'login' && (
+					<Alert role='status'>
+						<Clock className='h-4 w-4' />
+						<AlertDescription>{t('login.sessionExpired')}</AlertDescription>
+					</Alert>
+				)}
 
 				{/* Formulario actual */}
 				<div className='transition-all duration-300 ease-in-out'>
@@ -146,24 +168,6 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 
 				{/* Footer con información adicional */}
 				<div className='text-center space-y-4'>
-					{/* Enlaces de navegación */}
-					<div className='flex justify-center space-x-4 text-xs text-muted-foreground'>
-						<Link
-							href='/simple-test'
-							className='hover:text-primary transition-colors underline-offset-4 hover:underline'
-						>
-							Test Simple
-						</Link>
-						<span>•</span>
-						<Link href='/debug' className='hover:text-primary transition-colors underline-offset-4 hover:underline'>
-							Debug
-						</Link>
-						<span>•</span>
-						<Link href='/test' className='hover:text-primary transition-colors underline-offset-4 hover:underline'>
-							Test Completo
-						</Link>
-					</div>
-
 					{/* Información del proyecto */}
 					<div className='text-xs text-muted-foreground/80 space-y-1'>
 						<p>{t('container.description')}</p>

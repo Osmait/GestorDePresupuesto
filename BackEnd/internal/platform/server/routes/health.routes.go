@@ -7,6 +7,9 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rs/zerolog/log"
+
+	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
 )
 
 // HealthResponse represents the health check response structure
@@ -28,8 +31,14 @@ type HealthCheck struct {
 
 var startTime = time.Now()
 
-// HealthRoutes configures health check endpoints
-func HealthRoutes(engine *gin.Engine, db *sql.DB, version, environment string) {
+// HealthRoutes configures health check endpoints.
+//
+// /health, /health/live and /health/ready stay public (Railway / load
+// balancer probes). /health/detailed returns only the overall and per-check
+// status to anonymous callers; the full payload (pool stats, uptime, error
+// messages, environment) requires "Authorization: Bearer <internalToken>"
+// (METRICS_TOKEN). With an empty token the details are never served.
+func HealthRoutes(engine *gin.Engine, db *sql.DB, version, environment, internalToken string) {
 	// Basic health check - always returns OK
 	engine.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -48,7 +57,7 @@ func HealthRoutes(engine *gin.Engine, db *sql.DB, version, environment string) {
 
 	// Comprehensive health check
 	engine.GET("/health/detailed", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 10*time.Second)
 		defer cancel()
 
 		checks := make(map[string]HealthCheck)
@@ -92,20 +101,25 @@ func HealthRoutes(engine *gin.Engine, db *sql.DB, version, environment string) {
 			statusCode = http.StatusOK // Still return 200 for degraded
 		}
 
+		if !telemetry.ValidBearer(c.GetHeader("Authorization"), internalToken) {
+			c.JSON(statusCode, trimHealth(response))
+			return
+		}
 		c.JSON(statusCode, response)
 	})
 
 	// Readiness probe (for Kubernetes)
 	engine.GET("/health/ready", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 5*time.Second)
 		defer cancel()
 
-		// Check if we can connect to the database
+		// Check if we can connect to the database. The driver error (host
+		// names, users) is logged, never returned to the anonymous caller.
 		if err := db.PingContext(ctx); err != nil {
+			log.Warn().Err(err).Msg("readiness check: database ping failed")
 			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"status":  "not ready",
-				"reason":  "database connection failed",
-				"message": err.Error(),
+				"status": "not ready",
+				"reason": "database connection failed",
 			})
 			return
 		}
@@ -126,6 +140,19 @@ func HealthRoutes(engine *gin.Engine, db *sql.DB, version, environment string) {
 		})
 	})
 
+}
+
+// trimHealth strips everything but statuses from a detailed health response.
+func trimHealth(r HealthResponse) gin.H {
+	checks := make(map[string]gin.H, len(r.Checks))
+	for name, chk := range r.Checks {
+		checks[name] = gin.H{"status": chk.Status}
+	}
+	return gin.H{
+		"status":    r.Status,
+		"timestamp": r.Timestamp,
+		"checks":    checks,
+	}
 }
 
 // checkDatabase verifies database connectivity and basic functionality

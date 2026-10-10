@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import { useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 
@@ -22,6 +22,7 @@ interface AnimatedSidebarNavProps {
 
 export function AnimatedSidebarNav({ items, isExpanded, onMobileClose, onItemClick }: AnimatedSidebarNavProps) {
 	const pathname = usePathname()
+	const router = useRouter()
 	const navRef = useRef<HTMLDivElement>(null)
 	const itemRefs = useRef<(HTMLAnchorElement | null)[]>([])
 	const [indicatorStyle, setIndicatorStyle] = useState({
@@ -93,16 +94,23 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose, onItemCli
 				}}
 			/>
 
-			{/* Efecto de pulso sutil */}
+			{/* Efecto de pulso sutil: the glow is a static (painted once) shadow whose
+			    opacity pulses, so the animation runs on the compositor instead of
+			    re-painting an animated box-shadow under a blur every frame. */}
 			<div
-				className='absolute left-0 w-1 bg-primary/50 rounded-r-full transition-all duration-500 ease-out pointer-events-none z-5 animate-glow-pulse'
+				className='absolute left-0 w-1 bg-primary/50 rounded-r-full transition-all duration-500 ease-out pointer-events-none z-5'
 				style={{
 					top: `${indicatorStyle.top}px`,
 					height: `${indicatorStyle.height}px`,
 					opacity: indicatorStyle.opacity * 0.6,
 					filter: 'blur(1px)',
 				}}
-			/>
+			>
+				<span
+					aria-hidden='true'
+					className='absolute inset-0 rounded-r-full shadow-[0_0_20px_hsl(var(--primary)/0.6)] opacity-60 will-change-[opacity] animate-glow-pulse motion-reduce:animate-none'
+				/>
+			</div>
 
 			{/* Items de navegación */}
 			<div className='relative z-20 space-y-1'>
@@ -117,6 +125,10 @@ export function AnimatedSidebarNav({ items, isExpanded, onMobileClose, onItemCli
 								itemRefs.current[index] = el
 							}}
 							href={item.href}
+							// Dynamic pages: prefetch on intent (hover/focus) instead of every link on every load.
+							prefetch={false}
+							onMouseEnter={() => router.prefetch(item.href)}
+							onFocus={() => router.prefetch(item.href)}
 							onClick={(e) => handleLinkClick(e, item)}
 							className={`flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 group relative ${
 								isActive

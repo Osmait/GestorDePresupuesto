@@ -3,6 +3,7 @@
 import { PieChart } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useAppLocale } from '@/lib/i18n/date-locale'
 import { formatDop, groupByCategory } from '@/lib/monthlyPlanUtils'
 import { MonthlyPlanItem } from '@/types/monthlyPlan'
 
@@ -18,6 +19,7 @@ export function MonthlyPlanCategoryBreakdown({
 	categoryNames: Map<string, string>
 }) {
 	const t = useTranslations('monthlyPlan')
+	const locale = useAppLocale()
 	const expenses = items.filter((item) => item.type === 'bill')
 	const shares = groupByCategory(expenses, categoryNames, t('uncategorized'))
 
@@ -39,7 +41,7 @@ export function MonthlyPlanCategoryBreakdown({
 						<div className='mb-1 flex items-center justify-between gap-3 text-sm'>
 							<span className='text-foreground truncate'>{share.label}</span>
 							<span className='text-muted-foreground shrink-0'>
-								{formatDop(share.amount)} · {share.percentage.toFixed(1)}%
+								{formatDop(share.amount, locale)} · {share.percentage.toFixed(1)}%
 							</span>
 						</div>
 						<div className='h-2 w-full overflow-hidden rounded-full bg-muted'>

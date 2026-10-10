@@ -36,7 +36,7 @@ func CreateAPIKey(service *apikeyService.APIKeyService) gin.HandlerFunc {
 			return
 		}
 
-		keyWithToken, err := service.GenerateKey(ctx, userID, req.Name)
+		keyWithToken, err := service.GenerateKey(ctx.Request.Context(), userID, req.Name)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -61,7 +61,7 @@ func ListAPIKeys(service *apikeyService.APIKeyService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userID := ctx.GetString("X-User-Id")
 
-		keys, err := service.ListKeys(ctx, userID)
+		keys, err := service.ListKeys(ctx.Request.Context(), userID)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -89,7 +89,7 @@ func RevokeAPIKey(service *apikeyService.APIKeyService) gin.HandlerFunc {
 		id := ctx.Param("id")
 		userID := ctx.GetString("X-User-Id")
 
-		if err := service.RevokeKey(ctx, id, userID); err != nil {
+		if err := service.RevokeKey(ctx.Request.Context(), id, userID); err != nil {
 			_ = ctx.Error(err)
 			return
 		}

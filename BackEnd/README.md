@@ -227,14 +227,45 @@ DB_PASSWORD=admin123
 # Server
 SERVER_HOST=localhost
 SERVER_PORT=8080
+SERVER_READ_HEADER_TIMEOUT=10s   # slowloris protection
+SERVER_READ_TIMEOUT=60s          # headers + body (AI uploads)
+SERVER_WRITE_TIMEOUT=120s        # SSE endpoints clear their own deadline
+SERVER_IDLE_TIMEOUT=120s
+
+# Client IP / reverse proxy (default: trust nobody -> TCP peer IP is the client IP)
+TRUSTED_PROXIES=                 # comma-separated IPs/CIDRs whose X-Forwarded-For is trusted
+TRUSTED_PLATFORM_HEADER=         # header set by the platform edge, e.g. X-Real-IP (Railway)
+PROXY_SHARED_SECRET=             # >= 32 chars in production; same value on the frontend (see below)
+
+# CORS (Bearer-token API: credentials not needed)
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:4321,http://localhost:8080
+CORS_ALLOW_CREDENTIALS=false
 
 # JWT
-JWT_SECRET=your-secret-key
-JWT_EXPIRATION=24h
+JWT_SECRET=your-secret-key       # >= 32 chars, required outside development/test
+JWT_EXPIRATION=24h               # access token lifetime (also used by legacy /login)
+JWT_REFRESH_EXPIRATION=168h
+JWT_ISSUER=gestor-de-presupuesto
+JWT_AUDIENCE=gestor-de-presupuesto-api
+JWT_REFRESH_REUSE_GRACE=30s      # re-presenting a just-rotated refresh token -> 401 without revoking all sessions
+
+# Login brute-force protection (per email + client IP, in memory)
+MAX_LOGIN_ATTEMPTS=5
+ACCOUNT_LOCK_TIME=15m
+
+# WebAuthn ceremony sessions are stored in Postgres (webauthn_sessions)
+WEBAUTHN_CHALLENGE_TTL=5m
 
 # Environment
 ENV=development
 ```
+
+#### Producción (Railway)
+
+- `CORS_ALLOWED_ORIGINS`: origen(es) exactos del frontend, p. ej. `https://app.tudominio.com`. El comodín `*` se rechaza en producción.
+- `TRUSTED_PLATFORM_HEADER=X-Real-IP` (el edge de Railway lo fija con la IP real del cliente). Alternativa: `TRUSTED_PROXIES` con el rango de la red privada del proxy. Sin ninguno de los dos, todos los clientes comparten la IP del proxy para rate limiting y bloqueo de login.
+- `PROXY_SHARED_SECRET` aleatorio de 32+ caracteres (p. ej. `openssl rand -base64 48`), con **el mismo valor** en el backend (Railway) y en el frontend (Vercel). El navegador nunca llama al backend directamente: el proxy `/api/backend/*`, los Server Components y next-auth lo llaman desde los servidores de Vercel, así que sin este secreto todos los usuarios comparten la IP de salida de Vercel para rate limiting (`/auth/demo`, bloqueo de login). El frontend envía la IP del navegador en `X-Client-IP` junto con el secreto en `X-Proxy-Secret`; el backend solo acepta `X-Client-IP` si el secreto coincide (comparación en tiempo constante) y, si no, usa `TRUSTED_PLATFORM_HEADER`/IP del peer (sin rechazar la petición: el servidor MCP y otros clientes directos no lo envían). Ambas cabeceras se eliminan de la petición antes del resto de middlewares, así que nunca se registran. En el frontend solo debe configurarse donde el edge de la plataforma sobrescribe `x-real-ip`/`x-forwarded-for` (Vercel lo hace).
+- `JWT_SECRET` aleatorio de 32+ caracteres; `JWT_ISSUER`/`JWT_AUDIENCE` deben coincidir entre todas las instancias. Tokens emitidos sin `iss`/`aud` son rechazados.
 
 ### Docker Development
 

@@ -20,9 +20,19 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('@/components/ui/animated-counter', () => ({
-	AnimatedCounter: ({ value, prefix = '', suffix = '' }: { value: number; prefix?: string; suffix?: string }) => (
+	AnimatedCounter: ({
+		value,
+		prefix = '',
+		suffix = '',
+		currency,
+	}: {
+		value: number
+		prefix?: string
+		suffix?: string
+		currency?: string
+	}) => (
 		<span>
-			{prefix}
+			{currency ? `${currency} ` : prefix}
 			{value}
 			{suffix}
 		</span>
@@ -46,9 +56,9 @@ describe('MonthlyPlanSummaryCard', () => {
 	it('renders the four totals coming from the backend', () => {
 		render(<MonthlyPlanSummaryCard summary={makeSummary()} />)
 
-		expect(screen.getByText('$97000')).toBeInTheDocument()
-		expect(screen.getByText('$27790')).toBeInTheDocument()
-		expect(screen.getByText('$69210')).toBeInTheDocument()
+		expect(screen.getByText('DOP 97000')).toBeInTheDocument()
+		expect(screen.getByText('DOP 27790')).toBeInTheDocument()
+		expect(screen.getByText('DOP 69210')).toBeInTheDocument()
 		expect(screen.getByText('28.6%')).toBeInTheDocument()
 	})
 

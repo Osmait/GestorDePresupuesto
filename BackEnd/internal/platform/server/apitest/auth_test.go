@@ -40,7 +40,9 @@ func TestLogin_UnknownEmail(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	testEngine.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	// Same status and body as a wrong password: no account enumeration.
+	assert.Equal(t, http.StatusBadRequest, w.Code)
+	assert.JSONEq(t, `{"error":"invalid email or password"}`, w.Body.String())
 }
 
 func TestLogin_EmptyCredentials(t *testing.T) {
@@ -49,7 +51,7 @@ func TestLogin_EmptyCredentials(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	testEngine.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	assert.Equal(t, http.StatusBadRequest, w.Code)
 }
 
 // POST /auth/login (modern endpoint - returns access_token + refresh_token)
@@ -92,7 +94,9 @@ func TestAuthLogin_UnknownEmail(t *testing.T) {
 	req.Header.Set("Content-Type", "application/json")
 	testEngine.ServeHTTP(w, req)
 
-	assert.Equal(t, http.StatusInternalServerError, w.Code)
+	// Same status and body as a wrong password: no account enumeration.
+	assert.Equal(t, http.StatusUnauthorized, w.Code)
+	assert.JSONEq(t, `{"error":"invalid email or password"}`, w.Body.String())
 }
 
 func TestAuthLogin_InvalidJSON(t *testing.T) {

@@ -4,10 +4,10 @@ import (
 	"context"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/budget"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
-	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/segmentio/ksuid"
 )
 
@@ -15,11 +15,11 @@ import (
 type BudgetServices struct {
 	repository      budgetRepo.BudgetRepoInterface
 	transactionRepo transactionRepo.TransactionRepositoryInterface
-	usdToDopRateFn  func(context.Context) (float64, error)
+	usdToDopRateFn  func(context.Context) (money.Amount, error)
 }
 
 // NewBudgetServices creates a new instance of BudgetServices.
-func NewBudgetServices(repo budgetRepo.BudgetRepoInterface, transactionRepo transactionRepo.TransactionRepositoryInterface, usdToDopRateFn func(context.Context) (float64, error)) *BudgetServices {
+func NewBudgetServices(repo budgetRepo.BudgetRepoInterface, transactionRepo transactionRepo.TransactionRepositoryInterface, usdToDopRateFn func(context.Context) (money.Amount, error)) *BudgetServices {
 	return &BudgetServices{
 		repository:      repo,
 		transactionRepo: transactionRepo,
@@ -53,9 +53,9 @@ func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.Bud
 	if err != nil {
 		return nil, err
 	}
-	usdToDop := 60.0
+	usdToDop := money.FromInt(60)
 	if b.usdToDopRateFn != nil {
-		if rate, rateErr := b.usdToDopRateFn(ctx); rateErr == nil && rate > 0 {
+		if rate, rateErr := b.usdToDopRateFn(ctx); rateErr == nil && rate.IsPositive() {
 			usdToDop = rate
 		}
 	}
@@ -67,7 +67,7 @@ func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.Bud
 
 	budgetResponses := make([]*dto.BudgetResponse, 0)
 	for _, budget := range budgets {
-		currentAmount := currentBudgets[budget.Id]
+		currentAmount := currentBudgets[budget.Id].RoundCents()
 		budgetResponse := dto.NewBudgetReponse(budget.Id, budget.CategoryId, budget.UserId, budget.Amount, currentAmount, budget.CreatedAt)
 		budgetResponses = append(budgetResponses, budgetResponse)
 	}
@@ -77,13 +77,7 @@ func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.Bud
 
 // Delete removes a budget by its ID and User ID.
 func (b *BudgetServices) Delete(ctx context.Context, id string, userId string) error {
-	budgets, err := b.repository.FindOne(ctx, id)
-	if err != nil {
-		return err
-	}
-	if budgets.Id != id {
-		return errorhttp.ErrNotFound
-	}
-	err = b.repository.Delete(ctx, id, userId)
-	return err
+	// The repository scopes the delete to userId and reports a missing or
+	// foreign budget as not found.
+	return b.repository.Delete(ctx, id, userId)
 }

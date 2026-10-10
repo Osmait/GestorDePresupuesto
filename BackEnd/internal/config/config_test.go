@@ -1,7 +1,9 @@
 package config
 
 import (
+	"encoding/json"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -230,7 +232,7 @@ func TestConfigValidation(t *testing.T) {
 				MaxIdleConns: 5,
 			},
 			JWT: JWTConfig{
-				Secret:            "development-secret-key-change-in-production-please-use-env-var", // Invalid in production
+				Secret:            devJWTSecret, // the real dev fallback constant is invalid in production
 				Expiration:        24 * time.Hour,
 				RefreshExpiration: 168 * time.Hour,
 			},
@@ -357,7 +359,7 @@ func TestDatabaseURLGeneration(t *testing.T) {
 			},
 		}
 
-		expected := "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable&binary_parameters=no"
+		expected := "postgres://testuser:testpass@localhost:5432/testdb?sslmode=disable&binary_parameters=yes"
 		assert.Equal(t, expected, config.GetDatabaseUrl())
 	})
 
@@ -558,12 +560,127 @@ func TestValidationHelpers(t *testing.T) {
 	})
 }
 
-func TestSecureSecretGeneration(t *testing.T) {
-	t.Run("generateSecureSecret", func(t *testing.T) {
-		secret := generateSecureSecret()
-		assert.NotEmpty(t, secret)
-		assert.Equal(t, 64, len(secret)) // 32 bytes hex encoded = 64 characters
-	})
+func TestHardeningValidation(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(c *Config)
+		wantErr string
+	}{
+		{
+			name:   "defaults are valid",
+			mutate: func(c *Config) {},
+		},
+		{
+			name: "trusted proxies accept IPs and CIDRs",
+			mutate: func(c *Config) {
+				c.Server.TrustedProxies = []string{"10.0.0.1", "100.64.0.0/10", "fd00::/8"}
+			},
+		},
+		{
+			name:    "trusted proxies reject garbage",
+			mutate:  func(c *Config) { c.Server.TrustedProxies = []string{"not-an-ip"} },
+			wantErr: "TRUSTED_PROXIES",
+		},
+		{
+			name:   "rate limit whitelist accepts CIDR",
+			mutate: func(c *Config) { c.RateLimit.IPWhitelist = []string{"192.168.0.0/16"} },
+		},
+		{
+			name: "wildcard origin with credentials is rejected",
+			mutate: func(c *Config) {
+				c.CORS.AllowedOrigins = []string{"*"}
+				c.CORS.AllowCredentials = true
+			},
+			wantErr: "wildcard",
+		},
+		{
+			name: "wildcard origin rejected in production",
+			mutate: func(c *Config) {
+				c.Server.Environment = EnvironmentProduction
+				c.JWT.Secret = "a-production-secret-that-is-long-enough-123"
+				c.CORS.AllowedOrigins = []string{"*"}
+			},
+			wantErr: "CORS wildcard origin cannot be used in production",
+		},
+		{
+			name: "dev fallback secret rejected in production",
+			mutate: func(c *Config) {
+				c.Server.Environment = EnvironmentProduction
+				c.JWT.Secret = devJWTSecret
+			},
+			wantErr: "default JWT secret",
+		},
+		{
+			name: "short proxy shared secret rejected in production",
+			mutate: func(c *Config) {
+				c.Server.Environment = EnvironmentProduction
+				c.JWT.Secret = strings.Repeat("j", 40)
+				c.Server.ProxySharedSecret = strings.Repeat("p", 31)
+			},
+			wantErr: "PROXY_SHARED_SECRET",
+		},
+		{
+			name: "long proxy shared secret accepted in production",
+			mutate: func(c *Config) {
+				c.Server.Environment = EnvironmentProduction
+				c.JWT.Secret = strings.Repeat("j", 40)
+				c.Server.ProxySharedSecret = strings.Repeat("p", 32)
+			},
+		},
+		{
+			name:   "short proxy shared secret tolerated outside production",
+			mutate: func(c *Config) { c.Server.ProxySharedSecret = "p" },
+		},
+	}
+
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("ENV", "test")
+			cfg, err := LoadConfig()
+			if !assert.NoError(t, err) {
+				return
+			}
+			tc.mutate(cfg)
+			err = cfg.Validate()
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+			if assert.Error(t, err) {
+				assert.Contains(t, err.Error(), tc.wantErr)
+			}
+		})
+	}
+}
+
+func TestLoadConfig_HardeningDefaults(t *testing.T) {
+	t.Setenv("ENV", "test")
+	t.Setenv("TRUSTED_PROXIES", " 10.0.0.0/8 , ,192.168.1.1")
+	t.Setenv("TRUSTED_PLATFORM_HEADER", "X-Real-IP")
+
+	cfg, err := LoadConfig()
+	assert.NoError(t, err)
+	assert.Equal(t, []string{"10.0.0.0/8", "192.168.1.1"}, cfg.Server.TrustedProxies)
+	assert.Equal(t, "X-Real-IP", cfg.Server.TrustedPlatformHeader)
+	assert.Equal(t, 10*time.Second, cfg.Server.ReadHeaderTimeout)
+	assert.Equal(t, 30*time.Second, cfg.JWT.RefreshReuseGrace)
+	assert.NotEmpty(t, cfg.JWT.Issuer)
+	assert.NotEmpty(t, cfg.JWT.Audience)
+	assert.False(t, cfg.CORS.AllowCredentials, "bearer-token API must not allow credentialed CORS by default")
+}
+
+func TestLoadConfig_ProxySharedSecretNeverSerialized(t *testing.T) {
+	secret := strings.Repeat("s", 40)
+	t.Setenv("ENV", "test")
+	t.Setenv("PROXY_SHARED_SECRET", "  "+secret+" ")
+
+	cfg, err := LoadConfig()
+	require.NoError(t, err)
+	assert.Equal(t, secret, cfg.Server.ProxySharedSecret, "surrounding whitespace is trimmed")
+
+	out, err := json.Marshal(cfg)
+	require.NoError(t, err)
+	assert.NotContains(t, string(out), secret)
 }
 
 // Benchmark tests

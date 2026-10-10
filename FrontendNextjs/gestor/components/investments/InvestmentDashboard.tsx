@@ -1,16 +1,35 @@
 'use client'
 
-import { ResponsivePie } from '@nivo/pie'
+import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import { useTheme } from 'next-themes'
 import { useMemo } from 'react'
-import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useGetInvestments } from '@/hooks/queries/useInvestmentsQuery'
+import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
 import { formatCurrency } from '@/lib/utils'
+import { InvestmentType } from '@/types/investment'
 import { InvestmentSummaryCards } from './InvestmentSummaryCards'
 
+const KNOWN_TYPES = new Set<string>(Object.values(InvestmentType))
+
+// Client-only chart chunks: the summary cards render without waiting for Nivo.
+const chartLoading = () => <div className='h-full w-full rounded bg-muted/20 animate-pulse' />
+const InvestmentAllocationChart = dynamic(() => import('@/components/charts/InvestmentAllocationChart'), {
+	ssr: false,
+	loading: chartLoading,
+})
+const AreaTrendChart = dynamic(() => import('@/components/charts/AreaTrendChart'), {
+	ssr: false,
+	loading: chartLoading,
+})
+
 export function InvestmentDashboard() {
+	const t = useTranslations('investments')
+	const locale = useAppLocale()
+	const intlLocale = getIntlLocale(locale)
+	const money = (value: number) => formatCurrency(value, 'USD', { locale })
 	const { data: investments, isLoading } = useGetInvestments()
 	const { theme } = useTheme()
 
@@ -36,7 +55,7 @@ export function InvestmentDashboard() {
 
 		const allocation = Array.from(allocationMap.entries()).map(([id, value]) => ({
 			id,
-			label: id.charAt(0).toUpperCase() + id.slice(1).replace('_', ' '),
+			label: KNOWN_TYPES.has(id) ? t(`types.${id as InvestmentType}`) : id,
 			value,
 			color: id === 'stock' ? '#3b82f6' : id === 'crypto' ? '#f59e0b' : '#10b981',
 		}))
@@ -74,7 +93,7 @@ export function InvestmentDashboard() {
 		}
 
 		return { totalValue, totalCost, totalProfit, roi, allocation, history }
-	}, [investments])
+	}, [investments, t])
 
 	const nivoTheme = useMemo(
 		() => ({
@@ -91,6 +110,25 @@ export function InvestmentDashboard() {
 			},
 		}),
 		[theme],
+	)
+
+	const growthPoints = useMemo(
+		() =>
+			metrics.history.map((point) => {
+				const date = new Date(point.x)
+				return {
+					label: date.toLocaleDateString(intlLocale, { month: 'short', day: 'numeric', timeZone: 'UTC' }),
+					tooltipLabel: date.toLocaleDateString(intlLocale, {
+						weekday: 'short',
+						year: 'numeric',
+						month: 'short',
+						day: 'numeric',
+						timeZone: 'UTC',
+					}),
+					value: point.y,
+				}
+			}),
+		[metrics.history, intlLocale],
 	)
 
 	if (isLoading) {
@@ -117,110 +155,41 @@ export function InvestmentDashboard() {
 			<div className='grid gap-4 md:grid-cols-2'>
 				<Card className='col-span-1'>
 					<CardHeader>
-						<CardTitle>Asset Allocation</CardTitle>
+						<CardTitle>{t('dashboard.allocation')}</CardTitle>
 					</CardHeader>
 					<CardContent className='h-[300px]'>
 						{metrics.allocation.length > 0 ? (
-							<ResponsivePie
+							<InvestmentAllocationChart
 								data={metrics.allocation}
-								margin={{ top: 20, right: 20, bottom: 20, left: 20 }}
-								innerRadius={0.6}
-								padAngle={0.5}
-								cornerRadius={3}
-								activeOuterRadiusOffset={8}
-								colors={{ datum: 'data.color' }}
-								borderWidth={1}
-								borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
-								enableArcLinkLabels={true}
-								arcLinkLabelsSkipAngle={10}
-								arcLinkLabelsTextColor={theme === 'dark' ? '#ffffff' : '#333333'}
-								arcLinkLabelsThickness={2}
-								arcLinkLabelsColor={{ from: 'color' }}
-								arcLabelsSkipAngle={10}
-								arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
-								theme={nivoTheme}
-								tooltip={({ datum }) => (
-									<div
-										style={{
-											color: datum.color,
-											background: theme === 'dark' ? '#333' : '#fff',
-											padding: '5px 10px',
-											borderRadius: '4px',
-										}}
-									>
-										<strong>{datum.label}</strong>: {formatCurrency(datum.value)} (
-										{((datum.value / metrics.totalValue) * 100).toFixed(1)}%)
-									</div>
-								)}
+								totalValue={metrics.totalValue}
+								isDark={theme === 'dark'}
+								nivoTheme={nivoTheme}
+								formatValue={money}
 							/>
 						) : (
-							<div className='h-full flex items-center justify-center text-muted-foreground'>No data to display</div>
+							<div className='h-full flex items-center justify-center text-muted-foreground'>
+								{t('dashboard.noData')}
+							</div>
 						)}
 					</CardContent>
 				</Card>
 
 				<Card className='col-span-1'>
 					<CardHeader>
-						<CardTitle>Portfolio Growth (Cost Basis)</CardTitle>
+						<CardTitle>{t('dashboard.growth')}</CardTitle>
 					</CardHeader>
 					<CardContent className='h-[300px]'>
 						{metrics.history.length > 0 ? (
-							<ResponsiveContainer width='100%' height='100%'>
-								<AreaChart data={metrics.history} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-									<defs>
-										<linearGradient id='colorPortfolio' x1='0' y1='0' x2='0' y2='1'>
-											<stop offset='5%' stopColor='#2563eb' stopOpacity={0.8} />
-											<stop offset='95%' stopColor='#2563eb' stopOpacity={0} />
-										</linearGradient>
-									</defs>
-									<CartesianGrid
-										strokeDasharray='3 3'
-										vertical={false}
-										stroke='#e5e7eb'
-										className='dark:stroke-gray-800'
-									/>
-									<XAxis
-										dataKey='x'
-										tickLine={false}
-										axisLine={false}
-										tick={{ fontSize: 12, fill: '#6b7280' }}
-										minTickGap={30}
-										tickFormatter={(value) => {
-											const date = new Date(value)
-											return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
-										}}
-									/>
-									<YAxis hide domain={['auto', 'auto']} />
-									<Tooltip
-										contentStyle={{
-											borderRadius: '8px',
-											border: '1px solid #e5e7eb',
-											backgroundColor: theme === 'dark' ? '#1f2937' : '#ffffff',
-											color: theme === 'dark' ? '#fff' : '#000',
-										}}
-										labelStyle={{ fontWeight: 'bold', color: theme === 'dark' ? '#fff' : '#374151' }}
-										formatter={(value: any) => [formatCurrency(Number(value)), 'Value']}
-										labelFormatter={(label) =>
-											new Date(label).toLocaleDateString(undefined, {
-												weekday: 'short',
-												year: 'numeric',
-												month: 'short',
-												day: 'numeric',
-											})
-										}
-									/>
-									<Area
-										type='monotone'
-										dataKey='y'
-										stroke='#2563eb'
-										strokeWidth={2}
-										fillOpacity={1}
-										fill='url(#colorPortfolio)'
-									/>
-								</AreaChart>
-							</ResponsiveContainer>
+							<AreaTrendChart
+								points={growthPoints}
+								color='#2563eb'
+								seriesLabel={t('dashboard.value')}
+								formatValue={money}
+							/>
 						) : (
-							<div className='h-full flex items-center justify-center text-muted-foreground'>No history data</div>
+							<div className='h-full flex items-center justify-center text-muted-foreground'>
+								{t('dashboard.noHistory')}
+							</div>
 						)}
 					</CardContent>
 				</Card>

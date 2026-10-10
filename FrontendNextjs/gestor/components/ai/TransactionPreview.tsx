@@ -1,7 +1,7 @@
 'use client'
 
 import { format } from 'date-fns'
-import { AnimatePresence, motion } from 'framer-motion'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { AlertTriangle, Calendar, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
@@ -46,7 +46,17 @@ function buildUniqueCategoryName(baseName: string, existingNames: string[]): str
 	return candidate
 }
 
-export function TransactionPreview({
+// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
+// full feature bundle (layout, drag) is not needed.
+export function TransactionPreview(props: TransactionPreviewProps) {
+	return (
+		<LazyMotion features={domAnimation}>
+			<TransactionPreviewView {...props} />
+		</LazyMotion>
+	)
+}
+
+function TransactionPreviewView({
 	transactions,
 	categories,
 	potentialDuplicatesByTransactionId,
@@ -176,7 +186,7 @@ export function TransactionPreview({
 					const isSimilarTransaction = duplicateInfo?.match_type === 'similar'
 
 					return (
-						<motion.div
+						<m.div
 							key={`transaction-${index}`}
 							initial={{ opacity: 0, y: 10 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -404,7 +414,7 @@ export function TransactionPreview({
 									</div>
 								</div>
 							)}
-						</motion.div>
+						</m.div>
 					)
 				})}
 			</AnimatePresence>

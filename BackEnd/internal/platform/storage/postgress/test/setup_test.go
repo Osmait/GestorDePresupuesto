@@ -20,6 +20,17 @@ import (
 
 var testDB *sql.DB
 
+// testServerAddr is host:port of the test container: tests that need their
+// own database or role build their DSN from it.
+var testServerAddr string
+
+// testMigrationsURL is the golang-migrate source URL of the migrations.
+var testMigrationsURL string
+
+// testConnStr is the superuser DSN of the test container; tests derive
+// connections for other roles from it.
+var testConnStr string
+
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
@@ -59,8 +70,11 @@ func TestMain(m *testing.M) {
 		log.Fatalf("failed to get mapped port: %v", err)
 	}
 
-	connStr := fmt.Sprintf("postgres://test:test@%s:%s/testdb?sslmode=disable", host, mappedPort.Port())
+	// binary_parameters=yes: the production DSN setting (config.GetPostgresUrl).
+	connStr := fmt.Sprintf("postgres://test:test@%s:%s/testdb?sslmode=disable&binary_parameters=yes", host, mappedPort.Port())
+	testServerAddr = fmt.Sprintf("%s:%s", host, mappedPort.Port())
 
+	testConnStr = connStr
 	testDB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("failed to open test database: %v", err)
@@ -68,7 +82,10 @@ func TestMain(m *testing.M) {
 
 	_, filename, _, _ := runtime.Caller(0)
 	migrationsDir, _ := filepath.Abs(filepath.Join(filepath.Dir(filename), "../../../../../cmd/api/db/migrations"))
-	utils.RunDBMigration("file://"+filepath.ToSlash(migrationsDir), connStr)
+	testMigrationsURL = "file://" + filepath.ToSlash(migrationsDir)
+	if err := utils.RunDBMigration(testMigrationsURL, connStr); err != nil {
+		log.Fatalf("failed to run migrations: %v", err)
+	}
 
 	os.Exit(m.Run())
 }

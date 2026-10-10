@@ -8,6 +8,10 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
+// TransactionScheduler periodically executes due recurring transactions.
+// It is safe to run in several replicas at once: each occurrence is claimed
+// with SELECT ... FOR UPDATE SKIP LOCKED and guarded by a unique
+// (recurring_transaction_id, execution_date) row, so it is created only once.
 type TransactionScheduler struct {
 	service *recurring_transaction.RecurringTransactionService
 }
@@ -42,7 +46,7 @@ func (s *TransactionScheduler) Start(ctx context.Context) {
 
 func (s *TransactionScheduler) runJob(ctx context.Context) {
 	log.Debug().Msg("Running scheduled transaction check")
-	if err := s.service.ProcessDueTransactions(ctx); err != nil {
+	if err := instrumentedRun(ctx, "transaction_scheduler", s.service.ProcessDueTransactions); err != nil {
 		log.Error().Err(err).Msg("Error running scheduled transaction check")
 	}
 }

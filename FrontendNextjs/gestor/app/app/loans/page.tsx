@@ -23,8 +23,20 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ACCOUNT_KEYS, useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { TRANSACTION_KEYS } from '@/hooks/queries/useTransactionsQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
-import { loanRepository } from '@/lib/repositoryConfig'
-import { CreateLoanDTO, Loan, LoanDetails, LoanPayment, LoanSummary } from '@/types/loan'
+import { getInsufficientFundsMessage } from '@/lib/api-error'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { hasAtMostDecimals } from '@/lib/money-validation'
+import { getLoanRepository } from '@/lib/repositoryConfig'
+import { formatCurrency } from '@/lib/utils'
+import {
+	CreateLoanDTO,
+	Loan,
+	LoanDetails,
+	LoanInstallmentStatus,
+	LoanPayment,
+	LoanStatus,
+	LoanSummary,
+} from '@/types/loan'
 
 const initialCreateForm: CreateLoanDTO = {
 	borrower_name: '',
@@ -41,6 +53,10 @@ const initialCreateForm: CreateLoanDTO = {
 
 export default function LoansPage() {
 	const t = useTranslations('loans')
+	const tCommon = useTranslations('common')
+	const tForms = useTranslations('forms')
+	const locale = useAppLocale()
+	const formatMoney = (value: number, currency: string | undefined) => formatCurrency(value, currency, { locale })
 	const queryClient = useQueryClient()
 	const [loading, setLoading] = useState(true)
 	const [loans, setLoans] = useState<Loan[]>([])
@@ -58,6 +74,9 @@ export default function LoansPage() {
 	const [paymentDate, setPaymentDate] = useState(new Date().toISOString().split('T')[0])
 	const [paymentDestination, setPaymentDestination] = useState('')
 	const [paymentNotes, setPaymentNotes] = useState('')
+	// Inline form errors (sub-cent amounts, INSUFFICIENT_FUNDS) shown inside the dialogs.
+	const [createError, setCreateError] = useState<string | null>(null)
+	const [paymentError, setPaymentError] = useState<string | null>(null)
 	const router = useRouter()
 	const pathname = usePathname()
 	const searchParams = useSearchParams()
@@ -69,11 +88,15 @@ export default function LoansPage() {
 	const isLoansModuleEnabled = isEnabled('module_loans')
 
 	const accountOptions = useMemo(() => accounts.filter((account) => account.type !== 'credit_card'), [accounts])
+	const selectedSourceAccount = accountOptions.find((account) => account.id === createForm.source_account_id)
 
 	const loadData = useCallback(async () => {
 		try {
 			setLoading(true)
-			const [loanData, summaryData] = await Promise.all([loanRepository.findAll(), loanRepository.getSummary()])
+			const [loanData, summaryData] = await Promise.all([
+				getLoanRepository().findAll(),
+				getLoanRepository().getSummary(),
+			])
 			setLoans(loanData || [])
 			setSummary(summaryData || null)
 		} catch (error) {
@@ -87,7 +110,7 @@ export default function LoansPage() {
 	const openDetails = useCallback(
 		async (loanId: string) => {
 			try {
-				const details = await loanRepository.findById(loanId)
+				const details = await getLoanRepository().findById(loanId)
 				setSelectedLoanDetails(details)
 				setDetailsOpen(true)
 			} catch (_error) {
@@ -124,7 +147,9 @@ export default function LoansPage() {
 		const matchedLoan = loans.find((item) => item.id === selectedId)
 		if (matchedLoan) {
 			const row = document.getElementById(`loan-row-${selectedId}`)
-			row?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+			const card = document.getElementById(`loan-card-${selectedId}`)
+			const target = row?.offsetParent ? row : card
+			target?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 		}
 
 		if (shouldOpenDetails) {
@@ -155,9 +180,15 @@ export default function LoansPage() {
 
 	const handleCreate = async (event: React.FormEvent<HTMLFormElement>) => {
 		event.preventDefault()
+		setCreateError(null)
+		// loans.principal_amount is DECIMAL(15,2): the API rejects sub-cent amounts.
+		if (!hasAtMostDecimals(createForm.principal_amount)) {
+			setCreateError(tForms('maxTwoDecimals'))
+			return
+		}
 		try {
 			setSaving(true)
-			await loanRepository.create({
+			await getLoanRepository().create({
 				...createForm,
 				principal_amount: Number(createForm.principal_amount),
 				annual_rate: Number(createForm.annual_rate),
@@ -173,6 +204,12 @@ export default function LoansPage() {
 			])
 			await loadData()
 		} catch (error: any) {
+			// The disbursement would overdraw the source account: say so inside the dialog.
+			const insufficientFunds = getInsufficientFundsMessage(error, tForms, locale)
+			if (insufficientFunds) {
+				setCreateError(insufficientFunds)
+				return
+			}
 			toast.error(error?.message || t('createError'))
 		} finally {
 			setSaving(false)
@@ -185,18 +222,20 @@ export default function LoansPage() {
 		const numericPaymentAmount = Number(paymentAmount)
 		const pendingAmount = Number(selectedLoan.pending_amount || 0)
 		const currency = selectedLoan.currency || 'DOP'
-		const formatInlineMoney = (value: number) =>
-			new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-DO', {
-				style: 'currency',
-				currency,
-				maximumFractionDigits: 2,
-			}).format(value)
+		const formatInlineMoney = (value: number) => formatMoney(value, currency)
+		setPaymentError(null)
 
 		if (Number.isNaN(numericPaymentAmount) || numericPaymentAmount <= 0) {
 			toast.error(t('invalidPaymentAmount'), {
 				description: t('invalidPaymentAmountDetailed'),
 				duration: 4000,
 			})
+			return
+		}
+
+		// loan_payments.amount is DECIMAL(15,2): the API rejects sub-cent amounts.
+		if (!hasAtMostDecimals(numericPaymentAmount)) {
+			setPaymentError(tForms('maxTwoDecimals'))
 			return
 		}
 
@@ -213,7 +252,7 @@ export default function LoansPage() {
 
 		try {
 			setSaving(true)
-			const payment: LoanPayment = await loanRepository.registerPayment(selectedLoan.id, {
+			const payment: LoanPayment = await getLoanRepository().registerPayment(selectedLoan.id, {
 				destination_account_id: paymentDestination,
 				amount: numericPaymentAmount,
 				payment_date: paymentDate,
@@ -230,7 +269,7 @@ export default function LoansPage() {
 			])
 			await loadData()
 			if (selectedLoanDetails) {
-				const refreshed = await loanRepository.findById(selectedLoan.id)
+				const refreshed = await getLoanRepository().findById(selectedLoan.id)
 				setSelectedLoanDetails({
 					...refreshed,
 					payments: [payment, ...refreshed.payments],
@@ -247,7 +286,7 @@ export default function LoansPage() {
 		if (!selectedLoan) return
 		setCancelling(true)
 		try {
-			await loanRepository.cancelLoan(selectedLoan.id)
+			await getLoanRepository().cancelLoan(selectedLoan.id)
 			toast.success(t('loanCancelled'))
 			setCancelDialogOpen(false)
 			await Promise.all([
@@ -263,12 +302,8 @@ export default function LoansPage() {
 		}
 	}
 
-	const formatMoney = (value: number, currency: string) =>
-		new Intl.NumberFormat(currency === 'USD' ? 'en-US' : 'es-DO', {
-			style: 'currency',
-			currency,
-			maximumFractionDigits: 2,
-		}).format(value)
+	const loanStatusLabel = (status: LoanStatus) => t(`statuses.${status}`)
+	const installmentStatusLabel = (status: LoanInstallmentStatus) => t(`installmentStatuses.${status}`)
 
 	const getStatusVariant = (status: Loan['status']) => {
 		if (status === 'paid') return 'default'
@@ -277,40 +312,70 @@ export default function LoansPage() {
 		return 'outline'
 	}
 
+	const renderLoanActions = (loan: Loan) => (
+		<>
+			<Button variant='outline' size='sm' onClick={() => openDetails(loan.id)}>
+				{t('details')}
+			</Button>
+			<Button
+				size='sm'
+				disabled={loan.status !== 'active'}
+				onClick={() => {
+					setSelectedLoan(loan)
+					setPaymentOpen(true)
+				}}
+			>
+				{t('registerPayment')}
+			</Button>
+			<Button
+				variant='destructive'
+				size='sm'
+				disabled={loan.status !== 'active'}
+				aria-label={t('cancelLoanFor', { name: loan.borrower_name })}
+				onClick={() => {
+					setSelectedLoan(loan)
+					setCancelDialogOpen(true)
+				}}
+			>
+				{t('cancelLoan')}
+			</Button>
+		</>
+	)
+
 	if (isFeatureFlagsLoading) {
-		return <div className='container mx-auto p-6'>{t('loading')}</div>
+		return <div className='container mx-auto px-4 py-8'>{t('loading')}</div>
 	}
 
 	if (!isLoansModuleEnabled) {
 		return (
-			<div className='container mx-auto space-y-4 p-6'>
+			<div className='container mx-auto space-y-4 px-4 py-8'>
 				<h1 className='text-2xl font-semibold'>{t('title')}</h1>
-				<p className='text-muted-foreground'>This module is currently disabled for your account.</p>
+				<p className='text-muted-foreground'>{tCommon('moduleDisabled.message')}</p>
 				<Button variant='outline' onClick={() => router.push('/app')}>
-					Go to dashboard
+					{tCommon('moduleDisabled.goToDashboard')}
 				</Button>
 			</div>
 		)
 	}
 
 	if (loading) {
-		return <div className='container mx-auto p-6'>{t('loading')}</div>
+		return <div className='container mx-auto px-4 py-8'>{t('loading')}</div>
 	}
 
 	return (
-		<div className='container mx-auto space-y-6 p-6'>
-			<div className='flex items-center justify-between'>
+		<div className='container mx-auto space-y-6 px-4 py-8'>
+			<div className='flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between'>
 				<div>
 					<h1 className='text-3xl font-bold'>{t('title')}</h1>
 					<p className='text-muted-foreground'>{t('subtitle')}</p>
 				</div>
-				<Button onClick={() => setCreateOpen(true)}>
+				<Button className='w-full sm:w-auto' onClick={() => setCreateOpen(true)}>
 					<Plus className='mr-2 h-4 w-4' />
 					{t('newLoan')}
 				</Button>
 			</div>
 
-			<div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5'>
+			<div className='grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5'>
 				<Card>
 					<CardHeader className='pb-2'>
 						<CardTitle className='text-sm text-muted-foreground'>{t('totalPrincipal')}</CardTitle>
@@ -357,79 +422,101 @@ export default function LoansPage() {
 					{loans.length === 0 ? (
 						<p className='text-sm text-muted-foreground'>{t('empty')}</p>
 					) : (
-						<Table>
-							<TableHeader>
-								<TableRow>
-									<TableHead>{t('borrower')}</TableHead>
-									<TableHead>{t('principal')}</TableHead>
-									<TableHead>{t('interestEarned')}</TableHead>
-									<TableHead>{t('pending')}</TableHead>
-									<TableHead>{t('status')}</TableHead>
-									<TableHead>{t('actions')}</TableHead>
-								</TableRow>
-							</TableHeader>
-							<TableBody>
+						<>
+							<ul className='space-y-3 md:hidden' aria-label={t('loanPortfolio')}>
 								{loans.map((loan) => (
-									<TableRow
-										id={`loan-row-${loan.id}`}
+									<li
+										id={`loan-card-${loan.id}`}
 										key={loan.id}
-										className={selectedLoanIdParam === loan.id ? 'bg-primary/5 ring-1 ring-primary/40' : ''}
+										className={`rounded-lg border p-4 ${selectedLoanIdParam === loan.id ? 'bg-primary/5 ring-1 ring-primary/40' : ''}`}
 									>
-										<TableCell>
-											<div className='font-medium'>{loan.borrower_name}</div>
-											<div className='text-xs text-muted-foreground'>{loan.borrower_contact || '-'}</div>
-										</TableCell>
-										<TableCell>{formatMoney(loan.principal_amount, loan.currency)}</TableCell>
-										<TableCell>
-											<div className='font-medium text-emerald-600'>
-												{formatMoney(loan.paid_interest, loan.currency)}
+										<div className='flex items-start justify-between gap-3'>
+											<div className='min-w-0'>
+												<div className='truncate font-medium'>{loan.borrower_name}</div>
+												<div className='truncate text-xs text-muted-foreground'>{loan.borrower_contact || '-'}</div>
 											</div>
-											<div className='text-xs text-muted-foreground'>
-												{t('ofTotalInterest', { total: formatMoney(loan.total_interest, loan.currency) })}
+											<Badge variant={getStatusVariant(loan.status)}>{loanStatusLabel(loan.status)}</Badge>
+										</div>
+										<dl className='mt-3 grid grid-cols-2 gap-x-4 gap-y-2 text-sm'>
+											<div>
+												<dt className='text-xs text-muted-foreground'>{t('principal')}</dt>
+												<dd className='font-medium'>{formatMoney(loan.principal_amount, loan.currency)}</dd>
 											</div>
-										</TableCell>
-										<TableCell>{formatMoney(loan.pending_amount, loan.currency)}</TableCell>
-										<TableCell>
-											<Badge variant={getStatusVariant(loan.status)}>{loan.status}</Badge>
-										</TableCell>
-										<TableCell>
-											<div className='flex gap-2'>
-												<Button variant='outline' size='sm' onClick={() => openDetails(loan.id)}>
-													{t('details')}
-												</Button>
-												<Button
-													size='sm'
-													disabled={loan.status !== 'active'}
-													onClick={() => {
-														setSelectedLoan(loan)
-														setPaymentOpen(true)
-													}}
-												>
-													{t('registerPayment')}
-												</Button>
-												<Button
-													variant='destructive'
-													size='sm'
-													disabled={loan.status !== 'active'}
-													onClick={() => {
-														setSelectedLoan(loan)
-														setCancelDialogOpen(true)
-													}}
-												>
-													{t('cancelLoan')}
-												</Button>
+											<div>
+												<dt className='text-xs text-muted-foreground'>{t('pending')}</dt>
+												<dd className='font-medium'>{formatMoney(loan.pending_amount, loan.currency)}</dd>
 											</div>
-										</TableCell>
-									</TableRow>
+											<div className='col-span-2'>
+												<dt className='text-xs text-muted-foreground'>{t('interestEarned')}</dt>
+												<dd>
+													<span className='font-medium text-emerald-600'>
+														{formatMoney(loan.paid_interest, loan.currency)}
+													</span>{' '}
+													<span className='text-xs text-muted-foreground'>
+														{t('ofTotalInterest', { total: formatMoney(loan.total_interest, loan.currency) })}
+													</span>
+												</dd>
+											</div>
+										</dl>
+										<div className='mt-3 grid grid-cols-1 gap-2'>{renderLoanActions(loan)}</div>
+									</li>
 								))}
-							</TableBody>
-						</Table>
+							</ul>
+							<Table className='hidden md:table'>
+								<TableHeader>
+									<TableRow>
+										<TableHead>{t('borrower')}</TableHead>
+										<TableHead>{t('principal')}</TableHead>
+										<TableHead>{t('interestEarned')}</TableHead>
+										<TableHead>{t('pending')}</TableHead>
+										<TableHead>{t('status')}</TableHead>
+										<TableHead>{t('actions')}</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{loans.map((loan) => (
+										<TableRow
+											id={`loan-row-${loan.id}`}
+											key={loan.id}
+											className={selectedLoanIdParam === loan.id ? 'bg-primary/5 ring-1 ring-primary/40' : ''}
+										>
+											<TableCell>
+												<div className='font-medium'>{loan.borrower_name}</div>
+												<div className='text-xs text-muted-foreground'>{loan.borrower_contact || '-'}</div>
+											</TableCell>
+											<TableCell>{formatMoney(loan.principal_amount, loan.currency)}</TableCell>
+											<TableCell>
+												<div className='font-medium text-emerald-600'>
+													{formatMoney(loan.paid_interest, loan.currency)}
+												</div>
+												<div className='text-xs text-muted-foreground'>
+													{t('ofTotalInterest', { total: formatMoney(loan.total_interest, loan.currency) })}
+												</div>
+											</TableCell>
+											<TableCell>{formatMoney(loan.pending_amount, loan.currency)}</TableCell>
+											<TableCell>
+												<Badge variant={getStatusVariant(loan.status)}>{loanStatusLabel(loan.status)}</Badge>
+											</TableCell>
+											<TableCell>
+												<div className='flex flex-wrap gap-2'>{renderLoanActions(loan)}</div>
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
+						</>
 					)}
 				</CardContent>
 			</Card>
 
-			<Dialog open={createOpen} onOpenChange={setCreateOpen}>
-				<DialogContent>
+			<Dialog
+				open={createOpen}
+				onOpenChange={(open) => {
+					setCreateOpen(open)
+					if (!open) setCreateError(null)
+				}}
+			>
+				<DialogContent className='max-h-[90vh] overflow-y-auto'>
 					<DialogHeader>
 						<DialogTitle>{t('newLoan')}</DialogTitle>
 						<DialogDescription>{t('newLoanDescription')}</DialogDescription>
@@ -450,7 +537,7 @@ export default function LoansPage() {
 								onChange={(event) => setCreateForm((prev) => ({ ...prev, borrower_contact: event.target.value }))}
 							/>
 						</div>
-						<div className='grid grid-cols-2 gap-3'>
+						<div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
 							<div className='space-y-2'>
 								<Label>{t('principal')}</Label>
 								<Input
@@ -476,7 +563,7 @@ export default function LoansPage() {
 								/>
 							</div>
 						</div>
-						<div className='grid grid-cols-2 gap-3'>
+						<div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
 							<div className='space-y-2'>
 								<Label>{t('termMonths')}</Label>
 								<Input
@@ -511,6 +598,13 @@ export default function LoansPage() {
 									</option>
 								))}
 							</select>
+							{selectedSourceAccount?.current_balance !== undefined && (
+								<p className='text-xs text-muted-foreground'>
+									{tForms('availableBalance', {
+										amount: formatMoney(selectedSourceAccount.current_balance, selectedSourceAccount.currency),
+									})}
+								</p>
+							)}
 						</div>
 						<div className='space-y-2'>
 							<Label>{t('notes')}</Label>
@@ -519,6 +613,11 @@ export default function LoansPage() {
 								onChange={(event) => setCreateForm((prev) => ({ ...prev, notes: event.target.value }))}
 							/>
 						</div>
+						{createError && (
+							<p role='alert' className='text-sm text-destructive'>
+								{createError}
+							</p>
+						)}
 						<DialogFooter>
 							<Button type='button' variant='outline' onClick={() => setCreateOpen(false)}>
 								{t('cancel')}
@@ -531,8 +630,14 @@ export default function LoansPage() {
 				</DialogContent>
 			</Dialog>
 
-			<Dialog open={paymentOpen} onOpenChange={setPaymentOpen}>
-				<DialogContent>
+			<Dialog
+				open={paymentOpen}
+				onOpenChange={(open) => {
+					setPaymentOpen(open)
+					if (!open) setPaymentError(null)
+				}}
+			>
+				<DialogContent className='max-h-[90vh] overflow-y-auto'>
 					<DialogHeader>
 						<DialogTitle>{t('registerPayment')}</DialogTitle>
 						<DialogDescription>{selectedLoan?.borrower_name}</DialogDescription>
@@ -552,7 +657,7 @@ export default function LoansPage() {
 								))}
 							</select>
 						</div>
-						<div className='grid grid-cols-2 gap-3'>
+						<div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
 							<div className='space-y-2'>
 								<Label>{t('amount')}</Label>
 								<Input
@@ -583,6 +688,11 @@ export default function LoansPage() {
 							<Label>{t('notes')}</Label>
 							<Input value={paymentNotes} onChange={(event) => setPaymentNotes(event.target.value)} />
 						</div>
+						{paymentError && (
+							<p role='alert' className='text-sm text-destructive'>
+								{paymentError}
+							</p>
+						)}
 						<DialogFooter>
 							<Button type='button' variant='outline' onClick={() => setPaymentOpen(false)}>
 								{t('cancel')}
@@ -614,13 +724,13 @@ export default function LoansPage() {
 
 			<Dialog open={detailsOpen} onOpenChange={handleDetailsOpenChange}>
 				<DialogContent className='w-[95vw] max-w-5xl max-h-[88vh] overflow-hidden p-0'>
-					<DialogHeader className='border-b border-border/60 px-6 py-4'>
+					<DialogHeader className='border-b border-border/60 px-4 py-4 sm:px-6'>
 						<DialogTitle>{t('loanDetails')}</DialogTitle>
 						<DialogDescription>{selectedLoanDetails?.loan.borrower_name}</DialogDescription>
 					</DialogHeader>
 					{selectedLoanDetails && (
-						<div className='space-y-5 overflow-y-auto px-6 py-4 max-h-[calc(88vh-90px)]'>
-							<div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+						<div className='space-y-5 overflow-y-auto px-4 py-4 sm:px-6 max-h-[calc(88vh-90px)]'>
+							<div className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
 								<Card>
 									<CardHeader className='pb-1'>
 										<CardTitle className='text-xs text-muted-foreground'>{t('principal')}</CardTitle>
@@ -652,7 +762,7 @@ export default function LoansPage() {
 								<Table>
 									<TableHeader>
 										<TableRow>
-											<TableHead>#</TableHead>
+											<TableHead aria-label={t('installmentNumber')}>#</TableHead>
 											<TableHead>{t('dueDate')}</TableHead>
 											<TableHead>{t('amount')}</TableHead>
 											<TableHead>{t('paid')}</TableHead>
@@ -663,11 +773,11 @@ export default function LoansPage() {
 										{selectedLoanDetails.installments.map((item) => (
 											<TableRow key={item.id}>
 												<TableCell>{item.installment_number}</TableCell>
-												<TableCell>{new Date(item.due_date).toLocaleDateString()}</TableCell>
+												<TableCell className='whitespace-nowrap'>{formatLocalDate(item.due_date, locale)}</TableCell>
 												<TableCell>{formatMoney(item.expected_amount, selectedLoanDetails.loan.currency)}</TableCell>
 												<TableCell>{formatMoney(item.paid_amount, selectedLoanDetails.loan.currency)}</TableCell>
 												<TableCell>
-													<Badge variant='outline'>{item.status}</Badge>
+													<Badge variant='outline'>{installmentStatusLabel(item.status)}</Badge>
 												</TableCell>
 											</TableRow>
 										))}
@@ -689,7 +799,9 @@ export default function LoansPage() {
 									<TableBody>
 										{selectedLoanDetails.payments.map((payment) => (
 											<TableRow key={payment.id}>
-												<TableCell>{new Date(payment.payment_date).toLocaleDateString()}</TableCell>
+												<TableCell className='whitespace-nowrap'>
+													{formatLocalDate(payment.payment_date, locale)}
+												</TableCell>
 												<TableCell>{formatMoney(payment.amount, selectedLoanDetails.loan.currency)}</TableCell>
 												<TableCell>
 													{formatMoney(payment.principal_component, selectedLoanDetails.loan.currency)}

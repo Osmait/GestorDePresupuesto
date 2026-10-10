@@ -2,7 +2,9 @@ package handler
 
 import (
 	"errors"
+	"math"
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 	authDomain "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
@@ -31,11 +33,14 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 			ctx.JSON(http.StatusBadRequest, err)
 			return
 		}
-		token, err := authService.Login(ctx, &authRequest)
+		token, err := authService.LoginFromIP(ctx.Request.Context(), &authRequest, ctx.ClientIP())
 		if err != nil {
+			if writeLoginLocked(ctx, err) {
+				return
+			}
 			switch {
 			case errors.Is(err, errorhttp.ErrBadRequest):
-				ctx.JSON(http.StatusBadRequest, err)
+				ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid email or password"})
 				return
 			}
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "problem with password or email "})
@@ -43,6 +48,22 @@ func Login(authService *auth.AuthService) gin.HandlerFunc {
 		}
 		ctx.JSON(http.StatusOK, token)
 	}
+}
+
+// writeLoginLocked answers 429 + Retry-After when the (email, IP) pair is
+// locked out after too many failed password attempts.
+func writeLoginLocked(ctx *gin.Context, err error) bool {
+	var locked *auth.LoginLockedError
+	if !errors.As(err, &locked) {
+		return false
+	}
+	seconds := int(math.Ceil(locked.RetryAfter.Seconds()))
+	ctx.Header("Retry-After", strconv.Itoa(seconds))
+	ctx.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
+		"error":       "too many failed login attempts, try again later",
+		"retry_after": seconds,
+	})
+	return true
 }
 
 // LoginWithTokens godoc
@@ -69,8 +90,11 @@ func LoginWithTokens(authService *auth.AuthService) gin.HandlerFunc {
 		userAgent := ctx.GetHeader("User-Agent")
 		ipAddress := ctx.ClientIP()
 
-		response, err := authService.LoginWithTokens(ctx, &authRequest, userAgent, ipAddress)
+		response, err := authService.LoginWithTokens(ctx.Request.Context(), &authRequest, userAgent, ipAddress)
 		if err != nil {
+			if writeLoginLocked(ctx, err) {
+				return
+			}
 			switch {
 			case errors.Is(err, errorhttp.ErrBadRequest):
 				ctx.JSON(http.StatusUnauthorized, gin.H{"error": "invalid email or password"})
@@ -109,7 +133,7 @@ func RefreshTokens(authService *auth.AuthService) gin.HandlerFunc {
 		userAgent := ctx.GetHeader("User-Agent")
 		ipAddress := ctx.ClientIP()
 
-		response, err := authService.RefreshTokens(ctx, request.RefreshToken, userAgent, ipAddress)
+		response, err := authService.RefreshTokens(ctx.Request.Context(), request.RefreshToken, userAgent, ipAddress)
 		if err != nil {
 			switch {
 			case errors.Is(err, auth.ErrInvalidRefreshToken):
@@ -151,7 +175,7 @@ func Logout(authService *auth.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		if err := authService.Logout(ctx, request.RefreshToken); err != nil {
+		if err := authService.Logout(ctx.Request.Context(), request.RefreshToken); err != nil {
 			log.Error().Err(err).Msg("logout failed")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "logout failed"})
 			return
@@ -181,7 +205,7 @@ func LogoutAll(authService *auth.AuthService) gin.HandlerFunc {
 			return
 		}
 
-		if err := authService.LogoutAll(ctx, userId.(string)); err != nil {
+		if err := authService.LogoutAll(ctx.Request.Context(), userId.(string)); err != nil {
 			log.Error().Err(err).Msg("logout all failed")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "logout failed"})
 			return
@@ -204,7 +228,7 @@ func LogoutAll(authService *auth.AuthService) gin.HandlerFunc {
 func DemoLogin(authService *auth.AuthService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		ip := ctx.ClientIP()
-		token, err := authService.CreateDemoUser(ctx, ip)
+		token, err := authService.CreateDemoUser(ctx.Request.Context(), ip)
 		if err != nil {
 			log.Error().Err(err).Msg("demo user creation failed")
 			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})

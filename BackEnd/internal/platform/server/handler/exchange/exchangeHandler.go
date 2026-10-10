@@ -2,15 +2,15 @@ package exchange
 
 import (
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	exchangeService "github.com/osmait/gestorDePresupuesto/internal/services/exchange"
 )
 
 func GetExchangeRate(service *exchangeService.ExchangeRateService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		rate, err := service.GetUSDtoDOP(ctx)
+		rate, err := service.GetUSDtoDOP(ctx.Request.Context())
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -27,13 +27,13 @@ func ConvertCurrency(service *exchangeService.ExchangeRateService) gin.HandlerFu
 			return
 		}
 
-		amount, err := strconv.ParseFloat(amountStr, 64)
+		amount, err := money.Parse(amountStr)
 		if err != nil {
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid amount"})
 			return
 		}
 
-		result, err := service.ConvertUSDToDOP(ctx, amount)
+		result, err := service.ConvertUSDToDOP(ctx.Request.Context(), amount)
 		if err != nil {
 			_ = ctx.Error(err)
 			return

@@ -34,8 +34,12 @@ func CreateItem(service *monthly_plan.MonthlyPlanService) gin.HandlerFunc {
 			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
+		if err := req.Validate(); err != nil {
+			_ = c.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
+			return
+		}
 
-		if err := service.Create(c, &req, userID); err != nil {
+		if err := service.Create(c.Request.Context(), &req, userID); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -60,7 +64,7 @@ func FindAllItems(service *monthly_plan.MonthlyPlanService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("X-User-Id")
 
-		items, err := service.FindAllByUser(c, userID)
+		items, err := service.FindAllByUser(c.Request.Context(), userID)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -86,7 +90,7 @@ func GetSummary(service *monthly_plan.MonthlyPlanService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("X-User-Id")
 
-		summary, err := service.Summary(c, userID)
+		summary, err := service.Summary(c.Request.Context(), userID)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -123,8 +127,12 @@ func UpdateItem(service *monthly_plan.MonthlyPlanService) gin.HandlerFunc {
 			_ = c.Error(apperrors.NewValidationError("INVALID_JSON", err.Error()))
 			return
 		}
+		if err := req.Validate(); err != nil {
+			_ = c.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
+			return
+		}
 
-		if err := service.Update(c, &req, id, userID); err != nil {
+		if err := service.Update(c.Request.Context(), &req, id, userID); err != nil {
 			_ = c.Error(mapNotFound(err, id))
 			return
 		}
@@ -161,7 +169,7 @@ func ToggleItem(service *monthly_plan.MonthlyPlanService) gin.HandlerFunc {
 			return
 		}
 
-		if err := service.SetActive(c, id, userID, *req.IsActive); err != nil {
+		if err := service.SetActive(c.Request.Context(), id, userID, *req.IsActive); err != nil {
 			_ = c.Error(mapNotFound(err, id))
 			return
 		}
@@ -189,7 +197,7 @@ func DeleteItem(service *monthly_plan.MonthlyPlanService) gin.HandlerFunc {
 		id := c.Param("id")
 		userID := c.GetString("X-User-Id")
 
-		if err := service.Delete(c, id, userID); err != nil {
+		if err := service.Delete(c.Request.Context(), id, userID); err != nil {
 			_ = c.Error(mapNotFound(err, id))
 			return
 		}

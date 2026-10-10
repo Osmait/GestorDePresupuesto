@@ -72,6 +72,28 @@ func (r *HTTPResponse) AsJSON(v interface{}) error {
 	return json.Unmarshal(r.Body, v)
 }
 
+// AsJSONNumbers unmarshals the response body keeping numbers as json.Number,
+// so monetary amounts can be compared exactly (they are serialized as exact
+// decimals, not floats).
+func (r *HTTPResponse) AsJSONNumbers(v interface{}) error {
+	dec := json.NewDecoder(bytes.NewReader(r.Body))
+	dec.UseNumber()
+	return dec.Decode(v)
+}
+
+// ErrorCode returns error.code from an apperrors JSON body ("" if absent).
+func (r *HTTPResponse) ErrorCode() string {
+	var body struct {
+		Error struct {
+			Code string `json:"code"`
+		} `json:"error"`
+	}
+	if err := json.Unmarshal(r.Body, &body); err != nil {
+		return ""
+	}
+	return body.Error.Code
+}
+
 // AsString returns the response body as a string
 func (r *HTTPResponse) AsString() string {
 	return string(r.Body)
@@ -79,6 +101,12 @@ func (r *HTTPResponse) AsString() string {
 
 // MakeRequest makes an HTTP request with the specified parameters
 func (h *TestHelpers) MakeRequest(method, path string, body interface{}, token string) *HTTPResponse {
+	return h.MakeRequestWithHeaders(method, path, body, token, nil)
+}
+
+// MakeRequestWithHeaders is MakeRequest with extra request headers (e.g.
+// Accept-Language).
+func (h *TestHelpers) MakeRequestWithHeaders(method, path string, body interface{}, token string, headers map[string]string) *HTTPResponse {
 	var reqBody io.Reader
 
 	if body != nil {
@@ -99,6 +127,9 @@ func (h *TestHelpers) MakeRequest(method, path string, body interface{}, token s
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	for k, v := range headers {
+		req.Header.Set(k, v)
 	}
 
 	// Make the request
@@ -382,6 +413,62 @@ func (h *TestHelpers) CreateUserFlow(suffix string) *CompleteUserData {
 		AccountID:  accountID,
 		CategoryID: categoryID,
 	}
+}
+
+// AccountListItem is one element of the GET /account response.
+type AccountListItem struct {
+	AccountInfo struct {
+		ID             string      `json:"id"`
+		Name           string      `json:"name"`
+		Bank           string      `json:"bank"`
+		InitialBalance json.Number `json:"initial_balance"`
+		Currency       string      `json:"currency"`
+	} `json:"account_info"`
+	CurrentBalance json.Number `json:"current_balance"`
+}
+
+// ListAccounts calls GET /account and decodes the list (amounts exact).
+func (h *TestHelpers) ListAccounts(token string) ([]AccountListItem, *HTTPResponse) {
+	resp := h.MakeRequest("GET", "/account", nil, token)
+	var accounts []AccountListItem
+	if resp.StatusCode == http.StatusOK {
+		if err := resp.AsJSONNumbers(&accounts); err != nil {
+			panic(fmt.Sprintf("Failed to parse accounts response: %v - %s", err, resp.AsString()))
+		}
+	}
+	return accounts, resp
+}
+
+// TransactionListItem is one element of the paginated GET /transaction data.
+type TransactionListItem struct {
+	ID         string      `json:"id"`
+	Name       string      `json:"name"`
+	Amount     json.Number `json:"amount"`
+	Type       string      `json:"type_transation"`
+	AccountID  string      `json:"account_id"`
+	CategoryID string      `json:"category_id"`
+}
+
+// TransactionPage is the paginated GET /transaction response.
+type TransactionPage struct {
+	Data       []TransactionListItem `json:"data"`
+	Pagination struct {
+		TotalRecords int64 `json:"total_records"`
+		PerPage      int   `json:"per_page"`
+	} `json:"pagination"`
+}
+
+// ListTransactions calls GET <path> (e.g. "/transaction?limit=100") and
+// decodes the paginated response (amounts exact).
+func (h *TestHelpers) ListTransactions(path, token string) (TransactionPage, *HTTPResponse) {
+	resp := h.MakeRequest("GET", path, nil, token)
+	var page TransactionPage
+	if resp.StatusCode == http.StatusOK {
+		if err := resp.AsJSONNumbers(&page); err != nil {
+			panic(fmt.Sprintf("Failed to parse transactions response: %v - %s", err, resp.AsString()))
+		}
+	}
+	return page, resp
 }
 
 // CompleteUserData represents a complete user setup for testing

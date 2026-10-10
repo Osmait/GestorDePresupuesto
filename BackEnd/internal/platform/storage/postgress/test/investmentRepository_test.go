@@ -5,7 +5,9 @@ import (
 	"testing"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money/moneytest"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/stretchr/testify/assert"
@@ -33,13 +35,13 @@ func TestInvestmentRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test FindByID
-	foundInvestment, err := investmentRepository.FindByID(ctx, investment.ID)
+	foundInvestment, err := investmentRepository.FindByID(ctx, investment.ID, user.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, investment.ID, foundInvestment.ID)
 	assert.Equal(t, investment.Name, foundInvestment.Name)
-	assert.Equal(t, investment.PurchasePrice, foundInvestment.PurchasePrice) // Price -> PurchasePrice
-	assert.Equal(t, investment.CurrentPrice, foundInvestment.CurrentPrice)
-	assert.Equal(t, investment.Quantity, foundInvestment.Quantity)
+	moneytest.Equal(t, investment.PurchasePrice, foundInvestment.PurchasePrice) // Price -> PurchasePrice
+	moneytest.Equal(t, investment.CurrentPrice, foundInvestment.CurrentPrice)
+	moneytest.Equal(t, investment.Quantity, foundInvestment.Quantity)
 
 	// Test FindAll - Now using correct user_id after fixing the bug
 	investments, err := investmentRepository.FindAll(ctx, investment.UserID)
@@ -47,12 +49,12 @@ func TestInvestmentRepository(t *testing.T) {
 	assert.NotEmpty(t, investments)
 
 	// Test Delete
-	err = investmentRepository.Delete(ctx, investment.ID)
+	err = investmentRepository.Delete(ctx, investment.ID, user.Id)
 	assert.NoError(t, err)
 
 	// Verify deletion
-	foundInvestment, err = investmentRepository.FindByID(ctx, investment.ID)
-	assert.NoError(t, err)
+	foundInvestment, err = investmentRepository.FindByID(ctx, investment.ID, user.Id)
+	assert.ErrorIs(t, err, ownership.ErrNotFound)
 	assert.Nil(t, foundInvestment) // Should be nil after deletion
 
 	// Cleanup
@@ -66,8 +68,8 @@ func TestInvestmentRepository_FindOne_NotFound(t *testing.T) {
 	investmentRepository := investmentRepo.NewInvestmentRepository(db)
 
 	// Test FindByID with non-existent ID
-	investment, err := investmentRepository.FindByID(ctx, "non-existent-id")
-	assert.NoError(t, err)
+	investment, err := investmentRepository.FindByID(ctx, "non-existent-id", "non-existent-user")
+	assert.ErrorIs(t, err, ownership.ErrNotFound)
 	assert.Nil(t, investment) // Should be nil when not found
 }
 
@@ -107,7 +109,7 @@ func TestInvestmentRepository_Multiple_Investments(t *testing.T) {
 
 	// Test that we can find each investment individually
 	for _, investment := range createdInvestments {
-		foundInvestment, err := investmentRepository.FindByID(ctx, investment.ID)
+		foundInvestment, err := investmentRepository.FindByID(ctx, investment.ID, user.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, investment.ID, foundInvestment.ID)
 		assert.Equal(t, investment.Name, foundInvestment.Name)
@@ -115,7 +117,7 @@ func TestInvestmentRepository_Multiple_Investments(t *testing.T) {
 
 	// Cleanup
 	for _, investment := range createdInvestments {
-		err = investmentRepository.Delete(ctx, investment.ID)
+		err = investmentRepository.Delete(ctx, investment.ID, user.Id)
 		assert.NoError(t, err)
 	}
 

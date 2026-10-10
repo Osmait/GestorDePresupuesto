@@ -2,6 +2,7 @@ package dto
 
 import (
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 )
 
@@ -51,14 +52,14 @@ type PotentialDuplicate struct {
 }
 
 type DuplicateCandidate struct {
-	ID             string  `json:"id"`
-	Name           string  `json:"name"`
-	Amount         float64 `json:"amount"`
-	TypeTransation string  `json:"type_transation"`
-	AccountID      string  `json:"account_id"`
-	Currency       string  `json:"currency"`
-	CreatedAt      string  `json:"created_at"`
-	Score          float64 `json:"score"`
+	ID             string       `json:"id"`
+	Name           string       `json:"name"`
+	Amount         money.Amount `json:"amount"`
+	TypeTransation string       `json:"type_transation"`
+	AccountID      string       `json:"account_id"`
+	Currency       string       `json:"currency"`
+	CreatedAt      string       `json:"created_at"`
+	Score          float64      `json:"score"`
 }
 
 type SpendingAnalysisResponse struct {
@@ -77,8 +78,8 @@ type SpendingInsights struct {
 }
 
 type SpendingSummary struct {
-	TotalExpenses      float64             `json:"total_expenses"`
-	TotalIncome        float64             `json:"total_income"`
+	TotalExpenses      money.Amount        `json:"total_expenses"`
+	TotalIncome        money.Amount        `json:"total_income"`
 	SavingsRatePercent float64             `json:"savings_rate_percent"`
 	Period             PeriodInfo          `json:"period"`
 	TopCategories      []CategoryBreakdown `json:"top_categories"`
@@ -91,9 +92,9 @@ type PeriodInfo struct {
 }
 
 type CategoryBreakdown struct {
-	Category   string  `json:"category"`
-	Amount     float64 `json:"amount"`
-	Percentage float64 `json:"percentage"`
+	Category   string       `json:"category"`
+	Amount     money.Amount `json:"amount"`
+	Percentage float64      `json:"percentage"`
 }
 
 type Pattern struct {
@@ -103,10 +104,10 @@ type Pattern struct {
 }
 
 type Recommendation struct {
-	Title            string  `json:"title"`
-	Description      string  `json:"description"`
-	PotentialSavings float64 `json:"potential_savings"`
-	Priority         string  `json:"priority"`
+	Title            string       `json:"title"`
+	Description      string       `json:"description"`
+	PotentialSavings money.Amount `json:"potential_savings"`
+	Priority         string       `json:"priority"`
 }
 
 type ErrorResponse struct {
@@ -162,26 +163,26 @@ type ReconciliationFailedItem struct {
 }
 
 type SavingsPlanData struct {
-	TargetAmount            float64 `json:"target_amount"`
-	CurrentAverageSavings   float64 `json:"current_average_savings"`
-	RecommendedMonthlySave  float64 `json:"recommended_monthly_save"`
-	RecommendedWeeklySave   float64 `json:"recommended_weekly_save"`
-	EstimatedMonthsToTarget int     `json:"estimated_months_to_target"`
-	FeasibleByDate          bool    `json:"feasible_by_date"`
-	TargetDate              string  `json:"target_date,omitempty"`
+	TargetAmount            money.Amount `json:"target_amount"`
+	CurrentAverageSavings   money.Amount `json:"current_average_savings"`
+	RecommendedMonthlySave  money.Amount `json:"recommended_monthly_save"`
+	RecommendedWeeklySave   money.Amount `json:"recommended_weekly_save"`
+	EstimatedMonthsToTarget int          `json:"estimated_months_to_target"`
+	FeasibleByDate          bool         `json:"feasible_by_date"`
+	TargetDate              string       `json:"target_date,omitempty"`
 }
 
 type SavingsGoal struct {
-	ID           string  `json:"id"`
-	Name         string  `json:"name"`
-	TargetAmount float64 `json:"target_amount"`
-	CurrentSaved float64 `json:"current_saved"`
-	ProgressPct  float64 `json:"progress_pct"`
-	TargetDate   string  `json:"target_date,omitempty"`
-	AccountID    string  `json:"account_id,omitempty"`
-	Status       string  `json:"status"`
-	CreatedAt    string  `json:"created_at"`
-	UpdatedAt    string  `json:"updated_at"`
+	ID           string       `json:"id"`
+	Name         string       `json:"name"`
+	TargetAmount money.Amount `json:"target_amount"`
+	CurrentSaved money.Amount `json:"current_saved"`
+	ProgressPct  float64      `json:"progress_pct"`
+	TargetDate   string       `json:"target_date,omitempty"`
+	AccountID    string       `json:"account_id,omitempty"`
+	Status       string       `json:"status"`
+	CreatedAt    string       `json:"created_at"`
+	UpdatedAt    string       `json:"updated_at"`
 }
 
 type SavingsGoalResponse struct {
@@ -200,12 +201,12 @@ type SavingsGoalProgressResponse struct {
 }
 
 type SavingsGoalProgressData struct {
-	Goal                    SavingsGoal `json:"goal"`
-	CurrentAverageSavings   float64     `json:"current_average_savings"`
-	RecommendedMonthlySave  float64     `json:"recommended_monthly_save"`
-	RecommendedWeeklySave   float64     `json:"recommended_weekly_save"`
-	EstimatedMonthsToTarget int         `json:"estimated_months_to_target"`
-	FeasibleByDate          bool        `json:"feasible_by_date"`
+	Goal                    SavingsGoal  `json:"goal"`
+	CurrentAverageSavings   money.Amount `json:"current_average_savings"`
+	RecommendedMonthlySave  money.Amount `json:"recommended_monthly_save"`
+	RecommendedWeeklySave   money.Amount `json:"recommended_weekly_save"`
+	EstimatedMonthsToTarget int          `json:"estimated_months_to_target"`
+	FeasibleByDate          bool         `json:"feasible_by_date"`
 }
 
 func ToExtractResponse(result *domain.AIResult) *ExtractResponse {
@@ -242,5 +243,19 @@ func NewErrorResponse(err error, code string) *ErrorResponse {
 		Success: false,
 		Error:   err.Error(),
 		Code:    code,
+	}
+}
+
+// RoundAmounts rounds every monetary value produced by the LLM half-even to
+// cents. LLM JSON is a float-producing boundary: the numbers are parsed
+// exactly from their text by money.Amount and rounded once, here.
+func (s *SpendingInsights) RoundAmounts() {
+	s.Summary.TotalExpenses = s.Summary.TotalExpenses.RoundCents()
+	s.Summary.TotalIncome = s.Summary.TotalIncome.RoundCents()
+	for i := range s.Summary.TopCategories {
+		s.Summary.TopCategories[i].Amount = s.Summary.TopCategories[i].Amount.RoundCents()
+	}
+	for i := range s.Recommendations {
+		s.Recommendations[i].PotentialSavings = s.Recommendations[i].PotentialSavings.RoundCents()
 	}
 }

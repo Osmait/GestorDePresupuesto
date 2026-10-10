@@ -10,11 +10,13 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money/moneytest"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/monthly_plan"
 )
 
 // newTestItem builds a minimal domain item for the response mapping tests.
-func newTestItem(currency string, amount float64) *monthly_plan.MonthlyPlanItem {
+func newTestItem(currency string, amount money.Amount) *monthly_plan.MonthlyPlanItem {
 	return monthly_plan.NewMonthlyPlanItem(
 		"item-1", "user-1", "Test", "", amount,
 		currency, monthly_plan.TypeBill, nil, nil, nil, true,
@@ -25,7 +27,6 @@ func newTestItem(currency string, amount float64) *monthly_plan.MonthlyPlanItem 
 // same validation the handlers rely on.
 func bindRequest[T any](t *testing.T, payload string) (*T, error) {
 	t.Helper()
-	gin.SetMode(gin.TestMode)
 
 	ctx, _ := gin.CreateTestContext(httptest.NewRecorder())
 	ctx.Request = httptest.NewRequest(http.MethodPost, "/", bytes.NewBufferString(payload))
@@ -182,12 +183,12 @@ func TestNewMonthlyPlanItemResponseConvertsCurrency(t *testing.T) {
 	tests := []struct {
 		name          string
 		currency      string
-		amount        float64
-		rate          float64
-		wantAmountDop float64
+		amount        money.Amount
+		rate          money.Amount
+		wantAmountDop money.Amount
 	}{
-		{name: "DOP is left untouched", currency: "DOP", amount: 25000, rate: 62.5, wantAmountDop: 25000},
-		{name: "USD is converted", currency: "USD", amount: 15, rate: 62.5, wantAmountDop: 937.5},
+		{name: "DOP is left untouched", currency: "DOP", amount: money.FromInt(25000), rate: money.MustParse("62.5"), wantAmountDop: money.FromInt(25000)},
+		{name: "USD is converted", currency: "USD", amount: money.FromInt(15), rate: money.MustParse("62.5"), wantAmountDop: money.MustParse("937.5")},
 	}
 
 	for _, tt := range tests {
@@ -196,8 +197,19 @@ func TestNewMonthlyPlanItemResponseConvertsCurrency(t *testing.T) {
 
 			response := NewMonthlyPlanItemResponse(newTestItem(tt.currency, tt.amount), tt.rate)
 
-			assert.Equal(t, tt.amount, response.Amount, "the original amount is always preserved")
-			assert.Equal(t, tt.wantAmountDop, response.AmountDop)
+			moneytest.Equal(t, tt.amount, response.Amount, "the original amount is always preserved")
+			moneytest.Equal(t, tt.wantAmountDop, response.AmountDop)
 		})
 	}
 }
+
+// monthly_plan_items.amount is NUMERIC(15,2).
+func TestMonthlyPlanItemRequest_RejectsSubCentAmount(t *testing.T) {
+	err := (&MonthlyPlanItemRequest{Amount: money.MustParse("12.345")}).Validate()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "amount must have at most 2 decimal places")
+	assert.NoError(t, (&MonthlyPlanItemRequest{Amount: money.MustParse("12.34")}).Validate())
+}
+
+// gin.SetMode is not safe to call from parallel subtests: set it once.
+func init() { gin.SetMode(gin.TestMode) }

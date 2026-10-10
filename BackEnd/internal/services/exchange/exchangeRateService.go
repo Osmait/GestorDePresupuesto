@@ -3,89 +3,144 @@ package exchange
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
+	"golang.org/x/sync/singleflight"
 )
 
+// ExchangeRateService serves the USD→DOP rate from an in-process cache
+// refreshed from a third-party API at most once per cacheDuration.
+//
+// Concurrency: the cached rate and its timestamp are only read and written
+// under mu, and concurrent cache misses share one upstream request
+// (singleflight). The shared fetch runs on a context detached from the
+// caller's cancellation (bounded by fetchTimeout), so one client
+// disconnecting does not fail every request waiting on the same fetch; each
+// caller still stops waiting when its own context ends.
 type ExchangeRateService struct {
-	cachedRate    float64
-	lastFetch     time.Time
-	cacheDuration time.Duration
 	mu            sync.RWMutex
+	cachedRate    money.Amount
+	lastFetch     time.Time
+	lastFailure   time.Time
+	cacheDuration time.Duration
+	retryAfter    time.Duration
+	fetchTimeout  time.Duration
+	url           string
 	httpClient    *http.Client
+	group         singleflight.Group
 }
 
+// currencyAPIResponse is the third-party payload. Quotes are decoded straight
+// from their JSON number text into money.Amount (no float64 step); the rate
+// is then rounded once, half-even, to money.RateScale at this boundary.
 type currencyAPIResponse struct {
-	TS     int                `json:"ts"`
-	Base   string             `json:"base"`
-	Quotes map[string]float64 `json:"quotes"`
+	TS     int                     `json:"ts"`
+	Base   string                  `json:"base"`
+	Quotes map[string]money.Amount `json:"quotes"`
 }
 
 type ExchangeRateResponse struct {
-	USDToDOP    float64   `json:"usd_to_dop"`
-	LastUpdated time.Time `json:"last_updated"`
+	USDToDOP    money.Amount `json:"usd_to_dop"`
+	LastUpdated time.Time    `json:"last_updated"`
 }
 
 type ConvertResponse struct {
-	USD  float64 `json:"usd"`
-	DOP  float64 `json:"dop"`
-	Rate float64 `json:"rate"`
+	USD  money.Amount `json:"usd"`
+	DOP  money.Amount `json:"dop"`
+	Rate money.Amount `json:"rate"`
 }
 
 const (
 	apiURL = "https://cdn.jsdelivr.net/gh/ismartcoding/currency-api@main/latest/data.json"
 )
 
+const defaultFetchTimeout = 10 * time.Second
+
 func NewExchangeRateService() *ExchangeRateService {
+	return newExchangeRateService(apiURL, telemetry.NewHTTPClient(defaultFetchTimeout))
+}
+
+func newExchangeRateService(url string, client *http.Client) *ExchangeRateService {
 	return &ExchangeRateService{
 		cacheDuration: 1 * time.Hour,
-		httpClient:    &http.Client{Timeout: 10 * time.Second},
+		retryAfter:    time.Minute,
+		fetchTimeout:  defaultFetchTimeout,
+		url:           url,
+		httpClient:    client,
 	}
+}
+
+// cached returns the cached rate and its timestamp, and whether it can be
+// served without asking upstream: either it is fresh, or it is stale but
+// upstream failed less than retryAfter ago (no refetch on every request
+// while the API is down). ok is false when no rate was ever fetched.
+func (s *ExchangeRateService) cached() (rate money.Amount, at time.Time, fresh, ok bool) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if !s.cachedRate.IsPositive() {
+		return money.Zero, time.Time{}, false, false
+	}
+	fresh = time.Since(s.lastFetch) < s.cacheDuration ||
+		(!s.lastFailure.IsZero() && time.Since(s.lastFailure) < s.retryAfter)
+	return s.cachedRate, s.lastFetch, fresh, true
+}
+
+func (s *ExchangeRateService) recordFailure() {
+	s.mu.Lock()
+	s.lastFailure = time.Now()
+	s.mu.Unlock()
 }
 
 func (s *ExchangeRateService) GetUSDtoDOP(ctx context.Context) (*ExchangeRateResponse, error) {
-	s.mu.RLock()
-	if time.Since(s.lastFetch) < s.cacheDuration && s.cachedRate > 0 {
-		rate := s.cachedRate
-		lastUpdate := s.lastFetch
-		s.mu.RUnlock()
-		return &ExchangeRateResponse{
-			USDToDOP:    rate,
-			LastUpdated: lastUpdate,
-		}, nil
+	if rate, at, fresh, ok := s.cached(); ok && fresh {
+		return &ExchangeRateResponse{USDToDOP: rate, LastUpdated: at}, nil
 	}
-	s.mu.RUnlock()
 
-	rate, err := s.fetchRate(ctx)
-	if err != nil {
-		s.mu.RLock()
-		if s.cachedRate > 0 {
-			cachedRate := s.cachedRate
-			lastUpdate := s.lastFetch
-			s.mu.RUnlock()
-			return &ExchangeRateResponse{
-				USDToDOP:    cachedRate,
-				LastUpdated: lastUpdate,
-			}, nil
+	ch := s.group.DoChan("usd_dop", func() (any, error) {
+		// Another caller may have refreshed the cache while this one waited
+		// for the singleflight slot.
+		if rate, at, fresh, ok := s.cached(); ok && fresh {
+			return &ExchangeRateResponse{USDToDOP: rate, LastUpdated: at}, nil
 		}
-		s.mu.RUnlock()
-		return nil, err
-	}
+		fetchCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), s.fetchTimeout)
+		defer cancel()
+		resp, err := s.fetchRate(fetchCtx)
+		if err != nil {
+			s.recordFailure()
+		}
+		return resp, err
+	})
 
-	return &ExchangeRateResponse{
-		USDToDOP:    rate,
-		LastUpdated: s.lastFetch,
-	}, nil
+	select {
+	case res := <-ch:
+		if res.Err == nil {
+			resp := *res.Val.(*ExchangeRateResponse)
+			return &resp, nil
+		}
+		// Upstream failed: serve the stale rate when there is one.
+		if rate, at, _, ok := s.cached(); ok {
+			return &ExchangeRateResponse{USDToDOP: rate, LastUpdated: at}, nil
+		}
+		return nil, res.Err
+	case <-ctx.Done():
+		return nil, ctx.Err()
+	}
 }
 
-func (s *ExchangeRateService) ConvertUSDToDOP(ctx context.Context, amount float64) (*ConvertResponse, error) {
+func (s *ExchangeRateService) ConvertUSDToDOP(ctx context.Context, amount money.Amount) (*ConvertResponse, error) {
 	rateResp, err := s.GetUSDtoDOP(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	dop := amount * rateResp.USDToDOP
+	// Derived amount: exact product rounded half-even to cents.
+	dop := amount.Mul(rateResp.USDToDOP).RoundCents()
 
 	return &ConvertResponse{
 		USD:  amount,
@@ -94,36 +149,39 @@ func (s *ExchangeRateService) ConvertUSDToDOP(ctx context.Context, amount float6
 	}, nil
 }
 
-func (s *ExchangeRateService) fetchRate(ctx context.Context) (float64, error) {
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL, nil)
+// fetchRate downloads the current rate and stores it in the cache.
+func (s *ExchangeRateService) fetchRate(ctx context.Context) (*ExchangeRateResponse, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, s.url, nil)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	resp, err := s.httpClient.Do(req)
 	if err != nil {
-		return 0, err
+		return nil, err
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode != http.StatusOK {
-		return 0, err
+		return nil, fmt.Errorf("exchange rate API returned status %d", resp.StatusCode)
 	}
 
 	var apiResp currencyAPIResponse
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
-		return 0, err
+		return nil, err
 	}
 
 	dopRate, ok := apiResp.Quotes["DOP"]
-	if !ok {
-		return 0, err
+	if !ok || !dopRate.IsPositive() {
+		return nil, errors.New("exchange rate API returned no DOP quote")
 	}
+	dopRate = dopRate.Round(money.RateScale)
 
+	now := time.Now()
 	s.mu.Lock()
 	s.cachedRate = dopRate
-	s.lastFetch = time.Now()
+	s.lastFetch = now
 	s.mu.Unlock()
 
-	return dopRate, nil
+	return &ExchangeRateResponse{USDToDOP: dopRate, LastUpdated: now}, nil
 }

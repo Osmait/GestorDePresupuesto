@@ -13,6 +13,7 @@ import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetDashboardSummary } from '@/hooks/queries/useAnalyticsQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { formatCurrency } from '@/lib/utils'
 import { AnalyticsQueryFilters, CategoryExpense } from '@/types/analytics'
 import { AnalysisFiltersState, useAnalysisContext } from './AnalysisContext'
 import { AnalysisFiltersForm } from './AnalysisFilters'
@@ -89,11 +90,7 @@ function createInitialWindows(): Record<ToolId, FloatingWindowState> {
 }
 
 function formatDOP(value: number): string {
-	return new Intl.NumberFormat('es-DO', {
-		style: 'currency',
-		currency: 'DOP',
-		maximumFractionDigits: 2,
-	}).format(value)
+	return formatCurrency(value, 'DOP')
 }
 
 function WhatIfTool({
@@ -506,7 +503,8 @@ export function AnalysisActions() {
 				</DropdownMenu>
 
 				<Drawer open={drawerOpen} onOpenChange={setDrawerOpen} side='right'>
-					<DrawerContent side='right' className='p-6'>
+					{/* Filter drawer has no description; opt out explicitly (Radix warns otherwise). */}
+					<DrawerContent side='right' className='p-6' aria-describedby={undefined}>
 						<DrawerHeader>
 							<DrawerTitle>{t('filterAnalytics')}</DrawerTitle>
 						</DrawerHeader>

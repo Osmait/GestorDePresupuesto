@@ -1,5 +1,6 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { AlertCircle, Loader2, Search } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
@@ -21,7 +22,9 @@ import {
 	useGetInvestmentFundingBalances,
 	useUpdateInvestmentMutation,
 } from '@/hooks/queries/useInvestmentsQuery'
-import { investmentRepository } from '@/lib/repositoryConfig'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { getInvestmentRepository } from '@/lib/repositoryConfig'
+import { formatCurrency } from '@/lib/utils'
 import { Investment, InvestmentType } from '@/types/investment'
 
 interface InvestmentFormModalProps {
@@ -30,23 +33,27 @@ interface InvestmentFormModalProps {
 	investmentToEdit?: Investment | null
 }
 
-const investmentSchema = z.object({
-	name: z.string().min(1, 'Name is required'),
-	symbol: z
-		.string()
-		.min(1, 'Symbol is required')
-		.transform((v) => v.toUpperCase()),
-	type: z.nativeEnum(InvestmentType),
-	quantity: z.coerce.number().min(0, 'Must be >= 0'),
-	purchase_price: z.coerce.number().min(0, 'Must be >= 0'),
-	current_price: z.coerce.number().min(0, 'Must be >= 0'),
-	settlement_currency: z
-		.string()
-		.min(1)
-		.transform((v) => v.toUpperCase()),
-})
+type FormTranslator = (key: string) => string
 
-type InvestmentFormValues = z.infer<typeof investmentSchema>
+function createInvestmentSchema(t: FormTranslator) {
+	return z.object({
+		name: z.string().min(1, t('errors.nameRequired')),
+		symbol: z
+			.string()
+			.min(1, t('errors.symbolRequired'))
+			.transform((v) => v.toUpperCase()),
+		type: z.nativeEnum(InvestmentType),
+		quantity: z.coerce.number().min(0, t('errors.minZero')),
+		purchase_price: z.coerce.number().min(0, t('errors.minZero')),
+		current_price: z.coerce.number().min(0, t('errors.minZero')),
+		settlement_currency: z
+			.string()
+			.min(1, t('errors.currencyRequired'))
+			.transform((v) => v.toUpperCase()),
+	})
+}
+
+type InvestmentFormValues = z.infer<ReturnType<typeof createInvestmentSchema>>
 
 const defaultValues: InvestmentFormValues = {
 	name: '',
@@ -59,6 +66,10 @@ const defaultValues: InvestmentFormValues = {
 }
 
 export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: InvestmentFormModalProps) {
+	const t = useTranslations('investments.form')
+	const tTypes = useTranslations('investments.typeSingular')
+	const locale = useAppLocale()
+	const investmentSchema = useMemo(() => createInvestmentSchema(t), [t])
 	const [error, setError] = useState<string | null>(null)
 	const [fetchLoading, setFetchLoading] = useState(false)
 	const createMutation = useCreateInvestmentMutation()
@@ -95,12 +106,18 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 		return match?.available || 0
 	}, [balances, settlementCurrency])
 
+	// Free-text currency field: only format as money once it looks like an ISO 4217 code.
+	const formatMoney = (amount: number) =>
+		/^[A-Z]{3}$/.test(settlementCurrency)
+			? formatCurrency(amount, settlementCurrency, { locale })
+			: `${amount.toFixed(2)} ${settlementCurrency}`
+
 	const handleFetchPrice = async () => {
 		const symbol = form.getValues('symbol')
 		if (!symbol) return
 		setFetchLoading(true)
 		try {
-			const quote = await investmentRepository.getQuote(symbol)
+			const quote = await getInvestmentRepository().getQuote(symbol)
 			if (quote) {
 				const currentName = form.getValues('name')
 				const currentPurchasePrice = form.getValues('purchase_price')
@@ -114,9 +131,9 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 				setError(null)
 				return
 			}
-			setError('Could not fetch price for this symbol')
+			setError(t('errors.quoteNotFound'))
 		} catch {
-			setError('Failed to fetch price')
+			setError(t('errors.quoteFailed'))
 		} finally {
 			setFetchLoading(false)
 		}
@@ -127,7 +144,11 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 
 		if (!investmentToEdit && requiredAmount > availableBalance) {
 			setError(
-				`Insufficient broker balance in ${settlementCurrency}. Required: ${requiredAmount.toFixed(2)}, available: ${availableBalance.toFixed(2)}`,
+				t('errors.insufficientBalance', {
+					currency: settlementCurrency,
+					required: formatMoney(requiredAmount),
+					available: formatMoney(availableBalance),
+				}),
 			)
 			return
 		}
@@ -140,8 +161,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 			}
 			onClose()
 		} catch (submitError: unknown) {
-			const errorMessage =
-				submitError instanceof Error ? submitError.message : 'Failed to save investment. Please try again.'
+			const errorMessage = submitError instanceof Error ? submitError.message : t('errors.saveFailed')
 			setError(errorMessage)
 		}
 	}
@@ -152,12 +172,8 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 		<Dialog open={isOpen} onOpenChange={onClose}>
 			<DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-[560px]'>
 				<DialogHeader>
-					<DialogTitle>{investmentToEdit ? 'Edit investment' : 'Add investment'}</DialogTitle>
-					<DialogDescription>
-						{investmentToEdit
-							? 'Update the details of your investment.'
-							: 'Use your broker funding balance to add a new investment.'}
-					</DialogDescription>
+					<DialogTitle>{investmentToEdit ? t('editTitle') : t('addTitle')}</DialogTitle>
+					<DialogDescription>{investmentToEdit ? t('editDescription') : t('addDescription')}</DialogDescription>
 				</DialogHeader>
 
 				{error && (
@@ -170,11 +186,13 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 				<Form {...form}>
 					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
 						<div className='rounded-md border p-3 text-sm'>
-							<p className='font-medium'>Broker balance</p>
+							<p className='font-medium'>{t('brokerBalance')}</p>
 							<p className='text-muted-foreground'>
-								{settlementCurrency}: {availableBalance.toFixed(2)}
+								{settlementCurrency}: {formatMoney(availableBalance)}
 							</p>
-							<p className='text-muted-foreground'>Required for this purchase: {requiredAmount.toFixed(2)}</p>
+							<p className='text-muted-foreground'>
+								{t('requiredForPurchase', { amount: formatMoney(requiredAmount) })}
+							</p>
 						</div>
 
 						<FormField
@@ -182,7 +200,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 							name='name'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>Name</FormLabel>
+									<FormLabel>{t('name')}</FormLabel>
 									<FormControl>
 										<Input {...field} />
 									</FormControl>
@@ -197,18 +215,20 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								name='symbol'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Symbol</FormLabel>
+										<FormLabel>{t('symbol')}</FormLabel>
 										<FormControl>
 											<div className='flex gap-2'>
 												<Input
 													{...field}
 													onChange={(e) => field.onChange(e.target.value.toUpperCase())}
-													placeholder='e.g. AAPL, BTC-USD'
+													placeholder={t('symbolPlaceholder')}
 												/>
 												<Button
 													type='button'
 													size='icon'
 													variant='outline'
+													aria-label={t('fetchPrice')}
+													title={t('fetchPrice')}
 													onClick={handleFetchPrice}
 													disabled={fetchLoading || !watchedValues.symbol}
 												>
@@ -228,17 +248,17 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								name='type'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Type</FormLabel>
+										<FormLabel>{t('type')}</FormLabel>
 										<Select value={field.value} onValueChange={field.onChange}>
 											<FormControl>
 												<SelectTrigger>
-													<SelectValue placeholder='Select type' />
+													<SelectValue placeholder={t('selectType')} />
 												</SelectTrigger>
 											</FormControl>
 											<SelectContent>
-												<SelectItem value={InvestmentType.STOCK}>Stock</SelectItem>
-												<SelectItem value={InvestmentType.CRYPTO}>Crypto</SelectItem>
-												<SelectItem value={InvestmentType.FIXED_INCOME}>Fixed income</SelectItem>
+												<SelectItem value={InvestmentType.STOCK}>{tTypes('stock')}</SelectItem>
+												<SelectItem value={InvestmentType.CRYPTO}>{tTypes('crypto')}</SelectItem>
+												<SelectItem value={InvestmentType.FIXED_INCOME}>{tTypes('fixed_income')}</SelectItem>
 											</SelectContent>
 										</Select>
 										<FormMessage />
@@ -251,7 +271,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								name='settlement_currency'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Purchase currency</FormLabel>
+										<FormLabel>{t('purchaseCurrency')}</FormLabel>
 										<FormControl>
 											<Input {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} maxLength={10} />
 										</FormControl>
@@ -265,7 +285,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								name='quantity'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Quantity</FormLabel>
+										<FormLabel>{t('quantity')}</FormLabel>
 										<FormControl>
 											<Input type='number' step='any' {...field} />
 										</FormControl>
@@ -279,7 +299,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								name='purchase_price'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel>Purchase price</FormLabel>
+										<FormLabel>{t('purchasePrice')}</FormLabel>
 										<FormControl>
 											<Input type='number' step='any' {...field} />
 										</FormControl>
@@ -293,7 +313,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								name='current_price'
 								render={({ field }) => (
 									<FormItem className='md:col-span-2'>
-										<FormLabel>Current price</FormLabel>
+										<FormLabel>{t('currentPrice')}</FormLabel>
 										<FormControl>
 											<Input type='number' step='any' {...field} />
 										</FormControl>
@@ -306,7 +326,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 						<DialogFooter>
 							<Button type='submit' disabled={isLoading}>
 								{isLoading && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-								{investmentToEdit ? 'Update' : 'Create'}
+								{investmentToEdit ? t('update') : t('create')}
 							</Button>
 						</DialogFooter>
 					</form>

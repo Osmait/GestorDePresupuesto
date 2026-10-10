@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // Logger wraps zerolog with OpenTelemetry integration
@@ -77,8 +78,9 @@ func NewLogger(cfg *LoggerConfig) *Logger {
 	// Configure time format
 	zerolog.TimeFieldFormat = cfg.TimeFormat
 
-	// Add timestamp and caller information
-	logger = logger.With().Timestamp().Logger()
+	// Add timestamp and caller information; TraceHook adds request/trace ids
+	// to events logged with .Ctx(ctx).
+	logger = logger.With().Timestamp().Logger().Hook(TraceHook{})
 	if cfg.Caller {
 		logger = logger.With().Caller().Logger()
 	}
@@ -86,9 +88,26 @@ func NewLogger(cfg *LoggerConfig) *Logger {
 	return &Logger{logger: logger}
 }
 
-// WithContext adds context to the logger (currently no-op for traces)
+// WithContext adds the request id and the active trace_id/span_id (when a
+// recording span is in ctx) so log lines can be joined with traces.
 func (l *Logger) WithContext(ctx context.Context) *Logger {
-	return &Logger{logger: l.logger}
+	if ctx == nil {
+		return l
+	}
+	lc := l.logger.With()
+	changed := false
+	if rid := RequestIDFromContext(ctx); rid != "" {
+		lc = lc.Str(RequestIDField, rid)
+		changed = true
+	}
+	if sc := trace.SpanContextFromContext(ctx); sc.IsValid() {
+		lc = lc.Str(TraceIDField, sc.TraceID().String()).Str(SpanIDField, sc.SpanID().String())
+		changed = true
+	}
+	if !changed {
+		return l
+	}
+	return &Logger{logger: lc.Logger()}
 }
 
 // WithFields adds structured fields to the logger

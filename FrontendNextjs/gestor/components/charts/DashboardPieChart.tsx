@@ -1,6 +1,7 @@
 'use client'
 
 import { ResponsivePie } from '@nivo/pie'
+import { formatCurrency } from '@/lib/utils'
 
 interface DashboardPieChartProps {
 	data: any[]
@@ -27,12 +28,7 @@ const DashboardPieChart = ({ data, theme, nivoTheme, t }: DashboardPieChartProps
 
 	const total = data.reduce((sum: number, item: any) => sum + Number(item.value || 0), 0)
 
-	const formatDOP = (value: number) =>
-		new Intl.NumberFormat('es-DO', {
-			style: 'currency',
-			currency: 'DOP',
-			maximumFractionDigits: 2,
-		}).format(value)
+	const formatDOP = (value: number) => formatCurrency(value, 'DOP')
 
 	return (
 		<div className='h-full grid grid-cols-1 md:grid-cols-[1.4fr_1fr] gap-4 items-stretch'>

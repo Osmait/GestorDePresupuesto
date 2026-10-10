@@ -1,24 +1,13 @@
 'use client'
 
 import { ArrowDownCircle, ArrowUpCircle, TrendingUp } from 'lucide-react'
-import { useLocale, useTranslations } from 'next-intl'
+import dynamic from 'next/dynamic'
+import { useTranslations } from 'next-intl'
 import { useMemo } from 'react'
-import {
-	Area,
-	AreaChart,
-	Bar,
-	BarChart,
-	CartesianGrid,
-	Cell,
-	Legend,
-	Pie,
-	PieChart,
-	ResponsiveContainer,
-	Tooltip,
-	XAxis,
-	YAxis,
-} from 'recharts'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { isInflowTransaction } from '@/lib/transaction-utils'
+import { DEFAULT_CURRENCY, formatCurrency } from '@/lib/utils'
 import { Category } from '@/types/category'
 import { Transaction } from '@/types/transaction'
 
@@ -26,14 +15,39 @@ interface AccountAnalyticsProps {
 	transactions: Transaction[]
 	categories: Category[]
 	currentBalance: number
+	/** Currency of the account; all its transactions are shown in it. */
+	currency?: string
 }
 
 const COLORS = ['#10b981', '#ef4444'] // Green for Income, Red for Expense
 const TOP_CATEGORIES_COUNT = 5
 
-export function AccountAnalytics({ transactions, categories, currentBalance }: AccountAnalyticsProps) {
+// Charts are client-only and load in their own chunk, after the summary cards.
+// The CardContent around each one has a fixed height, so nothing shifts.
+const chartLoading = () => <div className='h-full w-full rounded bg-muted/20 animate-pulse' />
+const HorizontalBarChart = dynamic(() => import('@/components/charts/HorizontalBarChart'), {
+	ssr: false,
+	loading: chartLoading,
+})
+const DonutLegendChart = dynamic(() => import('@/components/charts/DonutLegendChart'), {
+	ssr: false,
+	loading: chartLoading,
+})
+const AreaTrendChart = dynamic(() => import('@/components/charts/AreaTrendChart'), {
+	ssr: false,
+	loading: chartLoading,
+})
+
+export function AccountAnalytics({
+	transactions,
+	categories,
+	currentBalance,
+	currency = DEFAULT_CURRENCY,
+}: AccountAnalyticsProps) {
 	const t = useTranslations('analysis')
-	const locale = useLocale()
+	const locale = useAppLocale()
+	const formatMoney = (value: number, signDisplay?: 'exceptZero') =>
+		formatCurrency(value, currency, { locale, signDisplay })
 
 	const stats = useMemo(() => {
 		let income = 0
@@ -77,30 +91,26 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 			(a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
 		)
 
-		const historyPoints: { date: string; fullDate: Date; balance: number }[] = []
+		const historyPoints: { label: string; value: number }[] = []
 		// Push current state
-		const dateLocale = locale === 'es' ? 'es-ES' : 'en-US'
 		historyPoints.push({
-			date: new Date().toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
-			fullDate: new Date(),
-			balance: balanceTracker,
+			label: formatLocalDate(new Date(), locale, { month: 'short', day: 'numeric' }),
+			value: balanceTracker,
 		})
 
 		sortedTransactions.forEach((t) => {
 			// To go back in time:
 			// If transaction was Income (+), we SUBTRACT it to get previous balance.
 			// If transaction was Expense (-), we ADD it (using abs amount) to get previous balance.
-			const INCOME_TYPES = ['income', 'loan_collection', 'loan_cancellation_refund']
-			if (INCOME_TYPES.includes(t.type_transation)) {
+			if (isInflowTransaction(t.type_transation)) {
 				balanceTracker -= t.amount // going back in time: undo income = subtract
 			} else {
 				balanceTracker += t.amount // going back in time: undo expense = add back
 			}
 
 			historyPoints.push({
-				date: new Date(t.created_at).toLocaleDateString(dateLocale, { month: 'short', day: 'numeric' }),
-				fullDate: new Date(t.created_at),
-				balance: balanceTracker,
+				label: formatLocalDate(t.created_at, locale, { month: 'short', day: 'numeric' }),
+				value: balanceTracker,
 			})
 		})
 
@@ -132,192 +142,102 @@ export function AccountAnalytics({ transactions, categories, currentBalance }: A
 		}
 	}, [transactions, categories, currentBalance, locale, t])
 
-	const pieData = [
-		{ name: t('income'), value: stats.income },
-		{ name: t('expenses'), value: stats.expense },
+	const summaryData = [
+		{ name: t('income'), value: stats.income, color: COLORS[0] },
+		{ name: t('expenses'), value: stats.expense, color: COLORS[1] },
 	].filter((d) => d.value > 0)
 
-	const CustomTooltip = ({
-		active,
-		payload,
-		label,
-	}: {
-		active?: boolean
-		payload?: Array<{ name: string; value: number; payload: { name: string } }>
-		label?: string
-	}) => {
-		if (active && payload?.length) {
-			return (
-				<div className='bg-popover border border-border p-2 rounded shadow-md text-sm'>
-					<p className='font-semibold mb-1'>{payload[0].name === 'balance' ? label : payload[0].payload.name}</p>
-					<p className=''>${payload[0].value.toLocaleString()}</p>
-				</div>
-			)
-		}
-		return null
-	}
-
 	return (
-		<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8'>
-			<Card>
+		<div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8'>
+			<Card className='min-w-0'>
 				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
 					<CardTitle className='text-sm font-medium'>{t('totalIncome')}</CardTitle>
 					<ArrowUpCircle className='h-4 w-4 text-green-500' />
 				</CardHeader>
 				<CardContent>
-					<div className='text-2xl font-bold text-green-500'>+${stats.income.toLocaleString()}</div>
+					<div className='text-xl sm:text-2xl font-bold text-green-500 tabular-nums break-words'>
+						{formatMoney(stats.income, 'exceptZero')}
+					</div>
 				</CardContent>
 			</Card>
-			<Card>
+			<Card className='min-w-0'>
 				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
 					<CardTitle className='text-sm font-medium'>{t('totalExpenses')}</CardTitle>
 					<ArrowDownCircle className='h-4 w-4 text-red-500' />
 				</CardHeader>
 				<CardContent>
-					<div className='text-2xl font-bold text-red-500'>-${stats.expense.toLocaleString()}</div>
+					<div className='text-xl sm:text-2xl font-bold text-red-500 tabular-nums break-words'>
+						{formatMoney(-stats.expense, 'exceptZero')}
+					</div>
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-2 row-span-2'>
+			<Card className='min-w-0 md:col-span-2 lg:row-span-2'>
 				<CardHeader>
 					<CardTitle>{t('financialSummary')}</CardTitle>
 				</CardHeader>
-				<CardContent className='h-[200px]'>
-					<ResponsiveContainer width='100%' height='100%'>
-						<BarChart data={pieData} layout='vertical' margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-							<XAxis type='number' hide />
-							<YAxis dataKey='name' type='category' width={80} tick={{ fontSize: 12 }} />
-							<Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
-							<Bar dataKey='value' radius={[0, 4, 4, 0]}>
-								{pieData.map((entry) => (
-									<Cell key={`cell-${entry.name}`} fill={entry.name === t('income') ? COLORS[0] : COLORS[1]} />
-								))}
-							</Bar>
-						</BarChart>
-					</ResponsiveContainer>
+				<CardContent className='h-[200px] min-w-0'>
+					<HorizontalBarChart data={summaryData} formatValue={formatMoney} labelWidth={80} />
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-2'>
+			<Card className='min-w-0 md:col-span-2'>
 				<CardHeader>
 					<CardTitle>{t('expensesByCategory')}</CardTitle>
 				</CardHeader>
-				<CardContent className='h-[200px]'>
+				<CardContent className='h-[200px] min-w-0'>
 					{stats.expenseByCategory.length > 0 ? (
-						<ResponsiveContainer width='100%' height='100%'>
-							<PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-								<Pie
-									data={stats.expenseByCategory}
-									cx='50%'
-									cy='50%'
-									innerRadius={40}
-									outerRadius={60}
-									paddingAngle={2}
-									dataKey='value'
-								>
-									{stats.expenseByCategory.map((entry) => (
-										<Cell key={`cell-${entry.name}`} fill={entry.color} />
-									))}
-								</Pie>
-								<Tooltip content={<CustomTooltip />} />
-								<Legend layout='vertical' verticalAlign='middle' align='right' wrapperStyle={{ fontSize: '12px' }} />
-							</PieChart>
-						</ResponsiveContainer>
+						<DonutLegendChart data={stats.expenseByCategory} formatValue={formatMoney} />
 					) : (
 						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
 					)}
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-2'>
+			<Card className='min-w-0 md:col-span-2'>
 				<CardHeader>
 					<CardTitle>{t('incomeByCategory')}</CardTitle>
 				</CardHeader>
-				<CardContent className='h-[200px]'>
+				<CardContent className='h-[200px] min-w-0'>
 					{stats.incomeByCategory.length > 0 ? (
-						<ResponsiveContainer width='100%' height='100%'>
-							<PieChart margin={{ top: 0, right: 0, left: 0, bottom: 0 }}>
-								<Pie
-									data={stats.incomeByCategory}
-									cx='50%'
-									cy='50%'
-									innerRadius={40}
-									outerRadius={60}
-									paddingAngle={2}
-									dataKey='value'
-								>
-									{stats.incomeByCategory.map((entry) => (
-										<Cell key={`cell-${entry.name}`} fill={entry.color} />
-									))}
-								</Pie>
-								<Tooltip content={<CustomTooltip />} />
-								<Legend layout='vertical' verticalAlign='middle' align='right' wrapperStyle={{ fontSize: '12px' }} />
-							</PieChart>
-						</ResponsiveContainer>
+						<DonutLegendChart data={stats.incomeByCategory} formatValue={formatMoney} />
 					) : (
 						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
 					)}
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-2'>
+			<Card className='min-w-0 md:col-span-2'>
 				<CardHeader>
 					<CardTitle>{t('topExpenses')}</CardTitle>
 				</CardHeader>
-				<CardContent className='h-[200px]'>
+				<CardContent className='h-[200px] min-w-0'>
 					{stats.topExpenses.length > 0 ? (
-						<ResponsiveContainer width='100%' height='100%'>
-							<BarChart data={stats.topExpenses} layout='vertical' margin={{ top: 5, right: 10, left: 10, bottom: 5 }}>
-								<XAxis type='number' hide />
-								<YAxis dataKey='name' type='category' width={90} tick={{ fontSize: 11 }} interval={0} />
-								<Tooltip cursor={{ fill: 'transparent' }} content={<CustomTooltip />} />
-								<Bar dataKey='value' radius={[0, 4, 4, 0]} fill='#ef4444' barSize={20} />
-							</BarChart>
-						</ResponsiveContainer>
+						<HorizontalBarChart
+							data={stats.topExpenses}
+							formatValue={formatMoney}
+							labelWidth={100}
+							fontSize={11}
+							padding={0.4}
+						/>
 					) : (
 						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
 					)}
 				</CardContent>
 			</Card>
 
-			<Card className='col-span-4 mt-4'>
+			<Card className='min-w-0 md:col-span-2 lg:col-span-4 lg:mt-4'>
 				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
 					<CardTitle>{t('balanceHistory')}</CardTitle>
 					<TrendingUp className='h-4 w-4 text-muted-foreground' />
 				</CardHeader>
-				<CardContent className='h-[250px]'>
-					<ResponsiveContainer width='100%' height='100%'>
-						<AreaChart data={stats.balanceHistory} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-							<defs>
-								<linearGradient id='colorBalance' x1='0' y1='0' x2='0' y2='1'>
-									<stop offset='5%' stopColor='#8884d8' stopOpacity={0.8} />
-									<stop offset='95%' stopColor='#8884d8' stopOpacity={0} />
-								</linearGradient>
-							</defs>
-							<CartesianGrid strokeDasharray='3 3' vertical={false} stroke='#e5e7eb' className='dark:stroke-gray-800' />
-							<XAxis
-								dataKey='date'
-								tickLine={false}
-								axisLine={false}
-								tick={{ fontSize: 12, fill: '#6b7280' }}
-								minTickGap={30}
-							/>
-							<YAxis hide domain={['auto', 'auto']} />
-							<Tooltip
-								contentStyle={{ borderRadius: '8px', border: '1px solid #e5e7eb' }}
-								labelStyle={{ fontWeight: 'bold', color: '#374151' }}
-								formatter={(value) => [`$${Number(value).toLocaleString()}`, t('balance')]}
-							/>
-							<Area
-								type='monotone'
-								dataKey='balance'
-								stroke='#8884d8'
-								strokeWidth={2}
-								fillOpacity={1}
-								fill='url(#colorBalance)'
-							/>
-						</AreaChart>
-					</ResponsiveContainer>
+				<CardContent className='h-[250px] min-w-0'>
+					<AreaTrendChart
+						points={stats.balanceHistory}
+						color='#8884d8'
+						seriesLabel={t('balance')}
+						formatValue={formatMoney}
+					/>
 				</CardContent>
 			</Card>
 		</div>

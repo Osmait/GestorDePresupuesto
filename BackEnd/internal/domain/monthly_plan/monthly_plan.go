@@ -7,7 +7,11 @@
 // how much of my expected income is already committed before the month starts.
 package monthly_plan
 
-import "time"
+import (
+	"time"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+)
 
 // Item types. These match the vocabulary used by the transactions table
 // ('bill' rather than 'expense') so the whole codebase stays consistent.
@@ -36,7 +40,7 @@ type MonthlyPlanItem struct {
 	Description string
 	Currency    string
 	Type        string
-	Amount      float64
+	Amount      money.Amount
 	IsActive    bool
 }
 
@@ -45,7 +49,7 @@ type MonthlyPlanItem struct {
 // working.
 func NewMonthlyPlanItem(
 	id, userID, name, description string,
-	amount float64,
+	amount money.Amount,
 	currency, itemType string,
 	categoryID, accountID *string,
 	dayOfMonth *int,
@@ -76,8 +80,8 @@ func NewMonthlyPlanItem(
 // Totals is the raw aggregation returned by the repository, already converted
 // to DOP.
 type Totals struct {
-	TotalIncome   float64
-	TotalExpenses float64
+	TotalIncome   money.Amount
+	TotalExpenses money.Amount
 	IncomeCount   int
 	ExpensesCount int
 }
@@ -85,15 +89,15 @@ type Totals struct {
 // Summary is the headline of the feature: what comes in, what is already
 // committed, and what is actually left.
 type Summary struct {
-	TotalIncome   float64
-	TotalExpenses float64
+	TotalIncome   money.Amount
+	TotalExpenses money.Amount
 	// Available is income minus expenses. It can be negative, which is exactly
 	// the situation the user needs to see.
-	Available float64
+	Available money.Amount
 	// CommittedPercentage is the share of the expected income already taken by
 	// fixed expenses. Zero when there is no income to compare against.
 	CommittedPercentage float64
-	UsdToDopRate        float64
+	UsdToDopRate        money.Amount
 	IncomeCount         int
 	ExpensesCount       int
 }

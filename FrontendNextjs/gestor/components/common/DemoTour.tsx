@@ -1,9 +1,8 @@
 'use client'
 
-import { DriveStep, driver } from 'driver.js'
-import { useEffect } from 'react'
-import 'driver.js/dist/driver.css'
+import type { DriveStep } from 'driver.js'
 import { usePathname } from 'next/navigation'
+import { useEffect } from 'react'
 
 interface DemoTourProps {
 	user: {
@@ -16,14 +15,10 @@ export function DemoTour({ user }: DemoTourProps) {
 	const pathname = usePathname()
 
 	useEffect(() => {
-		console.log('DemoTour: Checking trigger...', { user, pathname })
-
 		// Check if user is a demo user
 		// Ensure case-insensitive check and trim
 		const email = user?.email?.toLowerCase().trim()
 		const isDemoUser = email?.startsWith('demo+')
-
-		console.log('DemoTour: isDemoUser?', isDemoUser, 'Email:', email)
 
 		if (!isDemoUser) return
 
@@ -202,33 +197,37 @@ export function DemoTour({ user }: DemoTourProps) {
 		}
 
 		const hasSeenTour = sessionStorage.getItem(tourKey)
-		console.log(`DemoTour: Path ${pathname}, TourKey ${tourKey}, HasSeen ${hasSeenTour}, Steps ${steps.length}`)
 
 		if (steps.length > 0 && !hasSeenTour) {
-			console.log('DemoTour: Starting driver...')
-			const driverObj = driver({
-				showProgress: true,
-				animate: true,
-				allowClose: true,
-				doneBtnText: '¡Entendido!',
-				nextBtnText: 'Siguiente',
-				prevBtnText: 'Anterior',
-				progressText: 'Paso {{current}} de {{total}}',
-				steps: steps,
-				onDestroyStarted: () => {
-					if (tourKey) {
-						sessionStorage.setItem(tourKey, 'true')
-					}
-					driverObj.destroy()
-				},
-			})
-
-			// Small delay to ensure DOM is ready and transitions finished
-			const timer = setTimeout(() => {
+			let cancelled = false
+			// Small delay to ensure DOM is ready and transitions finished. driver.js and
+			// its CSS are only downloaded here, i.e. for demo users who have a tour to see.
+			const timer = setTimeout(async () => {
+				const { driver } = await import('./demo-tour-driver')
+				if (cancelled) return
+				const driverObj = driver({
+					showProgress: true,
+					animate: true,
+					allowClose: true,
+					doneBtnText: '¡Entendido!',
+					nextBtnText: 'Siguiente',
+					prevBtnText: 'Anterior',
+					progressText: 'Paso {{current}} de {{total}}',
+					steps: steps,
+					onDestroyStarted: () => {
+						if (tourKey) {
+							sessionStorage.setItem(tourKey, 'true')
+						}
+						driverObj.destroy()
+					},
+				})
 				driverObj.drive()
 			}, 1000)
 
-			return () => clearTimeout(timer)
+			return () => {
+				cancelled = true
+				clearTimeout(timer)
+			}
 		}
 	}, [user, pathname])
 

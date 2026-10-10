@@ -2,12 +2,11 @@ package handler
 
 import (
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	analyticsdto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/analytics"
-	errorHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/error"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 )
 
@@ -16,7 +15,7 @@ func GetCategoryExpenses(analyticsService *analytics.AnalyticsService) gin.Handl
 		userID := c.GetString("X-User-Id")
 		categoryExpenses, err := analyticsService.GetCategoryExpenses(c.Request.Context(), userID)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			_ = c.Error(err)
 			return
 		}
 
@@ -29,7 +28,7 @@ func GetMonthlySummary(analyticsService *analytics.AnalyticsService) gin.Handler
 		userID := c.GetString("X-User-Id")
 		monthlySummary, err := analyticsService.GetMonthlySummary(c.Request.Context(), userID)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			_ = c.Error(err)
 			return
 		}
 
@@ -60,20 +59,20 @@ func GetDashboardSummary(analyticsService *analytics.AnalyticsService) gin.Handl
 		}
 
 		if minAmountStr := c.Query("min_amount"); minAmountStr != "" {
-			if parsed, parseErr := strconv.ParseFloat(minAmountStr, 64); parseErr == nil && parsed >= 0 {
+			if parsed, parseErr := money.Parse(minAmountStr); parseErr == nil && !parsed.IsNegative() {
 				filters.MinAmount = &parsed
 			}
 		}
 
 		if maxAmountStr := c.Query("max_amount"); maxAmountStr != "" {
-			if parsed, parseErr := strconv.ParseFloat(maxAmountStr, 64); parseErr == nil && parsed >= 0 {
+			if parsed, parseErr := money.Parse(maxAmountStr); parseErr == nil && !parsed.IsNegative() {
 				filters.MaxAmount = &parsed
 			}
 		}
 
 		summary, err := analyticsService.GetDashboardSummary(c.Request.Context(), userID, filters)
 		if err != nil {
-			errorHandler.ResponseByTypeOfErr(err, c)
+			_ = c.Error(err)
 			return
 		}
 

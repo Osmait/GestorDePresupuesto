@@ -1,92 +1,40 @@
 'use client'
 
+import { useQuery } from '@tanstack/react-query'
 import { useSession } from 'next-auth/react'
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
+import { getFeatureFlagRepository } from '@/lib/repositoryConfig'
 
-const BASE_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://127.0.0.1:8080'
+export const FEATURE_FLAG_KEYS = {
+	all: ['featureFlags'] as const,
+	mine: (userId: string) => [...FEATURE_FLAG_KEYS.all, 'me', userId] as const,
+}
 
-let cachedFlags: Record<string, boolean> = {}
-let hasLoadedFlags = false
-let inFlightFlagsRequest: Promise<Record<string, boolean>> | null = null
-let cachedToken = ''
+/** Flags change rarely (admin action); every component using the hook shares one cached request. */
+const FEATURE_FLAGS_STALE_TIME_MS = 5 * 60 * 1000
+
+const NO_FLAGS: Record<string, boolean> = {}
 
 export function useFeatureFlags() {
 	const { data: session, status } = useSession()
-	const accessToken = ((session as any)?.accessToken as string | undefined) || ''
-	const [flags, setFlags] = useState<Record<string, boolean>>(cachedFlags)
-	const [isLoading, setIsLoading] = useState(!hasLoadedFlags)
+	const userId = status === 'authenticated' ? session?.user?.id || '' : ''
 
-	const loadFlags = useCallback(async () => {
-		if (accessToken !== cachedToken) {
-			cachedToken = accessToken
-			cachedFlags = {}
-			hasLoadedFlags = false
-			inFlightFlagsRequest = null
-		}
+	const query = useQuery({
+		queryKey: FEATURE_FLAG_KEYS.mine(userId),
+		queryFn: () => getFeatureFlagRepository().getMyFeatures(),
+		enabled: !!userId,
+		staleTime: FEATURE_FLAGS_STALE_TIME_MS,
+	})
 
-		if (!accessToken) {
-			cachedFlags = {}
-			hasLoadedFlags = true
-			return cachedFlags
-		}
-
-		if (inFlightFlagsRequest) {
-			return inFlightFlagsRequest
-		}
-
-		inFlightFlagsRequest = (async () => {
-			const response = await fetch(`${BASE_URL}/me/features`, {
-				headers: { Authorization: `Bearer ${accessToken}` },
-			})
-
-			if (!response.ok) {
-				throw new Error(`failed to load feature flags: ${response.status}`)
-			}
-
-			const data = await response.json()
-			cachedFlags = data?.map || {}
-			hasLoadedFlags = true
-			return cachedFlags
-		})()
-
-		try {
-			return await inFlightFlagsRequest
-		} finally {
-			inFlightFlagsRequest = null
-		}
-	}, [accessToken])
-
-	const refresh = useCallback(async () => {
-		if (status !== 'authenticated') {
-			cachedFlags = {}
-			hasLoadedFlags = true
-			setFlags(cachedFlags)
-			setIsLoading(false)
-			return
-		}
-
-		if (!hasLoadedFlags) {
-			setIsLoading(true)
-		}
-		try {
-			const loadedFlags = await loadFlags()
-			setFlags(loadedFlags)
-		} catch {
-			if (!hasLoadedFlags) {
-				hasLoadedFlags = true
-				cachedFlags = {}
-			}
-			setFlags({})
-		} finally {
-			setIsLoading(false)
-		}
-	}, [status, loadFlags])
-
-	useEffect(() => {
-		void refresh()
-	}, [refresh])
+	const flags = (userId && query.data) || NO_FLAGS
+	// Unknown until the session is resolved and, for a signed-in user, the first answer arrived.
+	const isLoading = status === 'loading' || (!!userId && query.isPending)
 
 	const isEnabled = useCallback((featureKey: string) => !!flags[featureKey], [flags])
+	const { refetch } = query
+	const refresh = useCallback(async () => {
+		if (userId) await refetch()
+	}, [userId, refetch])
 
 	return {
 		flags,

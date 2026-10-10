@@ -2,6 +2,7 @@
 
 import { format, parse } from 'date-fns'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { useTranslations } from 'next-intl'
 import { useTransition } from 'react'
 import type { DateRange } from 'react-day-picker'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
@@ -9,6 +10,15 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 type Preset = 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'all' | 'custom'
+
+const PRESET_LABEL_KEYS = {
+	this_month: 'thisMonth',
+	last_month: 'lastMonth',
+	last_3_months: 'last3Months',
+	this_year: 'thisYear',
+	all: 'allTime',
+	custom: 'customRange',
+} as const satisfies Record<Preset, string>
 
 interface Props {
 	initialFrom?: string
@@ -37,14 +47,13 @@ function computePresetRange(preset: Preset): { from: string; to: string } | null
 				from: format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd'),
 				to: format(new Date(now.getFullYear(), 11, 31), 'yyyy-MM-dd'),
 			}
-		case 'all':
-		case 'custom':
 		default:
 			return null
 	}
 }
 
 export function DashboardDateFilter({ initialFrom, initialTo, initialPreset = 'this_month' }: Props) {
+	const t = useTranslations('dateFilter')
 	const router = useRouter()
 	const searchParams = useSearchParams()
 	const [isPending, startTransition] = useTransition()
@@ -102,22 +111,21 @@ export function DashboardDateFilter({ initialFrom, initialTo, initialPreset = 't
 	return (
 		<div className='flex flex-wrap items-center gap-2' data-loading={isPending ? 'true' : 'false'}>
 			<Select value={initialPreset} onValueChange={(v) => handlePresetChange(v as Preset)}>
-				<SelectTrigger className='w-[180px]'>
+				<SelectTrigger className='w-[180px]' aria-label={t('label')}>
 					<SelectValue />
 				</SelectTrigger>
 				<SelectContent>
-					<SelectItem value='this_month'>This month</SelectItem>
-					<SelectItem value='last_month'>Last month</SelectItem>
-					<SelectItem value='last_3_months'>Last 3 months</SelectItem>
-					<SelectItem value='this_year'>This year</SelectItem>
-					<SelectItem value='all'>All time</SelectItem>
-					<SelectItem value='custom'>Custom range</SelectItem>
+					{(Object.keys(PRESET_LABEL_KEYS) as Preset[]).map((preset) => (
+						<SelectItem key={preset} value={preset}>
+							{t(PRESET_LABEL_KEYS[preset])}
+						</SelectItem>
+					))}
 				</SelectContent>
 			</Select>
 			{initialPreset === 'custom' && <CalendarDateRangePicker value={pickerValue} onChange={handleCustomRange} />}
 			{initialPreset !== 'this_month' && (
 				<Button variant='ghost' size='sm' onClick={clearFilter}>
-					Reset
+					{t('reset')}
 				</Button>
 			)}
 		</div>

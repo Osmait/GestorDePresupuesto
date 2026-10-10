@@ -3,6 +3,8 @@ package investment
 import (
 	"context"
 	"time"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 type InvestmentType string
@@ -19,38 +21,38 @@ type Investment struct {
 	Type               InvestmentType `json:"type"`
 	Name               string         `json:"name"`
 	Symbol             string         `json:"symbol"`
-	Quantity           float64        `json:"quantity"`
-	PurchasePrice      float64        `json:"purchase_price"`
-	CurrentPrice       float64        `json:"current_price"`
+	Quantity           money.Amount   `json:"quantity"`
+	PurchasePrice      money.Amount   `json:"purchase_price"`
+	CurrentPrice       money.Amount   `json:"current_price"`
 	SourceAccountID    string         `json:"source_account_id"`
-	SourceAmount       float64        `json:"source_amount"`
+	SourceAmount       money.Amount   `json:"source_amount"`
 	SettlementCurrency string         `json:"settlement_currency"`
-	ExchangeRate       float64        `json:"exchange_rate"`
+	ExchangeRate       money.Amount   `json:"exchange_rate"`
 	CreatedAt          time.Time      `json:"created_at"`
 	UpdatedAt          time.Time      `json:"updated_at"`
 }
 
 type FundingBalance struct {
-	Currency  string  `json:"currency"`
-	Available float64 `json:"available"`
+	Currency  string       `json:"currency"`
+	Available money.Amount `json:"available"`
 }
 
 type FundingMovement struct {
-	ID              string    `json:"id"`
-	UserID          string    `json:"user_id"`
-	Currency        string    `json:"currency"`
-	Amount          float64   `json:"amount"`
-	MovementType    string    `json:"movement_type"`
-	Description     string    `json:"description"`
-	ReferenceType   string    `json:"reference_type"`
-	ReferenceID     string    `json:"reference_id"`
-	CounterCurrency string    `json:"counter_currency"`
-	CounterAmount   float64   `json:"counter_amount"`
-	ExchangeRate    float64   `json:"exchange_rate"`
-	CreatedAt       time.Time `json:"created_at"`
+	ID              string       `json:"id"`
+	UserID          string       `json:"user_id"`
+	Currency        string       `json:"currency"`
+	Amount          money.Amount `json:"amount"`
+	MovementType    string       `json:"movement_type"`
+	Description     string       `json:"description"`
+	ReferenceType   string       `json:"reference_type"`
+	ReferenceID     string       `json:"reference_id"`
+	CounterCurrency string       `json:"counter_currency"`
+	CounterAmount   money.Amount `json:"counter_amount"`
+	ExchangeRate    money.Amount `json:"exchange_rate"`
+	CreatedAt       time.Time    `json:"created_at"`
 }
 
-func NewInvestment(id, userId string, investmentType InvestmentType, name, symbol string, quantity, purchasePrice, currentPrice float64) *Investment {
+func NewInvestment(id, userId string, investmentType InvestmentType, name, symbol string, quantity, purchasePrice, currentPrice money.Amount) *Investment {
 	return &Investment{
 		ID:            id,
 		UserID:        userId,
@@ -65,13 +67,21 @@ func NewInvestment(id, userId string, investmentType InvestmentType, name, symbo
 	}
 }
 
+// InvestmentRepository persists investments. Every method is scoped to the
+// owning user: Update uses investment.UserID, and rows of other users are
+// reported as not found.
 type InvestmentRepository interface {
 	Save(ctx context.Context, investment *Investment) error
 	FindAll(ctx context.Context, userId string) ([]*Investment, error)
-	FindByID(ctx context.Context, id string) (*Investment, error)
+	FindByID(ctx context.Context, id string, userId string) (*Investment, error)
+	// FindByIDForUpdate is FindByID plus a row lock held until the request
+	// transaction ends.
+	FindByIDForUpdate(ctx context.Context, id string, userId string) (*Investment, error)
+	// UpdateCurrentPrice sets only current_price (quote refresh).
+	UpdateCurrentPrice(ctx context.Context, id string, userId string, price money.Amount) error
 	Update(ctx context.Context, investment *Investment) error
-	Delete(ctx context.Context, id string) error
+	Delete(ctx context.Context, id string, userId string) error
 	GetFundingBalances(ctx context.Context, userId string) ([]*FundingBalance, error)
 	AddFunding(ctx context.Context, movement *FundingMovement) error
-	ConsumeFundingForInvestment(ctx context.Context, inv *Investment, currency string, requiredAmount float64) error
+	ConsumeFundingForInvestment(ctx context.Context, inv *Investment, currency string, requiredAmount money.Amount) error
 }

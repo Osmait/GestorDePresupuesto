@@ -1,6 +1,10 @@
 package loan
 
-import "time"
+import (
+	"time"
+
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+)
 
 type InterestMode string
 
@@ -32,18 +36,18 @@ type Loan struct {
 	UserId                  string
 	BorrowerName            string
 	BorrowerContact         string
-	PrincipalAmount         float64
+	PrincipalAmount         money.Amount
 	Currency                string
 	InterestMode            InterestMode
-	AnnualRate              float64
+	AnnualRate              money.Amount
 	TermMonths              int
 	StartDate               time.Time
 	SourceAccountId         string
 	Notes                   string
-	TotalInterest           float64
-	TotalAmount             float64
-	PaidPrincipal           float64
-	PaidInterest            float64
+	TotalInterest           money.Amount
+	TotalAmount             money.Amount
+	PaidPrincipal           money.Amount
+	PaidInterest            money.Amount
 	Status                  LoanStatus
 	DisbursementTransaction *string
 	CreatedAt               time.Time
@@ -55,8 +59,8 @@ type Installment struct {
 	LoanId            string
 	InstallmentNumber int
 	DueDate           time.Time
-	ExpectedAmount    float64
-	PaidAmount        float64
+	ExpectedAmount    money.Amount
+	PaidAmount        money.Amount
 	Status            InstallmentStatus
 	PaidAt            *time.Time
 	CreatedAt         time.Time
@@ -67,9 +71,9 @@ type Payment struct {
 	Id                   string
 	LoanId               string
 	DestinationAccountId string
-	Amount               float64
-	PrincipalComponent   float64
-	InterestComponent    float64
+	Amount               money.Amount
+	PrincipalComponent   money.Amount
+	InterestComponent    money.Amount
 	PaymentDate          time.Time
 	IncomeTransactionId  *string
 	Notes                string

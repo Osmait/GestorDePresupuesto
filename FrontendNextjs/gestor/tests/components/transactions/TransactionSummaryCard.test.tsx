@@ -5,6 +5,7 @@ import { TypeTransaction } from '@/types/transaction'
 
 // Mock dependencies
 vi.mock('next-intl', () => ({
+	useLocale: () => 'es',
 	useTranslations: () => (key: string) => {
 		const translations: Record<string, string> = {
 			summary: 'Summary',
@@ -17,12 +18,15 @@ vi.mock('next-intl', () => ({
 }))
 
 vi.mock('@/components/common/AnimatedFlashNumber', () => ({
-	AnimatedFlashNumber: ({ value, prefix = '' }: { value: number; prefix?: string }) => (
-		<span>
-			{prefix}
-			{value}
-		</span>
-	),
+	AnimatedFlashNumber: ({
+		value,
+		prefix = '',
+		formattingFn,
+	}: {
+		value: number
+		prefix?: string
+		formattingFn?: (_n: number) => string
+	}) => <span>{formattingFn ? formattingFn(value) : `${prefix}${value}`}</span>,
 }))
 
 describe('TransactionSummaryCard', () => {
@@ -73,11 +77,11 @@ describe('TransactionSummaryCard', () => {
 
 		// Income
 		expect(screen.getByText('Total Income')).toBeInTheDocument()
-		expect(screen.getByText('$5000')).toBeInTheDocument()
+		expect(screen.getAllByText('RD$5,000.00').length).toBeGreaterThan(0)
 
 		// Expenses (Bill)
 		expect(screen.getByText('Total Expenses')).toBeInTheDocument()
-		expect(screen.getByText('$1500')).toBeInTheDocument()
+		expect(screen.getAllByText('RD$1,500.00').length).toBeGreaterThan(0)
 
 		// Count
 		expect(screen.getByText('Total Transactions')).toBeInTheDocument()
@@ -87,6 +91,6 @@ describe('TransactionSummaryCard', () => {
 	it('handles empty transactions list', () => {
 		render(<TransactionSummaryCard transactions={[]} summary={null} />)
 		// Should verify counts are 0
-		expect(screen.getAllByText('$0').length).toBeGreaterThan(0)
+		expect(screen.getAllByText('RD$0.00').length).toBeGreaterThan(0)
 	})
 })

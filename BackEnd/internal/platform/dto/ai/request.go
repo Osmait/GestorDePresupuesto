@@ -1,46 +1,6 @@
 package dto
 
-import (
-	"encoding/json"
-	"fmt"
-	"strconv"
-	"strings"
-)
-
-type FlexibleFloat64 float64
-
-func (f *FlexibleFloat64) UnmarshalJSON(data []byte) error {
-	trimmed := strings.TrimSpace(string(data))
-	if trimmed == "" || trimmed == "null" {
-		*f = 0
-		return nil
-	}
-
-	if strings.HasPrefix(trimmed, "\"") {
-		var raw string
-		if err := json.Unmarshal(data, &raw); err != nil {
-			return err
-		}
-		raw = strings.TrimSpace(raw)
-		if raw == "" {
-			*f = 0
-			return nil
-		}
-		value, err := strconv.ParseFloat(raw, 64)
-		if err != nil {
-			return fmt.Errorf("invalid numeric string: %w", err)
-		}
-		*f = FlexibleFloat64(value)
-		return nil
-	}
-
-	value, err := strconv.ParseFloat(trimmed, 64)
-	if err != nil {
-		return fmt.Errorf("invalid numeric value: %w", err)
-	}
-	*f = FlexibleFloat64(value)
-	return nil
-}
+import "github.com/osmait/gestorDePresupuesto/internal/domain/money"
 
 type ExtractRequest struct {
 	AccountID       string `json:"account_id" binding:"required"`
@@ -69,12 +29,12 @@ func (r *AnalyzeSpendingRequest) Validate() error {
 }
 
 type SuggestCategoryRequest struct {
-	Name        string          `json:"name" binding:"required"`
-	Description string          `json:"description"`
-	Amount      FlexibleFloat64 `json:"amount" binding:"required"`
-	Type        string          `json:"type_transation" binding:"required,oneof=income bill"`
-	AccountID   string          `json:"account_id" binding:"required"`
-	Currency    string          `json:"currency"`
+	Name        string       `json:"name" binding:"required"`
+	Description string       `json:"description"`
+	Amount      money.Amount `json:"amount" binding:"required"`
+	Type        string       `json:"type_transation" binding:"required,oneof=income bill"`
+	AccountID   string       `json:"account_id" binding:"required"`
+	Currency    string       `json:"currency"`
 }
 
 type SuggestCategoriesBatchRequest struct {
@@ -94,9 +54,9 @@ type ReconciliationPreviewRequest struct {
 }
 
 type SavingsPlanRequest struct {
-	TargetAmount float64 `json:"target_amount" binding:"required,gt=0"`
-	TargetDate   string  `json:"target_date"`
-	AccountID    string  `json:"account_id"`
+	TargetAmount money.Amount `json:"target_amount" binding:"required,gt=0"`
+	TargetDate   string       `json:"target_date"`
+	AccountID    string       `json:"account_id"`
 }
 
 type ReconciliationApplyRequest struct {
@@ -111,18 +71,18 @@ type ReconciliationAction struct {
 }
 
 type CreateSavingsGoalRequest struct {
-	Name         string  `json:"name" binding:"required,min=2,max=120"`
-	TargetAmount float64 `json:"target_amount" binding:"required,gt=0"`
-	TargetDate   string  `json:"target_date"`
-	AccountID    string  `json:"account_id"`
-	CurrentSaved float64 `json:"current_saved"`
+	Name         string       `json:"name" binding:"required,min=2,max=120"`
+	TargetAmount money.Amount `json:"target_amount" binding:"required,gt=0"`
+	TargetDate   string       `json:"target_date"`
+	AccountID    string       `json:"account_id"`
+	CurrentSaved money.Amount `json:"current_saved"`
 }
 
 type UpdateSavingsGoalRequest struct {
-	Name         string  `json:"name"`
-	TargetAmount float64 `json:"target_amount"`
-	TargetDate   string  `json:"target_date"`
-	AccountID    string  `json:"account_id"`
-	CurrentSaved float64 `json:"current_saved"`
-	Status       string  `json:"status"`
+	Name         string       `json:"name"`
+	TargetAmount money.Amount `json:"target_amount"`
+	TargetDate   string       `json:"target_date"`
+	AccountID    string       `json:"account_id"`
+	CurrentSaved money.Amount `json:"current_saved"`
+	Status       string       `json:"status"`
 }

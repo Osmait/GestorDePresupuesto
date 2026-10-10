@@ -1,6 +1,7 @@
 'use client'
 
 import { Calculator, Plus } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 
 interface CertificateActionsProps {
@@ -9,15 +10,17 @@ interface CertificateActionsProps {
 }
 
 export function CertificateActions({ onAddNew, onOpenSimulator }: CertificateActionsProps) {
+	const t = useTranslations('certificates.actions')
+
 	return (
-		<div className='flex justify-end gap-2'>
+		<div className='flex flex-wrap gap-2 sm:justify-end'>
 			<Button variant='outline' onClick={onOpenSimulator}>
 				<Calculator className='h-4 w-4 mr-2' />
-				Simulator
+				{t('simulator')}
 			</Button>
 			<Button onClick={onAddNew}>
 				<Plus className='h-4 w-4 mr-2' />
-				New Certificate
+				{t('newCertificate')}
 			</Button>
 		</div>
 	)

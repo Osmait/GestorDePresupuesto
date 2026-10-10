@@ -4,8 +4,11 @@ import (
 	"context"
 	"testing"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money/moneytest"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/stretchr/testify/assert"
@@ -41,12 +44,12 @@ func TestBudgetRepository(t *testing.T) {
 	assert.NoError(t, err)
 
 	// Test FindOne
-	foundBudget, err := budgetRepository.FindOne(ctx, budget.Id)
+	foundBudget, err := budgetRepository.FindOne(ctx, budget.Id, user.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, budget.Id, foundBudget.Id)
 	assert.Equal(t, budget.CategoryId, foundBudget.CategoryId)
 	assert.Equal(t, budget.UserId, foundBudget.UserId)
-	assert.Equal(t, budget.Amount, foundBudget.Amount)
+	moneytest.Equal(t, budget.Amount, foundBudget.Amount)
 	assert.NotZero(t, foundBudget.CreatedAt)
 
 	// Test FindAll
@@ -76,9 +79,9 @@ func TestBudgetRepository_FindOne_NotFound(t *testing.T) {
 	budgetRepository := budgetRepo.NewBudgetRepository(db)
 
 	// Test FindOne with non-existent ID
-	budget, err := budgetRepository.FindOne(ctx, "non-existent-id")
-	assert.NoError(t, err)         // Current implementation doesn't return error for not found
-	assert.Equal(t, "", budget.Id) // Should be empty when not found
+	budget, err := budgetRepository.FindOne(ctx, "non-existent-id", "non-existent-user")
+	assert.ErrorIs(t, err, ownership.ErrNotFound)
+	assert.Nil(t, budget)
 }
 
 func TestBudgetRepository_FindAll_EmptyResult(t *testing.T) {
@@ -108,7 +111,7 @@ func TestBudgetRepository_Multiple_Budgets(t *testing.T) {
 
 	// Create multiple categories and budgets
 	var createdBudgets []string
-	budgetAmounts := []float64{1000.0, 500.0, 750.0, 300.0, 1200.0}
+	budgetAmounts := []money.Amount{money.FromInt(1000), money.FromInt(500), money.FromInt(750), money.FromInt(300), money.FromInt(1200)}
 
 	for i, amount := range budgetAmounts {
 		// Create category for each budget
@@ -135,22 +138,22 @@ func TestBudgetRepository_Multiple_Budgets(t *testing.T) {
 	assert.Equal(t, len(budgetAmounts), len(budgets))
 
 	// Verify all budgets are found and belong to user
-	totalAmount := 0.0
+	totalAmount := money.Zero
 	for _, budget := range budgets {
 		assert.Equal(t, user.Id, budget.UserId)
-		totalAmount += budget.Amount
+		totalAmount = totalAmount.Add(budget.Amount)
 	}
 
 	// Verify total amount matches expected
-	expectedTotal := 0.0
+	expectedTotal := money.Zero
 	for _, amount := range budgetAmounts {
-		expectedTotal += amount
+		expectedTotal = expectedTotal.Add(amount)
 	}
-	assert.Equal(t, expectedTotal, totalAmount)
+	moneytest.Equal(t, expectedTotal, totalAmount)
 
 	// Test FindOne for each budget
 	for _, budgetId := range createdBudgets {
-		foundBudget, err := budgetRepository.FindOne(ctx, budgetId)
+		foundBudget, err := budgetRepository.FindOne(ctx, budgetId, user.Id)
 		assert.NoError(t, err)
 		assert.Equal(t, budgetId, foundBudget.Id)
 		assert.Equal(t, user.Id, foundBudget.UserId)
@@ -193,12 +196,12 @@ func TestBudgetRepository_User_Isolation(t *testing.T) {
 	budget1 := utils.GetNewRandomBudget()
 	budget1.UserId = user1.Id
 	budget1.CategoryId = category1.Id
-	budget1.Amount = 1000.0
+	budget1.Amount = money.FromInt(1000)
 
 	budget2 := utils.GetNewRandomBudget()
 	budget2.UserId = user2.Id
 	budget2.CategoryId = category2.Id
-	budget2.Amount = 2000.0
+	budget2.Amount = money.FromInt(2000)
 
 	err = budgetRepository.Save(ctx, budget1)
 	assert.NoError(t, err)
@@ -209,12 +212,12 @@ func TestBudgetRepository_User_Isolation(t *testing.T) {
 	user1Budgets, err := budgetRepository.FindAll(ctx, user1.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(user1Budgets))
-	assert.Equal(t, 1000.0, user1Budgets[0].Amount)
+	moneytest.Equal(t, 1000.0, user1Budgets[0].Amount)
 
 	user2Budgets, err := budgetRepository.FindAll(ctx, user2.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, 1, len(user2Budgets))
-	assert.Equal(t, 2000.0, user2Budgets[0].Amount)
+	moneytest.Equal(t, 2000.0, user2Budgets[0].Amount)
 
 	// Cleanup in FK order: budgets → categories → users
 	_, err = db.ExecContext(ctx, "DELETE FROM budgets WHERE user_id = $1 OR user_id = $2", user1.Id, user2.Id)

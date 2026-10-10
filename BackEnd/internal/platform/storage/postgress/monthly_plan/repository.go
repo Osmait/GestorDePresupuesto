@@ -8,7 +8,9 @@ import (
 
 	"github.com/rs/zerolog/log"
 
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/monthly_plan"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
@@ -23,12 +25,33 @@ func NewMonthlyPlanRepository(db *sql.DB) *MonthlyPlanRepository {
 	return &MonthlyPlanRepository{db: db}
 }
 
+func optionalID(id *string) string {
+	if id == nil {
+		return ""
+	}
+	return *id
+}
+
+// verifyReferences checks that the optional category and account of an item
+// belong to the item's owner.
+func verifyReferences(ctx context.Context, q txhelper.Querier, item *monthly_plan.MonthlyPlanItem) error {
+	return ownership.VerifyReferences(ctx, q, item.UserID,
+		ownership.Reference{Table: ownership.Category, ID: optionalID(item.CategoryID)},
+		ownership.Reference{Table: ownership.Account, ID: optionalID(item.AccountID)},
+	)
+}
+
 func (r *MonthlyPlanRepository) Save(ctx context.Context, item *monthly_plan.MonthlyPlanItem) error {
+	q := txhelper.FromContext(ctx, r.db)
+	if err := verifyReferences(ctx, q, item); err != nil {
+		return err
+	}
+
 	query := `INSERT INTO monthly_plan_items
 		(id, user_id, name, description, amount, currency, type, category_id, account_id, day_of_month, is_active, created_at, updated_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)`
 
-	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query,
+	_, err := q.ExecContext(ctx, query,
 		item.ID, item.UserID, item.Name, item.Description, item.Amount, item.Currency,
 		item.Type, item.CategoryID, item.AccountID, item.DayOfMonth, item.IsActive,
 		item.CreatedAt, item.UpdatedAt,
@@ -39,12 +62,17 @@ func (r *MonthlyPlanRepository) Save(ctx context.Context, item *monthly_plan.Mon
 // Update rewrites the editable fields of an item. It returns the number of
 // affected rows so the service can tell "not found" from "nothing changed".
 func (r *MonthlyPlanRepository) Update(ctx context.Context, item *monthly_plan.MonthlyPlanItem) (int64, error) {
+	q := txhelper.FromContext(ctx, r.db)
+	if err := verifyReferences(ctx, q, item); err != nil {
+		return 0, err
+	}
+
 	query := `UPDATE monthly_plan_items
 		SET name = $1, description = $2, amount = $3, currency = $4, type = $5,
 		    category_id = $6, account_id = $7, day_of_month = $8, is_active = $9, updated_at = $10
 		WHERE id = $11 AND user_id = $12`
 
-	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query,
+	result, err := q.ExecContext(ctx, query,
 		item.Name, item.Description, item.Amount, item.Currency, item.Type,
 		item.CategoryID, item.AccountID, item.DayOfMonth, item.IsActive,
 		time.Now().UTC(), item.ID, item.UserID,
@@ -126,9 +154,9 @@ func (r *MonthlyPlanRepository) FindAllByUser(ctx context.Context, userID string
 
 // Totals aggregates active items in the database, converting USD rows with the
 // supplied rate so the sums come back in DOP already.
-func (r *MonthlyPlanRepository) Totals(ctx context.Context, userID string, usdToDop float64) (*monthly_plan.Totals, error) {
-	if usdToDop <= 0 {
-		usdToDop = 1
+func (r *MonthlyPlanRepository) Totals(ctx context.Context, userID string, usdToDop money.Amount) (*monthly_plan.Totals, error) {
+	if !usdToDop.IsPositive() {
+		usdToDop = money.FromInt(1)
 	}
 
 	query := `SELECT

@@ -1,16 +1,18 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { TransactionActions } from '@/components/transactions/TransactionActions'
+
+const { setFilters } = vi.hoisted(() => ({ setFilters: vi.fn() }))
 
 // Mock hooks
 vi.mock('@/components/transactions/TransactionContext', () => ({
 	useTransactionContext: () => ({
 		openModal: vi.fn(),
 		setOpenModal: vi.fn(),
-		filters: {},
-		setFilters: vi.fn(),
+		filters: { search: '', minAmount: '', maxAmount: '', type: 'all', account: 'all', category: 'all' },
+		setFilters,
 	}),
 }))
 
@@ -114,5 +116,37 @@ describe('TransactionActions', () => {
 		await user.click(screen.getByText('filters'))
 
 		expect(await screen.findByText('filterTransactions')).toBeInTheDocument()
+	})
+
+	it('debounces the search box: one filter update after the user stops typing', async () => {
+		setFilters.mockClear()
+		const user = userEvent.setup()
+		render(<TransactionActions />, { wrapper: createWrapper() })
+		await user.click(screen.getByText('filters'))
+		const input = await screen.findByPlaceholderText('searchPlaceholder')
+
+		vi.useFakeTimers()
+		try {
+			// One change per keystroke, 120 ms apart (vaul's drawer does not support
+			// user-event pointer sequences in jsdom).
+			const text = 'Gasto 12'
+			for (let i = 1; i <= text.length; i++) {
+				fireEvent.change(input, { target: { value: text.slice(0, i) } })
+				act(() => {
+					vi.advanceTimersByTime(120)
+				})
+			}
+			expect(input).toHaveValue('Gasto 12')
+			expect(setFilters).not.toHaveBeenCalled()
+
+			await act(async () => {
+				vi.advanceTimersByTime(300)
+			})
+			expect(setFilters).toHaveBeenCalledTimes(1)
+			const update = setFilters.mock.calls[0][0]
+			expect(update({ search: '' })).toEqual({ search: 'Gasto 12' })
+		} finally {
+			vi.useRealTimers()
+		}
 	})
 })

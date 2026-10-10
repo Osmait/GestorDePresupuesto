@@ -125,9 +125,9 @@ func (e *TransactionExtractor) ParseResponse(rawJSON string) (interface{}, error
 			txn.TypeTransation = "bill"
 		}
 
-		if txn.Amount < 0 {
-			txn.Amount = -txn.Amount
-		}
+		// Boundary: the LLM's JSON number was parsed exactly by
+		// money.Amount; round it once, half-even, to cents.
+		txn.Amount = txn.Amount.Abs().RoundCents()
 
 		txn.Currency = normalizeCurrency(txn.Currency)
 

@@ -1,14 +1,22 @@
 'use client'
 
 import { PiggyBank, Receipt, TrendingUp, Wallet } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { CertificateSummary, formatCurrency } from '@/types/certificate'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { formatCurrency } from '@/lib/utils'
+import { CertificateSummary } from '@/types/certificate'
 
 interface CertificateSummaryCardProps {
 	summary: CertificateSummary | undefined
 }
 
 export function CertificateSummaryCard({ summary }: CertificateSummaryCardProps) {
+	const t = useTranslations('certificates.summary')
+	const locale = useAppLocale()
+	// The summary endpoint aggregates without a currency; amounts are reported in DOP.
+	const money = (value: number) => formatCurrency(value, 'DOP', { locale })
+
 	if (!summary) {
 		return (
 			<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
@@ -28,26 +36,30 @@ export function CertificateSummaryCard({ summary }: CertificateSummaryCardProps)
 
 	const cards = [
 		{
-			title: 'Total Capital',
-			value: formatCurrency(summary.total_capital),
+			key: 'totalCapital',
+			title: t('totalCapital'),
+			value: money(summary.total_capital),
 			icon: Wallet,
 			color: 'text-blue-500',
 		},
 		{
-			title: 'Net Interest Earned',
-			value: formatCurrency(summary.total_net_interest),
+			key: 'netInterestEarned',
+			title: t('netInterestEarned'),
+			value: money(summary.total_net_interest),
 			icon: TrendingUp,
 			color: 'text-green-500',
 		},
 		{
-			title: 'Taxes Withheld',
-			value: formatCurrency(summary.total_tax_withheld),
+			key: 'taxesWithheld',
+			title: t('taxesWithheld'),
+			value: money(summary.total_tax_withheld),
 			icon: Receipt,
 			color: 'text-orange-500',
 		},
 		{
-			title: 'Portfolio Value',
-			value: formatCurrency(summary.portfolio_value),
+			key: 'portfolioValue',
+			title: t('portfolioValue'),
+			value: money(summary.portfolio_value),
 			icon: PiggyBank,
 			color: 'text-primary',
 		},
@@ -56,15 +68,17 @@ export function CertificateSummaryCard({ summary }: CertificateSummaryCardProps)
 	return (
 		<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
 			{cards.map((card) => (
-				<Card key={card.title}>
+				<Card key={card.key}>
 					<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
 						<CardTitle className='text-sm font-medium text-muted-foreground'>{card.title}</CardTitle>
 						<card.icon className={`h-4 w-4 ${card.color}`} />
 					</CardHeader>
 					<CardContent>
 						<div className='text-2xl font-bold'>{card.value}</div>
-						{card.title === 'Total Capital' && (
-							<p className='text-xs text-muted-foreground'>{summary.active_certificates} active certificates</p>
+						{card.key === 'totalCapital' && (
+							<p className='text-xs text-muted-foreground'>
+								{t('activeCertificates', { count: summary.active_certificates })}
+							</p>
 						)}
 					</CardContent>
 				</Card>

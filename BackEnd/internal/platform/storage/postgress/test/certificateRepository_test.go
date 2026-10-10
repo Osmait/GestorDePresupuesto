@@ -5,6 +5,8 @@ import (
 	"testing"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money/moneytest"
 	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
@@ -31,9 +33,9 @@ func TestCertificateRepository(t *testing.T) {
 	assert.NoError(t, err)
 	assert.Equal(t, cert.Id, foundCert.Id)
 	assert.Equal(t, cert.Bank, foundCert.Bank)
-	assert.Equal(t, cert.BaseCapital, foundCert.BaseCapital)
+	moneytest.Equal(t, cert.BaseCapital, foundCert.BaseCapital)
 	assert.Equal(t, cert.InterestType, foundCert.InterestType)
-	assert.Equal(t, cert.CurrentInterestRate, foundCert.CurrentInterestRate)
+	moneytest.Equal(t, cert.CurrentInterestRate, foundCert.CurrentInterestRate)
 	assert.Equal(t, cert.Status, certificate.StatusActive)
 
 	certs, err := certificateRepository.FindAll(ctx, user.Id)
@@ -78,21 +80,21 @@ func TestCertificateRepository_Update(t *testing.T) {
 	assert.NoError(t, err)
 
 	cert := utils.GetNewRandomCertificate(user.Id)
-	cert.CurrentInterestRate = 5.0
+	cert.CurrentInterestRate = money.FromInt(5)
 
 	err = certificateRepository.Save(ctx, cert)
 	assert.NoError(t, err)
 
-	cert.CurrentInterestRate = 6.5
-	cert.CurrentTaxRate = 15.0
+	cert.CurrentInterestRate = money.MustParse("6.5")
+	cert.CurrentTaxRate = money.FromInt(15)
 
 	err = certificateRepository.Update(ctx, cert)
 	assert.NoError(t, err)
 
 	foundCert, err := certificateRepository.FindById(ctx, cert.Id, user.Id)
 	assert.NoError(t, err)
-	assert.Equal(t, 6.5, foundCert.CurrentInterestRate)
-	assert.Equal(t, 15.0, foundCert.CurrentTaxRate)
+	moneytest.Equal(t, 6.5, foundCert.CurrentInterestRate)
+	moneytest.Equal(t, 15.0, foundCert.CurrentTaxRate)
 
 	err = userRepository.Delete(ctx, user.Id)
 	assert.NoError(t, err)
@@ -122,11 +124,11 @@ func TestCertificateRepository_SaveAndFindPayments(t *testing.T) {
 	err = certificateRepository.SavePayment(ctx, payment2)
 	assert.NoError(t, err)
 
-	payments, err := certificateRepository.FindPaymentsByCertificate(ctx, cert.Id)
+	payments, err := certificateRepository.FindPaymentsByCertificate(ctx, cert.Id, user.Id)
 	assert.NoError(t, err)
 	assert.Len(t, payments, 2)
 
-	lastPayment, err := certificateRepository.FindLastPayment(ctx, cert.Id)
+	lastPayment, err := certificateRepository.FindLastPayment(ctx, cert.Id, user.Id)
 	assert.NoError(t, err)
 	assert.Equal(t, payment2.Id, lastPayment.Id)
 

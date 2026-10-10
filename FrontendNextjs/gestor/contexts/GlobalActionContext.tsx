@@ -1,6 +1,7 @@
 'use client'
 
-import { createContext, ReactNode, useContext, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { createContext, ReactNode, useCallback, useContext, useState } from 'react'
 import { AccountFormModal } from '@/components/accounts/AccountFormModal'
 import { BudgetProvider } from '@/components/budgets/BudgetContext'
 import { BudgetFormModal } from '@/components/budgets/BudgetFormModal' // BudgetFormModal generally handles its own context or we wrap it
@@ -21,7 +22,19 @@ interface GlobalActionContextType {
 const GlobalActionContext = createContext<GlobalActionContextType | undefined>(undefined)
 
 export function GlobalActionProvider({ children }: { children: ReactNode }) {
+	const router = useRouter()
 	const [activeModal, setActiveModal] = useState<ModalType>(null)
+
+	/*
+	 * Called after every successful create launched from the global "+" menu.
+	 * The mutation hooks already invalidate the TanStack Query caches (accounts,
+	 * transactions, budgets, analytics...); router.refresh() re-renders the
+	 * Server Components (the dashboard fetches its data on the server) so the
+	 * page behind the modal shows the new data without a manual reload.
+	 */
+	const onDataChanged = useCallback(() => {
+		router.refresh()
+	}, [router])
 	const {
 		mutateAsync: createAccountMutation,
 		isPending: isAccountLoading,
@@ -31,6 +44,7 @@ export function GlobalActionProvider({ children }: { children: ReactNode }) {
 
 	const handleCreateAccount = async (name: string, bank: string, initial_balance: number) => {
 		await createAccountMutation({ name, bank, initial_balance })
+		onDataChanged()
 		closeModal()
 	}
 
@@ -53,55 +67,80 @@ export function GlobalActionProvider({ children }: { children: ReactNode }) {
 			{/* Category Modal: Uses CategoryContext */}
 			{activeModal === 'CATEGORY' && (
 				<CategoryProvider>
-					<CategoryModalWrapper isOpen={true} onClose={closeModal} />
+					<CategoryModalWrapper isOpen={true} onClose={closeModal} onCreated={onDataChanged} />
 				</CategoryProvider>
 			)}
 
 			{/* Transaction Modal: Uses TransactionContext */}
 			{activeModal === 'TRANSACTION' && (
-				<TransactionProvider>
-					<TransactionModalWrapper isOpen={true} onClose={closeModal} />
+				<TransactionProvider syncUrl={false} fetchTransactions={false}>
+					<TransactionModalWrapper isOpen={true} onClose={closeModal} onCreated={onDataChanged} />
 				</TransactionProvider>
 			)}
 
 			{/* Budget Modal: Uses BudgetContext */}
 			{activeModal === 'BUDGET' && (
 				<BudgetProvider>
-					<BudgetModalWrapper isOpen={true} onClose={closeModal} />
+					<BudgetModalWrapper isOpen={true} onClose={closeModal} onCreated={onDataChanged} />
 				</BudgetProvider>
 			)}
 
 			{/* Investment Modal: Uses hooks internally */}
 			{activeModal === 'INVESTMENT' && (
-				<InvestmentFormModal isOpen={true} onClose={closeModal} investmentToEdit={null} />
+				<InvestmentFormModal
+					isOpen={true}
+					onClose={() => {
+						// InvestmentFormModal has no success callback; refreshing on close is cheap.
+						onDataChanged()
+						closeModal()
+					}}
+					investmentToEdit={null}
+				/>
 			)}
 		</GlobalActionContext.Provider>
 	)
 }
 
-function CategoryModalWrapper({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-	const { createCategory } = useCategoryContext()
-	return <CategoryFormModal open={isOpen} setOpen={(v) => !v && onClose()} onCreateCategory={createCategory} />
+interface ModalWrapperProps {
+	isOpen: boolean
+	onClose: () => void
+	onCreated: () => void
 }
 
-function TransactionModalWrapper({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+function CategoryModalWrapper({ isOpen, onClose, onCreated }: ModalWrapperProps) {
+	const { createCategory } = useCategoryContext()
+	return (
+		<CategoryFormModal
+			open={isOpen}
+			setOpen={(v) => !v && onClose()}
+			onCreateCategory={async (...args) => {
+				await createCategory(...args)
+				onCreated()
+			}}
+		/>
+	)
+}
+
+function TransactionModalWrapper({ isOpen, onClose, onCreated }: ModalWrapperProps) {
 	const { createTransaction, isLoading, error } = useTransactionContext()
 
 	return (
 		<TransactionFormModal
 			open={isOpen}
 			setOpen={(v) => !v && onClose()}
-			createTransaction={createTransaction}
+			createTransaction={async (...args) => {
+				await createTransaction(...args)
+				onCreated()
+			}}
 			isLoading={isLoading}
 			error={error}
 		/>
 	)
 }
 
-function BudgetModalWrapper({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-	// BudgetFormModal uses context internally create/update
-	// It accepts setOpen
-	return <BudgetFormModal open={isOpen} setOpen={(v) => !v && onClose()} />
+function BudgetModalWrapper({ isOpen, onClose, onCreated }: ModalWrapperProps) {
+	// BudgetFormModal creates through BudgetContext and closes itself through setOpen.
+	return <BudgetFormModal open={isOpen} setOpen={(v) => !v && onClose()} onSaved={onCreated} />
 }
 
 export function useGlobalAction() {

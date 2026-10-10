@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mark3labs/mcp-go/mcp"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	transactionDomain "github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
@@ -279,8 +280,8 @@ func (s *MCPServer) handleCreateTransaction(ctx context.Context, req mcp.CallToo
 		return mcp.NewToolResultError("name is required"), nil
 	}
 
-	amount := req.GetFloat("amount", 0)
-	if amount <= 0 {
+	amount, amountErr := amountArg(req, "amount", money.StorageScale)
+	if amountErr != nil || !amount.IsPositive() {
 		return mcp.NewToolResultError("amount must be a positive number"), nil
 	}
 
@@ -394,8 +395,8 @@ func (s *MCPServer) handleUpdateTransaction(ctx context.Context, req mcp.CallToo
 	if err != nil {
 		return mcp.NewToolResultError("name is required"), nil
 	}
-	amount := req.GetFloat("amount", 0)
-	if amount <= 0 {
+	amount, amountErr := amountArg(req, "amount", money.StorageScale)
+	if amountErr != nil || !amount.IsPositive() {
 		return mcp.NewToolResultError("amount must be a positive number"), nil
 	}
 	txType, err := req.RequireString("type")

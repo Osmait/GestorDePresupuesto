@@ -24,7 +24,7 @@ func CreateCreditCard(service *creditcard.CreditCardService) gin.HandlerFunc {
 			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
-		response, err := service.CreateCreditCard(ctx, &req, userId)
+		response, err := service.CreateCreditCard(ctx.Request.Context(), &req, userId)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userId).Interface("request", req).Msg("Failed to create credit card")
 			_ = ctx.Error(err)
@@ -37,7 +37,7 @@ func CreateCreditCard(service *creditcard.CreditCardService) gin.HandlerFunc {
 func FindAllCreditCards(service *creditcard.CreditCardService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		cards, err := service.FindAllCards(ctx, userId)
+		cards, err := service.FindAllCards(ctx.Request.Context(), userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -50,7 +50,7 @@ func FindCreditCardById(service *creditcard.CreditCardService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
 		cardId := ctx.Param("id")
-		card, err := service.FindCardById(ctx, cardId, userId)
+		card, err := service.FindCardById(ctx.Request.Context(), cardId, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -68,7 +68,7 @@ func UpdateCreditCard(service *creditcard.CreditCardService) gin.HandlerFunc {
 			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
 			return
 		}
-		response, err := service.UpdateCreditCard(ctx, cardId, &req, userId)
+		response, err := service.UpdateCreditCard(ctx.Request.Context(), cardId, &req, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -81,7 +81,7 @@ func DeleteCreditCard(service *creditcard.CreditCardService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
 		cardId := ctx.Param("id")
-		if err := service.DeleteCreditCard(ctx, cardId, userId); err != nil {
+		if err := service.DeleteCreditCard(ctx.Request.Context(), cardId, userId); err != nil {
 			_ = ctx.Error(err)
 			return
 		}
@@ -91,13 +91,19 @@ func DeleteCreditCard(service *creditcard.CreditCardService) gin.HandlerFunc {
 
 func UpdateCardBalance(service *creditcard.CreditCardService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		cardId := ctx.Param("id")
 		balanceId := ctx.Param("balanceId")
 		var req dto.UpdateBalanceRequest
 		if err := ctx.BindJSON(&req); err != nil {
 			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
 			return
 		}
-		response, err := service.UpdateBalance(ctx, balanceId, &req)
+		if err := req.Validate(); err != nil {
+			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
+			return
+		}
+		response, err := service.UpdateBalance(ctx.Request.Context(), cardId, balanceId, userId, &req)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -114,7 +120,7 @@ func ResetCardBalance(service *creditcard.CreditCardService) gin.HandlerFunc {
 		if err := ctx.ShouldBindJSON(&req); err != nil {
 			req = dto.ResetBalanceRequest{}
 		}
-		response, err := service.ResetCardBalance(ctx, cardId, userId, &req)
+		response, err := service.ResetCardBalance(ctx.Request.Context(), cardId, userId, &req)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userId).Str("card_id", cardId).Msg("Failed to reset card balance")
 			_ = ctx.Error(err)
@@ -128,7 +134,7 @@ func FindCardBalanceResets(service *creditcard.CreditCardService) gin.HandlerFun
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
 		cardId := ctx.Param("id")
-		resets, err := service.FindBalanceResetsByCard(ctx, cardId, userId)
+		resets, err := service.FindBalanceResetsByCard(ctx.Request.Context(), cardId, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -151,7 +157,7 @@ func CreateCardPayment(service *creditcard.CreditCardService) gin.HandlerFunc {
 			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
 			return
 		}
-		response, err := service.CreatePayment(ctx, cardId, userId, &req)
+		response, err := service.CreatePayment(ctx.Request.Context(), cardId, userId, &req)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userId).Str("card_id", cardId).Msg("Failed to create card payment")
 			_ = ctx.Error(err)
@@ -165,7 +171,7 @@ func FindCardPayments(service *creditcard.CreditCardService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
 		cardId := ctx.Param("id")
-		payments, err := service.FindPaymentsByCard(ctx, cardId, userId)
+		payments, err := service.FindPaymentsByCard(ctx.Request.Context(), cardId, userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -177,7 +183,7 @@ func FindCardPayments(service *creditcard.CreditCardService) gin.HandlerFunc {
 func GetCreditCardSummary(service *creditcard.CreditCardService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
 		userId := ctx.GetString("X-User-Id")
-		summary, err := service.GetSummary(ctx, userId)
+		summary, err := service.GetSummary(ctx.Request.Context(), userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return

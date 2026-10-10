@@ -5,19 +5,20 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 type CreateCertificateRequest struct {
-	Bank                string  `json:"bank" binding:"required,min=2,max=100"`
-	BaseCapital         float64 `json:"base_capital" binding:"required,gt=0"`
-	InterestType        string  `json:"interest_type" binding:"required,oneof=simple compound"`
-	CurrentInterestRate float64 `json:"current_interest_rate" binding:"required,gt=0,lte=100"`
-	CurrentTaxRate      float64 `json:"current_tax_rate" binding:"gte=0,lte=100"`
-	CutDay              int     `json:"cut_day" binding:"required,min=1,max=28"`
-	ReinvestInterest    bool    `json:"reinvest_interest"`
-	PayoutAccountId     *string `json:"payout_account_id"`
-	MaturityDate        string  `json:"maturity_date"`
-	Currency            string  `json:"currency" binding:"omitempty,len=3"`
+	Bank                string       `json:"bank" binding:"required,min=2,max=100"`
+	BaseCapital         money.Amount `json:"base_capital" binding:"required,gt=0"`
+	InterestType        string       `json:"interest_type" binding:"required,oneof=simple compound"`
+	CurrentInterestRate money.Amount `json:"current_interest_rate" binding:"required,gt=0,lte=100"`
+	CurrentTaxRate      money.Amount `json:"current_tax_rate" binding:"gte=0,lte=100"`
+	CutDay              int          `json:"cut_day" binding:"required,min=1,max=28"`
+	ReinvestInterest    bool         `json:"reinvest_interest"`
+	PayoutAccountId     *string      `json:"payout_account_id"`
+	MaturityDate        string       `json:"maturity_date"`
+	Currency            string       `json:"currency" binding:"omitempty,len=3"`
 }
 
 func (r *CreateCertificateRequest) Validate() error {
@@ -30,7 +31,8 @@ func (r *CreateCertificateRequest) Validate() error {
 	if r.InterestType == "compound" && r.ReinvestInterest {
 		r.PayoutAccountId = nil
 	}
-	return nil
+	// certificates.base_capital is DECIMAL(15,2).
+	return money.CheckCents("base_capital", r.BaseCapital)
 }
 
 func (r *CreateCertificateRequest) GetInterestType() certificate.InterestType {
@@ -53,30 +55,64 @@ func (r *CreateCertificateRequest) GetMaturityDate() *time.Time {
 
 type UpdateCertificateRequest struct {
 	Bank                *string                        `json:"bank" binding:"omitempty,min=2,max=100"`
-	BaseCapital         *float64                       `json:"base_capital" binding:"omitempty,gt=0"`
-	CurrentInterestRate *float64                       `json:"current_interest_rate" binding:"omitempty,gt=0,lte=100"`
-	CurrentTaxRate      *float64                       `json:"current_tax_rate" binding:"omitempty,gte=0,lte=100"`
+	BaseCapital         *money.Amount                  `json:"base_capital" binding:"omitempty,gt=0"`
+	CurrentInterestRate *money.Amount                  `json:"current_interest_rate" binding:"omitempty,gt=0,lte=100"`
+	CurrentTaxRate      *money.Amount                  `json:"current_tax_rate" binding:"omitempty,gte=0,lte=100"`
 	CutDay              *int                           `json:"cut_day" binding:"omitempty,min=1,max=28"`
 	ReinvestInterest    *bool                          `json:"reinvest_interest"`
 	PayoutAccountId     *string                        `json:"payout_account_id"`
 	Status              *certificate.CertificateStatus `json:"status" binding:"omitempty,oneof=active matured cancelled"`
 }
 
+// Validate rejects money with more decimals than its DECIMAL(15,2) column.
+func (r *UpdateCertificateRequest) Validate() error {
+	return checkOptionalCents(optionalAmount{"base_capital", r.BaseCapital})
+}
+
 type UpdateCertificatePaymentRequest struct {
-	PaymentDate    *string  `json:"payment_date"`
-	PeriodStart    *string  `json:"period_start"`
-	PeriodEnd      *string  `json:"period_end"`
-	GrossInterest  *float64 `json:"gross_interest" binding:"omitempty,gte=0"`
-	TaxWithheld    *float64 `json:"tax_withheld" binding:"omitempty,gte=0"`
-	NetInterest    *float64 `json:"net_interest" binding:"omitempty,gte=0"`
-	AppliedRate    *float64 `json:"applied_rate" binding:"omitempty,gt=0,lte=100"`
-	AppliedTaxRate *float64 `json:"applied_tax_rate" binding:"omitempty,gte=0,lte=100"`
-	AppliedCapital *float64 `json:"applied_capital" binding:"omitempty,gt=0"`
+	PaymentDate    *string       `json:"payment_date"`
+	PeriodStart    *string       `json:"period_start"`
+	PeriodEnd      *string       `json:"period_end"`
+	GrossInterest  *money.Amount `json:"gross_interest" binding:"omitempty,gte=0"`
+	TaxWithheld    *money.Amount `json:"tax_withheld" binding:"omitempty,gte=0"`
+	NetInterest    *money.Amount `json:"net_interest" binding:"omitempty,gte=0"`
+	AppliedRate    *money.Amount `json:"applied_rate" binding:"omitempty,gt=0,lte=100"`
+	AppliedTaxRate *money.Amount `json:"applied_tax_rate" binding:"omitempty,gte=0,lte=100"`
+	AppliedCapital *money.Amount `json:"applied_capital" binding:"omitempty,gt=0"`
+}
+
+// Validate rejects money with more decimals than its DECIMAL(15,2) column
+// (certificate_payments.gross_interest, tax_withheld, net_interest,
+// applied_capital).
+func (r *UpdateCertificatePaymentRequest) Validate() error {
+	return checkOptionalCents(
+		optionalAmount{"gross_interest", r.GrossInterest},
+		optionalAmount{"tax_withheld", r.TaxWithheld},
+		optionalAmount{"net_interest", r.NetInterest},
+		optionalAmount{"applied_capital", r.AppliedCapital},
+	)
+}
+
+type optionalAmount struct {
+	field string
+	value *money.Amount
+}
+
+func checkOptionalCents(fields ...optionalAmount) error {
+	for _, f := range fields {
+		if f.value == nil {
+			continue
+		}
+		if err := money.CheckCents(f.field, *f.value); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 type SimulatePaymentRequest struct {
-	Capital *float64 `json:"capital" binding:"omitempty,gt=0"`
-	Rate    *float64 `json:"rate" binding:"omitempty,gt=0,lte=100"`
-	TaxRate *float64 `json:"tax_rate" binding:"omitempty,gte=0,lte=100"`
-	Months  int      `json:"months" binding:"omitempty,min=1,max=60"`
+	Capital *money.Amount `json:"capital" binding:"omitempty,gt=0"`
+	Rate    *money.Amount `json:"rate" binding:"omitempty,gt=0,lte=100"`
+	TaxRate *money.Amount `json:"tax_rate" binding:"omitempty,gte=0,lte=100"`
+	Months  int           `json:"months" binding:"omitempty,min=1,max=60"`
 }

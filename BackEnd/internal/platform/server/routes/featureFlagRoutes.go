@@ -8,8 +8,8 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 )
 
-func FeatureFlagRoutes(s *gin.Engine, db *sql.DB) {
-	handler := featureFlagHandler.NewHandler(db)
+func FeatureFlagRoutes(s *gin.Engine, db *sql.DB, flags *middleware.FeatureFlags) {
+	handler := featureFlagHandler.NewHandler(db, flags)
 
 	s.GET("/me/features", handler.GetMyFeatures)
 

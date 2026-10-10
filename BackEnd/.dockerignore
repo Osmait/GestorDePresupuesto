@@ -1,0 +1,9 @@
+main
+gestorDePresupuesto
+gestor-de-presupuesto
+gestorApp
+tmp/
+coverage/
+postgres_data/
+.env
+*.out

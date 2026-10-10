@@ -2,7 +2,8 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { format } from 'date-fns'
 import { enUS, es } from 'date-fns/locale'
-import { AlertCircle, CalendarIcon, Loader2, PlusCircle } from 'lucide-react'
+import { AlertCircle, CalendarIcon, HistoryIcon, Loader2, PlusCircle } from 'lucide-react'
+import { useSession } from 'next-auth/react'
 import { useLocale, useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -21,6 +22,7 @@ import { useSuggestCategoryMutation } from '@/hooks/queries/useAIQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { onSessionExpired } from '@/lib/client-session'
 import { getCreditCardRepository } from '@/lib/repositoryConfig'
 import { cn } from '@/lib/utils'
 import { AICategorySuggestion } from '@/types/ai'
@@ -39,6 +41,49 @@ const transactionSchema = z.object({
 	created_at: z.date(),
 })
 type TransactionFormValues = z.infer<typeof transactionSchema>
+
+/**
+ * Unsent form input is kept in sessionStorage when the session expires mid-edit
+ * (the user is redirected to /login), and restored the next time the modal is
+ * opened. Keyed by user and form (new transaction / edited transaction id).
+ */
+export function transactionDraftKey(userId: string, transactionId?: string | null): string {
+	return `gestor:draft:transaction-form:${userId}:${transactionId || 'new'}`
+}
+
+export function saveTransactionDraft(key: string, values: Partial<TransactionFormValues>): boolean {
+	try {
+		const createdAt = values.created_at instanceof Date ? values.created_at.toISOString() : undefined
+		window.sessionStorage.setItem(key, JSON.stringify({ ...values, created_at: createdAt }))
+		return true
+	} catch {
+		return false
+	}
+}
+
+export function loadTransactionDraft(key: string): Partial<TransactionFormValues> | null {
+	try {
+		const raw = window.sessionStorage.getItem(key)
+		if (!raw) return null
+		const parsed = JSON.parse(raw) as Partial<Record<keyof TransactionFormValues, unknown>>
+		if (!parsed || typeof parsed !== 'object') return null
+		const createdAt = typeof parsed.created_at === 'string' ? new Date(parsed.created_at) : undefined
+		return {
+			...(parsed as Partial<TransactionFormValues>),
+			created_at: createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt : new Date(),
+		}
+	} catch {
+		return null
+	}
+}
+
+export function clearTransactionDraft(key: string) {
+	try {
+		window.sessionStorage.removeItem(key)
+	} catch {
+		// storage unavailable: nothing to clear
+	}
+}
 
 type TransactionFormModalProps = {
 	open: boolean
@@ -106,7 +151,10 @@ export default function TransactionFormModal({
 }: TransactionFormModalProps) {
 	const t = useTranslations('forms')
 	const tTx = useTranslations('transactions')
+	const tSession = useTranslations('auth.session')
 	const locale = useLocale()
+	const { data: session } = useSession()
+	const userId = session?.user?.id
 	const { data: accounts = [] } = useGetAccounts()
 	const { data: categories = [], refetch: refetchCategories } = useGetCategories()
 	useGetBudgets() // Keep hook for cache but don't use data directly
@@ -126,6 +174,8 @@ export default function TransactionFormModal({
 	const [cardCurrencies, setCardCurrencies] = useState<string[]>([])
 	const [cardCurrenciesLoaded, setCardCurrenciesLoaded] = useState(false)
 	const [categorySuggestion, setCategorySuggestion] = useState<AICategorySuggestion | null>(null)
+	const [draftRestored, setDraftRestored] = useState(false)
+	const draftKey = userId ? transactionDraftKey(userId, editingTransaction?.id) : null
 
 	const form = useForm<TransactionFormValues>({
 		resolver: zodResolver(transactionSchema),
@@ -219,6 +269,47 @@ export default function TransactionFormModal({
 			})
 		}
 	}, [editingTransaction, form])
+
+	// Restore a draft saved when the session expired (runs after the reset above).
+	useEffect(() => {
+		if (!open || !draftKey) return
+		const draft = loadTransactionDraft(draftKey)
+		if (!draft) return
+		// keepDefaultValues: the draft fills the fields but never becomes the
+		// form's reset target, so the reset after a successful submit goes back
+		// to a clean form instead of resurrecting the (already sent) draft.
+		form.reset({ ...form.getValues(), ...draft }, { keepDefaultValues: true })
+		setDraftRestored(true)
+	}, [open, draftKey, form])
+
+	// While the modal is open, keep the user's input if the session expires
+	// (e.g. a submit answered 401) before they are sent to /login.
+	useEffect(() => {
+		if (!open || !draftKey) return
+		return onSessionExpired(() => {
+			const saved = saveTransactionDraft(draftKey, form.getValues())
+			toast.error(tSession('expired'), {
+				description: saved ? tSession('draftSaved') : undefined,
+			})
+			return true
+		})
+	}, [open, draftKey, form, tSession])
+
+	const discardDraft = () => {
+		if (draftKey) clearTransactionDraft(draftKey)
+		setDraftRestored(false)
+		form.reset({
+			name: '',
+			description: '',
+			amount: 0,
+			type_transaction: TypeTransaction.BILL,
+			account_id: '',
+			category_id: '',
+			budget_id: undefined,
+			currency: 'DOP',
+			created_at: new Date(),
+		})
+	}
 
 	useEffect(() => {
 		if (isEditing) {
@@ -350,10 +441,13 @@ export default function TransactionFormModal({
 					values.created_at,
 				)
 			}
+			if (draftKey) clearTransactionDraft(draftKey)
+			setDraftRestored(false)
 			form.reset()
 			setOpen(false)
 		} catch {
-			// Error is handled via the error prop
+			// Error is handled via the error prop (a 401 also triggers the
+			// session-expired listener above, which saves the draft).
 		}
 	}
 
@@ -420,6 +514,17 @@ export default function TransactionFormModal({
 				<DialogHeader>
 					<DialogTitle>{isEditing ? t('editTransaction') : t('newTransaction')}</DialogTitle>
 				</DialogHeader>
+				{draftRestored && (
+					<Alert role='status'>
+						<HistoryIcon className='h-4 w-4' />
+						<AlertDescription className='flex items-center justify-between gap-2'>
+							<span>{tSession('draftRestored')}</span>
+							<Button type='button' variant='ghost' size='sm' onClick={discardDraft}>
+								{tSession('discardDraft')}
+							</Button>
+						</AlertDescription>
+					</Alert>
+				)}
 				<Form {...form}>
 					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
 						{/* Row 1: Nombre */}
@@ -485,16 +590,14 @@ export default function TransactionFormModal({
 										</FormControl>
 										{selectedAccountType === 'bank' && selectedAccountId ? (
 											<p className='text-xs text-muted-foreground'>
-												La moneda en cuentas bancarias es fija: {selectedAccountCurrency}
+												{t('bankCurrencyFixed', { currency: selectedAccountCurrency })}
 											</p>
 										) : null}
 										{selectedAccountType === 'credit_card' &&
 										selectedAccountId &&
 										cardCurrenciesLoaded &&
 										cardCurrencies.length === 0 ? (
-											<p className='text-xs text-destructive'>
-												Esta tarjeta no tiene balances configurados para registrar transacciones.
-											</p>
+											<p className='text-xs text-destructive'>{t('cardWithoutBalances')}</p>
 										) : null}
 										<FormMessage />
 									</FormItem>
@@ -508,12 +611,7 @@ export default function TransactionFormModal({
 									<FormItem>
 										<FormLabel>{t('type')}</FormLabel>
 										<FormControl>
-											<Select
-												value={field.value}
-												onValueChange={(value) => {
-													void handleAccountChange(value, field.onChange)
-												}}
-											>
+											<Select value={field.value} onValueChange={field.onChange}>
 												<SelectTrigger>
 													<SelectValue placeholder={t('select')} />
 												</SelectTrigger>
@@ -538,7 +636,12 @@ export default function TransactionFormModal({
 									<FormItem>
 										<FormLabel>{t('account')}</FormLabel>
 										<FormControl>
-											<Select value={field.value} onValueChange={field.onChange}>
+											<Select
+												value={field.value}
+												onValueChange={(value) => {
+													void handleAccountChange(value, field.onChange)
+												}}
+											>
 												<SelectTrigger>
 													<SelectValue placeholder={t('select')} />
 												</SelectTrigger>
@@ -694,9 +797,9 @@ export default function TransactionFormModal({
 						<AlertCircle className='h-4 w-4' />
 						<AlertDescription>
 							{error.includes('currency must match account currency')
-								? 'La moneda de la transacción debe coincidir con la moneda de la cuenta bancaria.'
+								? t('currencyMustMatchAccount')
 								: error.includes('card does not have a balance in currency')
-									? 'La tarjeta no tiene un balance disponible en esa moneda.'
+									? t('cardCurrencyUnavailable')
 									: error}
 						</AlertDescription>
 					</Alert>

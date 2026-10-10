@@ -2,7 +2,9 @@ package passkey
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"io"
 	"net/http"
 
@@ -22,7 +24,7 @@ func BeginRegistration(service *svc.PasskeyService) gin.HandlerFunc {
 			_ = ctx.Error(apperrors.NewUnauthorizedError("missing user"))
 			return
 		}
-		result, err := service.BeginRegistration(ctx, userId)
+		result, err := service.BeginRegistration(ctx.Request.Context(), userId)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userId).Msg("passkey begin registration failed")
 			_ = ctx.Error(err)
@@ -53,7 +55,7 @@ func FinishRegistration(service *svc.PasskeyService) gin.HandlerFunc {
 			return
 		}
 
-		pk, err := service.FinishRegistration(ctx, userId, req.SessionId, req.Name, attestationReq)
+		pk, err := service.FinishRegistration(ctx.Request.Context(), userId, req.SessionId, req.Name, attestationReq)
 		if err != nil {
 			log.Error().Err(err).Str("user_id", userId).Msg("passkey finish registration failed")
 			_ = ctx.Error(err)
@@ -66,7 +68,7 @@ func FinishRegistration(service *svc.PasskeyService) gin.HandlerFunc {
 // BeginLogin starts a discoverable (usernameless) WebAuthn login ceremony.
 func BeginLogin(service *svc.PasskeyService) gin.HandlerFunc {
 	return func(ctx *gin.Context) {
-		result, err := service.BeginLogin(ctx)
+		result, err := service.BeginLogin(ctx.Request.Context())
 		if err != nil {
 			log.Error().Err(err).Msg("passkey begin login failed")
 			_ = ctx.Error(err)
@@ -95,9 +97,13 @@ func FinishLogin(service *svc.PasskeyService) gin.HandlerFunc {
 		userAgent := ctx.Request.UserAgent()
 		ipAddress := ctx.ClientIP()
 
-		tokens, _, err := service.FinishLogin(ctx, req.SessionId, assertionReq, userAgent, ipAddress)
+		tokens, _, err := service.FinishLogin(ctx.Request.Context(), req.SessionId, assertionReq, userAgent, ipAddress)
 		if err != nil {
 			log.Error().Err(err).Msg("passkey finish login failed")
+			if errors.Is(err, svc.ErrClonedAuthenticator) {
+				_ = ctx.Error(apperrors.NewUnauthorizedError("passkey rejected"))
+				return
+			}
 			_ = ctx.Error(err)
 			return
 		}
@@ -118,7 +124,7 @@ func ListPasskeys(service *svc.PasskeyService) gin.HandlerFunc {
 			_ = ctx.Error(apperrors.NewUnauthorizedError("missing user"))
 			return
 		}
-		passkeys, err := service.ListForUser(ctx, userId)
+		passkeys, err := service.ListForUser(ctx.Request.Context(), userId)
 		if err != nil {
 			_ = ctx.Error(err)
 			return
@@ -140,7 +146,11 @@ func DeletePasskey(service *svc.PasskeyService) gin.HandlerFunc {
 			return
 		}
 		id := ctx.Param("id")
-		if err := service.DeleteForUser(ctx, id, userId); err != nil {
+		if err := service.DeleteForUser(ctx.Request.Context(), id, userId); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				_ = ctx.Error(apperrors.NewNotFoundError("passkey", id))
+				return
+			}
 			_ = ctx.Error(err)
 			return
 		}

@@ -1,16 +1,17 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen, waitFor } from '@testing-library/react'
 import { toast } from 'sonner'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { CreateUserModal } from '@/app/admin/dashboard/create-user-modal'
+import { renderWithIntl } from '@/tests/utils/intl'
 
-// Mock next-auth
+// Mock next-auth (the session exposed to the browser carries no backend token)
 vi.mock('next-auth/react', () => ({
 	useSession: () => ({
-		data: {
-			accessToken: 'mock-token',
-		},
+		data: { user: { id: 'admin-1', role: 'ADMIN' } },
 		status: 'authenticated',
 	}),
+	getSession: vi.fn(),
+	signOut: vi.fn(),
 }))
 
 // Mock sonner
@@ -37,14 +38,14 @@ describe('CreateUserModal', () => {
 	})
 
 	it('renders correctly', () => {
-		render(<CreateUserModal onUserCreated={mockOnUserCreated} />)
+		renderWithIntl(<CreateUserModal onUserCreated={mockOnUserCreated} />)
 
 		// Check if the trigger button is present
 		expect(screen.getByText('Add User')).toBeDefined()
 	})
 
 	it('opens modal when clicking Add User button', () => {
-		render(<CreateUserModal onUserCreated={mockOnUserCreated} />)
+		renderWithIntl(<CreateUserModal onUserCreated={mockOnUserCreated} />)
 
 		const button = screen.getByText('Add User')
 		fireEvent.click(button)
@@ -60,10 +61,12 @@ describe('CreateUserModal', () => {
 	it('submits form with correct data', async () => {
 		fetchMock.mockResolvedValueOnce({
 			ok: true,
+			status: 201,
+			headers: new Headers({ 'content-type': 'application/json' }),
 			json: async () => ({ id: '123', name: 'John', last_name: 'Doe' }),
 		})
 
-		render(<CreateUserModal onUserCreated={mockOnUserCreated} />)
+		renderWithIntl(<CreateUserModal onUserCreated={mockOnUserCreated} />)
 
 		// Open modal
 		fireEvent.click(screen.getByText('Add User'))
@@ -85,14 +88,12 @@ describe('CreateUserModal', () => {
 			expect(fetchMock).toHaveBeenCalledTimes(1)
 		})
 
+		// Goes through the same-origin proxy; the token is attached server-side.
 		expect(fetchMock).toHaveBeenCalledWith(
-			expect.stringContaining('/users'),
+			'/api/backend/users',
 			expect.objectContaining({
 				method: 'POST',
-				headers: expect.objectContaining({
-					'Content-Type': 'application/json',
-					Authorization: 'Bearer mock-token',
-				}),
+				headers: { 'Content-Type': 'application/json' },
 				body: JSON.stringify({
 					name: 'John',
 					last_name: 'Doe',
@@ -103,7 +104,7 @@ describe('CreateUserModal', () => {
 			}),
 		)
 
-		expect(toast.success).toHaveBeenCalled()
+		await waitFor(() => expect(toast.success).toHaveBeenCalled())
 		expect(mockOnUserCreated).toHaveBeenCalled()
 	})
 
@@ -114,7 +115,7 @@ describe('CreateUserModal', () => {
 			text: async () => 'Invalid data',
 		})
 
-		render(<CreateUserModal onUserCreated={mockOnUserCreated} />)
+		renderWithIntl(<CreateUserModal onUserCreated={mockOnUserCreated} />)
 
 		// Open modal
 		fireEvent.click(screen.getByText('Add User'))
@@ -137,7 +138,7 @@ describe('CreateUserModal', () => {
 	})
 
 	it('validates form inputs', async () => {
-		render(<CreateUserModal onUserCreated={mockOnUserCreated} />)
+		renderWithIntl(<CreateUserModal onUserCreated={mockOnUserCreated} />)
 
 		// Open modal
 		fireEvent.click(screen.getByText('Add User'))

@@ -1,13 +1,9 @@
+import { formatCurrency } from '@/lib/utils'
 import { MonthlyPlanItem } from '@/types/monthlyPlan'
 
-/** Formats an amount as Dominican pesos, the currency every total is expressed in. */
-export function formatDop(amount: number): string {
-	return new Intl.NumberFormat('es-DO', {
-		style: 'currency',
-		currency: 'DOP',
-		minimumFractionDigits: 2,
-		maximumFractionDigits: 2,
-	}).format(amount)
+/** Formats an amount as Dominican pesos (the currency every total is expressed in) in the given app locale. */
+export function formatDop(amount: number, locale?: string): string {
+	return formatCurrency(amount, 'DOP', { locale })
 }
 
 /** Sums the DOP amount of the active items only; paused ones never count. */

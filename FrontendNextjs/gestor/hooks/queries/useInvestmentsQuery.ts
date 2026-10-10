@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getInvestmentRepository } from '@/lib/repositoryConfig'
 import { CreateInvestmentDTO, FundBrokerDTO, InvestmentFilters, UpdateInvestmentDTO } from '@/types/investment'
+import { invalidateFinancialData } from './invalidateFinancialData'
 
 export const INVESTMENT_KEYS = {
 	all: ['investments'] as const,
@@ -30,6 +31,7 @@ export function useCreateInvestmentMutation() {
 			return repo.create(data)
 		},
 		onSuccess: () => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.fundingBalances() })
 		},
@@ -55,6 +57,7 @@ export function useFundBrokerMutation() {
 			return repo.fundBroker(data)
 		},
 		onSuccess: () => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.fundingBalances() })
 			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.lists() })
 		},
@@ -70,6 +73,7 @@ export function useUpdateInvestmentMutation() {
 			return repo.update(data)
 		},
 		onSuccess: (_, variables) => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.detail(variables.id) })
 		},
@@ -85,6 +89,7 @@ export function useDeleteInvestmentMutation() {
 			return repo.delete(id)
 		},
 		onSuccess: () => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: INVESTMENT_KEYS.lists() })
 		},
 	})

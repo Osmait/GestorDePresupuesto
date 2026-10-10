@@ -14,7 +14,6 @@ import (
 	"github.com/go-webauthn/webauthn/webauthn"
 	authDomain "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
 	passkeyDomain "github.com/osmait/gestorDePresupuesto/internal/domain/passkey"
-	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	userDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
 	passkeyRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/passkey"
 	"github.com/rs/zerolog/log"
@@ -32,23 +31,26 @@ type UserServiceInterface interface {
 	FindUserById(ctx context.Context, id string) (*userDTO.UserResponse, error)
 }
 
+// ErrClonedAuthenticator is returned when the authenticator's signature
+// counter did not advance, which signals a possibly cloned credential.
+var ErrClonedAuthenticator = errors.New("passkey rejected: signature counter did not increase (possible cloned authenticator)")
+
 // PasskeyService implements the WebAuthn register/login ceremonies for the API.
 type PasskeyService struct {
 	webAuthn   *webauthn.WebAuthn
 	repo       passkeyRepo.PasskeyRepositoryInterface
 	userSvc    UserServiceInterface
 	authSvc    AuthServiceInterface
-	cache      cache.CacheRepository
 	sessionTTL time.Duration
 }
 
-// NewPasskeyService wires the collaborators together.
+// NewPasskeyService wires the collaborators together. Ceremony sessions are
+// persisted through repo (Postgres) so they work across instances.
 func NewPasskeyService(
 	wa *webauthn.WebAuthn,
 	repo passkeyRepo.PasskeyRepositoryInterface,
 	userSvc UserServiceInterface,
 	authSvc AuthServiceInterface,
-	cacheRepo cache.CacheRepository,
 	sessionTTL time.Duration,
 ) *PasskeyService {
 	if sessionTTL <= 0 {
@@ -59,7 +61,6 @@ func NewPasskeyService(
 		repo:       repo,
 		userSvc:    userSvc,
 		authSvc:    authSvc,
-		cache:      cacheRepo,
 		sessionTTL: sessionTTL,
 	}
 }
@@ -135,44 +136,52 @@ func toWebAuthnCredential(pk *passkeyDomain.Passkey) webauthn.Credential {
 }
 
 // -----------------------------------------------------------------------------
-// Session storage (challenges stored in the shared go-cache)
+// Session storage (challenges persisted in Postgres, single-use, with TTL)
 // -----------------------------------------------------------------------------
 
 const (
-	sessionPrefixRegister = "passkey:session:register:"
-	sessionPrefixLogin    = "passkey:session:login:"
+	sessionKindRegister = "register"
+	sessionKindLogin    = "login"
 )
 
+// errSessionNotFound is returned for unknown, consumed or expired sessions.
+var errSessionNotFound = errors.New("session not found or expired")
+
 type storedSession struct {
-	UserID  string               `json:"user_id,omitempty"`
-	Session webauthn.SessionData `json:"session"`
+	UserID  string
+	Session webauthn.SessionData
 }
 
-func (s *PasskeyService) putSession(prefix, id string, data storedSession) error {
-	payload, err := json.Marshal(data)
+func (s *PasskeyService) putSession(ctx context.Context, kind, id string, data storedSession) error {
+	payload, err := json.Marshal(data.Session)
 	if err != nil {
 		return err
 	}
-	s.cache.Set(prefix+id, payload, s.sessionTTL)
-	return nil
+	return s.repo.SaveSession(ctx, &passkeyRepo.WebAuthnSession{
+		Id:          id,
+		Kind:        kind,
+		UserId:      data.UserID,
+		SessionData: payload,
+		ExpiresAt:   time.Now().Add(s.sessionTTL),
+	})
 }
 
-func (s *PasskeyService) takeSession(prefix, id string) (*storedSession, error) {
-	raw, found := s.cache.Get(prefix + id)
-	if !found {
-		return nil, errors.New("session not found or expired")
+func (s *PasskeyService) takeSession(ctx context.Context, kind, id string) (*storedSession, error) {
+	if id == "" {
+		return nil, errSessionNotFound
 	}
-	// Consume exactly once.
-	s.cache.Delete(prefix + id)
-
-	payload, ok := raw.([]byte)
-	if !ok {
-		return nil, errors.New("invalid session payload")
+	row, err := s.repo.TakeSession(ctx, id, kind)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errSessionNotFound
+		}
+		return nil, fmt.Errorf("load webauthn session: %w", err)
 	}
 	var data storedSession
-	if err := json.Unmarshal(payload, &data); err != nil {
-		return nil, err
+	if err := json.Unmarshal(row.SessionData, &data.Session); err != nil {
+		return nil, fmt.Errorf("invalid session payload: %w", err)
 	}
+	data.UserID = row.UserId
 	return &data, nil
 }
 
@@ -198,7 +207,7 @@ func (s *PasskeyService) BeginRegistration(ctx context.Context, userId string) (
 	}
 
 	sessionID := ksuid.New().String()
-	if err := s.putSession(sessionPrefixRegister, sessionID, storedSession{
+	if err := s.putSession(ctx, sessionKindRegister, sessionID, storedSession{
 		UserID:  userId,
 		Session: *sessionData,
 	}); err != nil {
@@ -210,7 +219,7 @@ func (s *PasskeyService) BeginRegistration(ctx context.Context, userId string) (
 
 // FinishRegistration parses the attestation and persists the new credential.
 func (s *PasskeyService) FinishRegistration(ctx context.Context, userId, sessionID, name string, request *http.Request) (*passkeyDomain.Passkey, error) {
-	stored, err := s.takeSession(sessionPrefixRegister, sessionID)
+	stored, err := s.takeSession(ctx, sessionKindRegister, sessionID)
 	if err != nil {
 		return nil, err
 	}
@@ -274,7 +283,7 @@ func (s *PasskeyService) BeginLogin(ctx context.Context) (*BeginLoginResult, err
 	}
 
 	sessionID := ksuid.New().String()
-	if err := s.putSession(sessionPrefixLogin, sessionID, storedSession{Session: *sessionData}); err != nil {
+	if err := s.putSession(ctx, sessionKindLogin, sessionID, storedSession{Session: *sessionData}); err != nil {
 		return nil, err
 	}
 
@@ -284,7 +293,7 @@ func (s *PasskeyService) BeginLogin(ctx context.Context) (*BeginLoginResult, err
 // FinishLogin verifies the assertion, updates the sign counter and returns
 // a fresh access + refresh token pair for the authenticated user.
 func (s *PasskeyService) FinishLogin(ctx context.Context, sessionID string, request *http.Request, userAgent, ipAddress string) (*authDomain.AuthResponse, *passkeyDomain.Passkey, error) {
-	stored, err := s.takeSession(sessionPrefixLogin, sessionID)
+	stored, err := s.takeSession(ctx, sessionKindLogin, sessionID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -322,11 +331,26 @@ func (s *PasskeyService) FinishLogin(ctx context.Context, sessionID string, requ
 		return nil, nil, errors.New("passkey lookup failed")
 	}
 
-	// Advance sign counter (replay detection). If the authenticator reports a
-	// value lower than what we stored, FinishDiscoverableLogin will already
-	// have raised an error via CloneWarning semantics; we still persist the
-	// newest counter to stay in sync.
-	if err := s.repo.UpdateSignCount(ctx, matchedPasskey.Id, credential.Authenticator.SignCount); err != nil {
+	// Clone detection. go-webauthn (v0.16.x) does NOT fail the ceremony when
+	// the signature counter goes backwards / does not advance: it only sets
+	// Authenticator.CloneWarning and leaves SignCount unchanged. Treat it as
+	// a failed login and do not persist anything.
+	if credential.Authenticator.CloneWarning {
+		log.Warn().
+			Str("user_id", matchedPasskey.UserId).
+			Str("passkey_id", matchedPasskey.Id).
+			Uint32("stored_sign_count", matchedPasskey.SignCount).
+			Msg("passkey login rejected: clone warning")
+		return nil, nil, ErrClonedAuthenticator
+	}
+
+	// Persist the new counter + flags in both the column and credential_json
+	// (the latter is what the next login reads back).
+	credentialJSON, err := json.Marshal(credential)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to serialize credential: %w", err)
+	}
+	if err := s.repo.UpdateSignCount(ctx, matchedPasskey.Id, credential.Authenticator.SignCount, credentialJSON); err != nil {
 		log.Warn().Err(err).Str("passkey_id", matchedPasskey.Id).Msg("failed to update passkey sign counter")
 	}
 

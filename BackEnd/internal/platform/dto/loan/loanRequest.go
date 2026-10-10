@@ -6,24 +6,29 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/loan"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
 type CreateLoanRequest struct {
-	BorrowerName    string  `json:"borrower_name" binding:"required,min=2,max=120"`
-	BorrowerContact string  `json:"borrower_contact"`
-	PrincipalAmount float64 `json:"principal_amount" binding:"required,gt=0"`
-	Currency        string  `json:"currency" binding:"omitempty,len=3"`
-	InterestMode    string  `json:"interest_mode" binding:"required,oneof=fixed_total none"`
-	AnnualRate      float64 `json:"annual_rate" binding:"gte=0,lte=100"`
-	TermMonths      int     `json:"term_months" binding:"required,min=1,max=120"`
-	StartDate       string  `json:"start_date"`
-	SourceAccountId string  `json:"source_account_id" binding:"required"`
-	Notes           string  `json:"notes"`
+	BorrowerName    string       `json:"borrower_name" binding:"required,min=2,max=120"`
+	BorrowerContact string       `json:"borrower_contact"`
+	PrincipalAmount money.Amount `json:"principal_amount" binding:"required,gt=0"`
+	Currency        string       `json:"currency" binding:"omitempty,len=3"`
+	InterestMode    string       `json:"interest_mode" binding:"required,oneof=fixed_total none"`
+	AnnualRate      money.Amount `json:"annual_rate" binding:"gte=0,lte=100"`
+	TermMonths      int          `json:"term_months" binding:"required,min=1,max=120"`
+	StartDate       string       `json:"start_date"`
+	SourceAccountId string       `json:"source_account_id" binding:"required"`
+	Notes           string       `json:"notes"`
 }
 
 func (r *CreateLoanRequest) Validate() error {
-	if r.PrincipalAmount <= 0 {
+	if !r.PrincipalAmount.IsPositive() {
 		return errors.New("principal_amount must be greater than 0")
+	}
+	// loans.principal_amount is DECIMAL(15,2).
+	if err := money.CheckCents("principal_amount", r.PrincipalAmount); err != nil {
+		return err
 	}
 	if r.TermMonths < 1 || r.TermMonths > 120 {
 		return errors.New("term_months must be between 1 and 120")
@@ -32,7 +37,7 @@ func (r *CreateLoanRequest) Validate() error {
 		return errors.New("interest_mode must be 'fixed_total' or 'none'")
 	}
 	if r.InterestMode == string(loan.InterestModeNone) {
-		r.AnnualRate = 0
+		r.AnnualRate = money.Zero
 	}
 	if r.Currency == "" {
 		r.Currency = "DOP"
@@ -60,15 +65,19 @@ type UpdateLoanStatusRequest struct {
 }
 
 type RegisterLoanPaymentRequest struct {
-	DestinationAccountId string  `json:"destination_account_id" binding:"required"`
-	Amount               float64 `json:"amount" binding:"required,gt=0"`
-	PaymentDate          string  `json:"payment_date"`
-	Notes                string  `json:"notes"`
+	DestinationAccountId string       `json:"destination_account_id" binding:"required"`
+	Amount               money.Amount `json:"amount" binding:"required,gt=0"`
+	PaymentDate          string       `json:"payment_date"`
+	Notes                string       `json:"notes"`
 }
 
 func (r *RegisterLoanPaymentRequest) Validate() error {
-	if r.Amount <= 0 {
+	if !r.Amount.IsPositive() {
 		return errors.New("amount must be greater than 0")
+	}
+	// loan_payments.amount is DECIMAL(15,2).
+	if err := money.CheckCents("amount", r.Amount); err != nil {
+		return err
 	}
 	if r.DestinationAccountId == "" {
 		return errors.New("destination_account_id is required")

@@ -30,8 +30,8 @@ func (m *MockCategoryRepository) Delete(ctx context.Context, id string, userId s
 	return args.Error(0)
 }
 
-func (m *MockCategoryRepository) FindOne(ctx context.Context, id string) (*category.Category, error) {
-	args := m.Called(ctx, id)
+func (m *MockCategoryRepository) FindOne(ctx context.Context, id string, userId string) (*category.Category, error) {
+	args := m.Called(ctx, id, userId)
 	return args.Get(0).(*category.Category), args.Error(1)
 }
 
@@ -79,8 +79,7 @@ func TestDeleteCategory(t *testing.T) {
 	category := utils.GetNewRandomCategory()
 
 	ctx := context.Background()
-	mockRepo.On("FindOne", ctx, mock.Anything).Return(category, nil)
-	mockRepo.On("Delete", ctx, mock.Anything, mock.Anything).Return(nil)
+	mockRepo.On("Delete", ctx, category.Id, category.UserId).Return(nil)
 	categoryServices := NewCategoryServices(mockRepo)
 	err := categoryServices.Delete(ctx, category.Id, category.UserId)
 	mockRepo.AssertExpectations(t)

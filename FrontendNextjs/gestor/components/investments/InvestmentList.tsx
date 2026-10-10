@@ -1,3 +1,4 @@
+import { useTranslations } from 'next-intl'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useDeleteInvestmentMutation, useGetInvestments } from '@/hooks/queries/useInvestmentsQuery'
@@ -10,6 +11,7 @@ interface InvestmentListProps {
 }
 
 export function InvestmentList({ type, onEdit }: InvestmentListProps) {
+	const t = useTranslations('investments.list')
 	const { data: investments, isLoading } = useGetInvestments()
 	const deleteMutation = useDeleteInvestmentMutation()
 
@@ -37,13 +39,13 @@ export function InvestmentList({ type, onEdit }: InvestmentListProps) {
 	if (filteredInvestments.length === 0) {
 		return (
 			<div className='text-center py-10'>
-				<p className='text-muted-foreground'>No investments found for this category.</p>
+				<p className='text-muted-foreground'>{t('empty')}</p>
 			</div>
 		)
 	}
 
 	const handleDelete = async (id: string) => {
-		if (confirm('Are you sure you want to delete this investment?')) {
+		if (confirm(t('confirmDelete'))) {
 			await deleteMutation.mutateAsync(id)
 		}
 	}

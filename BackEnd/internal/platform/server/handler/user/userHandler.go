@@ -10,10 +10,25 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
 
+// GetUser returns a user profile. Requires authentication (enforced by
+// AuthMiddleware) and is restricted to the user themself or an ADMIN.
 func GetUser(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		id := c.Param("id")
-		user, err := userService.FindUserById(c, id)
+		requesterID := c.GetString("X-User-Id")
+		if requesterID == "" {
+			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "authentication required"})
+			return
+		}
+		if id != requesterID {
+			requester, ok := c.Get("User")
+			model, isUser := requester.(*dto.UserResponse)
+			if !ok || !isUser || model.Role != "ADMIN" {
+				c.AbortWithStatusJSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+				return
+			}
+		}
+		user, err := userService.FindUserById(c.Request.Context(), id)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -25,7 +40,7 @@ func GetUser(userService *user.UserService) gin.HandlerFunc {
 func GetProfile(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userid := c.GetString("X-User-Id")
-		user, err := userService.FindUserById(c, userid)
+		user, err := userService.FindUserById(c.Request.Context(), userid)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -43,7 +58,7 @@ func CreateUser(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		err = userService.CreateUser(c, &user)
+		err = userService.CreateUser(c.Request.Context(), &user)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -56,7 +71,7 @@ func CreateUser(userService *user.UserService) gin.HandlerFunc {
 func CleanupDemoUsers(userService *user.UserService) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Pass 0 to delete all demo users immediately (regardless of age)
-		err := userService.DeleteDemoUsers(c, 0)
+		err := userService.DeleteDemoUsers(c.Request.Context(), 0)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -81,7 +96,7 @@ func GetUsers(userService *user.UserService) gin.HandlerFunc {
 			}
 		}
 
-		users, err := userService.GetUsersFiltered(c, query, limit, offset)
+		users, err := userService.GetUsersFiltered(c.Request.Context(), query, limit, offset)
 		if err != nil {
 			_ = c.Error(err)
 			return
@@ -98,7 +113,7 @@ func UpdateUsers(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.BatchUpdateUsers(c, users); err != nil {
+		if err := userService.BatchUpdateUsers(c.Request.Context(), users); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -117,7 +132,7 @@ func SoftDeleteUser(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.SoftDeleteUser(c, id); err != nil {
+		if err := userService.SoftDeleteUser(c.Request.Context(), id); err != nil {
 			_ = c.Error(err)
 			return
 		}
@@ -142,7 +157,7 @@ func CreateUserByAdmin(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.CreateUser(c, &userReq); err != nil {
+		if err := userService.CreateUser(c.Request.Context(), &userReq); err != nil {
 			_ = c.Error(err)
 			return
 		}

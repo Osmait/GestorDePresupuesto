@@ -1,0 +1,29 @@
+# Template: __BACKEND_METRICS_TARGET__ and __METRICS_TOKEN__ are substituted
+# from the environment at container start (see docker-compose.yml).
+global:
+  scrape_interval: 10s
+  evaluation_interval: 10s
+
+scrape_configs:
+  # Go backend: OpenTelemetry Prometheus exporter, protected by METRICS_TOKEN.
+  - job_name: gestor-backend-scrape
+    metrics_path: /metrics
+    authorization:
+      type: Bearer
+      credentials: __METRICS_TOKEN__
+    static_configs:
+      - targets: ["__BACKEND_METRICS_TARGET__"]
+        labels:
+          service: gestor-backend
+
+  # Everything pushed over OTLP (Next.js Web Vitals, or the backend when
+  # METRICS_EXPORTER=otlp). honor_labels keeps job=<service.name>.
+  - job_name: otel-collector
+    honor_labels: true
+    static_configs:
+      - targets: ["otel-collector:8889"]
+
+  # The collector's own health (dropped spans, queue sizes).
+  - job_name: otel-collector-internal
+    static_configs:
+      - targets: ["otel-collector:8888"]

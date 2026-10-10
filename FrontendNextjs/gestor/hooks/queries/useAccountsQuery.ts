@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAccountRepository } from '@/lib/repositoryConfig'
+import { invalidateFinancialData } from './invalidateFinancialData'
 
 export const ACCOUNT_KEYS = {
 	all: ['accounts'] as const,
@@ -40,9 +41,8 @@ export function useCreateAccountMutation() {
 			const repo = await getAccountRepository()
 			return repo.create(data.name, data.bank, data.initial_balance)
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.lists() })
-		},
+		// Lists, details, dashboard totals and transactions (delete cascades) depend on accounts.
+		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }
 
@@ -55,9 +55,8 @@ export function useUpdateAccountMutation() {
 			const repo = await getAccountRepository()
 			return repo.update(data.id, data.name, data.bank)
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.lists() })
-		},
+		// Lists, details, dashboard totals and transactions (delete cascades) depend on accounts.
+		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }
 
@@ -70,8 +69,7 @@ export function useDeleteAccountMutation() {
 			const repo = await getAccountRepository()
 			return repo.delete(id)
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.lists() })
-		},
+		// Lists, details, dashboard totals and transactions (delete cascades) depend on accounts.
+		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }

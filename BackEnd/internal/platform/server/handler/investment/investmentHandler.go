@@ -2,9 +2,12 @@ package investment
 
 import (
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/investment"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	investmentService "github.com/osmait/gestorDePresupuesto/internal/services/investment"
 	"github.com/segmentio/ksuid"
 )
@@ -17,35 +20,50 @@ func NewInvestmentHandler(service *investmentService.InvestmentService) *Investm
 	return &InvestmentHandler{service: service}
 }
 
+// UpdateInvestmentRequest is the body accepted by the update endpoint. Only the
+// fields listed here can be changed; any id/user_id sent by the client is
+// ignored (ownership always comes from the JWT). Omitted fields keep their
+// current value.
+type UpdateInvestmentRequest struct {
+	// ID is only read by the legacy `PUT /investments` route, which has no path
+	// parameter. It is used to look the row up among the caller's investments.
+	ID                 string                     `json:"id"`
+	Type               *investment.InvestmentType `json:"type"`
+	Name               *string                    `json:"name"`
+	Symbol             *string                    `json:"symbol"`
+	Quantity           *money.Amount              `json:"quantity"`
+	PurchasePrice      *money.Amount              `json:"purchase_price" binding:"omitempty,gt=0"`
+	CurrentPrice       *money.Amount              `json:"current_price" binding:"omitempty,gte=0"`
+	SettlementCurrency *string                    `json:"settlement_currency"`
+}
+
 func (h *InvestmentHandler) Create(ctx *gin.Context) {
 	var req struct {
-		ID                 string                    `json:"id"`
 		Type               investment.InvestmentType `json:"type" binding:"required"`
 		Name               string                    `json:"name" binding:"required"`
 		Symbol             string                    `json:"symbol" binding:"required"`
-		Quantity           float64                   `json:"quantity" binding:"required"`
-		PurchasePrice      float64                   `json:"purchase_price" binding:"required,gt=0"`
-		CurrentPrice       float64                   `json:"current_price" binding:"required,gt=0"`
+		Quantity           money.Amount              `json:"quantity" binding:"required"`
+		PurchasePrice      money.Amount              `json:"purchase_price" binding:"required,gt=0"`
+		CurrentPrice       money.Amount              `json:"current_price" binding:"required,gt=0"`
 		SettlementCurrency string                    `json:"settlement_currency"`
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
 		return
 	}
 
 	userId := ctx.GetString("X-User-Id")
 	if userId == "" {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		_ = ctx.Error(apperrors.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
-	if req.ID == "" {
-		req.ID = ksuid.New().String()
-	}
+	// The id is always generated server side.
+	id := ksuid.New().String()
 
-	if err := h.service.Create(ctx, req.ID, userId, req.Type, req.Name, req.Symbol, req.Quantity, req.PurchasePrice, req.CurrentPrice, req.SettlementCurrency); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+	if err := h.service.Create(ctx.Request.Context(), id, userId, req.Type, req.Name, req.Symbol, req.Quantity, req.PurchasePrice, req.CurrentPrice, req.SettlementCurrency); err != nil {
+		_ = ctx.Error(err)
 		return
 	}
 
@@ -54,26 +72,26 @@ func (h *InvestmentHandler) Create(ctx *gin.Context) {
 
 func (h *InvestmentHandler) FundBroker(ctx *gin.Context) {
 	var req struct {
-		SourceAccountID string  `json:"source_account_id" binding:"required"`
-		SourceAmount    float64 `json:"source_amount" binding:"required,gt=0"`
-		TargetCurrency  string  `json:"target_currency"`
-		ExchangeRate    float64 `json:"exchange_rate"`
-		FeeAmount       float64 `json:"fee_amount"`
-		Notes           string  `json:"notes"`
+		SourceAccountID string       `json:"source_account_id" binding:"required"`
+		SourceAmount    money.Amount `json:"source_amount" binding:"required,gt=0"`
+		TargetCurrency  string       `json:"target_currency"`
+		ExchangeRate    money.Amount `json:"exchange_rate"`
+		FeeAmount       money.Amount `json:"fee_amount"`
+		Notes           string       `json:"notes"`
 	}
 
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
 		return
 	}
 
 	userId := ctx.GetString("X-User-Id")
 	if userId == "" {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		_ = ctx.Error(apperrors.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
-	if err := h.service.FundBroker(ctx, userId, investmentService.FundingRequest{
+	if err := h.service.FundBroker(ctx.Request.Context(), userId, investmentService.FundingRequest{
 		SourceAccountID: req.SourceAccountID,
 		SourceAmount:    req.SourceAmount,
 		TargetCurrency:  req.TargetCurrency,
@@ -81,7 +99,7 @@ func (h *InvestmentHandler) FundBroker(ctx *gin.Context) {
 		FeeAmount:       req.FeeAmount,
 		Notes:           req.Notes,
 	}); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		_ = ctx.Error(err)
 		return
 	}
 
@@ -91,13 +109,13 @@ func (h *InvestmentHandler) FundBroker(ctx *gin.Context) {
 func (h *InvestmentHandler) GetFundingBalances(ctx *gin.Context) {
 	userId := ctx.GetString("X-User-Id")
 	if userId == "" {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		_ = ctx.Error(apperrors.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
-	balances, err := h.service.GetFundingBalances(ctx, userId)
+	balances, err := h.service.GetFundingBalances(ctx.Request.Context(), userId)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		_ = ctx.Error(err)
 		return
 	}
 
@@ -107,39 +125,72 @@ func (h *InvestmentHandler) GetFundingBalances(ctx *gin.Context) {
 func (h *InvestmentHandler) FindAll(ctx *gin.Context) {
 	userId := ctx.GetString("X-User-Id")
 	if userId == "" {
-		ctx.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		_ = ctx.Error(apperrors.NewUnauthorizedError("unauthorized"))
 		return
 	}
 
-	investments, err := h.service.FindAll(ctx, userId)
+	investments, err := h.service.FindAll(ctx.Request.Context(), userId)
 	if err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		_ = ctx.Error(err)
 		return
 	}
 
 	ctx.JSON(http.StatusOK, investments)
 }
 
+// Update modifies an investment owned by the authenticated user. The target id
+// comes from the `:id` path parameter (`PUT /investments/:id`) or, for the
+// legacy `PUT /investments` route, from the body. Either way the lookup is
+// scoped to the caller, so another user's id yields 404.
 func (h *InvestmentHandler) Update(ctx *gin.Context) {
-	var req investment.Investment
+	userId := ctx.GetString("X-User-Id")
+	if userId == "" {
+		_ = ctx.Error(apperrors.NewUnauthorizedError("unauthorized"))
+		return
+	}
+
+	var req UpdateInvestmentRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
 		return
 	}
 
-	// In a real app we might want to fetch first to verify ownership, assuming service/repo handles or strict ID checks
-	if err := h.service.Update(ctx, &req); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	id := strings.TrimSpace(ctx.Param("id"))
+	if id == "" {
+		id = strings.TrimSpace(req.ID)
+	}
+	if id == "" {
+		_ = ctx.Error(apperrors.NewValidationError("MISSING_ID", "Investment id is required"))
 		return
 	}
 
-	ctx.Status(http.StatusOK)
+	updated, err := h.service.Update(ctx.Request.Context(), id, userId, investmentService.UpdateInput{
+		Type:               req.Type,
+		Name:               req.Name,
+		Symbol:             req.Symbol,
+		Quantity:           req.Quantity,
+		PurchasePrice:      req.PurchasePrice,
+		CurrentPrice:       req.CurrentPrice,
+		SettlementCurrency: req.SettlementCurrency,
+	})
+	if err != nil {
+		_ = ctx.Error(err)
+		return
+	}
+
+	ctx.JSON(http.StatusOK, updated)
 }
 
 func (h *InvestmentHandler) Delete(ctx *gin.Context) {
+	userId := ctx.GetString("X-User-Id")
+	if userId == "" {
+		_ = ctx.Error(apperrors.NewUnauthorizedError("unauthorized"))
+		return
+	}
+
 	id := ctx.Param("id")
-	if err := h.service.Delete(ctx, id); err != nil {
-		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	if err := h.service.Delete(ctx.Request.Context(), id, userId); err != nil {
+		_ = ctx.Error(err)
 		return
 	}
 	ctx.Status(http.StatusOK)

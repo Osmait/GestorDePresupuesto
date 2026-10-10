@@ -17,7 +17,6 @@ const DashboardBarChart = dynamic(() => import('@/components/charts/DashboardBar
 
 interface DashboardChartsProps {
 	categories: { id: string; name: string; color: string }[]
-	transactions: { amount: number; type_transation: string; category_id: string; created_at: string }[]
 	categorysData: CategoryExpense[]
 	monthSummary: MonthlySummary[]
 }

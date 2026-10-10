@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { PaymentModal } from '@/components/creditcards/PaymentModal'
+import { renderWithIntl } from '@/tests/utils/intl'
 import { CreditCard } from '@/types/creditcard'
 
 // Polyfill for Radix UI
@@ -15,10 +16,6 @@ beforeAll(() => {
 	} as unknown as typeof globalThis.ResizeObserver
 })
 
-vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string) => key,
-}))
-
 const mockFindAll = vi.fn().mockResolvedValue([
 	{
 		id: 'acc1',
@@ -27,6 +24,7 @@ const mockFindAll = vi.fn().mockResolvedValue([
 		currency: 'DOP',
 		type: 'bank',
 		initial_balance: 50000,
+		current_balance: 48000,
 		user_id: 'u1',
 		created_at: '',
 	},
@@ -43,9 +41,9 @@ const mockFindAll = vi.fn().mockResolvedValue([
 ])
 
 vi.mock('@/lib/repositoryConfig', () => ({
-	accountRepository: {
+	getAccountRepository: () => ({
 		findAll: () => mockFindAll(),
-	},
+	}),
 }))
 
 vi.mock('@/hooks/queries/useExchangeRateQuery', () => ({
@@ -86,7 +84,7 @@ describe('PaymentModal', () => {
 	})
 
 	function renderModal(card: CreditCard | null = mockCard) {
-		return render(<PaymentModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} card={card} />)
+		return renderWithIntl(<PaymentModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} card={card} />)
 	}
 
 	it('renders with card data', async () => {
@@ -197,10 +195,99 @@ describe('PaymentModal', () => {
 		expect(mockOnClose).toHaveBeenCalled()
 	})
 
+	it('renders Spanish copy and formatted debt for the es locale', async () => {
+		renderWithIntl(<PaymentModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} card={mockCard} />, {
+			locale: 'es',
+		})
+
+		expect(screen.getByText('Pagar tarjeta de crédito')).toBeInTheDocument()
+		expect(screen.getByText('Realizar pago')).toBeInTheDocument()
+		await waitFor(() => {
+			expect(screen.getByText(/Deuda actual: .*15,000\.00/)).toBeInTheDocument()
+		})
+	})
+
 	it('has notes field', () => {
 		renderModal()
 
 		expect(screen.getByText('Notes (Optional)')).toBeInTheDocument()
 		expect(screen.getByPlaceholderText('Payment notes')).toBeInTheDocument()
+	})
+
+	async function submitPaymentFromSavings(user: ReturnType<typeof userEvent.setup>) {
+		await waitFor(() => expect(mockFindAll).toHaveBeenCalled())
+		await user.click(screen.getAllByRole('combobox')[0])
+		await user.click(await screen.findByRole('option', { name: /Savings/ }))
+		const submit = screen.getByRole('button', { name: 'Make Payment' })
+		await waitFor(() => expect(submit).toBeEnabled())
+		await user.click(submit)
+	}
+
+	it('keeps the modal open and shows the backend detail when the payment fails', async () => {
+		const user = userEvent.setup()
+		mockOnSubmit.mockRejectedValueOnce(Object.assign(new Error('insufficient funds in account'), { status: 422 }))
+		renderModal()
+
+		await submitPaymentFromSavings(user)
+
+		await waitFor(() => expect(mockOnSubmit).toHaveBeenCalledTimes(1))
+		expect(await screen.findByText('The payment could not be processed. Please try again.')).toBeInTheDocument()
+		expect(screen.getByText('insufficient funds in account')).toBeInTheDocument()
+		expect(mockOnClose).not.toHaveBeenCalled()
+	})
+
+	it('shows the available balance of the selected source account', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await waitFor(() => expect(mockFindAll).toHaveBeenCalled())
+		await user.click(screen.getAllByRole('combobox')[0])
+		await user.click(await screen.findByRole('option', { name: /Savings/ }))
+
+		expect(await screen.findByText(/Available: RD\$48,000\.00/)).toBeInTheDocument()
+	})
+
+	it('shows the translated INSUFFICIENT_FUNDS message inline and keeps the modal open', async () => {
+		const user = userEvent.setup()
+		mockOnSubmit.mockRejectedValueOnce(
+			Object.assign(new Error('insufficient funds: the source account has 50.00 DOP available'), {
+				status: 400,
+				code: 'INSUFFICIENT_FUNDS',
+				details: { available: '50.00', required: '15000.00', currency: 'DOP' },
+			}),
+		)
+		renderModal()
+
+		await submitPaymentFromSavings(user)
+
+		expect(
+			await screen.findByText("The source account doesn't have enough funds: only RD$50.00 available."),
+		).toBeInTheDocument()
+		expect(screen.queryByText(/the source account has 50.00 DOP/)).not.toBeInTheDocument()
+		expect(mockOnClose).not.toHaveBeenCalled()
+	})
+
+	it('rejects amounts with more than 2 decimal places before calling the API', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		const amountInput = screen.getByRole('spinbutton', { name: 'Amount to Pay' })
+		await user.clear(amountInput)
+		await user.type(amountInput, '0.001')
+		await submitPaymentFromSavings(user)
+
+		expect(await screen.findByText('Use at most 2 decimal places')).toBeInTheDocument()
+		expect(mockOnSubmit).not.toHaveBeenCalled()
+	})
+
+	it('shows only the generic message for server errors', async () => {
+		const user = userEvent.setup()
+		mockOnSubmit.mockRejectedValueOnce(Object.assign(new Error('pq: deadlock detected'), { status: 500 }))
+		renderModal()
+
+		await submitPaymentFromSavings(user)
+
+		expect(await screen.findByText('The payment could not be processed. Please try again.')).toBeInTheDocument()
+		expect(screen.queryByText(/deadlock/)).not.toBeInTheDocument()
 	})
 })
