@@ -3,22 +3,36 @@ package featureflag
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"net/http"
 	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/segmentio/ksuid"
 )
 
+// Handler serves the feature-flag endpoints. Every query runs on the
+// request's RLS transaction (txhelper.FromContext / txhelper.InTx): these
+// routes are registered after RLSMiddleware, which already holds the
+// request's pooled connection, so using the *sql.DB directly would need a
+// second connection (pool deadlock under load).
 type Handler struct {
-	db *sql.DB
+	db    *sql.DB
+	flags *middleware.FeatureFlags
 }
 
-func NewHandler(db *sql.DB) *Handler {
-	return &Handler{db: db}
+// NewHandler returns a Handler. flags (may be nil) is the route-gate cache
+// that admin updates invalidate.
+func NewHandler(db *sql.DB, flags *middleware.FeatureFlags) *Handler {
+	return &Handler{db: db, flags: flags}
 }
+
+// errUnknownFeature marks a request for a feature key that does not exist.
+var errUnknownFeature = errors.New("unknown feature key")
 
 type FeatureItem struct {
 	Key                 string `json:"key"`
@@ -74,7 +88,7 @@ func (h *Handler) GetMyFeatures(c *gin.Context) {
 }
 
 func (h *Handler) GetCatalog(c *gin.Context) {
-	rows, err := h.db.QueryContext(
+	rows, err := txhelper.FromContext(c.Request.Context(), h.db).QueryContext(
 		c.Request.Context(),
 		`SELECT f.key, f.name, COALESCE(f.description, ''), f.scope, f.default_enabled,
 		        g.enabled,
@@ -133,45 +147,33 @@ func (h *Handler) SetGlobalFeature(c *gin.Context) {
 		return
 	}
 
-	tx, err := h.db.BeginTx(c.Request.Context(), nil)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed to start transaction", err))
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	oldValue, hasOld, err := h.getGlobalFeatureEffectiveInTx(c, tx, featureKey)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed reading current global value", err))
-		return
-	}
-
-	_, err = tx.ExecContext(
-		c.Request.Context(),
-		`INSERT INTO feature_flag_global_overrides (feature_key, enabled, updated_by_admin_id, updated_at)
-		 VALUES ($1, $2, $3, $4)
-		 ON CONFLICT (feature_key)
-		 DO UPDATE SET enabled = EXCLUDED.enabled, updated_by_admin_id = EXCLUDED.updated_by_admin_id, updated_at = EXCLUDED.updated_at`,
-		featureKey,
-		req.Enabled,
-		adminID,
-		time.Now(),
-	)
+	ctx := c.Request.Context()
+	err := txhelper.InTx(ctx, h.db, func(q txhelper.Querier) error {
+		oldValue, hasOld, err := h.getGlobalFeatureEffective(ctx, q, featureKey)
+		if err != nil {
+			return err
+		}
+		if _, err = q.ExecContext(
+			ctx,
+			`INSERT INTO feature_flag_global_overrides (feature_key, enabled, updated_by_admin_id, updated_at)
+			 VALUES ($1, $2, $3, $4)
+			 ON CONFLICT (feature_key)
+			 DO UPDATE SET enabled = EXCLUDED.enabled, updated_by_admin_id = EXCLUDED.updated_by_admin_id, updated_at = EXCLUDED.updated_at`,
+			featureKey,
+			req.Enabled,
+			adminID,
+			time.Now(),
+		); err != nil {
+			return err
+		}
+		if !hasOld {
+			oldValue = false
+		}
+		return h.insertAuditLog(ctx, q, "global", nil, featureKey, &oldValue, &req.Enabled, adminID, req.Reason)
+	})
+	h.flags.InvalidateAfterTx(ctx)
 	if err != nil {
 		_ = c.Error(apperrors.NewInternalError("failed to set global feature override", err))
-		return
-	}
-
-	if !hasOld {
-		oldValue = false
-	}
-	if err = h.insertAuditLogTx(c, tx, "global", nil, featureKey, &oldValue, &req.Enabled, adminID, req.Reason); err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed to write audit log", err))
-		return
-	}
-
-	if err = tx.Commit(); err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed to commit global override", err))
 		return
 	}
 
@@ -182,43 +184,30 @@ func (h *Handler) ResetGlobalFeature(c *gin.Context) {
 	adminID := c.GetString("X-User-Id")
 	featureKey := c.Param("featureKey")
 
-	tx, err := h.db.BeginTx(c.Request.Context(), nil)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed to start transaction", err))
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	oldValue, hasOld, err := h.getGlobalFeatureEffectiveInTx(c, tx, featureKey)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed reading old global value", err))
-		return
-	}
-
-	_, err = tx.ExecContext(c.Request.Context(), `DELETE FROM feature_flag_global_overrides WHERE feature_key = $1`, featureKey)
+	ctx := c.Request.Context()
+	err := txhelper.InTx(ctx, h.db, func(q txhelper.Querier) error {
+		oldValue, hasOld, err := h.getGlobalFeatureEffective(ctx, q, featureKey)
+		if err != nil {
+			return err
+		}
+		if _, err = q.ExecContext(ctx, `DELETE FROM feature_flag_global_overrides WHERE feature_key = $1`, featureKey); err != nil {
+			return err
+		}
+		newValue, hasNew, err := h.getGlobalFeatureEffective(ctx, q, featureKey)
+		if err != nil {
+			return err
+		}
+		if !hasNew {
+			newValue = false
+		}
+		if !hasOld {
+			return nil
+		}
+		return h.insertAuditLog(ctx, q, "global", nil, featureKey, &oldValue, &newValue, adminID, "reset global override")
+	})
+	h.flags.InvalidateAfterTx(ctx)
 	if err != nil {
 		_ = c.Error(apperrors.NewInternalError("failed resetting global override", err))
-		return
-	}
-
-	newValue, hasNew, err := h.getGlobalFeatureEffectiveInTx(c, tx, featureKey)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed reading new global value", err))
-		return
-	}
-	if !hasNew {
-		newValue = false
-	}
-
-	if hasOld {
-		if err = h.insertAuditLogTx(c, tx, "global", nil, featureKey, &oldValue, &newValue, adminID, "reset global override"); err != nil {
-			_ = c.Error(apperrors.NewInternalError("failed to write audit log", err))
-			return
-		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed to commit global reset", err))
 		return
 	}
 
@@ -235,67 +224,62 @@ func (h *Handler) UpsertUserFeatures(c *gin.Context) {
 		return
 	}
 
-	tx, err := h.db.BeginTx(c.Request.Context(), nil)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed to start transaction", err))
+	ctx := c.Request.Context()
+	var unknownKey string
+	err := txhelper.InTx(ctx, h.db, func(q txhelper.Querier) error {
+		for _, override := range req.Overrides {
+			featureKey := strings.TrimSpace(override.FeatureKey)
+			if featureKey == "" {
+				continue
+			}
+
+			var exists bool
+			if err := q.QueryRowContext(ctx, `SELECT EXISTS(SELECT 1 FROM feature_flags WHERE key = $1)`, featureKey).Scan(&exists); err != nil {
+				return err
+			}
+			if !exists {
+				unknownKey = featureKey
+				return errUnknownFeature
+			}
+
+			oldValue, hasOld, err := h.getUserFeatureEffective(ctx, q, userID, featureKey)
+			if err != nil {
+				return err
+			}
+
+			if _, err = q.ExecContext(
+				ctx,
+				`INSERT INTO feature_flag_user_overrides (id, user_id, feature_key, enabled, updated_by_admin_id, updated_at)
+				 VALUES ($1, $2, $3, $4, $5, $6)
+				 ON CONFLICT (user_id, feature_key)
+				 DO UPDATE SET enabled = EXCLUDED.enabled, updated_by_admin_id = EXCLUDED.updated_by_admin_id, updated_at = EXCLUDED.updated_at`,
+				ksuid.New().String(),
+				userID,
+				featureKey,
+				override.Enabled,
+				adminID,
+				time.Now(),
+			); err != nil {
+				return err
+			}
+
+			if !hasOld {
+				oldValue = false
+			}
+			targetUserID := userID
+			if err = h.insertAuditLog(ctx, q, "user", &targetUserID, featureKey, &oldValue, &override.Enabled, adminID, override.Reason); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	h.flags.InvalidateAfterTx(ctx)
+	if errors.Is(err, errUnknownFeature) {
+		_ = c.Error(apperrors.NewValidationError("FEATURE_NOT_FOUND", "unknown feature key: "+unknownKey))
 		return
 	}
-	defer func() { _ = tx.Rollback() }()
-
-	for _, override := range req.Overrides {
-		featureKey := strings.TrimSpace(override.FeatureKey)
-		if featureKey == "" {
-			continue
-		}
-
-		var exists bool
-		existsErr := tx.QueryRowContext(c.Request.Context(), `SELECT EXISTS(SELECT 1 FROM feature_flags WHERE key = $1)`, featureKey).Scan(&exists)
-		if existsErr != nil {
-			_ = c.Error(apperrors.NewInternalError("failed validating feature key", existsErr))
-			return
-		}
-		if !exists {
-			_ = c.Error(apperrors.NewValidationError("FEATURE_NOT_FOUND", "unknown feature key: "+featureKey))
-			return
-		}
-
-		oldValue, hasOld, oldErr := h.getUserFeatureEffectiveInTx(c, tx, userID, featureKey)
-		if oldErr != nil {
-			_ = c.Error(apperrors.NewInternalError("failed reading old feature value", oldErr))
-			return
-		}
-
-		overrideID := ksuid.New().String()
-		_, upsertErr := tx.ExecContext(
-			c.Request.Context(),
-			`INSERT INTO feature_flag_user_overrides (id, user_id, feature_key, enabled, updated_by_admin_id, updated_at)
-			 VALUES ($1, $2, $3, $4, $5, $6)
-			 ON CONFLICT (user_id, feature_key)
-			 DO UPDATE SET enabled = EXCLUDED.enabled, updated_by_admin_id = EXCLUDED.updated_by_admin_id, updated_at = EXCLUDED.updated_at`,
-			overrideID,
-			userID,
-			featureKey,
-			override.Enabled,
-			adminID,
-			time.Now(),
-		)
-		if upsertErr != nil {
-			_ = c.Error(apperrors.NewInternalError("failed to update feature override", upsertErr))
-			return
-		}
-
-		if !hasOld {
-			oldValue = false
-		}
-		targetUserID := userID
-		if err = h.insertAuditLogTx(c, tx, "user", &targetUserID, featureKey, &oldValue, &override.Enabled, adminID, override.Reason); err != nil {
-			_ = c.Error(apperrors.NewInternalError("failed to write audit log", err))
-			return
-		}
-	}
-
-	if err := tx.Commit(); err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed committing feature updates", err))
+	if err != nil {
+		_ = c.Error(apperrors.NewInternalError("failed to update feature override", err))
 		return
 	}
 
@@ -313,41 +297,28 @@ func (h *Handler) ResetUserFeature(c *gin.Context) {
 	userID := c.Param("id")
 	featureKey := c.Param("featureKey")
 
-	tx, err := h.db.BeginTx(c.Request.Context(), nil)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed to start transaction", err))
-		return
-	}
-	defer func() { _ = tx.Rollback() }()
-
-	oldValue, hasOld, err := h.getUserFeatureEffectiveInTx(c, tx, userID, featureKey)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed reading current value", err))
-		return
-	}
-
-	_, err = tx.ExecContext(c.Request.Context(), `DELETE FROM feature_flag_user_overrides WHERE user_id = $1 AND feature_key = $2`, userID, featureKey)
+	ctx := c.Request.Context()
+	err := txhelper.InTx(ctx, h.db, func(q txhelper.Querier) error {
+		oldValue, hasOld, err := h.getUserFeatureEffective(ctx, q, userID, featureKey)
+		if err != nil {
+			return err
+		}
+		if _, err = q.ExecContext(ctx, `DELETE FROM feature_flag_user_overrides WHERE user_id = $1 AND feature_key = $2`, userID, featureKey); err != nil {
+			return err
+		}
+		newValue, _, err := h.getUserFeatureEffective(ctx, q, userID, featureKey)
+		if err != nil {
+			return err
+		}
+		if !hasOld {
+			return nil
+		}
+		targetUserID := userID
+		return h.insertAuditLog(ctx, q, "user", &targetUserID, featureKey, &oldValue, &newValue, adminID, "reset override")
+	})
+	h.flags.InvalidateAfterTx(ctx)
 	if err != nil {
 		_ = c.Error(apperrors.NewInternalError("failed to reset user override", err))
-		return
-	}
-
-	newValue, _, err := h.getUserFeatureEffectiveInTx(c, tx, userID, featureKey)
-	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed reading new value", err))
-		return
-	}
-
-	if hasOld {
-		targetUserID := userID
-		if err = h.insertAuditLogTx(c, tx, "user", &targetUserID, featureKey, &oldValue, &newValue, adminID, "reset override"); err != nil {
-			_ = c.Error(apperrors.NewInternalError("failed to write audit log", err))
-			return
-		}
-	}
-
-	if err = tx.Commit(); err != nil {
-		_ = c.Error(apperrors.NewInternalError("failed to commit reset", err))
 		return
 	}
 
@@ -361,7 +332,7 @@ func (h *Handler) ResetUserFeature(c *gin.Context) {
 }
 
 func (h *Handler) getFeaturesForUser(ctx context.Context, userID string) ([]FeatureItem, error) {
-	rows, err := h.db.QueryContext(
+	rows, err := txhelper.FromContext(ctx, h.db).QueryContext(
 		ctx,
 		`SELECT f.key, f.name, COALESCE(f.description, ''), f.scope, f.default_enabled,
 		        COALESCE(g.enabled, o.enabled, f.default_enabled) AS enabled,
@@ -422,10 +393,10 @@ func (h *Handler) getFeaturesForUser(ctx context.Context, userID string) ([]Feat
 	return result, rows.Err()
 }
 
-func (h *Handler) getUserFeatureEffectiveInTx(c *gin.Context, tx *sql.Tx, userID string, featureKey string) (bool, bool, error) {
+func (h *Handler) getUserFeatureEffective(ctx context.Context, q txhelper.Querier, userID string, featureKey string) (bool, bool, error) {
 	var enabled bool
-	err := tx.QueryRowContext(
-		c.Request.Context(),
+	err := q.QueryRowContext(
+		ctx,
 		`SELECT COALESCE(g.enabled, o.enabled, f.default_enabled)
 		 FROM feature_flags f
 		 LEFT JOIN feature_flag_global_overrides g
@@ -445,10 +416,10 @@ func (h *Handler) getUserFeatureEffectiveInTx(c *gin.Context, tx *sql.Tx, userID
 	return enabled, true, nil
 }
 
-func (h *Handler) getGlobalFeatureEffectiveInTx(c *gin.Context, tx *sql.Tx, featureKey string) (bool, bool, error) {
+func (h *Handler) getGlobalFeatureEffective(ctx context.Context, q txhelper.Querier, featureKey string) (bool, bool, error) {
 	var enabled bool
-	err := tx.QueryRowContext(
-		c.Request.Context(),
+	err := q.QueryRowContext(
+		ctx,
 		`SELECT COALESCE(g.enabled, f.default_enabled)
 		 FROM feature_flags f
 		 LEFT JOIN feature_flag_global_overrides g
@@ -465,10 +436,10 @@ func (h *Handler) getGlobalFeatureEffectiveInTx(c *gin.Context, tx *sql.Tx, feat
 	return enabled, true, nil
 }
 
-func (h *Handler) insertAuditLogTx(c *gin.Context, tx *sql.Tx, scope string, targetUserID *string, featureKey string, oldValue *bool, newValue *bool, adminID, reason string) error {
+func (h *Handler) insertAuditLog(ctx context.Context, q txhelper.Querier, scope string, targetUserID *string, featureKey string, oldValue *bool, newValue *bool, adminID, reason string) error {
 	auditID := ksuid.New().String()
-	_, err := tx.ExecContext(
-		c.Request.Context(),
+	_, err := q.ExecContext(
+		ctx,
 		`INSERT INTO feature_flag_audit_logs
 			(id, user_id, target_user_id, feature_key, old_value, new_value, changed_by_admin_id, reason, scope, created_at)
 		 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,

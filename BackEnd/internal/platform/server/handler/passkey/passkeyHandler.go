@@ -2,6 +2,7 @@ package passkey
 
 import (
 	"bytes"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"io"
@@ -146,6 +147,10 @@ func DeletePasskey(service *svc.PasskeyService) gin.HandlerFunc {
 		}
 		id := ctx.Param("id")
 		if err := service.DeleteForUser(ctx, id, userId); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				_ = ctx.Error(apperrors.NewNotFoundError("passkey", id))
+				return
+			}
 			_ = ctx.Error(err)
 			return
 		}

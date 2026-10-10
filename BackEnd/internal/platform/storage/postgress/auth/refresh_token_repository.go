@@ -7,6 +7,7 @@ import (
 	"time"
 
 	authDomain "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
 // ErrTokenNotActive is returned by Rotate when the presented token is not an
@@ -31,7 +32,10 @@ type RefreshTokenRepositoryInterface interface {
 	DeleteExpired(ctx context.Context) (int64, error)
 }
 
-// RefreshTokenRepository implements RefreshTokenRepositoryInterface with PostgreSQL
+// RefreshTokenRepository implements RefreshTokenRepositoryInterface with PostgreSQL.
+// Queries resolve their executor through txhelper.FromContext so that
+// authenticated routes (e.g. POST /auth/logout-all) run on the request's RLS
+// transaction instead of needing a second pooled connection.
 type RefreshTokenRepository struct {
 	db *sql.DB
 }
@@ -47,7 +51,7 @@ func (r *RefreshTokenRepository) Save(ctx context.Context, token *authDomain.Ref
 		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, user_agent, ip_address)
 		VALUES ($1, $2, $3, $4, $5, $6, $7)
 	`
-	_, err := r.db.ExecContext(ctx, query,
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query,
 		token.Id,
 		token.UserId,
 		token.TokenHash,
@@ -60,45 +64,37 @@ func (r *RefreshTokenRepository) Save(ctx context.Context, token *authDomain.Ref
 }
 
 // Rotate implements RefreshTokenRepositoryInterface.Rotate.
-func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash string, newToken *authDomain.RefreshToken, now time.Time) (userID string, err error) {
-	tx, err := r.db.BeginTx(ctx, nil)
-	if err != nil {
-		return "", err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
+func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash string, newToken *authDomain.RefreshToken, now time.Time) (string, error) {
+	var userID string
+	// InTx joins the request transaction when there is one (never a second
+	// pooled connection inside a request); otherwise it opens its own.
+	err := txhelper.InTx(ctx, r.db, func(tx txhelper.Querier) error {
+		// Row-level lock + re-check: a concurrent rotation of the same token
+		// blocks on this UPDATE and, once the first one commits, re-evaluates
+		// "revoked_at IS NULL" as false and matches zero rows.
+		var oldID string
+		err := tx.QueryRowContext(ctx, `
+			UPDATE refresh_tokens
+			SET revoked_at = $2, replaced_by = $3
+			WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
+			RETURNING id, user_id
+		`, oldTokenHash, now, newToken.Id).Scan(&oldID, &userID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return ErrTokenNotActive
 		}
-	}()
+		if err != nil {
+			return err
+		}
 
-	// Row-level lock + re-check: a concurrent rotation of the same token
-	// blocks on this UPDATE and, once the first one commits, re-evaluates
-	// "revoked_at IS NULL" as false and matches zero rows.
-	var oldID string
-	err = tx.QueryRowContext(ctx, `
-		UPDATE refresh_tokens
-		SET revoked_at = $2, replaced_by = $3
-		WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
-		RETURNING id, user_id
-	`, oldTokenHash, now, newToken.Id).Scan(&oldID, &userID)
-	if errors.Is(err, sql.ErrNoRows) {
-		err = ErrTokenNotActive
-		return "", err
-	}
+		newToken.UserId = userID
+		_, err = tx.ExecContext(ctx, `
+			INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, user_agent, ip_address)
+			VALUES ($1, $2, $3, $4, $5, $6, $7)
+		`, newToken.Id, newToken.UserId, newToken.TokenHash, newToken.ExpiresAt, newToken.CreatedAt,
+			newToken.UserAgent, newToken.IpAddress)
+		return err
+	})
 	if err != nil {
-		return "", err
-	}
-
-	newToken.UserId = userID
-	if _, err = tx.ExecContext(ctx, `
-		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, user_agent, ip_address)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, newToken.Id, newToken.UserId, newToken.TokenHash, newToken.ExpiresAt, newToken.CreatedAt,
-		newToken.UserAgent, newToken.IpAddress); err != nil {
-		return "", err
-	}
-
-	if err = tx.Commit(); err != nil {
 		return "", err
 	}
 	return userID, nil
@@ -111,7 +107,7 @@ func (r *RefreshTokenRepository) FindByHash(ctx context.Context, tokenHash strin
 		FROM refresh_tokens
 		WHERE token_hash = $1
 	`
-	row := r.db.QueryRowContext(ctx, query, tokenHash)
+	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, tokenHash)
 
 	var token authDomain.RefreshToken
 	var revokedAt sql.NullTime
@@ -160,7 +156,7 @@ func (r *RefreshTokenRepository) FindByUserId(ctx context.Context, userId string
 		WHERE user_id = $1 AND revoked_at IS NULL AND expires_at > NOW()
 		ORDER BY created_at DESC
 	`
-	rows, err := r.db.QueryContext(ctx, query, userId)
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -215,7 +211,7 @@ func (r *RefreshTokenRepository) Revoke(ctx context.Context, tokenId string, rep
 		WHERE id = $3 AND revoked_at IS NULL
 	`
 	now := time.Now()
-	_, err := r.db.ExecContext(ctx, query, now, replacedBy, tokenId)
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, now, replacedBy, tokenId)
 	return err
 }
 
@@ -226,7 +222,7 @@ func (r *RefreshTokenRepository) RevokeByHash(ctx context.Context, tokenHash str
 		SET revoked_at = $1
 		WHERE token_hash = $2 AND revoked_at IS NULL
 	`
-	_, err := r.db.ExecContext(ctx, query, time.Now(), tokenHash)
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, time.Now(), tokenHash)
 	return err
 }
 
@@ -237,7 +233,7 @@ func (r *RefreshTokenRepository) RevokeAllForUser(ctx context.Context, userId st
 		SET revoked_at = $1
 		WHERE user_id = $2 AND revoked_at IS NULL
 	`
-	_, err := r.db.ExecContext(ctx, query, time.Now(), userId)
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, time.Now(), userId)
 	return err
 }
 
@@ -247,7 +243,7 @@ func (r *RefreshTokenRepository) DeleteExpired(ctx context.Context) (int64, erro
 		DELETE FROM refresh_tokens
 		WHERE expires_at < NOW() - INTERVAL '7 days'
 	`
-	result, err := r.db.ExecContext(ctx, query)
+	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query)
 	if err != nil {
 		return 0, err
 	}

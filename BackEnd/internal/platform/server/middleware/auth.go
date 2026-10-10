@@ -1,12 +1,15 @@
 package middleware
 
 import (
+	"context"
+	"errors"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/config"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
+	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 )
@@ -80,8 +83,27 @@ func AuthMiddleware(userService *user.UserService, cfg *config.Config) gin.Handl
 			return
 		}
 
-		// Validate user exists and is active
-		u, err := userService.FindUserById(c, claims.UserId)
+		// Validate user exists and is active. This runs before RLSMiddleware,
+		// so it holds no other pooled connection; it is the most frequent query
+		// of the API, hence the short-TTL cache (AUTH_USER_CACHE_TTL), and its
+		// wait is bounded like the request transaction (DB_TX_ACQUIRE_TIMEOUT)
+		// so pool exhaustion fails fast instead of queueing every request.
+		lookupCtx := c.Request.Context()
+		if timeout := cfg.Database.TxAcquireTimeout; timeout > 0 {
+			var cancel context.CancelFunc
+			lookupCtx, cancel = context.WithTimeout(lookupCtx, timeout)
+			defer cancel()
+		}
+		u, err := userService.FindActiveUserForAuth(lookupCtx, claims.UserId)
+		if err != nil && isTransientLookupError(err) {
+			// A database outage or an exhausted pool is not a reason to log
+			// the user out: answer 503 so clients retry instead.
+			c.Header("Retry-After", "1")
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{
+				"error": "authentication temporarily unavailable, please retry",
+			})
+			return
+		}
 		if err != nil || u == nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{
 				"error": "user not found or inactive",
@@ -94,6 +116,18 @@ func AuthMiddleware(userService *user.UserService, cfg *config.Config) gin.Handl
 		c.Set("User", u)
 		c.Next()
 	}
+}
+
+// isTransientLookupError reports whether a user lookup failed because of the
+// database (unavailable, pool exhausted, timeout) rather than because the
+// user does not exist or is inactive.
+func isTransientLookupError(err error) bool {
+	if errors.Is(err, context.DeadlineExceeded) || errors.Is(err, context.Canceled) {
+		return true
+	}
+	return apperrors.IsErrorType(err, apperrors.ErrorTypeDatabase) ||
+		apperrors.IsErrorType(err, apperrors.ErrorTypeTimeout) ||
+		apperrors.IsErrorType(err, apperrors.ErrorTypeUnavailable)
 }
 
 // RequireRole enforces role-based access control

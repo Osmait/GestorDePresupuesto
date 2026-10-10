@@ -410,6 +410,9 @@ func initializeServices(repos *repositories, cfg *config.Config) (*services, err
 	loanService := loan.NewLoanService(repos.loanRepository, transactionService, repos.accountRepository, repos.categoryRepository)
 
 	userService := user.NewUserService(repos.userRepository)
+	// Short-TTL cache for the auth middleware's per-request user lookup
+	// (AUTH_USER_CACHE_TTL); user mutations invalidate it.
+	userService.EnableAuthCache(cfg.Cache.AuthUserTTL)
 	authService := auth.NewAuthServiceWithRefreshTokens(repos.userRepository, repos.accountRepository, repos.categoryRepository, repos.budgetRepository, repos.transactionRepository, repos.refreshTokenRepository, cfg)
 
 	// WebAuthn / passkey service. Ceremony sessions (challenges) are stored in

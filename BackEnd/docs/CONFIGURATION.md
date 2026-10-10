@@ -52,11 +52,21 @@ The application uses a comprehensive configuration system that supports:
 | `DB_HOST` | `localhost` | Database host |
 | `DB_PORT` | `5432` | Database port |
 | `DB_NAME` | `my_store` | Database name |
-| `DB_MAX_OPEN_CONNS` | `25` | Maximum open connections |
-| `DB_MAX_IDLE_CONNS` | `25` | Maximum idle connections |
+| `DB_MAX_OPEN_CONNS` | `25` | Maximum open connections per instance. Each in-flight authenticated request holds exactly one for its RLS transaction, so this is also the per-instance request concurrency against the DB. Keep `instances x DB_MAX_OPEN_CONNS` below the server's `max_connections` (minus admin/migration headroom). |
+| `DB_MAX_IDLE_CONNS` | `25` | Maximum idle connections kept in the pool (clamped to `DB_MAX_OPEN_CONNS`) |
 | `DB_CONN_MAX_LIFETIME` | `5m` | Connection maximum lifetime |
 | `DB_CONN_MAX_IDLE_TIME` | `5m` | Connection maximum idle time |
+| `DB_TX_ACQUIRE_TIMEOUT` | `5s` | How long an authenticated request waits for a pooled connection to open its RLS transaction. When the pool stays exhausted that long the request fails fast with `503` + `Retry-After: 1` instead of queueing indefinitely. `0` disables the bound. |
 | `DB_SSL_MODE` | `disable` | SSL mode: `disable`, `require`, `verify-ca`, `verify-full` |
+
+> **One connection per request.** `RLSMiddleware` opens the request transaction on one pooled connection; every query a handler, service or middleware runs afterwards must use it (`txhelper.FromContext` / `txhelper.InTx`). Querying the plain `*sql.DB` inside a request needs a second connection and deadlocks the whole pool under load. Handlers that manage their own transactions (e.g. `POST /recurring-transactions/process`) are registered before `RLSMiddleware`.
+
+### In-process caches
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `AUTH_USER_CACHE_TTL` | `15s` | Caches the auth middleware's "user exists and is active" lookup per user id. Role changes, deletions and deactivations through this instance invalidate it immediately; other instances converge within the TTL. `0` disables it. |
+| `FEATURE_FLAG_CACHE_TTL` | `30s` | Caches feature-flag evaluations used by route gates per (user, flag). Admin flag/override changes invalidate it on this instance; other instances converge within the TTL. `0` disables it. |
 
 ### JWT Configuration
 

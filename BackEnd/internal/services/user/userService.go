@@ -18,6 +18,9 @@ import (
 // UserService handles business logic related to user management.
 type UserService struct {
 	userRepository userRepo.UserRepositoryInterface
+	// authCache (optional, see EnableAuthCache) serves the auth middleware's
+	// per-request user lookup.
+	authCache *authUserCache
 }
 
 // NewUserService creates a new instance of UserService.
@@ -189,6 +192,7 @@ func (u *UserService) DeleteUser(ctx context.Context, id string) error {
 		if err := u.userRepository.Delete(ctx, id); err != nil {
 			return apperrors.WrapDatabaseError(ctx, err, "Delete user")
 		}
+		u.invalidateAuthUser(ctx, id)
 
 		return nil
 	})
@@ -225,6 +229,7 @@ func (u *UserService) SoftDeleteUser(ctx context.Context, id string) error {
 		if err := u.userRepository.SoftDelete(ctx, id); err != nil {
 			return apperrors.WrapDatabaseError(ctx, err, "SoftDelete user")
 		}
+		u.invalidateAuthUser(ctx, id)
 
 		return nil
 	})
@@ -303,6 +308,7 @@ func (u *UserService) UpdateUser(ctx context.Context, id string, userRequest *dt
 		if err := u.userRepository.Update(ctx, existingUser); err != nil {
 			return apperrors.WrapDatabaseError(ctx, err, "Update user")
 		}
+		u.invalidateAuthUser(ctx, id)
 
 		return nil
 	})
@@ -328,6 +334,8 @@ func (u *UserService) BatchUpdateUsers(ctx context.Context, updates []dto.UserRe
 			if err := u.userRepository.Update(ctx, existingUser); err != nil {
 				return apperrors.WrapDatabaseError(ctx, err, fmt.Sprintf("Update user in batch: %s", update.Id))
 			}
+			// Role changes must reach the auth middleware promptly.
+			u.invalidateAuthUser(ctx, update.Id)
 		}
 		return nil
 	})
@@ -356,7 +364,11 @@ func (u *UserService) GetUserWithRetry(ctx context.Context, id string) (*dto.Use
 // If retention is 0, it deletes all demo users created before now.
 func (u *UserService) DeleteDemoUsers(ctx context.Context, retention time.Duration) error {
 	olderThan := time.Now().Add(-retention)
-	return u.userRepository.DeleteDemoUsersOlderThan(ctx, olderThan)
+	if err := u.userRepository.DeleteDemoUsersOlderThan(ctx, olderThan); err != nil {
+		return err
+	}
+	u.invalidateAllAuthUsers(ctx)
+	return nil
 }
 
 // GetAllUsers retrieves all users from the database and returns them as UserResponse DTOs.

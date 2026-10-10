@@ -166,7 +166,7 @@ func (s *CertificateService) FindAll(ctx context.Context, userId string) ([]*dto
 			continue
 		}
 
-		effectiveCapital, lastPayment := s.GetEffectiveCapital(cert)
+		effectiveCapital, lastPayment := s.GetEffectiveCapital(ctx, cert)
 		nextPaymentDate := s.CalculateNextPaymentDate(cert, lastPayment)
 		projected := s.GetProjectedPayment(cert, effectiveCapital, calculator)
 
@@ -201,7 +201,7 @@ func (s *CertificateService) FindById(ctx context.Context, id string, userId str
 	}
 
 	calculator := &PaymentCalculator{}
-	effectiveCapital, _ := s.GetEffectiveCapital(cert)
+	effectiveCapital, _ := s.GetEffectiveCapital(ctx, cert)
 	nextPaymentDate := s.CalculateNextPaymentDate(cert, nil)
 	projected := s.GetProjectedPayment(cert, effectiveCapital, calculator)
 
@@ -499,12 +499,16 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 	return nil
 }
 
-func (s *CertificateService) GetEffectiveCapital(cert *certificate.Certificate) (money.Amount, *certificate.CertificatePayment) {
+// GetEffectiveCapital returns the capital interest is computed on. ctx must
+// be the caller's context: inside an HTTP request it carries the RLS
+// transaction, and querying with a detached context would need a second
+// pooled connection while the request holds one (pool deadlock under load).
+func (s *CertificateService) GetEffectiveCapital(ctx context.Context, cert *certificate.Certificate) (money.Amount, *certificate.CertificatePayment) {
 	if cert.InterestType == certificate.InterestTypeSimple {
 		return cert.BaseCapital, nil
 	}
 
-	lastPayment, err := s.repository.FindLastPayment(context.Background(), cert.Id, cert.UserId)
+	lastPayment, err := s.repository.FindLastPayment(ctx, cert.Id, cert.UserId)
 	if err != nil {
 		return cert.BaseCapital, nil
 	}

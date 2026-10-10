@@ -280,7 +280,7 @@ func TestGetEffectiveCapital_Simple(t *testing.T) {
 
 	mockRepo.On("FindLastPayment", mock.Anything, mock.Anything, mock.Anything).Return(nil, sql.ErrNoRows)
 
-	effectiveCapital, _ := service.GetEffectiveCapital(cert)
+	effectiveCapital, _ := service.GetEffectiveCapital(context.Background(), cert)
 	moneytest.Equal(t, cert.BaseCapital, effectiveCapital)
 }
 
@@ -297,7 +297,7 @@ func TestGetEffectiveCapital_CompoundWithoutReinvest(t *testing.T) {
 
 	mockRepo.On("FindLastPayment", mock.Anything, mock.Anything, mock.Anything).Return(nil, sql.ErrNoRows)
 
-	effectiveCapital, _ := service.GetEffectiveCapital(cert)
+	effectiveCapital, _ := service.GetEffectiveCapital(context.Background(), cert)
 	moneytest.Equal(t, cert.BaseCapital, effectiveCapital)
 }
 

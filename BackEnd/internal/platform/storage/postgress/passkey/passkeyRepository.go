@@ -109,33 +109,46 @@ func (r *PasskeyRepository) Delete(ctx context.Context, id string, userId string
 	return nil
 }
 
-// SaveSession stores a WebAuthn ceremony session. It deliberately uses the
-// pool (autocommit) rather than the request transaction so the session is
-// visible to other instances immediately and its lifecycle is independent of
-// the request outcome. Expired rows are purged opportunistically.
+// SaveSession stores a WebAuthn ceremony session. Expired rows are purged
+// opportunistically.
+//
+// It runs on the request transaction when there is one (the authenticated
+// registration ceremony runs after RLSMiddleware, which already holds the
+// request's pooled connection: using the pool here would need a second
+// connection and deadlock under load). The response is only sent after that
+// transaction commits, so the session is visible to every instance before
+// the client can use it. The anonymous login ceremony has no request
+// transaction and autocommits on the pool.
 func (r *PasskeyRepository) SaveSession(ctx context.Context, session *WebAuthnSession) error {
-	if _, err := r.db.ExecContext(ctx, `DELETE FROM webauthn_sessions WHERE expires_at < NOW()`); err != nil {
+	if _, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, `DELETE FROM webauthn_sessions WHERE expires_at < NOW()`); err != nil {
 		log.Warn().Err(err).Msg("failed to purge expired webauthn sessions")
 	}
 	var userID any
 	if session.UserId != "" {
 		userID = session.UserId
 	}
-	_, err := r.db.ExecContext(ctx, `INSERT INTO webauthn_sessions (id, kind, user_id, session_data, expires_at)
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, `INSERT INTO webauthn_sessions (id, kind, user_id, session_data, expires_at)
 		VALUES ($1, $2, $3, $4::jsonb, $5)`,
 		session.Id, session.Kind, userID, string(session.SessionData), session.ExpiresAt)
 	return err
 }
 
 // TakeSession atomically consumes a session: the DELETE ... RETURNING makes
-// it single-use even across instances. It runs outside the request
-// transaction on purpose — a failed ceremony rolls the request back, and the
-// session must stay consumed regardless.
+// it single-use even across instances.
+//
+// For the anonymous login ceremony there is no request transaction, so the
+// DELETE autocommits and the session stays consumed whatever the outcome.
+// The authenticated registration ceremony runs inside the request
+// transaction (never a second pooled connection): if registration fails the
+// request rolls back and the session remains usable until it expires
+// (WEBAUTHN_CHALLENGE_TTL), but only by the same authenticated user, whose id
+// is bound to the session and re-checked by FinishRegistration. Concurrent
+// consumers are still serialised by the row lock.
 func (r *PasskeyRepository) TakeSession(ctx context.Context, id, kind string) (*WebAuthnSession, error) {
 	s := &WebAuthnSession{}
 	var userID sql.NullString
 	var data string
-	err := r.db.QueryRowContext(ctx, `DELETE FROM webauthn_sessions
+	err := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, `DELETE FROM webauthn_sessions
 		WHERE id = $1 AND kind = $2
 		RETURNING id, kind, user_id, session_data::text, expires_at`, id, kind).
 		Scan(&s.Id, &s.Kind, &userID, &data, &s.ExpiresAt)

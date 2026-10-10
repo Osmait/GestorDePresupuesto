@@ -82,6 +82,7 @@ type Server struct {
 	db                  *sql.DB
 	config              *config.Config
 	rateLimiter         *middleware.RateLimitService
+	featureFlags        *middleware.FeatureFlags
 }
 
 func New(ctx context.Context,
@@ -148,6 +149,7 @@ func New(ctx context.Context,
 		db:                  db,
 		config:              cfg,
 	}
+	srv.featureFlags = middleware.NewFeatureFlags(db, cfg.Cache.FeatureFlagTTL)
 	srv.registerRoutes()
 	return serverContext(ctx), &srv
 }
@@ -261,9 +263,20 @@ func (s *Server) registerRoutes() {
 	notificationH := notificationHandler.NewNotificationHandler(s.notificationService)
 	s.Engine.GET("/notifications", notificationH.Subscribe)
 
+	// The on-demand recurring processor runs every occurrence in its own
+	// scheduler transaction, so it must not also hold a request transaction
+	// (that would need two pooled connections per request). See
+	// routes.RecurringTransactionProcessRoute.
+	routes.RecurringTransactionProcessRoute(s.Engine, s.recurringService)
+
 	// RLS middleware: pins each DB-touching authenticated request to a transaction
-	// with set_config('app.current_user_id', userID, true).
-	s.Engine.Use(middleware.RLSMiddleware(s.db))
+	// with set_config('app.current_user_id', userID, true). Every query that runs
+	// below this point must use that transaction (txhelper.FromContext/InTx):
+	// the request already holds a pooled connection, and waiting for a second
+	// one deadlocks once concurrent requests exhaust the pool. The connection
+	// is acquired with a bounded wait (DB_TX_ACQUIRE_TIMEOUT) and the request
+	// fails fast with 503 when the pool stays exhausted.
+	s.Engine.Use(middleware.RLSMiddlewareWithTimeout(s.db, s.config.Database.TxAcquireTimeout))
 
 	// Notification management endpoints — these DO query the DB and need RLS.
 	s.Engine.POST("/notifications/test", notificationH.SendTestNotification)
@@ -275,7 +288,7 @@ func (s *Server) registerRoutes() {
 	// Application routes
 	routes.AuhtRoutes(s.Engine, s.servicesAuth)
 	routes.UserRoute(s.Engine, s.servicesUser)
-	routes.FeatureFlagRoutes(s.Engine, s.db)
+	routes.FeatureFlagRoutes(s.Engine, s.db, s.featureFlags)
 	routes.AccountRotes(s.Engine, s.servicesAccunt)
 	routes.TransactionRoutes(s.Engine, s.servicesTransaction)
 	routes.CategoryRoutes(s.Engine, s.servicesCategory)
@@ -284,12 +297,12 @@ func (s *Server) registerRoutes() {
 	routes.RecurringTransactionRoutes(s.Engine, s.recurringService)
 	routes.MonthlyPlanRoutes(s.Engine, s.monthlyPlanService)
 	routes.SearchRoutes(s.Engine, s.searchService)
-	routes.InvestmentRoutes(s.Engine, s.investmentService, s.db)
-	routes.CertificateRoutes(s.Engine, s.certificateService, s.db)
-	routes.CreditCardRoutes(s.Engine, s.creditCardService, s.db)
-	routes.LoanRoutes(s.Engine, s.loanService, s.db)
-	routes.PasskeyRoutes(s.Engine, s.passkeyService, s.db)
-	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache)
+	routes.InvestmentRoutes(s.Engine, s.investmentService, s.featureFlags)
+	routes.CertificateRoutes(s.Engine, s.certificateService, s.featureFlags)
+	routes.CreditCardRoutes(s.Engine, s.creditCardService, s.featureFlags)
+	routes.LoanRoutes(s.Engine, s.loanService, s.featureFlags)
+	routes.PasskeyRoutes(s.Engine, s.passkeyService, s.featureFlags)
+	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache, s.featureFlags)
 	routes.APIKeyRoutes(s.Engine, s.apiKeyService)
 }
 

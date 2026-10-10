@@ -108,70 +108,85 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 
 	if budget != nil && typeTransaction == BILL {
 		log.Debug().Str("budget_id", budget.Id).Msg("checking budget thresholds for transaction")
-		go func() {
-			usdToDop := money.FromInt(60)
-			if s.usdToDopRateFn != nil {
-				if rate, rateErr := s.usdToDopRateFn(context.Background()); rateErr == nil && rate.IsPositive() {
-					usdToDop = rate
-				}
-			}
-
-			currentSpent, err := s.transactionRepository.FindCurrentBudget(context.Background(), budget.Id, userId, usdToDop)
-			if err != nil {
-				log.Error().Err(err).Msg("failed to get current budget details for alert")
-				return
-			}
-
-			// budget.Amount is positive, currentSpent is positive (bills stored as positive).
-			spentPositive := currentSpent
-			limit := budget.Amount
-			currentTransactionImpact := amount
-			if resolvedCurrency == "USD" {
-				currentTransactionImpact = currentTransactionImpact.Mul(usdToDop)
-			}
-
-			log.Debug().Stringer("current_spent", spentPositive).Stringer("limit", limit).Msg("budget status")
-
-			if limit.IsPositive() {
-				// Thresholds are compared exactly in decimal; the percentage is
-				// only converted for the human-readable message.
-				previousSpent := spentPositive.Sub(currentTransactionImpact) // remove current transaction with conversion if needed
-				ratio := spentPositive.Div(limit)
-				previousRatio := previousSpent.Div(limit)
-				one := money.FromInt(1)
-				warning := money.New(7, -1)
-				usedPercent := ratio.MulInt(100).StringFixed(0)
-
-				log.Debug().Stringer("ratio", ratio).Stringer("previous_ratio", previousRatio).Msg("budget percentages")
-
-				var alertType string
-				var alertMessage string
-
-				if ratio.GreaterThanOrEqual(one) && previousRatio.LessThan(one) {
-					alertType = "budget_critical"
-					alertMessage = fmt.Sprintf("🚨 Critical: You have exceeded your budget for this category! (%s%% used)", usedPercent)
-				} else if ratio.GreaterThanOrEqual(warning) && ratio.LessThan(one) && previousRatio.LessThan(warning) {
-					alertType = "budget_warning"
-					alertMessage = fmt.Sprintf("⚠️ Warning: You have used %s%% of your budget for this category.", usedPercent)
-				}
-
-				if alertType != "" {
-					log.Info().Str("alert_type", alertType).Msg("triggering budget alert")
-					notificationPayload := map[string]interface{}{
-						"type":    alertType,
-						"message": alertMessage,
-						"amount":  spentPositive.RoundCents(),
-					}
-					payloadBytes, _ := json.Marshal(notificationPayload)
-					s.notificationService.SendToUser(context.Background(), userId, string(payloadBytes))
-				} else {
-					log.Debug().Msg("no alert threshold crossed")
-				}
-			}
-		}()
+		// The spent amount is read synchronously on the caller's context: inside
+		// a request that is the RLS transaction, which already contains the new
+		// transaction. Reading it from a goroutine with a detached context used
+		// a second pooled connection while the request held one (pool deadlock
+		// pressure) and raced the commit (the new bill could be missing).
+		// Only the notification (DB insert + SSE push) is sent asynchronously.
+		s.checkBudgetThreshold(ctx, budget.Id, budget.Amount, userId, amount, resolvedCurrency)
 	}
 
 	return id, nil
+}
+
+// budgetAlertTimeout bounds the asynchronous budget-alert notification.
+const budgetAlertTimeout = 10 * time.Second
+
+func (s TransactionService) checkBudgetThreshold(ctx context.Context, budgetID string, budgetAmount money.Amount, userId string, amount money.Amount, resolvedCurrency string) {
+	usdToDop := money.FromInt(60)
+	if s.usdToDopRateFn != nil {
+		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate.IsPositive() {
+			usdToDop = rate
+		}
+	}
+
+	currentSpent, err := s.transactionRepository.FindCurrentBudget(ctx, budgetID, userId, usdToDop)
+	if err != nil {
+		log.Error().Err(err).Msg("failed to get current budget details for alert")
+		return
+	}
+
+	// budget.Amount is positive, currentSpent is positive (bills stored as positive).
+	spentPositive := currentSpent
+	limit := budgetAmount
+	currentTransactionImpact := amount
+	if resolvedCurrency == "USD" {
+		currentTransactionImpact = currentTransactionImpact.Mul(usdToDop)
+	}
+
+	log.Debug().Stringer("current_spent", spentPositive).Stringer("limit", limit).Msg("budget status")
+
+	if limit.IsPositive() {
+		// Thresholds are compared exactly in decimal; the percentage is
+		// only converted for the human-readable message.
+		previousSpent := spentPositive.Sub(currentTransactionImpact) // remove current transaction with conversion if needed
+		ratio := spentPositive.Div(limit)
+		previousRatio := previousSpent.Div(limit)
+		one := money.FromInt(1)
+		warning := money.New(7, -1)
+		usedPercent := ratio.MulInt(100).StringFixed(0)
+
+		log.Debug().Stringer("ratio", ratio).Stringer("previous_ratio", previousRatio).Msg("budget percentages")
+
+		var alertType string
+		var alertMessage string
+
+		if ratio.GreaterThanOrEqual(one) && previousRatio.LessThan(one) {
+			alertType = "budget_critical"
+			alertMessage = fmt.Sprintf("🚨 Critical: You have exceeded your budget for this category! (%s%% used)", usedPercent)
+		} else if ratio.GreaterThanOrEqual(warning) && ratio.LessThan(one) && previousRatio.LessThan(warning) {
+			alertType = "budget_warning"
+			alertMessage = fmt.Sprintf("⚠️ Warning: You have used %s%% of your budget for this category.", usedPercent)
+		}
+
+		if alertType != "" {
+			log.Info().Str("alert_type", alertType).Msg("triggering budget alert")
+			notificationPayload := map[string]interface{}{
+				"type":    alertType,
+				"message": alertMessage,
+				"amount":  spentPositive.RoundCents(),
+			}
+			payloadBytes, _ := json.Marshal(notificationPayload)
+			go func() {
+				notifyCtx, cancel := context.WithTimeout(context.Background(), budgetAlertTimeout)
+				defer cancel()
+				s.notificationService.SendToUser(notifyCtx, userId, string(payloadBytes))
+			}()
+		} else {
+			log.Debug().Msg("no alert threshold crossed")
+		}
+	}
 }
 
 // FindAll retrieves the transactions of userId for an account within a date range.

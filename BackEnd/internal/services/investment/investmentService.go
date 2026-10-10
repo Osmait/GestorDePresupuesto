@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"strings"
-	"sync"
 	"time"
 
 	accountDomain "github.com/osmait/gestorDePresupuesto/internal/domain/account"
@@ -249,46 +248,64 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 		return nil, err
 	}
 
-	// Determine which investments need updating
-	var wg sync.WaitGroup
-
+	// Refresh stale quotes. Only the HTTP quote lookups run concurrently; the
+	// prices are persisted afterwards on the caller's context (the request's
+	// RLS transaction), one by one. Writing from the lookup goroutines with a
+	// detached context used to need extra pooled connections while this
+	// request already held one (pool deadlock under load), and a *sql.Tx must
+	// not be shared between goroutines.
+	type quoteUpdate struct {
+		inv   *investment.Investment
+		price money.Amount
+	}
+	var stale []*investment.Investment
 	for _, inv := range investments {
 		// Update if older than 5 minutes or price is 0 (initial)
 		if time.Since(inv.UpdatedAt) > 5*time.Minute || inv.CurrentPrice.IsZero() {
-			wg.Add(1)
-			go func(i *investment.Investment) {
-				defer wg.Done()
+			stale = append(stale, inv)
+		}
+	}
+	if len(stale) == 0 || s.quoteService == nil {
+		return investments, nil
+	}
 
-				price, _, _, err := s.quoteService.GetQuote(i.Symbol)
-				if err == nil && price.IsPositive() {
-					i.CurrentPrice = price
-					i.UpdatedAt = time.Now()
+	results := make(chan quoteUpdate, len(stale))
+	for _, inv := range stale {
+		go func(i *investment.Investment) {
+			price, _, _, err := s.quoteService.GetQuote(i.Symbol)
+			if err != nil || !price.IsPositive() {
+				price = money.Zero
+			}
+			results <- quoteUpdate{inv: i, price: price}
+		}(inv)
+	}
 
-					// Persist only the quote. Writing the whole row here would
-					// overwrite a quantity/cost changed concurrently by a
-					// purchase (lost update). Ignore errors to not block reads.
-					_ = s.repo.UpdateCurrentPrice(context.Background(), i.ID, i.UserID, price)
-
-					// Update the instance in the list (pointer)
-					// (already updated via pointer i)
-				}
-			}(inv)
+	// Wait at most 2 seconds for the quotes; slower ones are skipped (the
+	// buffered channel lets their goroutines finish without blocking).
+	timeout := time.NewTimer(2 * time.Second)
+	defer timeout.Stop()
+	var updates []quoteUpdate
+collect:
+	for range stale {
+		select {
+		case u := <-results:
+			if u.price.IsPositive() {
+				updates = append(updates, u)
+			}
+		case <-timeout.C:
+			break collect
 		}
 	}
 
-	// Wait for updates to finish (or use channel with timeout if strict latency needed)
-	// For now, waiting is fine as it ensures user sees latest data
-	done := make(chan struct{})
-	go func() {
-		wg.Wait()
-		close(done)
-	}()
-
-	select {
-	case <-done:
-		// All updates finished
-	case <-time.After(2 * time.Second):
-		// Timeout after 2 seconds, return what we have
+	for _, u := range updates {
+		// Persist only the quote. Writing the whole row here would overwrite
+		// a quantity/cost changed concurrently by a purchase (lost update).
+		// Errors are ignored so a failed refresh never blocks the read.
+		if err := s.repo.UpdateCurrentPrice(ctx, u.inv.ID, u.inv.UserID, u.price); err != nil {
+			continue
+		}
+		u.inv.CurrentPrice = u.price
+		u.inv.UpdatedAt = time.Now()
 	}
 
 	return investments, nil

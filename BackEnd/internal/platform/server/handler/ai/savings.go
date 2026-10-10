@@ -28,7 +28,7 @@ func (h *Handler) verifyAccountOwnership(ctx context.Context, userID string, acc
 	if h.db == nil {
 		return fmt.Errorf("database connection not available")
 	}
-	return ownership.VerifyReference(ctx, h.db, userID, ownership.Account, accountID)
+	return ownership.VerifyReference(ctx, h.q(ctx), userID, ownership.Account, accountID)
 }
 
 func (h *Handler) SavingsPlan(c *gin.Context) {
@@ -92,7 +92,7 @@ func (h *Handler) CreateSavingsGoal(c *gin.Context) {
 		return
 	}
 
-	_, err = h.db.ExecContext(
+	_, err = h.q(c.Request.Context()).ExecContext(
 		c.Request.Context(),
 		`INSERT INTO savings_goals
 			(id, user_id, name, target_amount, current_saved, target_date, account_id, status, created_at, updated_at)
@@ -124,7 +124,7 @@ func (h *Handler) CreateSavingsGoal(c *gin.Context) {
 func (h *Handler) ListSavingsGoals(c *gin.Context) {
 	userID := c.GetString("X-User-Id")
 
-	rows, err := h.db.QueryContext(
+	rows, err := h.q(c.Request.Context()).QueryContext(
 		c.Request.Context(),
 		`SELECT id, name, target_amount, current_saved, target_date, account_id, status, created_at, updated_at
 		 FROM savings_goals
@@ -219,7 +219,7 @@ func (h *Handler) UpdateSavingsGoal(c *gin.Context) {
 		}
 	}
 
-	_, err = h.db.ExecContext(
+	_, err = h.q(c.Request.Context()).ExecContext(
 		c.Request.Context(),
 		`UPDATE savings_goals
 		 SET name = $1,
@@ -258,7 +258,7 @@ func (h *Handler) DeleteSavingsGoal(c *gin.Context) {
 	userID := c.GetString("X-User-Id")
 	goalID := c.Param("goal_id")
 
-	result, err := h.db.ExecContext(
+	result, err := h.q(c.Request.Context()).ExecContext(
 		c.Request.Context(),
 		`DELETE FROM savings_goals WHERE id = $1 AND user_id = $2`,
 		goalID,
@@ -474,7 +474,7 @@ func scanSavingsGoal(scanner interface {
 }
 
 func (h *Handler) findSavingsGoalByID(ctx context.Context, userID string, goalID string) (dto.SavingsGoal, error) {
-	row := h.db.QueryRowContext(
+	row := h.q(ctx).QueryRowContext(
 		ctx,
 		`SELECT id, name, target_amount, current_saved, target_date, account_id, status, created_at, updated_at
 		 FROM savings_goals

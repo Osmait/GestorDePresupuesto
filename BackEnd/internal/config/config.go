@@ -69,7 +69,25 @@ type DatabaseConfig struct {
 	MaxIdleConns    int           `json:"max_idle_conns" validate:"min=1"`
 	ConnMaxLifetime time.Duration `json:"conn_max_lifetime"`
 	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time"`
-	SSLMode         string        `json:"ssl_mode"`
+	// TxAcquireTimeout bounds how long an authenticated request waits for a
+	// pooled connection to open its RLS transaction (DB_TX_ACQUIRE_TIMEOUT).
+	// When the pool stays exhausted that long the request fails fast with
+	// 503 instead of queueing indefinitely. 0 disables the bound.
+	TxAcquireTimeout time.Duration `json:"tx_acquire_timeout"`
+	SSLMode          string        `json:"ssl_mode"`
+}
+
+// CacheConfig holds the TTLs of the small in-process caches that keep
+// per-request middleware off the database. A TTL of 0 disables the cache.
+type CacheConfig struct {
+	// AuthUserTTL caches the auth middleware's "user exists and is active"
+	// lookup (AUTH_USER_CACHE_TTL). Role changes and deactivations made
+	// through this instance invalidate it immediately; other instances
+	// converge within the TTL, so keep it short.
+	AuthUserTTL time.Duration `json:"auth_user_ttl"`
+	// FeatureFlagTTL caches feature-flag evaluations used by route gates
+	// (FEATURE_FLAG_CACHE_TTL). Admin updates invalidate it on this instance.
+	FeatureFlagTTL time.Duration `json:"feature_flag_ttl"`
 }
 
 // JWTConfig holds JWT-related configuration
@@ -250,6 +268,7 @@ type Config struct {
 	AI            AIConfig            `json:"ai"`
 	MCP           MCPConfig           `json:"mcp"`
 	WebAuthn      WebAuthnConfig      `json:"webauthn"`
+	Cache         CacheConfig         `json:"cache"`
 }
 
 // LoadConfig loads configuration from environment variables with comprehensive validation
@@ -294,7 +313,15 @@ func LoadConfig() (*Config, error) {
 			MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNS", 25),
 			ConnMaxLifetime: getDuration(getEnvString("DB_CONN_MAX_LIFETIME", "5m")),
 			ConnMaxIdleTime: getDuration(getEnvString("DB_CONN_MAX_IDLE_TIME", "5m")),
-			SSLMode:         getEnvString("DB_SSL_MODE", "disable"),
+			// Each authenticated request holds exactly one connection for its
+			// RLS transaction; this bounds the wait for it.
+			TxAcquireTimeout: getEnvDuration("DB_TX_ACQUIRE_TIMEOUT", 5*time.Second),
+			SSLMode:          getEnvString("DB_SSL_MODE", "disable"),
+		},
+
+		Cache: CacheConfig{
+			AuthUserTTL:    getEnvDuration("AUTH_USER_CACHE_TTL", 15*time.Second),
+			FeatureFlagTTL: getEnvDuration("FEATURE_FLAG_CACHE_TTL", 30*time.Second),
 		},
 
 		JWT: JWTConfig{
@@ -924,6 +951,24 @@ func getDuration(value string) time.Duration {
 		return duration
 	}
 	return 24 * time.Hour // default to 24 hours
+}
+
+// getEnvDuration returns the environment variable parsed as a
+// time.Duration ("5s", "250ms", "0" to disable), or defaultValue when it is
+// unset or invalid. Negative values are treated as 0.
+func getEnvDuration(key string, defaultValue time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return defaultValue
+	}
+	d, err := time.ParseDuration(value)
+	if err != nil {
+		return defaultValue
+	}
+	if d < 0 {
+		return 0
+	}
+	return d
 }
 
 // getEnvStringSlice returns the environment variable value as string slice

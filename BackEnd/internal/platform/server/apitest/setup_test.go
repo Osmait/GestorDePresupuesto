@@ -176,7 +176,7 @@ func buildRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 	routes.UserRoute(r, userService)
 	routes.AccountRotes(r, accountService)
 	routes.TransactionRoutes(r, transactionService)
-	routes.InvestmentRoutes(r, investmentService, db)
+	routes.InvestmentRoutes(r, investmentService, middleware.NewFeatureFlags(db, 0))
 
 	return r
 }

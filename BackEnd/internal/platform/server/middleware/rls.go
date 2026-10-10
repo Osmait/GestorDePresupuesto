@@ -3,10 +3,12 @@ package middleware
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"database/sql"
 	"net"
 	"net/http"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/user"
@@ -14,9 +16,18 @@ import (
 	"github.com/rs/zerolog/log"
 )
 
-// RLSMiddleware pins every authenticated request to a single *sql.Tx,
-// sets two transaction-scoped PostgreSQL settings via set_config(), and
-// stores the *sql.Tx both in the Gin context under "db_tx" and in
+// DefaultTxAcquireTimeout is how long RLSMiddleware waits for a pooled
+// connection when no explicit timeout is configured (DB_TX_ACQUIRE_TIMEOUT).
+const DefaultTxAcquireTimeout = 5 * time.Second
+
+// RLSMiddleware is RLSMiddlewareWithTimeout with DefaultTxAcquireTimeout.
+func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
+	return RLSMiddlewareWithTimeout(db, DefaultTxAcquireTimeout)
+}
+
+// RLSMiddlewareWithTimeout pins every authenticated request to a single
+// *sql.Tx, sets two transaction-scoped PostgreSQL settings via set_config(),
+// and stores the *sql.Tx both in the Gin context under "db_tx" and in
 // c.Request's context (txhelper.WithTx), so repositories resolve it through
 // txhelper.FromContext regardless of whether they receive the *gin.Context
 // or c.Request.Context().
@@ -24,6 +35,19 @@ import (
 // Settings applied per request:
 //   - app.current_user_id  — the authenticated user's ID
 //   - app.is_admin         — "true" for ADMIN role, "false" otherwise
+//
+// Connection budget: the request holds exactly ONE pooled connection for its
+// whole lifetime. Every query reachable from a handler must run on the
+// request transaction (txhelper.FromContext / txhelper.InTx); a query on the
+// plain *sql.DB needs a second connection and, once the pool is exhausted by
+// requests in that same situation, they all wait for each other forever.
+//
+// Bounded wait: the connection for the request transaction is acquired with
+// a deadline of acquireTimeout (DB_TX_ACQUIRE_TIMEOUT). When the pool stays
+// exhausted for that long the request fails fast with 503 + Retry-After
+// instead of queueing indefinitely. acquireTimeout <= 0 disables the bound
+// (the request context still applies). The deadline only covers acquisition:
+// the transaction itself lives as long as the request context.
 //
 // Transaction outcome:
 //   - The response is buffered while the handler runs, so the commit happens
@@ -36,11 +60,15 @@ import (
 //   - Streaming responses (text/event-stream, explicit Flush or Hijack) are
 //     not buffered: the writer switches to pass-through and the transaction
 //     is finalised after the handler returns.
+//   - Callbacks registered with txhelper.AfterTx (cache invalidation) run
+//     after the transaction has been committed or rolled back.
 //
 // Must be registered AFTER AuthMiddleware.
-// Long-lived SSE endpoints should still be registered before this middleware
-// so they do not hold a pooled connection for their whole lifetime.
-func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
+// Long-lived SSE endpoints, and handlers that manage their own transactions
+// (e.g. the recurring-transaction processor), must be registered before this
+// middleware so they do not hold a pooled connection while waiting for
+// another one.
+func RLSMiddlewareWithTimeout(db *sql.DB, acquireTimeout time.Duration) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		userID := c.GetString("X-User-Id")
 		if userID == "" {
@@ -55,44 +83,66 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 			}
 		}
 
-		tx, err := db.BeginTx(c.Request.Context(), nil)
+		reqCtx := c.Request.Context()
+		conn, err := acquireConn(reqCtx, db, acquireTimeout)
 		if err != nil {
+			stats := db.Stats()
+			log.Warn().Err(err).
+				Str("path", c.Request.URL.Path).
+				Int("pool_in_use", stats.InUse).
+				Int("pool_max_open", stats.MaxOpenConnections).
+				Int64("pool_wait_count", stats.WaitCount).
+				Dur("acquire_timeout", acquireTimeout).
+				Msg("rls: could not acquire a database connection")
+			c.Header("Retry-After", "1")
+			c.AbortWithStatusJSON(http.StatusServiceUnavailable, gin.H{"error": "database busy, please retry"})
+			return
+		}
+
+		tx, err := conn.BeginTx(reqCtx, nil)
+		if err != nil {
+			_ = conn.Close()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not begin transaction"})
 			c.Abort()
 			return
 		}
 
+		hooks := txhelper.NewTxHooks()
+		original := c.Writer
+		finished := false
+		defer func() {
+			if !finished {
+				// Error / panic path: never leak the transaction or the
+				// pooled connection.
+				_ = tx.Rollback()
+				c.Writer = original
+			}
+			// The transaction is over (committed or rolled back): return the
+			// connection to the pool, then run post-transaction callbacks.
+			_ = conn.Close()
+			hooks.Run()
+		}()
+
 		// set_config(name, value, is_local=true) is the parameterized equivalent of
 		// SET LOCAL. PostgreSQL does not support $1 placeholders in SET commands.
 		// is_local=true makes both settings transaction-scoped so they are
 		// automatically cleared when the connection returns to the pool.
-		_, err = tx.ExecContext(c.Request.Context(),
+		_, err = tx.ExecContext(reqCtx,
 			"SELECT set_config('app.current_user_id', $1, true),"+
 				"       set_config('app.is_admin', $2, true)",
 			userID, isAdmin)
 		if err != nil {
-			_ = tx.Rollback()
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not set rls context"})
 			c.Abort()
 			return
 		}
 
 		c.Set("db_tx", tx)
-		c.Request = c.Request.WithContext(txhelper.WithTx(c.Request.Context(), tx))
+		txhelper.SetGinTxHooks(c, hooks)
+		c.Request = c.Request.WithContext(txhelper.WithTxHooks(txhelper.WithTx(reqCtx, tx), hooks))
 
-		original := c.Writer
 		bw := newBufferedResponseWriter(original)
 		c.Writer = bw
-
-		finished := false
-		defer func() {
-			if finished {
-				return
-			}
-			// Panic path: never leak the transaction / pooled connection.
-			_ = tx.Rollback()
-			c.Writer = original
-		}()
 
 		c.Next()
 
@@ -122,6 +172,18 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 
 		bw.flushTo(original)
 	}
+}
+
+// acquireConn reserves one pooled connection, waiting at most timeout (when
+// positive) on top of ctx. The deadline applies to the acquisition only: the
+// returned *sql.Conn is not bound to it.
+func acquireConn(ctx context.Context, db *sql.DB, timeout time.Duration) (*sql.Conn, error) {
+	if timeout <= 0 {
+		return db.Conn(ctx)
+	}
+	acquireCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+	return db.Conn(acquireCtx)
 }
 
 // bufferedResponseWriter holds the status and body produced by downstream
