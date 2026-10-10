@@ -237,16 +237,14 @@ func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budget
 	return money.Zero, nil
 }
 
+// BalanceByAccountAndCurrency returns the net total of the user's transactions
+// on accountId in currency, read from the trigger-maintained account_balances
+// table (migration 000052).
 func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Context, accountId string, userId string, currency string) (money.Amount, error) {
-	query := `SELECT COALESCE(SUM(CASE
-    WHEN type_transation IN ('income','loan_collection','loan_cancellation_refund')
-    THEN amount
-    ELSE -amount
-END), 0) FROM transactions WHERE account_id = $1 AND user_id = $3 AND (currency = $2 OR ($2 = 'DOP' AND currency IS NULL))`
-	row := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx, query, accountId, currency, userId)
-
 	var total money.Amount
-	err := row.Scan(&total)
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(balance), 0) FROM account_balances WHERE user_id = $1 AND account_id = $2 AND currency = $3`,
+		userId, accountId, currency).Scan(&total)
 	if err != nil {
 		return money.Zero, err
 	}

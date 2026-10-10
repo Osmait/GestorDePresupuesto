@@ -9,11 +9,19 @@
 // # Concurrency
 //
 // Callers lock the source account row first (FindByIdAndUserIdForUpdate, a
-// SELECT ... FOR UPDATE inside the request transaction) and only then call
-// Require. A concurrent debit of the same account blocks on that lock until
-// the first request commits or rolls back; under READ COMMITTED its balance
-// query then sees the committed debit, so two movements that each fit but not
-// together can never both pass.
+// SELECT ... FOR NO KEY UPDATE inside the request transaction) and only then
+// call Require. A concurrent debit of the same account blocks on that lock
+// until the first request commits or rolls back; under READ COMMITTED its
+// balance query then sees the committed debit, so two movements that each fit
+// but not together can never both pass.
+//
+// The balance comes from the trigger-maintained account_balances table
+// (migration 000052), so the check is an index lookup however long the
+// account's history is. The lock does not block ordinary transaction INSERTs
+// on the account (their foreign key takes FOR KEY SHARE, which FOR NO KEY
+// UPDATE does not conflict with): an expense recorded concurrently may still
+// take the account below zero, exactly as if it had been recorded right after
+// the debit — expenses are never checked (see above).
 package funds
 
 import (

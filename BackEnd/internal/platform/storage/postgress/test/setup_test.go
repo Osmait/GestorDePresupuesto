@@ -27,6 +27,10 @@ var testServerAddr string
 // testMigrationsURL is the golang-migrate source URL of the migrations.
 var testMigrationsURL string
 
+// testConnStr is the superuser DSN of the test container; tests derive
+// connections for other roles from it.
+var testConnStr string
+
 func TestMain(m *testing.M) {
 	ctx := context.Background()
 
@@ -70,6 +74,7 @@ func TestMain(m *testing.M) {
 	connStr := fmt.Sprintf("postgres://test:test@%s:%s/testdb?sslmode=disable&binary_parameters=yes", host, mappedPort.Port())
 	testServerAddr = fmt.Sprintf("%s:%s", host, mappedPort.Port())
 
+	testConnStr = connStr
 	testDB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("failed to open test database: %v", err)
