@@ -28,10 +28,13 @@ const groupSegments = 3
 // Every key belongs to a group: its first three ':'-separated segments. Each
 // group has a generation number that is part of the stored key, so
 // DeleteByPrefix on a prefix that spans the whole group (at least three
-// segments, e.g. "transactions:user:<id>:") just bumps that one counter: the
-// group's old entries become unreachable at once and expire with their TTL
-// (go-cache's janitor frees them). Before, DeleteByPrefix copied and scanned
-// every item of the cache (go-cache Items()) on each write.
+// segments, e.g. "transactions:user:<id>:") bumps that one counter: the
+// group's old entries become unreachable at once. The stored keys of each
+// group are also indexed, so the bump deletes the old entries right away
+// (cost: the size of that group) instead of leaving them in memory until
+// their TTL, which made the heap grow with the write rate. Before,
+// DeleteByPrefix copied and scanned every item of the cache (go-cache
+// Items()) on each write.
 //
 // Bumping the whole group can invalidate more than the prefix asked for
 // (never less), which only costs cache misses. Shorter prefixes bump every
@@ -41,13 +44,34 @@ type InMemoryCache struct {
 
 	mu          sync.RWMutex
 	generations map[string]uint64
+	// members holds the stored keys of each group, so a bump can delete
+	// them; entries leave it when go-cache evicts them.
+	members map[string]map[string]struct{}
 }
 
 func NewInMemoryCache(defaultExpiration, cleanupInterval time.Duration) *InMemoryCache {
-	return &InMemoryCache{
+	c := &InMemoryCache{
 		cache:       cache.New(defaultExpiration, cleanupInterval),
 		generations: make(map[string]uint64),
+		members:     make(map[string]map[string]struct{}),
 	}
+	// go-cache calls this outside its own lock, on Delete and on expiry.
+	c.cache.OnEvicted(func(stored string, _ interface{}) { c.forget(stored) })
+	return c
+}
+
+// forget removes stored (a go-cache key) from its group's index.
+func (c *InMemoryCache) forget(stored string) {
+	key := stored[strings.IndexByte(stored, '|')+1:]
+	group, _ := groupOf(key)
+	c.mu.Lock()
+	if set := c.members[group]; set != nil {
+		delete(set, stored)
+		if len(set) == 0 {
+			delete(c.members, group)
+		}
+	}
+	c.mu.Unlock()
 }
 
 // groupOf returns the group of key (or of a prefix): everything before the
@@ -90,7 +114,17 @@ func (c *InMemoryCache) Get(key string) (interface{}, bool) {
 }
 
 func (c *InMemoryCache) Set(key string, value interface{}, duration time.Duration) {
-	c.cache.Set(c.storedKey(key, true), value, duration)
+	stored := c.storedKey(key, true)
+	group, _ := groupOf(key)
+	c.mu.Lock()
+	set := c.members[group]
+	if set == nil {
+		set = make(map[string]struct{})
+		c.members[group] = set
+	}
+	set[stored] = struct{}{}
+	c.mu.Unlock()
+	c.cache.Set(stored, value, duration)
 }
 
 func (c *InMemoryCache) Delete(key string) {
@@ -98,19 +132,34 @@ func (c *InMemoryCache) Delete(key string) {
 }
 
 func (c *InMemoryCache) DeleteByPrefix(prefix string) {
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	if group, whole := groupOf(prefix); whole {
+	var stale []string
+	bump := func(group string) {
 		c.generations[group]++
-		return
-	}
-	for group := range c.generations {
-		if strings.HasPrefix(group, prefix) {
-			c.generations[group]++
+		for stored := range c.members[group] {
+			stale = append(stale, stored)
 		}
+		delete(c.members, group)
+	}
+	c.mu.Lock()
+	if group, whole := groupOf(prefix); whole {
+		bump(group)
+	} else {
+		for group := range c.generations {
+			if strings.HasPrefix(group, prefix) {
+				bump(group)
+			}
+		}
+	}
+	c.mu.Unlock()
+	// Outside c.mu: Delete runs the OnEvicted callback, which takes it.
+	for _, stored := range stale {
+		c.cache.Delete(stored)
 	}
 }
 
 func (c *InMemoryCache) Flush() {
+	c.mu.Lock()
+	c.members = make(map[string]map[string]struct{})
+	c.mu.Unlock()
 	c.cache.Flush()
 }

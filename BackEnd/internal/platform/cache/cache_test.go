@@ -103,3 +103,28 @@ func BenchmarkDeleteByPrefix_10kEntries(b *testing.B) {
 		c.DeleteByPrefix("transactions:user:u7:")
 	}
 }
+
+func TestDeleteByPrefix_FreesOldEntries(t *testing.T) {
+	c := NewInMemoryCache(time.Minute, time.Minute)
+	for round := 0; round < 100; round++ {
+		for i := 0; i < 10; i++ {
+			c.Set(fmt.Sprintf("transactions:user:u1:filter:%d", i), i, time.Minute)
+		}
+		c.Set("transactions:user:u2:filter:0", round, time.Minute)
+		c.DeleteByPrefix("transactions:user:u1:")
+	}
+	if n := c.cache.ItemCount(); n != 1 {
+		t.Errorf("stored items after invalidations = %d, want 1 (u2 only)", n)
+	}
+	if len(c.members) != 1 {
+		t.Errorf("indexed groups = %d, want 1", len(c.members))
+	}
+
+	c.Delete("transactions:user:u2:filter:0")
+	c.Set("ai:analyze:u1:x", 1, time.Nanosecond)
+	time.Sleep(time.Millisecond)
+	c.cache.DeleteExpired()
+	if n := c.cache.ItemCount(); n != 0 || len(c.members) != 0 {
+		t.Errorf("after Delete and expiry: items=%d groups=%d, want 0 and 0", n, len(c.members))
+	}
+}
