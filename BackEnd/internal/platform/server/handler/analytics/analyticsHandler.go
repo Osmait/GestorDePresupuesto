@@ -46,6 +46,8 @@ func GetDashboardSummary(analyticsService *analytics.AnalyticsService) gin.Handl
 			TransactionType: c.Query("type"),
 		}
 
+		// date_from and date_to are calendar days, both inclusive: the
+		// service aggregates [date_from 00:00 UTC, date_to + 1 day 00:00 UTC).
 		if dateFromStr := c.Query("date_from"); dateFromStr != "" {
 			if parsed, parseErr := time.Parse("2006-01-02", dateFromStr); parseErr == nil {
 				filters.DateFrom = parsed

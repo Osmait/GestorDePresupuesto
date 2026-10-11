@@ -10,6 +10,7 @@ import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorState } from '@/components/shared/ErrorState'
 import { Button } from '@/components/ui/button'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import {
 	useDeleteMonthlyPlanItem,
@@ -17,13 +18,13 @@ import {
 	useMonthlyPlanSummary,
 	useToggleMonthlyPlanItem,
 } from '@/hooks/queries/useMonthlyPlanQuery'
+import { localToday, startingBalanceDop } from '@/lib/monthlyPlanUtils'
 import { MonthlyPlanItem } from '@/types/monthlyPlan'
-import { MonthlyPlanCategoryBreakdown } from './MonthlyPlanCategoryBreakdown'
-import { MonthlyPlanColumn } from './MonthlyPlanColumn'
+import { MonthlyPlanFlowCard } from './MonthlyPlanFlowCard'
 import { MonthlyPlanFormModal } from './MonthlyPlanFormModal'
+import { MonthlyPlanLedger } from './MonthlyPlanLedger'
 import { MonthlyPlanSkeleton } from './MonthlyPlanSkeleton'
 import { MonthlyPlanSummaryCard } from './MonthlyPlanSummaryCard'
-import { MonthlyPlanTimeline } from './MonthlyPlanTimeline'
 
 // m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
 // full feature bundle (layout, drag) is not needed.
@@ -40,22 +41,22 @@ function MonthlyPlanBoardView() {
 	const { data: items = [], isLoading, isError, refetch } = useMonthlyPlanItems()
 	const { data: summary } = useMonthlyPlanSummary()
 	const { data: categories = [] } = useGetCategories()
+	const accountsQuery = useGetAccounts()
 	const toggleMutation = useToggleMonthlyPlanItem()
 	const deleteMutation = useDeleteMonthlyPlanItem()
 	const { openCreate, openEdit } = useMonthlyPlanContext()
 	const [toDelete, setToDelete] = useState<MonthlyPlanItem | null>(null)
+	// The user's local date; this page only renders on the client (data comes from queries).
+	const [today] = useState(localToday)
 
-	const categoryNames = useMemo(() => new Map(categories.map((category) => [category.id, category.name])), [categories])
-
-	const incomes = useMemo(() => items.filter((item) => item.type === 'income'), [items])
-	const expenses = useMemo(() => items.filter((item) => item.type === 'bill'), [items])
+	const pausedExpenses = items.filter((item) => item.type === 'bill' && !item.is_active).length
+	const startBalance = useMemo(
+		() => (accountsQuery.data ? startingBalanceDop(accountsQuery.data, summary?.usd_to_dop_rate ?? 0) : null),
+		[accountsQuery.data, summary?.usd_to_dop_rate],
+	)
 
 	const handleToggle = (item: MonthlyPlanItem) => {
 		toggleMutation.mutate({ id: item.id, isActive: !item.is_active })
-	}
-
-	const handleDelete = (item: MonthlyPlanItem) => {
-		setToDelete(item)
 	}
 
 	if (isLoading) {
@@ -100,32 +101,25 @@ function MonthlyPlanBoardView() {
 
 	return (
 		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.3 }} className='space-y-6'>
-			{summary && <MonthlyPlanSummaryCard summary={summary} />}
+			{summary && <MonthlyPlanSummaryCard summary={summary} pausedExpenses={pausedExpenses} />}
 
-			<div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
-				<MonthlyPlanColumn
-					type='income'
-					items={incomes}
-					categoryNames={categoryNames}
-					onCreate={openCreate}
+			<div className='grid grid-cols-1 items-start gap-6 xl:grid-cols-[minmax(0,1fr)_22.5rem]'>
+				<MonthlyPlanLedger
+					items={items}
+					categories={categories}
+					today={today}
 					onEdit={openEdit}
 					onToggle={handleToggle}
-					onDelete={handleDelete}
+					onDelete={setToDelete}
 				/>
-				<MonthlyPlanColumn
-					type='bill'
-					items={expenses}
-					categoryNames={categoryNames}
-					onCreate={openCreate}
-					onEdit={openEdit}
-					onToggle={handleToggle}
-					onDelete={handleDelete}
+				<MonthlyPlanFlowCard
+					items={items}
+					today={today}
+					startBalance={startBalance}
+					loading={accountsQuery.isLoading}
+					error={accountsQuery.isError}
+					onRetry={() => accountsQuery.refetch()}
 				/>
-			</div>
-
-			<div className='grid grid-cols-1 gap-6 lg:grid-cols-2'>
-				<MonthlyPlanCategoryBreakdown items={items} categoryNames={categoryNames} />
-				<MonthlyPlanTimeline items={items} />
 			</div>
 
 			<MonthlyPlanFormModal />

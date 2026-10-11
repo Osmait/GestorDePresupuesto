@@ -8,7 +8,7 @@ interface MonthlyPlanContextType {
 	setModalOpen: (_isOpen: boolean) => void
 	editingItem: MonthlyPlanItem | null
 	setEditingItem: (_item: MonthlyPlanItem | null) => void
-	/** Pre-selects income or bill when opening the form from a column header. */
+	/** Pre-selects income or bill when opening the form (e.g. from the empty state). */
 	defaultType: MonthlyPlanItemType
 	openCreate: (_type: MonthlyPlanItemType) => void
 	openEdit: (_item: MonthlyPlanItem) => void

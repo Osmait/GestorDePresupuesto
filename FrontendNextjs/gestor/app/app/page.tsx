@@ -214,7 +214,11 @@ export default async function DashboardPage({
 		categoryRepository.findAll(),
 		budgetRepository.findAll(),
 		exchangeRateRepository.getRate(),
-		analyticsRepository.getDashboardSummary(analyticsFilters),
+		// getDashboardSummary throws on failure; the dashboard still renders its other data (totals show 0).
+		analyticsRepository.getDashboardSummary(analyticsFilters).catch((error: unknown) => {
+			console.error('Error fetching dashboard summary:', error)
+			return null
+		}),
 	])
 
 	const recentTransactions = Array.isArray(recentResponse?.data) ? recentResponse.data : []

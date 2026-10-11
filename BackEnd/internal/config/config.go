@@ -290,6 +290,8 @@ type MCPConfig struct {
 	ServerName    string `json:"server_name"`
 	ServerVersion string `json:"server_version"`
 	BaseURL       string `json:"base_url"`
+	// AppURL is the web app linked from the OAuth login page (MCP_APP_URL).
+	AppURL string `json:"app_url"`
 }
 
 // WebAuthnConfig holds passkey / WebAuthn relying party configuration.
@@ -540,6 +542,7 @@ func LoadConfig() (*Config, error) {
 			ServerName:    getEnvString("MCP_SERVER_NAME", "Gestor de Presupuesto"),
 			ServerVersion: getEnvString("MCP_SERVER_VERSION", "1.0.0"),
 			BaseURL:       getEnvString("MCP_BASE_URL", ""),
+			AppURL:        getEnvString("MCP_APP_URL", "https://presupuesto.saulburgos.com"),
 		},
 
 		WebAuthn: WebAuthnConfig{

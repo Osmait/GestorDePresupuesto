@@ -1,43 +1,8 @@
-import { render, screen } from '@testing-library/react'
-import { describe, expect, it, vi } from 'vitest'
+import { screen } from '@testing-library/react'
+import { describe, expect, it } from 'vitest'
 import { MonthlyPlanSummaryCard } from '@/components/monthly/MonthlyPlanSummaryCard'
+import { renderWithIntl } from '@/tests/utils/intl'
 import { MonthlyPlanSummary } from '@/types/monthlyPlan'
-
-vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string, values?: Record<string, unknown>) => {
-		const translations: Record<string, string> = {
-			summaryTitle: 'Plan summary',
-			totalIncome: 'Fixed income',
-			totalExpenses: 'Fixed expenses',
-			available: 'Available',
-			committed: 'Committed',
-			overcommitted: 'Your fixed expenses exceed your income',
-		}
-		if (key === 'itemsCount') return `${values?.count} items`
-		if (key === 'rateNote') return `rate ${values?.rate}`
-		return translations[key] || key
-	},
-}))
-
-vi.mock('@/components/ui/animated-counter', () => ({
-	AnimatedCounter: ({
-		value,
-		prefix = '',
-		suffix = '',
-		currency,
-	}: {
-		value: number
-		prefix?: string
-		suffix?: string
-		currency?: string
-	}) => (
-		<span>
-			{currency ? `${currency} ` : prefix}
-			{value}
-			{suffix}
-		</span>
-	),
-}))
 
 function makeSummary(overrides: Partial<MonthlyPlanSummary> = {}): MonthlyPlanSummary {
 	return {
@@ -52,99 +17,68 @@ function makeSummary(overrides: Partial<MonthlyPlanSummary> = {}): MonthlyPlanSu
 	}
 }
 
-describe('MonthlyPlanSummaryCard', () => {
-	it('renders the four totals coming from the backend', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary()} />)
+function indicator() {
+	return screen.getByRole('progressbar').firstElementChild as HTMLElement
+}
 
-		expect(screen.getByText('DOP 97000')).toBeInTheDocument()
-		expect(screen.getByText('DOP 27790')).toBeInTheDocument()
-		expect(screen.getByText('DOP 69210')).toBeInTheDocument()
-		expect(screen.getByText('28.6%')).toBeInTheDocument()
+describe('MonthlyPlanSummaryCard', () => {
+	it('renders the four figures in one labelled strip', () => {
+		renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary()} />)
+
+		expect(screen.getByRole('region', { name: 'Plan summary' })).toBeInTheDocument()
+		expect(screen.getByTestId('summary-income')).toHaveTextContent('RD$97,000.00')
+		expect(screen.getByTestId('summary-expenses')).toHaveTextContent('RD$27,790.00')
+		expect(screen.getByTestId('summary-available')).toHaveTextContent('RD$69,210.00')
+		expect(screen.getByTestId('summary-committed')).toHaveTextContent('28.6%')
 	})
 
-	it('shows how many items make up each side', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary()} />)
+	it('counts the incomes and the active and paused expenses', () => {
+		renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary()} pausedExpenses={2} />)
 
-		expect(screen.getByText('2 items')).toBeInTheDocument()
-		expect(screen.getByText('3 items')).toBeInTheDocument()
+		expect(screen.getByText('2 income items')).toBeInTheDocument()
+		expect(screen.getByText('3 active · 2 paused')).toBeInTheDocument()
+	})
+
+	it('leaves the paused count out when nothing is paused', () => {
+		renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary()} />)
+
+		expect(screen.getByText('3 active')).toBeInTheDocument()
 	})
 
 	it('warns when the plan does not add up', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary({ available: -5000, committed_percentage: 125 })} />)
+		renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary({ available: -5000, committed_percentage: 125 })} />)
 
 		expect(screen.getByText('Your fixed expenses exceed your income')).toBeInTheDocument()
+		expect(screen.queryByText('after fixed items')).not.toBeInTheDocument()
 	})
 
-	it('does not warn when there is money left', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary()} />)
-
-		expect(screen.queryByText('Your fixed expenses exceed your income')).not.toBeInTheDocument()
-	})
-
-	// The bar is capped so it cannot overflow its container, but the printed
-	// percentage must still show the real number.
-	it('caps the progress bar at 100% while printing the true percentage', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 125 })} />)
+	// The bar is capped so it cannot overflow, but the printed percentage tells the truth.
+	it('caps the bar at 100% while printing the true percentage, in red', () => {
+		renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 125 })} />)
 
 		expect(screen.getByText('125%')).toBeInTheDocument()
-		expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100')
-	})
-
-	function indicator() {
-		return screen.getByRole('progressbar').firstElementChild as HTMLElement
-	}
-
-	it('turns the bar red when overcommitted', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 125 })} />)
-
+		expect(screen.getByRole('progressbar', { name: 'Share of income already committed' })).toHaveAttribute(
+			'aria-valuenow',
+			'100',
+		)
 		expect(indicator().className).toContain('bg-destructive')
 	})
 
-	it('turns the bar amber when close to the limit', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 90 })} />)
-
+	it('turns the bar amber close to the limit and keeps it neutral with room to spare', () => {
+		const { unmount } = renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 90 })} />)
 		expect(indicator().className).toContain('bg-warning')
-	})
+		unmount()
 
-	it('keeps the bar neutral with room to spare', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 28.6 })} />)
-
+		renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary()} />)
 		expect(indicator().className).toContain('bg-primary')
 	})
 
-	it('labels the progress bar', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary()} />)
+	it('shows the exchange rate used for USD items, and hides it without a rate', () => {
+		const { unmount } = renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary()} />)
+		expect(screen.getByText('USD amounts converted at RD$62.50 per dollar.')).toBeInTheDocument()
+		unmount()
 
-		expect(screen.getByRole('progressbar', { name: 'committedBar' })).toBeInTheDocument()
-	})
-
-	it('shows the exchange rate used for USD items', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary()} />)
-
-		expect(screen.getByText('rate 62.50')).toBeInTheDocument()
-	})
-
-	it('hides the rate note when no rate is available', () => {
-		render(<MonthlyPlanSummaryCard summary={makeSummary({ usd_to_dop_rate: 0 })} />)
-
-		expect(screen.queryByText(/^rate /)).not.toBeInTheDocument()
-	})
-
-	it('renders an empty plan as zeros without crashing', () => {
-		render(
-			<MonthlyPlanSummaryCard
-				summary={makeSummary({
-					total_income: 0,
-					total_expenses: 0,
-					available: 0,
-					committed_percentage: 0,
-					usd_to_dop_rate: 0,
-					income_count: 0,
-					expenses_count: 0,
-				})}
-			/>,
-		)
-
-		expect(screen.getByText('0%')).toBeInTheDocument()
+		renderWithIntl(<MonthlyPlanSummaryCard summary={makeSummary({ usd_to_dop_rate: 0 })} />)
+		expect(screen.queryByText(/per dollar/)).not.toBeInTheDocument()
 	})
 })
