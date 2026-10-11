@@ -138,7 +138,7 @@ func (h *TestHelpers) MakeRequestWithHeaders(method, path string, body interface
 	if err != nil {
 		panic(fmt.Sprintf("Failed to make request: %v", err))
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	respBody, err := io.ReadAll(resp.Body)
@@ -179,7 +179,7 @@ func (h *TestHelpers) MakeRequestWithRawBody(method, path string, body string, t
 	if err != nil {
 		panic(fmt.Sprintf("Failed to make request: %v", err))
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	// Read response body
 	respBody, err := io.ReadAll(resp.Body)
@@ -496,6 +496,6 @@ func (h *TestHelpers) WaitForCondition(condition func() bool, timeout time.Durat
 // Close closes the database connection
 func (h *TestHelpers) Close() {
 	if h.db != nil {
-		h.db.Close()
+		_ = h.db.Close()
 	}
 }

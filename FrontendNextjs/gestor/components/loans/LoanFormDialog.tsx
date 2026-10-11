@@ -25,12 +25,12 @@ function createLoanSchema(t: Translate, tForms: Translate) {
 		borrower_contact: z.string().optional().default(''),
 		// loans.principal_amount is DECIMAL(15,2): the API rejects sub-cent amounts.
 		principal_amount: z.coerce
-			.number({ invalid_type_error: t('errors.principalPositive') })
+			.number<number>({ error: t('errors.principalPositive') })
 			.positive(t('errors.principalPositive'))
 			.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals')),
-		annual_rate: z.coerce.number({ invalid_type_error: t('errors.rateMin') }).min(0, t('errors.rateMin')),
+		annual_rate: z.coerce.number<number>({ error: t('errors.rateMin') }).min(0, t('errors.rateMin')),
 		term_months: z.coerce
-			.number({ invalid_type_error: t('errors.termRange') })
+			.number<number>({ error: t('errors.termRange') })
 			.int(t('errors.termRange'))
 			.min(1, t('errors.termRange'))
 			.max(120, t('errors.termRange')),
@@ -41,6 +41,8 @@ function createLoanSchema(t: Translate, tForms: Translate) {
 }
 
 type LoanFormValues = z.infer<ReturnType<typeof createLoanSchema>>
+
+type LoanFormInput = z.input<ReturnType<typeof createLoanSchema>>
 
 function emptyValues(sourceAccountId = ''): LoanFormValues {
 	return {
@@ -78,7 +80,7 @@ export function LoanFormDialog({ open, onOpenChange, accounts, onSubmit }: LoanF
 	const [submitError, setSubmitError] = useState<string | null>(null)
 	const defaultAccountId = accounts[0]?.id ?? ''
 
-	const form = useForm<LoanFormValues>({
+	const form = useForm<LoanFormInput, unknown, LoanFormValues>({
 		resolver: zodResolver(schema),
 		defaultValues: emptyValues(defaultAccountId),
 	})

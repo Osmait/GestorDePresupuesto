@@ -531,7 +531,7 @@ It reads the CSS tokens (resolved to concrete colors, since Nivo animates with r
 Sidebar: muted ink items, the active item gets `text-primary`, a 4px primary bar and a `bg-primary/10` fill that slide to it (the nav's one motion), and `aria-current='page'`. Collapse toggle is labelled ("Collapse"/"Expand"). Badges only for a time-limited launch, never a permanent "New". Top bar: small section label, search, notifications, quick actions (`Plus`), user menu.
 
 ### Motion
-`MotionConfig reducedMotion='user'` wraps the app (`components/common/motion-provider.tsx` in `app/layout.tsx`), so framer-motion components honor the OS setting without per-component checks. Non-framer animation (count-up) checks `useReducedMotion()`. Allowed: a short fade on content mount, the nav indicator slide, dialog/drawer transitions. No staggered entrances on every card, no hover lifts, no pulsing glows.
+`MotionConfig reducedMotion='user'` wraps the app (`components/common/motion-provider.tsx` in `app/layout.tsx`), so Motion (`motion/react`) components honor the OS setting without per-component checks. Non-Motion animation (count-up) checks `useReducedMotion()`. Allowed: a short fade on content mount, the nav indicator slide, dialog/drawer transitions. No staggered entrances on every card, no hover lifts, no pulsing glows.
 
 ## Do's and Don'ts
 

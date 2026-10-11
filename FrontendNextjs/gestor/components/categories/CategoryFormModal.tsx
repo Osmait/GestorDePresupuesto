@@ -45,8 +45,9 @@ export function CategoryFormModal({ open, setOpen, onCreateCategory }: CategoryF
 		[t],
 	)
 	type CategoryFormValues = z.infer<typeof categorySchema>
+	type CategoryFormInput = z.input<typeof categorySchema>
 
-	const form = useForm<CategoryFormValues>({
+	const form = useForm<CategoryFormInput, unknown, CategoryFormValues>({
 		resolver: zodResolver(categorySchema),
 		defaultValues: DEFAULT_VALUES,
 	})

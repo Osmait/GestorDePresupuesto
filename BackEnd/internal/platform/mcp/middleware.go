@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
 	"github.com/osmait/gestorDePresupuesto/internal/services/apikey"
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 )
 
 // extractBearerToken returns the token value from the Authorization header,

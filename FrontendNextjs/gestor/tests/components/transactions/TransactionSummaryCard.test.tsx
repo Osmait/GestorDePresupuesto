@@ -18,8 +18,8 @@ vi.mock('next-intl', () => ({
 }))
 
 // Reduced motion: <Amount animate> renders the final value instead of counting up.
-vi.mock('framer-motion', async (importOriginal) => ({
-	...(await importOriginal<typeof import('framer-motion')>()),
+vi.mock('motion/react', async (importOriginal) => ({
+	...(await importOriginal<typeof import('motion/react')>()),
 	useReducedMotion: () => true,
 }))
 

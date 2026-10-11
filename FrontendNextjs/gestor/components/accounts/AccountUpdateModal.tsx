@@ -37,8 +37,9 @@ export function AccountUpdateModal({ open, setOpen, account, updateAccount }: Ac
 		[t],
 	)
 	type AccountUpdateFormValues = z.infer<typeof accountUpdateSchema>
+	type AccountUpdateFormInput = z.input<typeof accountUpdateSchema>
 
-	const form = useForm<AccountUpdateFormValues>({
+	const form = useForm<AccountUpdateFormInput, unknown, AccountUpdateFormValues>({
 		resolver: zodResolver(accountUpdateSchema),
 		defaultValues: {
 			name: account?.name || '',

@@ -55,8 +55,7 @@ func (suite *E2ETestSuite) SetupSuite() {
 
 	// Setup test database with testcontainers
 	log.Println("Setting up test database container...")
-	dbContainer, err := postgres.RunContainer(ctx,
-		testcontainers.WithImage("postgres:17-alpine"),
+	dbContainer, err := postgres.Run(ctx, "postgres:17-alpine",
 		postgres.WithDatabase("e2e_testdb"),
 		postgres.WithUsername("e2e_user"),
 		postgres.WithPassword("e2e_password"),
@@ -142,7 +141,7 @@ func (suite *E2ETestSuite) TearDownSuite() {
 	}
 
 	if suite.db != nil {
-		suite.db.Close()
+		_ = suite.db.Close()
 	}
 
 	if suite.dbContainer != nil {
@@ -188,7 +187,9 @@ func (suite *E2ETestSuite) cleanDatabase() {
 func TestMain(m *testing.M) {
 	// Set required environment for Docker
 	if os.Getenv("DOCKER_HOST") == "" {
-		os.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock")
+		if err := os.Setenv("DOCKER_HOST", "unix:///var/run/docker.sock"); err != nil {
+			log.Fatalf("set DOCKER_HOST: %v", err)
+		}
 	}
 
 	os.Exit(m.Run())

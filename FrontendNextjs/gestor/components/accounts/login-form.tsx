@@ -31,14 +31,19 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 
 	// Schema de validación con Zod (con mensajes traducidos)
 	const loginSchema = z.object({
-		email: z.string().min(1, t('emailRequired')).email(t('emailInvalid')),
+		email: z
+			.string()
+			.min(1, t('emailRequired'))
+			.pipe(z.email(t('emailInvalid'))),
 		// Login only checks presence: the password policy is enforced at registration.
 		password: z.string().min(1, t('passwordRequired')).max(100, t('passwordTooLong')),
 	})
 
 	type LoginFormValues = z.infer<typeof loginSchema>
 
-	const form = useForm<LoginFormValues>({
+	type LoginFormInput = z.input<typeof loginSchema>
+
+	const form = useForm<LoginFormInput, unknown, LoginFormValues>({
 		resolver: zodResolver(loginSchema),
 		defaultValues: {
 			email: '',

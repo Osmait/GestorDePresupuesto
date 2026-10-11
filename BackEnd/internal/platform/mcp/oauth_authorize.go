@@ -11,7 +11,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 	"github.com/rs/zerolog/log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
@@ -30,10 +30,10 @@ const (
 
 // authorizeHandler implements the OAuth 2.1 authorization endpoint (login +
 // consent) on top of the shared oauth2.Storage, so the codes it issues are
-// redeemed by mcpkit's token endpoint. Validation mirrors mcpkit v0.4.0
-// (handleAuthorizationGet/Post) with two fixes: the redirect_uri is always
-// validated against the registered client before any redirect, and PKCE is
-// re-checked on POST.
+// redeemed by omniskill's token endpoint. Validation mirrors omniskill's
+// mcp/oauth2 v0.12, formerly mcpkit (handleAuthorizationGet/Post), with two
+// fixes: the redirect_uri is always validated against the registered client
+// before any redirect, and PKCE is re-checked on POST.
 type authorizeHandler struct {
 	storage    oauth2.Storage
 	auth       Authenticator
@@ -78,7 +78,7 @@ func (h *authorizeHandler) serve(w http.ResponseWriter, r *http.Request, clientI
 }
 
 // validateClient loads the client and checks the redirect URI exactly as
-// mcpkit does. On failure it renders the error page (never redirects: an
+// omniskill does. On failure it renders the error page (never redirects: an
 // unvalidated redirect_uri must not receive anything).
 func (h *authorizeHandler) validateClient(w http.ResponseWriter, locale i18n.Locale, req *authorizeRequest, defaultRedirect bool) (*oauth2.Client, bool) {
 	if req.ClientID == "" {
@@ -144,7 +144,7 @@ func (h *authorizeHandler) handlePost(w http.ResponseWriter, r *http.Request, lo
 		h.renderError(w, locale, http.StatusBadRequest, pageErrInvalidRequest)
 		return
 	}
-	// Same lookup as mcpkit (r.Form: body first, then the query string the
+	// Same lookup as omniskill (r.Form: body first, then the query string the
 	// form was posted to).
 	req := readAuthorizeRequest(r.Form)
 	client, ok := h.validateClient(w, locale, &req, false)
@@ -240,10 +240,10 @@ func redirectWithParams(w http.ResponseWriter, r *http.Request, redirectURI stri
 	http.Redirect(w, r, u.String(), http.StatusSeeOther)
 }
 
-// isValidRedirectURI is mcpkit v0.4.0's check (unexported there): the
-// requested URI must match a registered absolute URI by scheme, host
-// (case-insensitive) and path, or a registered relative URI by path.
-// Wildcards are never accepted.
+// isValidRedirectURI is omniskill mcp/oauth2's check (unexported there,
+// unchanged from mcpkit v0.4.0 to omniskill v0.12): the requested URI must
+// match a registered absolute URI by scheme, host (case-insensitive) and
+// path, or a registered relative URI by path. Wildcards are never accepted.
 func isValidRedirectURI(uri string, allowed []string) bool {
 	if uri == "" {
 		return false

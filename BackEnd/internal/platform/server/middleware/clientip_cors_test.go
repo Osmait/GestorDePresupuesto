@@ -88,6 +88,20 @@ func TestConfigureClientIP(t *testing.T) {
 	}
 }
 
+// A proxy may append its own X-Forwarded-For header line instead of extending
+// the client's. gin >= 1.11 joins every line before walking right to left, so
+// the client-supplied first line cannot win (older gin read only that line).
+func TestConfigureClientIP_MultipleXFFHeaderLines(t *testing.T) {
+	r := newClientIPRouter(t, config.ServerConfig{TrustedProxies: []string{"100.64.0.0/10"}})
+	req := httptest.NewRequest(http.MethodGet, "/ip", nil)
+	req.RemoteAddr = "100.64.1.2:4444"
+	req.Header.Add("X-Forwarded-For", "127.0.0.1")
+	req.Header.Add("X-Forwarded-For", "198.51.100.9")
+	w := httptest.NewRecorder()
+	r.ServeHTTP(w, req)
+	assert.Equal(t, "198.51.100.9", w.Body.String())
+}
+
 // testProxySecret is built at runtime: no secret-looking literal in the repo.
 var testProxySecret = strings.Repeat("x", 40)
 
@@ -445,7 +459,9 @@ func TestCORS(t *testing.T) {
 			req.Header.Set("Origin", tc.origin)
 			if tc.preflight {
 				req.Header.Set("Access-Control-Request-Method", "POST")
-				req.Header.Set("Access-Control-Request-Headers", "Authorization")
+				// Browsers send lowercase header names (Fetch spec); rs/cors >= 1.11
+				// matches them case-sensitively against its normalized allow-list.
+				req.Header.Set("Access-Control-Request-Headers", "authorization,content-type")
 			}
 			w := httptest.NewRecorder()
 			r.ServeHTTP(w, req)

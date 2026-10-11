@@ -24,17 +24,22 @@ function createRecurringSchema(t: (key: string) => string, tForms: (key: string)
 		description: z.string().optional(),
 		// recurring_transactions.amount is NUMERIC(15,2): the API rejects sub-cent amounts.
 		amount: z.coerce
-			.number()
+			.number<number>()
 			.min(0.01, t('validation.amountPositive'))
 			.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals')),
-		type: z.enum(['income', 'bill'], { required_error: t('validation.typeRequired') }),
+		type: z.enum(['income', 'bill'], {
+			// Only a missing value gets the custom message (Zod 3 `required_error` semantics).
+			error: (issue) => (issue.input === undefined ? t('validation.typeRequired') : undefined),
+		}),
 		account_id: z.string().min(1, t('validation.accountRequired')),
 		category_id: z.string().min(1, t('validation.categoryRequired')),
-		day_of_month: z.coerce.number().min(1, t('validation.dayRange')).max(31, t('validation.dayRange')),
+		day_of_month: z.coerce.number<number>().min(1, t('validation.dayRange')).max(31, t('validation.dayRange')),
 	})
 }
 
 type RecurringFormValues = z.infer<ReturnType<typeof createRecurringSchema>>
+
+type RecurringFormInput = z.input<ReturnType<typeof createRecurringSchema>>
 
 export function RecurringTransactionFormModal() {
 	const t = useTranslations('recurring')
@@ -52,7 +57,7 @@ export function RecurringTransactionFormModal() {
 	// The API error is not shown raw: one actionable message instead.
 	const hasError = Boolean(createMutation.error || updateMutation.error)
 
-	const form = useForm<RecurringFormValues>({
+	const form = useForm<RecurringFormInput, unknown, RecurringFormValues>({
 		resolver: zodResolver(recurringSchema),
 		defaultValues: {
 			name: '',

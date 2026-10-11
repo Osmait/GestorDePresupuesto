@@ -1,10 +1,10 @@
 'use client'
 
-import { MotionConfig } from 'framer-motion'
+import { MotionConfig } from 'motion/react'
 import type { ReactNode } from 'react'
 
 /**
- * App-wide framer-motion config: honors the OS "reduce motion" setting for
+ * App-wide Motion config: honors the OS "reduce motion" setting for
  * every `motion`/`m` component (transform and layout animations are skipped,
  * opacity still fades). Components don't need their own reduced-motion checks
  * for framer animations; non-framer counters use `useReducedMotion()`.

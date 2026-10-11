@@ -6,7 +6,7 @@ name: obs
 
 services:
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.135.0
+    image: otel/opentelemetry-collector-contrib:0.162.0
     container_name: obs-collector
     command: ["--config=/etc/otelcol/config.yaml"]
     volumes:
@@ -19,14 +19,14 @@ services:
     restart: unless-stopped
 
   jaeger:
-    image: jaegertracing/jaeger:2.13.0
+    image: jaegertracing/jaeger:2.22.0
     container_name: obs-jaeger
     ports:
       - "127.0.0.1:${OBS_JAEGER_UI_PORT:-16686}:16686"
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:v3.7.3
+    image: prom/prometheus:v3.15.0
     container_name: obs-prometheus
     # prometheus.yml is a template: the backend target and its bearer token
     # come from the environment (Prometheus does not expand env vars itself).

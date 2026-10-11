@@ -48,21 +48,22 @@ describe('client message scopes', () => {
 		expect(pages.length).toBeGreaterThan(10)
 	})
 
-	it.each(
-		pages.map((page) => [path.relative(ROOT, page)]),
-	)('%s: every namespace used by its client components is sent to the browser', (page) => {
-		const chain = renderChain(path.join(ROOT, page))
-		const { namespaces, byModule } = clientNamespaces(chain)
-		const scopes = scopesIn(chain)
-		for (const scope of scopes) expect(Object.keys(CLIENT_NAMESPACES)).toContain(scope)
-		const provided = new Set<string>([...CLIENT_NAMESPACES.root, ...scopes.flatMap((s) => CLIENT_NAMESPACES[s])])
+	it.each(pages.map((page) => [path.relative(ROOT, page)]))(
+		'%s: every namespace used by its client components is sent to the browser',
+		(page) => {
+			const chain = renderChain(path.join(ROOT, page))
+			const { namespaces, byModule } = clientNamespaces(chain)
+			const scopes = scopesIn(chain)
+			for (const scope of scopes) expect(Object.keys(CLIENT_NAMESPACES)).toContain(scope)
+			const provided = new Set<string>([...CLIENT_NAMESPACES.root, ...scopes.flatMap((s) => CLIENT_NAMESPACES[s])])
 
-		const missing = Array.from(namespaces).filter((ns) => !provided.has(ns))
-		const users = Array.from(byModule.entries())
-			.filter(([, used]) => used.some((ns) => missing.includes(ns)))
-			.map(([file, used]) => `${file}: ${used.join(', ')}`)
-		expect({ missing, users }).toEqual({ missing: [], users: [] })
-	})
+			const missing = Array.from(namespaces).filter((ns) => !provided.has(ns))
+			const users = Array.from(byModule.entries())
+				.filter(([, used]) => used.some((ns) => missing.includes(ns)))
+				.map(([file, used]) => `${file}: ${used.join(', ')}`)
+			expect({ missing, users }).toEqual({ missing: [], users: [] })
+		},
+	)
 
 	it('detects namespaces through the import graph (sanity check of the analysis)', () => {
 		const { namespaces } = clientNamespaces(renderChain(path.join(APP_DIR, 'app/transactions/page.tsx')))

@@ -22,13 +22,13 @@ function createCertificateSchema(t: (key: string) => string, tForms: (key: strin
 			bank: z.string().min(2, t('errors.bankMin')),
 			// certificates.base_capital is DECIMAL(15,2): the API rejects sub-cent amounts.
 			base_capital: z.coerce
-				.number()
+				.number<number>()
 				.min(0.01, t('errors.capitalMin'))
 				.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals')),
 			interest_type: z.enum(['simple', 'compound']),
-			current_interest_rate: z.coerce.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
-			current_tax_rate: z.coerce.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
-			cut_day: z.coerce.number().min(1, t('errors.cutDayRange')).max(28, t('errors.cutDayRange')),
+			current_interest_rate: z.coerce.number<number>().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
+			current_tax_rate: z.coerce.number<number>().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+			cut_day: z.coerce.number<number>().min(1, t('errors.cutDayRange')).max(28, t('errors.cutDayRange')),
 			reinvest_interest: z.boolean(),
 			payout_account_id: z.string().optional(),
 			maturity_date: z.string().optional(),
@@ -43,11 +43,15 @@ function createCertificateSchema(t: (key: string) => string, tForms: (key: strin
 			{
 				message: t('errors.payoutRequired'),
 				path: ['payout_account_id'],
+				// Only once every field is valid (Zod 3 semantics; Zod 4 runs it alongside field errors).
+				when: (payload) => payload.issues.length === 0,
 			},
 		)
 }
 
 type FormData = z.infer<ReturnType<typeof createCertificateSchema>>
+
+type FormInput = z.input<ReturnType<typeof createCertificateSchema>>
 
 const EMPTY_VALUES: FormData = {
 	bank: '',
@@ -91,7 +95,7 @@ export function CertificateFormModal({
 	const isEditing = !!certificate
 	const certificateSchema = useMemo(() => createCertificateSchema(t, tForms), [t, tForms])
 
-	const form = useForm<FormData>({
+	const form = useForm<FormInput, unknown, FormData>({
 		resolver: zodResolver(certificateSchema),
 		defaultValues: EMPTY_VALUES,
 	})

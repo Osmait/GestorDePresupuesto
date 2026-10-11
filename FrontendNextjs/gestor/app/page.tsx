@@ -1,6 +1,5 @@
 'use client'
 
-import { domAnimation, LazyMotion, m, useScroll, useTransform } from 'framer-motion'
 import {
 	ArrowDownUp,
 	ArrowRight,
@@ -14,9 +13,7 @@ import {
 	FileCode,
 	FolderTree,
 	GitBranch,
-	Github,
 	Layers,
-	Linkedin,
 	Moon,
 	Play,
 	Server,
@@ -25,6 +22,7 @@ import {
 	Terminal,
 	Zap,
 } from 'lucide-react'
+import { domAnimation, LazyMotion, m, useScroll, useTransform } from 'motion/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { useTheme } from 'next-themes'
@@ -32,6 +30,51 @@ import { useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+
+// Brand marks are not part of lucide-react 1.x. These keep the lucide 0.x outline
+// drawings (ISC license) so they match the other icons; decorative by default.
+type BrandIconProps = { className?: string }
+
+function GithubIcon({ className }: BrandIconProps) {
+	return (
+		<svg
+			xmlns='http://www.w3.org/2000/svg'
+			viewBox='0 0 24 24'
+			fill='none'
+			stroke='currentColor'
+			strokeWidth={2}
+			strokeLinecap='round'
+			strokeLinejoin='round'
+			className={className}
+			aria-hidden='true'
+			focusable='false'
+		>
+			<path d='M15 22v-4a4.8 4.8 0 0 0-1-3.5c3 0 6-2 6-5.5.08-1.25-.27-2.48-1-3.5.28-1.15.28-2.35 0-3.5 0 0-1 0-3 1.5-2.64-.5-5.36-.5-8 0C6 2 5 2 5 2c-.3 1.15-.3 2.35 0 3.5A5.403 5.403 0 0 0 4 9c0 3.5 3 5.5 6 5.5-.39.49-.68 1.05-.85 1.65-.17.6-.22 1.23-.15 1.85v4' />
+			<path d='M9 18c-4.51 2-5-2-7-2' />
+		</svg>
+	)
+}
+
+function LinkedinIcon({ className }: BrandIconProps) {
+	return (
+		<svg
+			xmlns='http://www.w3.org/2000/svg'
+			viewBox='0 0 24 24'
+			fill='none'
+			stroke='currentColor'
+			strokeWidth={2}
+			strokeLinecap='round'
+			strokeLinejoin='round'
+			className={className}
+			aria-hidden='true'
+			focusable='false'
+		>
+			<path d='M16 8a6 6 0 0 1 6 6v7h-4v-7a2 2 0 0 0-2-2 2 2 0 0 0-2 2v7h-4v-7a6 6 0 0 1 6-6z' />
+			<rect width='4' height='12' x='2' y='9' />
+			<circle cx='4' cy='4' r='2' />
+		</svg>
+	)
+}
 
 // ============================================
 // CONFIGURACIÓN DEL PROYECTO
@@ -138,7 +181,7 @@ function Navigation() {
 						)}
 						<Button variant='outline' asChild className='hidden sm:flex gap-2 rounded-full'>
 							<a href={PROJECT_CONFIG.repository} target='_blank' rel='noopener noreferrer'>
-								<Github className='h-4 w-4' />
+								<GithubIcon className='h-4 w-4' />
 								GitHub
 							</a>
 						</Button>
@@ -269,7 +312,7 @@ function HeroSection() {
 							className='text-lg px-8 py-7 rounded-full border-2 hover:bg-foreground/5 group'
 						>
 							<a href={PROJECT_CONFIG.repository} target='_blank' rel='noopener noreferrer'>
-								<Github className='mr-2 h-5 w-5 group-hover:rotate-12 transition-transform' />
+								<GithubIcon className='mr-2 h-5 w-5 group-hover:rotate-12 transition-transform' />
 								View Source Code
 							</a>
 						</Button>
@@ -832,7 +875,7 @@ function RepositorySection() {
 										whileHover={{ scale: 1.1, rotate: 5 }}
 										className='w-20 h-20 bg-gradient-to-br from-gray-900 to-gray-700 dark:from-white dark:to-gray-300 rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-2xl'
 									>
-										<Github className='h-10 w-10 text-white dark:text-black' />
+										<GithubIcon className='h-10 w-10 text-white dark:text-black' />
 									</m.div>
 									<h3 className='text-3xl font-bold mb-4'>Open Source</h3>
 									<p className='text-muted-foreground text-lg max-w-xl mx-auto mb-8'>
@@ -853,7 +896,7 @@ function RepositorySection() {
 								<div className='flex flex-col sm:flex-row gap-4 justify-center'>
 									<Button size='lg' asChild className='rounded-full shadow-lg'>
 										<a href={PROJECT_CONFIG.repository} target='_blank' rel='noopener noreferrer'>
-											<Github className='mr-2 h-5 w-5' />
+											<GithubIcon className='mr-2 h-5 w-5' />
 											View Repository
 											<ExternalLink className='ml-2 h-4 w-4' />
 										</a>
@@ -887,13 +930,18 @@ function Footer() {
 					</p>
 					<div className='flex items-center gap-4'>
 						<Button variant='ghost' size='sm' asChild>
-							<a href={PROJECT_CONFIG.developer.github} target='_blank' rel='noopener noreferrer'>
-								<Github className='h-4 w-4' />
+							<a href={PROJECT_CONFIG.developer.github} target='_blank' rel='noopener noreferrer' aria-label='GitHub'>
+								<GithubIcon className='h-4 w-4' />
 							</a>
 						</Button>
 						<Button variant='ghost' size='sm' asChild>
-							<a href={PROJECT_CONFIG.developer.linkedin} target='_blank' rel='noopener noreferrer'>
-								<Linkedin className='h-4 w-4' />
+							<a
+								href={PROJECT_CONFIG.developer.linkedin}
+								target='_blank'
+								rel='noopener noreferrer'
+								aria-label='LinkedIn'
+							>
+								<LinkedinIcon className='h-4 w-4' />
 							</a>
 						</Button>
 					</div>

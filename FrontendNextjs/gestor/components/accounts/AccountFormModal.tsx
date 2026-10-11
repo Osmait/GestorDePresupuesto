@@ -35,13 +35,14 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
 					.string()
 					.trim()
 					.min(2, tAcc('minChars', { count: 2 })),
-				initial_balance: z.coerce.number().min(0, tAcc('balanceMin')),
+				initial_balance: z.coerce.number<number>().min(0, tAcc('balanceMin')),
 			}),
 		[tAcc],
 	)
 	type AccountFormValues = z.infer<typeof accountSchema>
+	type AccountFormInput = z.input<typeof accountSchema>
 
-	const form = useForm<AccountFormValues>({
+	const form = useForm<AccountFormInput, unknown, AccountFormValues>({
 		resolver: zodResolver(accountSchema),
 		defaultValues: { name: '', bank: '', initial_balance: 0 },
 	})

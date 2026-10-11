@@ -2,45 +2,47 @@ name: E2E Tests
 
 on:
   pull_request:
-    branches: [main, development]
     paths:
       - 'BackEnd/**'
       - 'FrontendNextjs/**'
       - 'e2e-test/**'
+      - 'go.work'
+      - '.github/workflows/e2e.yaml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   playwright-e2e:
     timeout-minutes: 60
     runs-on: ubuntu-latest
-    
+
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      # --- Setup Backend Environment ---
+      # --- Setup Backend toolchain ---
+      # e2e-test/global-setup.ts starts its own PostgreSQL (testcontainers) and
+      # builds + spawns the Go backend, so only the Go toolchain is needed here.
       - name: Setup Go
-        uses: actions/setup-go@v4
+        uses: actions/setup-go@v7
         with:
-          go-version: '1.25'
-
-      - name: Install Air (for Backend Dev Server)
-        working-directory: ./BackEnd
-        run: go install github.com/air-verse/air@latest
-
-      - name: Start Backend Database Services
-        working-directory: ./BackEnd
-        run: docker compose up -d postgres
-      
-      - name: Wait for Database
-        run: sleep 10
+          go-version-file: BackEnd/go.mod
+          cache-dependency-path: BackEnd/go.sum
 
       # --- Setup Frontend Environment ---
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version-file: FrontendNextjs/gestor/package.json
           cache: 'npm'
-          cache-dependency-path: './FrontendNextjs/gestor/package-lock.json'
+          cache-dependency-path: |
+            FrontendNextjs/gestor/package-lock.json
+            e2e-test/package-lock.json
 
       - name: Install Frontend Dependencies
         working-directory: ./FrontendNextjs/gestor
@@ -50,18 +52,19 @@ jobs:
       - name: Install Playwright Dependencies
         working-directory: ./e2e-test
         run: |
-            npm ci
-            npx playwright install --with-deps
+          npm ci
+          npx playwright install --with-deps chromium
 
       # --- Run E2E Tests ---
+      # global-setup.ts: testcontainers PostgreSQL + compiled Go backend.
+      # playwright.config.ts webServer: Next.js dev server.
       - name: Run Playwright Tests
         run: make test-e2e
         env:
           NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
           NEXTAUTH_URL: "http://localhost:3000"
-        # Note: 'make test-e2e' uses 'webServer' config to start Backend (make backend) and Frontend (make frontend)
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         if: failure()
         with:
           name: playwright-report

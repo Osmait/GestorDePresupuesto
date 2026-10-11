@@ -1,8 +1,12 @@
-version: "3.8"
-
+# Local development stack (`make dev-start` uses only `postgres`;
+# `make dev-full` starts everything).
+#
+# NOTE: postgres moved from 13 to 17. An existing ./postgres_data directory
+# created by PostgreSQL 13 cannot be opened by 17: dump it first
+# (pg_dumpall) and move/remove ./postgres_data so it is re-initialised.
 services:
   postgres:
-    image: postgres:13
+    image: postgres:17-alpine
     command: ["postgres", "-c", "log_statement=all"]
     environment:
       - POSTGRES_DB=my_store
@@ -14,9 +18,23 @@ services:
       - ./postgres_data:/var/lib/postgresql/data
       - ./sql:/docker-entrypoint-initdb.d
 
+  # Go API with hot reload. The official Air image is still published as
+  # cosmtrek/air (the Go module moved to github.com/air-verse/air). The Go
+  # toolchain pinned in go.mod is fetched automatically (GOTOOLCHAIN=auto).
   app:
-    image: cosmtrek/air
+    image: cosmtrek/air:v1.67.4
     working_dir: /app
+    environment:
+      - ENV=development
+      - DB_TYPE=postgres
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_USER=osmait
+      - DB_PASSWORD=admin123
+      - DB_NAME=my_store
+      - SERVER_HOST=0.0.0.0
+      - SERVER_PORT=8080
+      - JWT_SECRET=your-super-secret-development-key-with-32-plus-characters-for-jwt-tokens
     ports:
       - 8080:8080
     depends_on:
@@ -24,26 +42,25 @@ services:
     volumes:
       - .:/app
 
+  # Next.js frontend (dev server). Secrets such as AUTH_SECRET and
+  # PROXY_SHARED_SECRET are read from FrontendNextjs/gestor/.env.local.
   app-front:
-    image: node:lts
+    image: node:24
     working_dir: /app
+    environment:
+      - BACKEND_URL=http://app:8080
     ports:
-      - 4321:4321
+      - 3000:3000
     depends_on:
-      - postgres
-
+      - app
     volumes:
-      - ../Frontend/gestor-presupuesto/:/app
-
-    command: sh -c
-      "
-      npm install
-      && npm run dev -- --host 0.0.0.0 &
-      tail -f /dev/null
-      "
+      - ../FrontendNextjs/gestor/:/app
+      # Keep the container's node_modules separate from the host's.
+      - /app/node_modules
+    command: sh -c "npm ci && npm run dev -- -H 0.0.0.0"
 
   testdb:
-    image: postgres:13
+    image: postgres:17-alpine
     command: ["postgres", "-c", "log_statement=all"]
     environment:
       - POSTGRES_DB=test

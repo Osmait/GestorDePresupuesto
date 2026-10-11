@@ -36,10 +36,10 @@ function createInvestmentSchema(t: FormTranslator) {
 			.string()
 			.min(1, t('errors.symbolRequired'))
 			.transform((v) => v.toUpperCase()),
-		type: z.nativeEnum(InvestmentType),
-		quantity: z.coerce.number().min(0, t('errors.minZero')),
-		purchase_price: z.coerce.number().min(0, t('errors.minZero')),
-		current_price: z.coerce.number().min(0, t('errors.minZero')),
+		type: z.enum(InvestmentType),
+		quantity: z.coerce.number<number>().min(0, t('errors.minZero')),
+		purchase_price: z.coerce.number<number>().min(0, t('errors.minZero')),
+		current_price: z.coerce.number<number>().min(0, t('errors.minZero')),
 		settlement_currency: z
 			.string()
 			.min(1, t('errors.currencyRequired'))
@@ -48,6 +48,8 @@ function createInvestmentSchema(t: FormTranslator) {
 }
 
 type InvestmentFormValues = z.infer<ReturnType<typeof createInvestmentSchema>>
+
+type InvestmentFormInput = z.input<ReturnType<typeof createInvestmentSchema>>
 
 const defaultValues: InvestmentFormValues = {
 	name: '',
@@ -70,7 +72,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 	const updateMutation = useUpdateInvestmentMutation()
 	const { data: balances = [] } = useGetInvestmentFundingBalances()
 
-	const form = useForm<InvestmentFormValues>({
+	const form = useForm<InvestmentFormInput, unknown, InvestmentFormValues>({
 		resolver: zodResolver(investmentSchema),
 		defaultValues,
 	})

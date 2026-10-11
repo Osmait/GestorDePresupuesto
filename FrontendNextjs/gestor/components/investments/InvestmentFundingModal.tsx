@@ -28,15 +28,17 @@ const SUPPORTED_CURRENCIES = ['USD', 'DOP']
 function createFundingSchema(t: (key: string) => string) {
 	return z.object({
 		sourceAccountID: z.string().min(1, t('errors.sourceRequired')),
-		sourceAmount: z.coerce.number().positive(t('errors.amountPositive')),
+		sourceAmount: z.coerce.number<number>().positive(t('errors.amountPositive')),
 		targetCurrency: z.string().min(1),
-		exchangeRate: z.coerce.number().min(0),
-		feeAmount: z.coerce.number().min(0),
+		exchangeRate: z.coerce.number<number>().min(0),
+		feeAmount: z.coerce.number<number>().min(0),
 		notes: z.string().optional().default(''),
 	})
 }
 
 type FundingFormValues = z.infer<ReturnType<typeof createFundingSchema>>
+
+type FundingFormInput = z.input<ReturnType<typeof createFundingSchema>>
 
 export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingModalProps) {
 	const t = useTranslations('investments.funding')
@@ -51,7 +53,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 	const fundMutation = useFundBrokerMutation()
 	const [error, setError] = useState<{ message: string; detail?: string | null } | null>(null)
 
-	const form = useForm<FundingFormValues>({
+	const form = useForm<FundingFormInput, unknown, FundingFormValues>({
 		resolver: zodResolver(fundingSchema),
 		defaultValues: {
 			sourceAccountID: '',

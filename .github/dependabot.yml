@@ -1,0 +1,93 @@
+version: 2
+
+updates:
+  # --- Frontend (Next.js) ---
+  - package-ecosystem: npm
+    directory: /FrontendNextjs/gestor
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      nextjs:
+        patterns:
+          - "next"
+          - "@next/*"
+      frontend-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- Playwright E2E suite ---
+  - package-ecosystem: npm
+    directory: /e2e-test
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      e2e-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- Root tooling (commitlint, husky) ---
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      tooling-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- Backend (Go) ---
+  - package-ecosystem: gomod
+    directory: /BackEnd
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      otel:
+        patterns:
+          - "go.opentelemetry.io/*"
+      backend-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- GitHub Actions ---
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # --- Backend Docker image (BackEnd/dockerfile) ---
+  - package-ecosystem: docker
+    directory: /BackEnd
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(deps)"

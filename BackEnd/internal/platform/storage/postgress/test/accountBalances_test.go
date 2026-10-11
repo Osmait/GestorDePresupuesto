@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"fmt"
 	"math/rand"
+	"net/url"
 	"os"
 	"sort"
 	"strconv"
@@ -597,9 +598,10 @@ func openRLSRole(t *testing.T) *sql.DB {
 		_, err := testDB.Exec(stmt)
 		require.NoError(t, err, stmt)
 	}
-	dsn, err := pq.ParseURL(testConnStr)
+	dsn, err := url.Parse(testConnStr)
 	require.NoError(t, err)
-	db, err := sql.Open("postgres", dsn+" user="+role+" password=rls")
+	dsn.User = url.UserPassword(role, "rls")
+	db, err := sql.Open("postgres", dsn.String())
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		_ = db.Close()

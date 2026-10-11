@@ -8,7 +8,7 @@ import { getBackendUrl } from '@/lib/backend-url'
 import { clientIpHeaders } from '@/lib/server/client-ip'
 
 const loginSchema = z.object({
-	email: z.string().email(),
+	email: z.email(),
 	password: z.string().min(1),
 })
 
