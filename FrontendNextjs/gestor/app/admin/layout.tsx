@@ -16,7 +16,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {
-	// Server-side guard (the middleware also enforces this): only admins render the backoffice.
+	// Server-side guard (proxy.ts also enforces this): only admins render the backoffice.
 	const session = await getServerSession()
 	if (!session?.user || session.error) {
 		redirect('/login?callbackUrl=%2Fadmin%2Fdashboard')

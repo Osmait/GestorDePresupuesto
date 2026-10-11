@@ -1,7 +1,7 @@
 'use client'
 
-import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { AlertTriangle, Calendar, Check, FileSearch, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'motion/react'
 import { useTranslations } from 'next-intl'
 import { type ReactNode, useId, useState } from 'react'
 import { Amount } from '@/components/shared/Amount'

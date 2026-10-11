@@ -1,7 +1,7 @@
 'use client'
 
-import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { CreditCard, Plus, Receipt, TrendingDown, TrendingUp } from 'lucide-react'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'motion/react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'

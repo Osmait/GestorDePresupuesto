@@ -27,16 +27,18 @@ const SimulationLineChart = dynamic(() => import('@/components/charts/Simulation
 
 function createSimulatorSchema(t: (key: string) => string) {
 	return z.object({
-		capital: z.coerce.number().min(0.01, t('errors.capitalMin')),
-		interestRate: z.coerce.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
-		taxRate: z.coerce.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
-		months: z.coerce.number().min(1, t('errors.monthsRange')).max(120, t('errors.monthsRange')),
+		capital: z.coerce.number<number>().min(0.01, t('errors.capitalMin')),
+		interestRate: z.coerce.number<number>().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
+		taxRate: z.coerce.number<number>().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+		months: z.coerce.number<number>().min(1, t('errors.monthsRange')).max(120, t('errors.monthsRange')),
 		interestType: z.enum(['simple', 'compound']),
 		reinvestInterest: z.boolean(),
 	})
 }
 
 type FormData = z.infer<ReturnType<typeof createSimulatorSchema>>
+
+type FormInput = z.input<ReturnType<typeof createSimulatorSchema>>
 
 interface SimulationResult {
 	month: number
@@ -63,7 +65,7 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 	const [results, setResults] = useState<SimulationResult[]>([])
 	const [showDetail, setShowDetail] = useState(false)
 
-	const form = useForm<FormData>({
+	const form = useForm<FormInput, unknown, FormData>({
 		resolver: zodResolver(simulatorSchema),
 		defaultValues: {
 			capital: 100000,

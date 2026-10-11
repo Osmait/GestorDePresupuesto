@@ -25,7 +25,7 @@ function createPlanItemSchema(maxTwoDecimals: string) {
 		description: z.string().optional(),
 		// monthly_plan_items.amount is NUMERIC(15,2): the API rejects sub-cent amounts.
 		amount: z.coerce
-			.number()
+			.number<number>()
 			.positive()
 			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals),
 		currency: z.enum(['DOP', 'USD']),
@@ -33,11 +33,13 @@ function createPlanItemSchema(maxTwoDecimals: string) {
 		category_id: z.string().optional(),
 		account_id: z.string().optional(),
 		// Empty means "no fixed day", which the backend stores as NULL.
-		day_of_month: z.union([z.coerce.number().int().min(1).max(31), z.literal('')]).optional(),
+		day_of_month: z.union([z.coerce.number<number>().int().min(1).max(31), z.literal('')]).optional(),
 	})
 }
 
 type PlanItemFormValues = z.infer<ReturnType<typeof createPlanItemSchema>>
+
+type PlanItemFormInput = z.input<ReturnType<typeof createPlanItemSchema>>
 
 export function MonthlyPlanFormModal() {
 	const t = useTranslations('monthlyPlan')
@@ -54,7 +56,7 @@ export function MonthlyPlanFormModal() {
 	const isLoading = createMutation.isPending || updateMutation.isPending
 	const error = createMutation.error || updateMutation.error
 
-	const form = useForm<PlanItemFormValues>({
+	const form = useForm<PlanItemFormInput, unknown, PlanItemFormValues>({
 		resolver: zodResolver(planItemSchema),
 		defaultValues: {
 			name: '',

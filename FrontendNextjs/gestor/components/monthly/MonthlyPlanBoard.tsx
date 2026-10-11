@@ -1,7 +1,7 @@
 'use client'
 
-import { domAnimation, LazyMotion, m } from 'framer-motion'
 import { CalendarClock, Plus } from 'lucide-react'
+import { domAnimation, LazyMotion, m } from 'motion/react'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'

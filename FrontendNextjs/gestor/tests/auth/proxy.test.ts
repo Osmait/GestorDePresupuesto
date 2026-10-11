@@ -8,7 +8,7 @@ vi.mock('next-auth/jwt', () => ({
 	getToken: (...args: unknown[]) => getTokenMock(...args),
 }))
 
-import middleware, { config } from '@/middleware'
+import { config, proxy } from '@/proxy'
 
 const SESSION_COOKIE = 'authjs.session-token=encrypted'
 
@@ -29,7 +29,7 @@ function sessionToken(overrides: Record<string, unknown> = {}) {
 	}
 }
 
-describe('middleware', () => {
+describe('proxy', () => {
 	beforeEach(() => {
 		process.env.AUTH_SECRET = 'test-secret'
 		getTokenMock.mockReset()
@@ -40,7 +40,7 @@ describe('middleware', () => {
 	})
 
 	it('redirects unauthenticated requests to /login with a callbackUrl', async () => {
-		const res = await middleware(request('/app/transactions?page=2'))
+		const res = await proxy(request('/app/transactions?page=2'))
 
 		expect(res.status).toBe(307)
 		const location = new URL(res.headers.get('location') ?? '')
@@ -51,7 +51,7 @@ describe('middleware', () => {
 
 	it('redirects unauthenticated admin requests to /login', async () => {
 		getTokenMock.mockResolvedValue(null)
-		const res = await middleware(request('/admin/dashboard', SESSION_COOKIE))
+		const res = await proxy(request('/admin/dashboard', SESSION_COOKIE))
 
 		const location = new URL(res.headers.get('location') ?? '')
 		expect(location.pathname).toBe('/login')
@@ -60,14 +60,14 @@ describe('middleware', () => {
 
 	it('treats a session whose refresh failed as unauthenticated', async () => {
 		getTokenMock.mockResolvedValue(sessionToken({ error: 'RefreshTokenError' }))
-		const res = await middleware(request('/app', SESSION_COOKIE))
+		const res = await proxy(request('/app', SESSION_COOKIE))
 
 		expect(new URL(res.headers.get('location') ?? '').pathname).toBe('/login')
 	})
 
 	it('redirects non-admin users away from /admin', async () => {
 		getTokenMock.mockResolvedValue(sessionToken({ role: 'USER' }))
-		const res = await middleware(request('/admin/dashboard', SESSION_COOKIE))
+		const res = await proxy(request('/admin/dashboard', SESSION_COOKIE))
 
 		expect(res.status).toBe(307)
 		expect(new URL(res.headers.get('location') ?? '').pathname).toBe('/app')
@@ -75,7 +75,7 @@ describe('middleware', () => {
 
 	it('lets admins into /admin', async () => {
 		getTokenMock.mockResolvedValue(sessionToken({ role: 'ADMIN' }))
-		const res = await middleware(request('/admin/dashboard', SESSION_COOKIE))
+		const res = await proxy(request('/admin/dashboard', SESSION_COOKIE))
 
 		expect(res.headers.get('location')).toBeNull()
 		expect(res.headers.get('x-middleware-next')).toBe('1')
@@ -84,7 +84,7 @@ describe('middleware', () => {
 	it('lets authenticated users into /app without refreshing tokens', async () => {
 		const fetchSpy = vi.spyOn(globalThis, 'fetch')
 		getTokenMock.mockResolvedValue(sessionToken({ accessTokenExpires: Date.now() - 1000 }))
-		const res = await middleware(request('/app', SESSION_COOKIE))
+		const res = await proxy(request('/app', SESSION_COOKIE))
 
 		expect(res.headers.get('x-middleware-next')).toBe('1')
 		expect(fetchSpy).not.toHaveBeenCalled()
