@@ -91,9 +91,9 @@ var pageCopies = map[i18n.Locale]*pageCopy{
 		WriteTitle:        "Podrá hacer cambios",
 		WriteItems:        []string{"Crear, editar y eliminar transacciones, cuentas y categorías", "Crear préstamos, registrar pagos y reiniciar saldos de tarjetas"},
 		Email:             "Correo electrónico",
-		EmailPlaceholder:  "tu@correo.com",
-		Password:          "Contraseña",
-		ShowPassword:      "Mostrar contraseña",
+		EmailPlaceholder:  "tu@correo.com",      // ggignore: UI copy, not a credential
+		Password:          "Contraseña",         // ggignore: UI copy, not a credential
+		ShowPassword:      "Mostrar contraseña", // ggignore: UI copy, not a credential
 		Submit:            "Autorizar acceso",
 		Cancel:            "Cancelar",
 		PasskeyNote:       "¿Entras solo con passkey? La conexión con Claude todavía no admite passkeys: crea una contraseña en",
@@ -124,9 +124,9 @@ var pageCopies = map[i18n.Locale]*pageCopy{
 		WriteTitle:        "It will be able to make changes",
 		WriteItems:        []string{"Create, edit and delete transactions, accounts and categories", "Create loans, record payments and reset card balances"},
 		Email:             "Email",
-		EmailPlaceholder:  "you@example.com",
-		Password:          "Password",
-		ShowPassword:      "Show password",
+		EmailPlaceholder:  "you@example.com", // ggignore: UI copy, not a credential
+		Password:          "Password",        // ggignore: UI copy, not a credential
+		ShowPassword:      "Show password",   // ggignore: UI copy, not a credential
 		Submit:            "Authorize access",
 		Cancel:            "Cancel",
 		PasskeyNote:       "Do you sign in with a passkey only? The Claude connection does not support passkeys yet: set a password in",
