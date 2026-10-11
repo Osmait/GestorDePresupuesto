@@ -7,11 +7,12 @@ import (
 	"testing"
 
 	"github.com/lib/pq"
+	"github.com/lib/pq/pqerror"
 )
 
 func TestFromPostgresError(t *testing.T) {
 	cases := []struct {
-		code   pq.ErrorCode
+		code   pqerror.Code
 		want   string
 		status int
 	}{

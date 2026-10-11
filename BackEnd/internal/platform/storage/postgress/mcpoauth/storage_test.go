@@ -19,7 +19,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	_ "github.com/lib/pq"
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"github.com/testcontainers/testcontainers-go"
@@ -492,6 +492,7 @@ func newProviderEngine(t *testing.T, db *sql.DB) (*mcp.OAuthProvider, *gin.Engin
 	e.GET("/oauth/authorize", p.AuthorizeHandler())
 	e.POST("/oauth/authorize", p.AuthorizeHandler())
 	e.POST("/oauth/token", gin.WrapH(p.TokenHandler()))
+	e.POST("/oauth/revoke", gin.WrapH(p.RevocationHandler()))
 	e.POST("/oauth/register", gin.WrapH(p.RegistrationHandler()))
 	return p, e
 }
@@ -579,4 +580,22 @@ func TestOAuthFlow_PostgresAcrossRestart(t *testing.T) {
 		"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken}, "client_id": {client.ClientID},
 	}))
 	assert.Equal(t, http.StatusBadRequest, replay.Code, "a rotated refresh token cannot be reused")
+
+	// Revocation (RFC 7009) authenticates the confidential client with the
+	// hashed secret, like the token endpoint.
+	var refreshed struct {
+		AccessToken string `json:"access_token"`
+	}
+	require.NoError(t, json.Unmarshal(refreshRec.Body.Bytes(), &refreshed))
+	revoke := func(secret string) *httptest.ResponseRecorder {
+		return serve(restartedEngine, form("/oauth/revoke", url.Values{
+			"token": {refreshed.AccessToken}, "client_id": {client.ClientID}, "client_secret": {secret},
+		}))
+	}
+	assert.Equal(t, http.StatusUnauthorized, revoke("wrong-secret").Code)
+	_, err = restarted.TokenVerifier()(refreshed.AccessToken)
+	require.NoError(t, err, "a rejected revocation leaves the token valid")
+	require.Equal(t, http.StatusOK, revoke(client.ClientSecret).Code)
+	_, err = restarted.TokenVerifier()(refreshed.AccessToken)
+	assert.Error(t, err, "a revoked access token is rejected")
 }

@@ -289,9 +289,10 @@ func (suite *E2ETestSuite) TestCompleteUserFlow() {
 		var mainAccountBalance, savingsAccountBalance float64
 		for _, acc := range accounts {
 			accInfo := acc["account_info"].(map[string]interface{})
-			if accInfo["id"].(string) == accountID {
+			switch accInfo["id"].(string) {
+			case accountID:
 				mainAccountBalance = acc["current_balance"].(float64)
-			} else if accInfo["id"].(string) == savingsAccountID {
+			case savingsAccountID:
 				savingsAccountBalance = acc["current_balance"].(float64)
 			}
 		}

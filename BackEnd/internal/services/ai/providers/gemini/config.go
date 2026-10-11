@@ -3,6 +3,8 @@ package gemini
 import (
 	"fmt"
 	"time"
+
+	"google.golang.org/genai"
 )
 
 type Config struct {
@@ -12,6 +14,10 @@ type Config struct {
 	TopP        float32
 	MaxRetries  int
 	Timeout     time.Duration
+
+	// httpOptions overrides the SDK's HTTP options (tests point BaseURL at a
+	// fake server).
+	httpOptions genai.HTTPOptions
 }
 
 func DefaultConfig() *Config {

@@ -420,6 +420,11 @@ func IsValidationError(err error) bool {
 
 ### 4. GeminiProvider con JSON Mode
 
+> Nota: `github.com/google/generative-ai-go` está deprecado; la implementación actual
+> (`internal/services/ai/providers/gemini/client.go`) usa `google.golang.org/genai`
+> (`client.Models.GenerateContent` con `GenerateContentConfig{ResponseMIMEType: "application/json"}`).
+> El código de abajo es el diseño original.
+
 ```go
 package gemini
 

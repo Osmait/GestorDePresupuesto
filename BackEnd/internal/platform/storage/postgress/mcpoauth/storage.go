@@ -2,7 +2,7 @@
 // authorization codes and tokens) in PostgreSQL, so a redeploy does not
 // disconnect Claude.
 //
-// Storage implements github.com/plexusone/mcpkit/oauth2.Storage. Every secret
+// Storage implements github.com/plexusone/omniskill/mcp/oauth2.Storage. Every secret
 // (authorization codes, access and refresh tokens, client secrets) is stored
 // as the hex SHA-256 of its value and looked up by that hash; the plain value
 // never reaches the database.
@@ -19,7 +19,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -64,7 +64,7 @@ func HashSecret(value string) string {
 
 // HashClientSecret implements the optional client-secret hashing hook used by
 // the MCP token endpoint: GetClient returns the stored hash as ClientSecret,
-// so the incoming secret has to be hashed the same way before mcpkit compares
+// so the incoming secret has to be hashed the same way before omniskill compares
 // them. Without the hook the comparison fails, i.e. it fails closed.
 func (s *Storage) HashClientSecret(secret string) string {
 	return HashSecret(secret)
@@ -246,7 +246,7 @@ func (s *Storage) DeleteAuthorizationCode(code string) error {
 
 // MarkAuthorizationCodeUsed consumes a code atomically: only one of several
 // concurrent token exchanges for the same code gets a nil error, every other
-// one gets ErrCodeUsed (or ErrCodeExpired / ErrCodeNotFound) and mcpkit then
+// one gets ErrCodeUsed (or ErrCodeExpired / ErrCodeNotFound) and omniskill then
 // refuses to issue a token.
 func (s *Storage) MarkAuthorizationCodeUsed(code string) error {
 	ctx, cancel := s.ctx()
@@ -366,7 +366,7 @@ func (s *Storage) GetToken(accessToken string) (*oauth2.TokenInfo, error) {
 
 // GetTokenByRefresh consumes a refresh token: the row is deleted in the same
 // statement that reads it, so concurrent refreshes with the same token yield
-// one new token pair at most (refresh token rotation). mcpkit deletes the old
+// one new token pair at most (refresh token rotation). omniskill deletes the old
 // access token right after this call anyway; AccessToken is left empty
 // because only its hash is known.
 func (s *Storage) GetTokenByRefresh(refreshToken string) (*oauth2.TokenInfo, error) {
