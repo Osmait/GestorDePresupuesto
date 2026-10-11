@@ -14,7 +14,8 @@ test.describe('Loans @prod-write', () => {
 
 		const borrowerName = `E2E-BORROWER-${Date.now()}`
 
-		await page.getByRole('button', { name: /New loan|Nuevo préstamo/i }).click()
+		// The header button (an empty portfolio repeats it in its empty state)
+		await page.getByRole('button', { name: /New loan|Nuevo préstamo/i }).first().click()
 		const modal = page.getByRole('dialog')
 		await expect(modal).toBeVisible()
 
@@ -22,8 +23,9 @@ test.describe('Loans @prod-write', () => {
 		await modal.locator('input[type="number"]').first().fill('3000') // must fit the source account balance (overdrafts are blocked)
 		await modal.locator('input[type="number"]').nth(1).fill('5')
 
-		const sourceSelect = modal.locator('select').first()
-		await sourceSelect.selectOption({ label: accountName })
+		// Source account (Radix select)
+		await modal.getByRole('combobox').first().click()
+		await page.getByRole('option', { name: accountName, exact: true }).click()
 
 		await modal.getByRole('button', { name: /^Create$|^Crear$/i }).click()
 		await expect(modal).not.toBeVisible({ timeout: 20000 })
@@ -32,9 +34,11 @@ test.describe('Loans @prod-write', () => {
 		await expect(loanRow).toBeVisible({ timeout: 20000 })
 		await expect(loanRow.getByText(/active|activo/i)).toBeVisible()
 
-		await loanRow.getByRole('button', { name: new RegExp(`^(Cancel loan for|Cancelar préstamo de) ${borrowerName}$`, 'i') }).click()
+		// Secondary actions live in the row menu ("Actions for <borrower>")
+		await loanRow.getByRole('button', { name: new RegExp(`^(Actions for|Acciones de) ${borrowerName}$`, 'i') }).click()
+		await page.getByRole('menuitem', { name: /^(Cancel loan|Cancelar préstamo)$/i }).click()
 
-		const cancelDialog = page.getByRole('dialog', { name: /Cancel Loan|Cancelar Préstamo/i })
+		const cancelDialog = page.getByRole('alertdialog', { name: /Cancel Loan|Cancelar Préstamo/i })
 		await expect(cancelDialog).toBeVisible()
 		await cancelDialog.getByRole('button', { name: /Confirm cancellation|Confirmar cancelación/i }).click()
 		await expect(cancelDialog).not.toBeVisible({ timeout: 20000 })
@@ -58,14 +62,16 @@ test.describe('Loans @prod-write', () => {
 		const borrowerName = `E2E-BORROWER-PAY-${Date.now()}`
 
 		// Create loan
-		await page.getByRole('button', { name: /New loan|Nuevo préstamo/i }).click()
+		// The header button (an empty portfolio repeats it in its empty state)
+		await page.getByRole('button', { name: /New loan|Nuevo préstamo/i }).first().click()
 		const modal = page.getByRole('dialog')
 		await expect(modal).toBeVisible()
 
 		await modal.locator('input').first().fill(borrowerName)
 		await modal.locator('input[type="number"]').first().fill('5000')
 		await modal.locator('input[type="number"]').nth(1).fill('10')
-		await modal.locator('select').first().selectOption({ label: accountName })
+		await modal.getByRole('combobox').first().click()
+		await page.getByRole('option', { name: accountName, exact: true }).click()
 
 		await modal.getByRole('button', { name: /^Create$|^Crear$/i }).click()
 		await expect(modal).not.toBeVisible({ timeout: 20000 })
@@ -80,7 +86,8 @@ test.describe('Loans @prod-write', () => {
 		const paymentDialog = page.getByRole('dialog')
 		await expect(paymentDialog).toBeVisible()
 
-		await paymentDialog.locator('select').selectOption({ label: accountName })
+		await paymentDialog.getByRole('combobox').first().click()
+		await page.getByRole('option', { name: accountName, exact: true }).click()
 		await paymentDialog.locator('input[type="number"]').fill('500')
 		await paymentDialog.locator('input[type="date"]').fill(new Date().toISOString().slice(0, 10))
 
@@ -88,7 +95,8 @@ test.describe('Loans @prod-write', () => {
 		await expect(paymentDialog).not.toBeVisible({ timeout: 20000 })
 
 		// View loan details
-		await loanRow.getByRole('button', { name: /^Details$|^Detalle$/i }).click()
+		await loanRow.getByRole('button', { name: new RegExp(`^(Actions for|Acciones de) ${borrowerName}$`, 'i') }).click()
+		await page.getByRole('menuitem', { name: /^Details$|^Detalle$/i }).click()
 
 		const detailsDialog = page.getByRole('dialog', { name: /Loan details|Detalle del préstamo/i })
 		await expect(detailsDialog).toBeVisible({ timeout: 20000 })
@@ -101,9 +109,11 @@ test.describe('Loans @prod-write', () => {
 		await expect(detailsDialog).not.toBeVisible({ timeout: 20000 })
 
 		// Cleanup — cancel the loan
-		await loanRow.getByRole('button', { name: new RegExp(`^(Cancel loan for|Cancelar préstamo de) ${borrowerName}$`, 'i') }).click()
+		// Secondary actions live in the row menu ("Actions for <borrower>")
+		await loanRow.getByRole('button', { name: new RegExp(`^(Actions for|Acciones de) ${borrowerName}$`, 'i') }).click()
+		await page.getByRole('menuitem', { name: /^(Cancel loan|Cancelar préstamo)$/i }).click()
 
-		const cancelDialog = page.getByRole('dialog', { name: /Cancel Loan|Cancelar Préstamo/i })
+		const cancelDialog = page.getByRole('alertdialog', { name: /Cancel Loan|Cancelar Préstamo/i })
 		await expect(cancelDialog).toBeVisible()
 		await cancelDialog.getByRole('button', { name: /Confirm cancellation|Confirmar cancelación/i }).click()
 		await expect(cancelDialog).not.toBeVisible({ timeout: 20000 })

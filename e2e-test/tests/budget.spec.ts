@@ -14,8 +14,8 @@ test.describe('Budgets @prod-write', () => {
 		const categoryModal = page.getByRole('dialog', { name: /Category|Categoría/i })
 		await expect(categoryModal).toBeVisible()
 		await categoryModal.locator('input[name="name"]').fill(categoryName)
-		await categoryModal.locator('button.text-2xl').first().click()
-		await categoryModal.locator('.w-6.h-6.rounded-full').first().click()
+		await categoryModal.getByRole('group', { name: /Icon|Icono/i }).getByRole('button').first().click()
+		await categoryModal.getByRole('group', { name: /^Color$/i }).getByRole('button').first().click()
 		await categoryModal.getByRole('button', { name: /Create|Crear/i }).click()
 		await expect(categoryModal).not.toBeVisible({ timeout: 15000 })
 
@@ -40,15 +40,9 @@ test.describe('Budgets @prod-write', () => {
 		// --- 4. Assert the budget card is visible ---
 		await expect(page.getByText(categoryName).first()).toBeVisible({ timeout: 10000 })
 
-		// Helper: open the dropdown menu on a budget card without triggering card navigation.
-		// Radix DropdownMenu listens to pointerdown; we dispatch it directly on the trigger.
+		// Helper: open the card's action menu (the trigger sits above the card's stretched link).
 		async function openBudgetDropdown(card: ReturnType<typeof page.locator>) {
-			const btn = card.getByRole('button', { name: /Editar presupuesto|Edit budget/i })
-			await btn.evaluate((el) => {
-				el.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }))
-				el.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, button: 0, pointerType: 'mouse' }))
-				el.dispatchEvent(new MouseEvent('click', { bubbles: true, button: 0 }))
-			})
+			await card.getByRole('button', { name: /^(Acciones de|Actions for) /i }).click()
 		}
 
 		// --- 5. Edit the budget ---
@@ -73,9 +67,9 @@ test.describe('Budgets @prod-write', () => {
 		await openBudgetDropdown(budgetCardForDelete)
 		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
 
-		const deleteDialog = page.getByRole('dialog').last()
+		const deleteDialog = page.getByRole('alertdialog')
 		await expect(deleteDialog).toBeVisible()
-		await deleteDialog.getByRole('button', { name: /Delete|Eliminar/i }).last().click()
+		await deleteDialog.getByRole('button', { name: /^(Delete|Eliminar)$/i }).click()
 
 		// Scope assertion to the budget card (categoryName appears in multiple places on the card)
 		await expect(budgetCard).not.toBeVisible({ timeout: 15000 })

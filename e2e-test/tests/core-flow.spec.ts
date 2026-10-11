@@ -64,14 +64,11 @@ test('Core Flow: Login (Demo), Create Account, Category, Transaction @prod-write
   const categoryName = `TestCat ${Date.now()}`;
   await categoryModal.locator('input[name="name"]').fill(categoryName);
 
-  // Select an icon (first one)
-  await categoryModal.locator('button.text-2xl').first().click();
-
-  // Select a color (first one)
-  await categoryModal.locator('.w-6.h-6.rounded-full').first().click();
+  // Select an icon and a color (first option of each shared picker group)
+  await categoryModal.getByRole('group', { name: /Icon|Icono/i }).getByRole('button').first().click();
+  await categoryModal.getByRole('group', { name: /^Color$/i }).getByRole('button').first().click();
 
   // Submit Category
-  // Note: CategoryFormModal button is outside the form and handles click, might not be type="submit"
   await categoryModal.getByRole('button', { name: /Create|Crear/i }).click();
 
   // Wait for modal to close

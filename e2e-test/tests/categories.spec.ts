@@ -20,18 +20,17 @@ test.describe('Categories @prod-write', () => {
 		await expect(createDialog).toBeVisible()
 
 		await createDialog.locator('input[name="name"]').fill(categoryName)
-		await createDialog.locator('button.text-2xl').first().click()
-		await createDialog.locator('.w-6.h-6.rounded-full').first().click()
+		await createDialog.getByRole('group', { name: /Icon|Icono/i }).getByRole('button').first().click()
+		await createDialog.getByRole('group', { name: /^Color$/i }).getByRole('button').first().click()
 		await createDialog.getByRole('button', { name: /Create|Crear/i }).click()
 		await expect(createDialog).not.toBeVisible({ timeout: 15000 })
 
 		await expect(page.getByText(categoryName).first()).toBeVisible({ timeout: 10000 })
 
 		// --- EDIT ---
-		// Category card dropdown is opacity-0 until hover; must hover card first
-		const categoryCard = page.locator('.group.cursor-pointer').filter({ hasText: categoryName }).first()
-		await categoryCard.hover()
-		await page.getByRole('button', { name: /Abrir menú|Open menu/i }).first().click()
+		// The card's action menu is always visible (keyboard and touch friendly)
+		const categoryCard = page.locator('[id^="category-card-"]').filter({ hasText: categoryName }).first()
+		await categoryCard.getByRole('button', { name: /^(Acciones de|Actions for) /i }).click()
 		await page.getByRole('menuitem', { name: /Edit|Editar/i }).click()
 
 		const editDialog = page.getByRole('dialog')
@@ -47,16 +46,15 @@ test.describe('Categories @prod-write', () => {
 		await expect(page.getByText(editedName).first()).toBeVisible({ timeout: 10000 })
 
 		// --- DELETE ---
-		const editedCard = page.locator('.group.cursor-pointer').filter({ hasText: editedName }).first()
-		await editedCard.hover()
-		await page.getByRole('button', { name: /Abrir menú|Open menu/i }).first().click()
+		const editedCard = page.locator('[id^="category-card-"]').filter({ hasText: editedName }).first()
+		await editedCard.getByRole('button', { name: /^(Acciones de|Actions for) /i }).click()
 		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
 
-		const deleteDialog = page.getByRole('dialog').last()
+		const deleteDialog = page.getByRole('alertdialog')
 		await expect(deleteDialog).toBeVisible()
-		await deleteDialog.getByRole('button', { name: /Delete|Eliminar/i }).last().click()
+		await deleteDialog.getByRole('button', { name: /^(Delete|Eliminar)$/i }).click()
 
-		// Scope assertion to the category card (editedName also appears in the dialog description)
+		// Scope assertion to the category card (editedName also appears in the dialog title)
 		await expect(editedCard).not.toBeVisible({ timeout: 15000 })
 	})
 })

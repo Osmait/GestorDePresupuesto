@@ -16,8 +16,8 @@ test.describe('Transactions CRUD @prod-write', () => {
 		const categoryModal = page.getByRole('dialog', { name: /Category|Categoría/i })
 		await expect(categoryModal).toBeVisible()
 		await categoryModal.locator('input[name="name"]').fill(categoryName)
-		await categoryModal.locator('button.text-2xl').first().click()
-		await categoryModal.locator('.w-6.h-6.rounded-full').first().click()
+		await categoryModal.getByRole('group', { name: /Icon|Icono/i }).getByRole('button').first().click()
+		await categoryModal.getByRole('group', { name: /^Color$/i }).getByRole('button').first().click()
 		await categoryModal.getByRole('button', { name: /Create|Crear/i }).click()
 		await expect(categoryModal).not.toBeVisible({ timeout: 15000 })
 
@@ -47,8 +47,8 @@ test.describe('Transactions CRUD @prod-write', () => {
 		await page.locator('a[href="/app/transactions"]').first().click()
 		await page.waitForURL('**/app/transactions')
 
-		// Use specific text to avoid strict mode violation (multiple h1 on page)
-		await expect(page.locator('h1').filter({ hasText: /Transacci/i })).toBeVisible()
+		// The page title is the plain section name (one h1 per page).
+		await expect(page.getByRole('heading', { level: 1, name: /^(Transacciones|Transactions)$/ })).toBeVisible()
 
 		// Confirm the transaction item is listed
 		const txnItem = page.locator('[id^="transaction-item-"]').filter({ hasText: txnName })
@@ -75,9 +75,10 @@ test.describe('Transactions CRUD @prod-write', () => {
 		await editedTxnItem.locator('button').filter({ has: page.locator('svg.lucide-ellipsis') }).first().click()
 		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
 
-		const deleteDialog = page.getByRole('dialog').last()
+		// ConfirmDialog is an alertdialog (focus starts on Cancel).
+		const deleteDialog = page.getByRole('alertdialog')
 		await expect(deleteDialog).toBeVisible({ timeout: 5000 })
-		await deleteDialog.getByRole('button', { name: /Delete|Eliminar/i }).last().click()
+		await deleteDialog.getByRole('button', { name: /^(Delete|Eliminar)$/i }).click()
 
 		await expect(page.locator('[id^="transaction-item-"]').filter({ hasText: editedTxnName })).not.toBeVisible({ timeout: 15000 })
 	})

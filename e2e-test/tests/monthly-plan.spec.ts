@@ -82,15 +82,18 @@ test.describe('Monthly Plan @prod-write', () => {
 		await page.getByRole('menuitem', { name: /Resume|Reactivar/i }).click()
 		await expect(pausedRow.getByText(/Paused|Pausado/i)).not.toBeVisible({ timeout: 10000 })
 
-		// --- 9. Delete both items, accepting the confirm dialog ---
-		page.on('dialog', (dialog) => dialog.accept())
+		// --- 9. Delete both items, confirming in the in-app alert dialog ---
+		async function deleteItem(name: string) {
+			await openItemMenu(name)
+			await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
+			const confirm = page.getByRole('alertdialog')
+			await expect(confirm).toBeVisible()
+			await confirm.getByRole('button', { name: /Delete|Eliminar/i }).click()
+			await expect(confirm).not.toBeVisible({ timeout: 15000 })
+			await expect(page.getByText(name)).toHaveCount(0, { timeout: 15000 })
+		}
 
-		await openItemMenu(expenseName)
-		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
-		await expect(page.getByText(expenseName)).toHaveCount(0, { timeout: 15000 })
-
-		await openItemMenu(incomeName)
-		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
-		await expect(page.getByText(incomeName)).toHaveCount(0, { timeout: 15000 })
+		await deleteItem(expenseName)
+		await deleteItem(incomeName)
 	})
 })
