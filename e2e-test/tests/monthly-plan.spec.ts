@@ -50,13 +50,16 @@ test.describe('Monthly Plan @prod-write', () => {
 		await expect(page.getByTestId('summary-available')).toBeVisible()
 		await expect(page.getByTestId('summary-committed')).toBeVisible()
 
-		// --- 5. Both columns show their own total ---
-		await expect(page.getByTestId('column-total-income')).toBeVisible()
-		await expect(page.getByTestId('column-total-bill')).toBeVisible()
+		// --- 5. The ledger shows the expected income group and the total of the fixed expenses ---
+		await expect(page.getByTestId('plan-group-income')).toContainText(incomeName)
+		await expect(page.getByTestId('ledger-total')).toBeVisible()
 
-		// --- 6. The timeline places the expense on day 1 and the income on day 30 ---
-		await expect(page.getByTestId('timeline-day-1')).toBeVisible()
-		await expect(page.getByTestId('timeline-day-30')).toBeVisible()
+		// --- 6. Grouped by week, the expense lands on days 1–7 and the income on 24–end; the month flow is shown ---
+		await page.getByRole('button', { name: /^(Week|Semana)$/ }).click()
+		await expect(page.getByTestId('plan-group-week-1')).toContainText(expenseName)
+		await expect(page.getByTestId('plan-group-week-4')).toContainText(incomeName)
+		await expect(page.getByTestId('monthly-flow')).toBeVisible()
+		await page.getByRole('button', { name: /^(Category|Categoría)$/ }).click()
 
 		// Radix DropdownMenu listens to pointerdown, so dispatch the events directly.
 		async function openItemMenu(name: string) {
