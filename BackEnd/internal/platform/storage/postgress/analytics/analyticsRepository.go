@@ -24,9 +24,11 @@ func NewAnalyticsRepository(db *sql.DB) *AnalyticsRepository {
 // Large ranges are read from transaction_monthly_rollup (migration 000054):
 // per (user, UTC month, category, type, currency) SUM(amount) and COUNT(*),
 // maintained by triggers in the same transaction as every write to
-// transactions. A date range [from, to] is split into the whole UTC months it
-// contains (read from the rollup) and the partial months at its edges (read
-// from transactions), so results are exactly those of aggregating the ledger.
+// transactions. A date range [from, to) — half-open: the ranged methods take
+// the instant just after the range, e.g. 00:00 of the day after its last day —
+// is split into the whole UTC months it contains (read from the rollup) and
+// the partial months at its edges (read from transactions), so results are
+// exactly those of aggregating the ledger.
 // Currency conversion is applied to the sums (sum(amount)*rate ==
 // sum(amount*rate) in NUMERIC arithmetic, which is exact).
 //
@@ -47,8 +49,8 @@ const (
 	sessionTZOther
 )
 
-// Unbounded range used to serve the all-time aggregates from the ledger
-// queries (fallback when the rollup cannot be used).
+// Unbounded range [allTimeFrom, allTimeTo) used to serve the all-time
+// aggregates from the ledger queries (fallback when the rollup cannot be used).
 var (
 	allTimeFrom = time.Date(1, time.January, 1, 0, 0, 0, 0, time.UTC)
 	allTimeTo   = time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)
@@ -88,7 +90,10 @@ func (a *AnalyticsRepository) rollupUsable(ctx context.Context) (bool, error) {
 }
 
 // wholeMonths returns the UTC month boundaries [start, end) of the whole
-// months contained in [from, to]; ok is false when there is none.
+// months contained in the half-open range [from, to); ok is false when there
+// is none. A month [m, m+1) is contained iff m >= from and m+1 <= to, so end
+// is the start of to's month: to = 00:00 of the 1st (the range ends with the
+// last day of the previous month) makes that previous month whole.
 func wholeMonths(from, to time.Time) (start, end time.Time, ok bool) {
 	f, t := from.UTC(), to.UTC()
 	start = time.Date(f.Year(), f.Month(), 1, 0, 0, 0, 0, time.UTC)
@@ -101,11 +106,11 @@ func wholeMonths(from, to time.Time) (start, end time.Time, ok bool) {
 
 // rangeUsesRollup decides whether a ranged aggregate can be served from the
 // rollup and returns the whole-month span to read from it.
-func (a *AnalyticsRepository) rangeUsesRollup(ctx context.Context, dateFrom, dateTo time.Time, accountID string, minAmount, maxAmount *money.Amount) (time.Time, time.Time, bool, error) {
+func (a *AnalyticsRepository) rangeUsesRollup(ctx context.Context, dateFrom, dateToExclusive time.Time, accountID string, minAmount, maxAmount *money.Amount) (time.Time, time.Time, bool, error) {
 	if accountID != "" || minAmount != nil || maxAmount != nil {
 		return time.Time{}, time.Time{}, false, nil
 	}
-	start, end, ok := wholeMonths(dateFrom, dateTo)
+	start, end, ok := wholeMonths(dateFrom, dateToExclusive)
 	if !ok {
 		return time.Time{}, time.Time{}, false, nil
 	}
@@ -141,10 +146,10 @@ const (
 				ELSE 0
 			END), 0) AS total_bill`
 
-	// Ranged sources: $1 user, $3/$4 requested range (inclusive), $5/$6 the
-	// whole UTC months [start, end) read from the rollup; the ledger covers
-	// [$3, $5) and [$6, $4]. $7 category filter, $8 type filter ('' = any;
-	// monthly source only).
+	// Ranged sources: $1 user, $3/$4 requested range [$3, $4) (half-open),
+	// $5/$6 the whole UTC months [start, end) read from the rollup; the ledger
+	// covers [$3, $5) and [$6, $4). $7 category filter, $8 type filter ('' =
+	// any; monthly source only).
 	rangedBillSource = `
 		SELECT r.category_id, r.currency, r.amount_sum AS amount, r.tx_count AS cnt
 		FROM transaction_monthly_rollup r
@@ -158,7 +163,7 @@ const (
 		WHERE t.user_id = $1
 			AND t.type_transation = 'bill'
 			AND (NULLIF($7, '') IS NULL OR t.category_id = $7)
-			AND ((t.created_at >= $3 AND t.created_at < $5) OR (t.created_at >= $6 AND t.created_at <= $4))`
+			AND ((t.created_at >= $3 AND t.created_at < $5) OR (t.created_at >= $6 AND t.created_at < $4))`
 
 	rangedMonthlySource = `
 		SELECT r.month, r.type_transation, r.currency, r.amount_sum AS amount
@@ -173,20 +178,18 @@ const (
 		WHERE t.user_id = $1
 			AND (NULLIF($7, '') IS NULL OR t.category_id = $7)
 			AND (NULLIF($8, '') IS NULL OR t.type_transation::text = $8)
-			AND ((t.created_at >= $3 AND t.created_at < $5) OR (t.created_at >= $6 AND t.created_at <= $4))`
+			AND ((t.created_at >= $3 AND t.created_at < $5) OR (t.created_at >= $6 AND t.created_at < $4))`
 )
 
-func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.CategoryExpenseRepository, error) {
-	if !usdToDop.IsPositive() {
-		usdToDop = money.FromInt(1)
-	}
+func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateToExclusive time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.CategoryExpenseRepository, error) {
+	usdToDop = rateOrFallback(usdToDop)
 
-	start, end, useRollup, err := a.rangeUsesRollup(ctx, dateFrom, dateTo, accountID, minAmount, maxAmount)
+	start, end, useRollup, err := a.rangeUsesRollup(ctx, dateFrom, dateToExclusive, accountID, minAmount, maxAmount)
 	if err != nil {
 		return nil, fmt.Errorf("error getting category expenses in range: %w", err)
 	}
 	if !useRollup {
-		return a.ledgerCategoryExpenses(ctx, userID, usdToDop, dateFrom, dateTo, accountID, categoryID, transactionType, minAmount, maxAmount)
+		return a.ledgerCategoryExpenses(ctx, userID, usdToDop, dateFrom, dateToExclusive, accountID, categoryID, transactionType, minAmount, maxAmount)
 	}
 	if transactionType != "" && transactionType != "bill" {
 		// category expenses only count bills
@@ -201,7 +204,7 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 		GROUP BY c.id, c.name, c.color`
 
 	rows, err := txhelper.FromContext(ctx, a.db).QueryContext(ctx, query,
-		userID, usdToDop, dateFrom, dateTo, start, end, categoryID)
+		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID)
 	if err != nil {
 		return nil, fmt.Errorf("error getting category expenses in range: %w", err)
 	}
@@ -210,9 +213,7 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 
 // GetCategoryExpenses aggregates the user's bills of all time per category.
 func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID string, usdToDop money.Amount) ([]*analytics.CategoryExpenseRepository, error) {
-	if !usdToDop.IsPositive() {
-		usdToDop = money.FromInt(1)
-	}
+	usdToDop = rateOrFallback(usdToDop)
 
 	usable, err := a.rollupUsable(ctx)
 	if err != nil {
@@ -242,9 +243,7 @@ func (a *AnalyticsRepository) GetCategoryExpenses(ctx context.Context, userID st
 
 // GetMonthlySummary aggregates income and bills of all time per month.
 func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID string, usdToDop money.Amount) ([]*analytics.MonthlySummaryRepository, error) {
-	if !usdToDop.IsPositive() {
-		usdToDop = money.FromInt(60)
-	}
+	usdToDop = rateOrFallback(usdToDop)
 
 	usable, err := a.rollupUsable(ctx)
 	if err != nil {
@@ -274,17 +273,15 @@ func (a *AnalyticsRepository) GetMonthlySummary(ctx context.Context, userID stri
 	return scanMonthlySummaries(rows, "")
 }
 
-func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.MonthlySummaryRepository, error) {
-	if !usdToDop.IsPositive() {
-		usdToDop = money.FromInt(60)
-	}
+func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateToExclusive time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.MonthlySummaryRepository, error) {
+	usdToDop = rateOrFallback(usdToDop)
 
-	start, end, useRollup, err := a.rangeUsesRollup(ctx, dateFrom, dateTo, accountID, minAmount, maxAmount)
+	start, end, useRollup, err := a.rangeUsesRollup(ctx, dateFrom, dateToExclusive, accountID, minAmount, maxAmount)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary in range: %w", err)
 	}
 	if !useRollup {
-		return a.ledgerMonthlySummary(ctx, userID, usdToDop, dateFrom, dateTo, accountID, categoryID, transactionType, minAmount, maxAmount)
+		return a.ledgerMonthlySummary(ctx, userID, usdToDop, dateFrom, dateToExclusive, accountID, categoryID, transactionType, minAmount, maxAmount)
 	}
 
 	query := `WITH s AS (` + rangedMonthlySource + `
@@ -297,7 +294,7 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 		ORDER BY s.month`
 
 	rows, err := txhelper.FromContext(ctx, a.db).QueryContext(ctx, query,
-		userID, usdToDop, dateFrom, dateTo, start, end, categoryID, transactionType)
+		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID, transactionType)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary in range: %w", err)
 	}
@@ -305,9 +302,7 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 }
 
 func (a *AnalyticsRepository) GetTotals(ctx context.Context, userID string, usdToDop money.Amount) (*analytics.TotalsRepository, error) {
-	if !usdToDop.IsPositive() {
-		usdToDop = money.FromInt(60)
-	}
+	usdToDop = rateOrFallback(usdToDop)
 
 	query := `
 		SELECT
@@ -333,17 +328,15 @@ func (a *AnalyticsRepository) GetTotals(ctx context.Context, userID string, usdT
 	return &totals, nil
 }
 
-func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) (*analytics.TotalsRepository, error) {
-	if !usdToDop.IsPositive() {
-		usdToDop = money.FromInt(60)
-	}
+func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateToExclusive time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) (*analytics.TotalsRepository, error) {
+	usdToDop = rateOrFallback(usdToDop)
 
-	start, end, useRollup, err := a.rangeUsesRollup(ctx, dateFrom, dateTo, accountID, minAmount, maxAmount)
+	start, end, useRollup, err := a.rangeUsesRollup(ctx, dateFrom, dateToExclusive, accountID, minAmount, maxAmount)
 	if err != nil {
 		return nil, err
 	}
 	if !useRollup {
-		return a.ledgerTotals(ctx, userID, usdToDop, dateFrom, dateTo, accountID, categoryID, transactionType, minAmount, maxAmount)
+		return a.ledgerTotals(ctx, userID, usdToDop, dateFrom, dateToExclusive, accountID, categoryID, transactionType, minAmount, maxAmount)
 	}
 
 	query := `WITH s AS (` + rangedMonthlySource + `
@@ -353,7 +346,7 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 
 	var totals analytics.TotalsRepository
 	if err := txhelper.FromContext(ctx, a.db).QueryRowContext(ctx, query,
-		userID, usdToDop, dateFrom, dateTo, start, end, categoryID, transactionType,
+		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID, transactionType,
 	).Scan(&totals.TotalIncome, &totals.TotalBill); err != nil {
 		return nil, err
 	}
@@ -363,7 +356,7 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 
 // ── Ledger aggregates (no rollup) ───────────────────────────────────────────
 
-func (a *AnalyticsRepository) ledgerCategoryExpenses(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.CategoryExpenseRepository, error) {
+func (a *AnalyticsRepository) ledgerCategoryExpenses(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateToExclusive time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.CategoryExpenseRepository, error) {
 	query := `
 		SELECT c.id,
 			c.name,
@@ -384,7 +377,7 @@ func (a *AnalyticsRepository) ledgerCategoryExpenses(ctx context.Context, userID
 			AND ($7 = '' OR $7 = 'bill')
 			AND ($8::numeric IS NULL OR t.amount >= $8)
 			AND ($9::numeric IS NULL OR t.amount <= $9)
-			AND t.created_at >= $3 AND t.created_at <= $4
+			AND t.created_at >= $3 AND t.created_at < $4
 		GROUP BY c.id, c.name, c.color
 	`
 
@@ -394,7 +387,7 @@ func (a *AnalyticsRepository) ledgerCategoryExpenses(ctx context.Context, userID
 		userID,
 		usdToDop,
 		dateFrom,
-		dateTo,
+		dateToExclusive,
 		accountID,
 		categoryID,
 		transactionType,
@@ -407,7 +400,7 @@ func (a *AnalyticsRepository) ledgerCategoryExpenses(ctx context.Context, userID
 	return scanCategoryExpenses(rows, "in range")
 }
 
-func (a *AnalyticsRepository) ledgerMonthlySummary(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.MonthlySummaryRepository, error) {
+func (a *AnalyticsRepository) ledgerMonthlySummary(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateToExclusive time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.MonthlySummaryRepository, error) {
 	query := `
 		SELECT
 			EXTRACT(YEAR FROM created_at)::int as year,
@@ -429,7 +422,7 @@ func (a *AnalyticsRepository) ledgerMonthlySummary(ctx context.Context, userID s
 			AND (NULLIF($7, '') IS NULL OR type_transation::text = $7)
 			AND ($8::numeric IS NULL OR amount >= $8)
 			AND ($9::numeric IS NULL OR amount <= $9)
-			AND created_at >= $3 AND created_at <= $4
+			AND created_at >= $3 AND created_at < $4
 		GROUP BY year, month
 		ORDER BY year, month
 	`
@@ -440,7 +433,7 @@ func (a *AnalyticsRepository) ledgerMonthlySummary(ctx context.Context, userID s
 		userID,
 		usdToDop,
 		dateFrom,
-		dateTo,
+		dateToExclusive,
 		accountID,
 		categoryID,
 		transactionType,
@@ -453,7 +446,7 @@ func (a *AnalyticsRepository) ledgerMonthlySummary(ctx context.Context, userID s
 	return scanMonthlySummaries(rows, "in range")
 }
 
-func (a *AnalyticsRepository) ledgerTotals(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateTo time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) (*analytics.TotalsRepository, error) {
+func (a *AnalyticsRepository) ledgerTotals(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateToExclusive time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) (*analytics.TotalsRepository, error) {
 	query := `
 		SELECT
 			COALESCE(SUM(CASE
@@ -473,7 +466,7 @@ func (a *AnalyticsRepository) ledgerTotals(ctx context.Context, userID string, u
 			AND (NULLIF($7, '') IS NULL OR type_transation::text = $7)
 			AND ($8::numeric IS NULL OR amount >= $8)
 			AND ($9::numeric IS NULL OR amount <= $9)
-			AND created_at >= $3 AND created_at <= $4
+			AND created_at >= $3 AND created_at < $4
 	`
 
 	var totals analytics.TotalsRepository
@@ -483,7 +476,7 @@ func (a *AnalyticsRepository) ledgerTotals(ctx context.Context, userID string, u
 		userID,
 		usdToDop,
 		dateFrom,
-		dateTo,
+		dateToExclusive,
 		accountID,
 		categoryID,
 		transactionType,
@@ -544,6 +537,16 @@ func scanMonthlySummaries(rows *sql.Rows, what string) ([]*analytics.MonthlySumm
 	}
 
 	return monthlySummaries, nil
+}
+
+// rateOrFallback returns usdToDop, or money.FallbackUsdToDopRate (60, the
+// fallback of AnalyticsService.resolveUsdToDop and the other modules) when it
+// is not positive, so every aggregate agrees with each other.
+func rateOrFallback(usdToDop money.Amount) money.Amount {
+	if !usdToDop.IsPositive() {
+		return money.FallbackUsdToDopRate
+	}
+	return usdToDop
 }
 
 func nullableAmountArg(value *money.Amount) any {

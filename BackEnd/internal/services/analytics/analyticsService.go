@@ -42,6 +42,12 @@ type AnalyticsService struct {
 	usdToDopRateFn        func(context.Context) (money.Amount, error)
 }
 
+// DashboardFilters selects the transactions aggregated by GetDashboardSummary.
+//
+// DateFrom and DateTo are the first and the last calendar day of the range,
+// both inclusive: only their year, month and day (in their own location) are
+// used. When either is zero the range is the current year to date in Santo
+// Domingo. See dashboardDateRange for the instants they select.
 type DashboardFilters struct {
 	DateFrom        time.Time
 	DateTo          time.Time
@@ -52,17 +58,17 @@ type DashboardFilters struct {
 	MaxAmount       *money.Amount
 }
 
-// resolveUsdToDop returns the USD->DOP rate, or 1 (no conversion) when the
-// rate is unavailable.
+// resolveUsdToDop returns the USD->DOP rate, or money.FallbackUsdToDopRate
+// (60, the fallback of the other modules) when the rate is unavailable.
 func (s *AnalyticsService) resolveUsdToDop(ctx context.Context) money.Amount {
 	if s.usdToDopRateFn == nil {
-		log.Warn().Msg("exchange rate function not configured, USD amounts will not be converted")
-		return money.FromInt(1)
+		log.Warn().Msg("exchange rate function not configured, using fallback rate 60")
+		return money.FallbackUsdToDopRate
 	}
 	rate, rateErr := s.usdToDopRateFn(ctx)
 	if rateErr != nil || !rate.IsPositive() {
-		log.Warn().Msg("exchange rate unavailable, USD amounts will not be converted")
-		return money.FromInt(1)
+		log.Warn().Err(rateErr).Msg("exchange rate unavailable, using fallback rate 60")
+		return money.FallbackUsdToDopRate
 	}
 	return rate
 }
@@ -124,7 +130,7 @@ func (s *AnalyticsService) GetMonthlySummary(ctx context.Context, userID string)
 }
 
 func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID string, filters DashboardFilters) (*analytics.DashboardSummary, error) {
-	dateFrom, dateTo := normalizeDashboardDateRange(filters.DateFrom, filters.DateTo)
+	dateFrom, dateToExclusive := dashboardDateRange(filters.DateFrom, filters.DateTo, time.Now())
 	transactionType := normalizeTransactionType(filters.TransactionType)
 
 	usdToDop := s.resolveUsdToDop(ctx)
@@ -134,7 +140,7 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		userID,
 		usdToDop,
 		dateFrom,
-		dateTo,
+		dateToExclusive,
 		filters.AccountID,
 		filters.CategoryID,
 		transactionType,
@@ -150,7 +156,7 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		userID,
 		usdToDop,
 		dateFrom,
-		dateTo,
+		dateToExclusive,
 		filters.AccountID,
 		filters.CategoryID,
 		transactionType,
@@ -166,7 +172,7 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		userID,
 		usdToDop,
 		dateFrom,
-		dateTo,
+		dateToExclusive,
 		filters.AccountID,
 		filters.CategoryID,
 		transactionType,
@@ -260,16 +266,31 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 	}, nil
 }
 
-func normalizeDashboardDateRange(dateFrom time.Time, dateTo time.Time) (time.Time, time.Time) {
+// dashboardDateRange returns the half-open range of instants [from, to) of
+// the inclusive calendar days [dateFrom, dateTo]: from 00:00 UTC of the first
+// day to 00:00 UTC of the day after the last one, so the whole last day is
+// included. Days are UTC days like in the transaction list (TransactionFilter
+// parses date_from/date_to as UTC dates) and like the months of the monthly
+// rollup, so the same period gives the same totals on both screens and a
+// range of whole months is served from the rollup. A reversed range is
+// swapped; a zero bound selects the current year to date in Santo Domingo.
+func dashboardDateRange(dateFrom, dateTo, now time.Time) (time.Time, time.Time) {
 	if dateFrom.IsZero() || dateTo.IsZero() {
-		return currentYearRangeInSantoDomingo()
+		dateFrom, dateTo = currentYearToDateInSantoDomingo(now)
 	}
 
-	if dateTo.Before(dateFrom) {
-		return dateTo, dateFrom
+	from, to := utcDay(dateFrom), utcDay(dateTo)
+	if to.Before(from) {
+		from, to = to, from
 	}
 
-	return dateFrom, dateTo
+	return from, to.AddDate(0, 0, 1)
+}
+
+// utcDay returns 00:00 UTC of t's calendar day (in t's location).
+func utcDay(t time.Time) time.Time {
+	year, month, day := t.Date()
+	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
 }
 
 func normalizeTransactionType(transactionType string) string {
@@ -280,15 +301,13 @@ func normalizeTransactionType(transactionType string) string {
 	return ""
 }
 
-func currentYearRangeInSantoDomingo() (time.Time, time.Time) {
-	loc, err := time.LoadLocation("America/Santo_Domingo")
-	if err != nil {
-		now := time.Now()
-		start := time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, now.Location())
-		return start, now
+// currentYearToDateInSantoDomingo returns January 1st and today of the
+// current year in Santo Domingo (in now's location if it cannot be loaded).
+func currentYearToDateInSantoDomingo(now time.Time) (time.Time, time.Time) {
+	if loc, err := time.LoadLocation("America/Santo_Domingo"); err == nil {
+		now = now.In(loc)
 	}
 
-	now := time.Now().In(loc)
-	start := time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, loc)
+	start := time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, now.Location())
 	return start, now
 }

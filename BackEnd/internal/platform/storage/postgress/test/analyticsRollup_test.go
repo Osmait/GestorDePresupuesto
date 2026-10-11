@@ -26,7 +26,7 @@ import (
 
 // ── The analytics queries as they were before the monthly rollup (000054) ──
 // They aggregate the ledger directly and are the reference the rollup-based
-// repository must reproduce exactly.
+// repository must reproduce exactly. Ranges are half-open: [$3, $4).
 
 const legacyCategoryExpensesSQL = `
 	SELECT c.id, c.name,
@@ -75,7 +75,7 @@ const legacyCategoryExpensesInRangeSQL = `
 		AND ($7 = '' OR $7 = 'bill')
 		AND ($8::numeric IS NULL OR t.amount >= $8)
 		AND ($9::numeric IS NULL OR t.amount <= $9)
-		AND t.created_at >= $3 AND t.created_at <= $4
+		AND t.created_at >= $3 AND t.created_at < $4
 	GROUP BY c.id, c.name, c.color`
 
 const legacyMonthlySummaryInRangeSQL = `
@@ -99,7 +99,7 @@ const legacyMonthlySummaryInRangeSQL = `
 		AND (NULLIF($7, '') IS NULL OR type_transation::text = $7)
 		AND ($8::numeric IS NULL OR amount >= $8)
 		AND ($9::numeric IS NULL OR amount <= $9)
-		AND created_at >= $3 AND created_at <= $4
+		AND created_at >= $3 AND created_at < $4
 	GROUP BY year, month
 	ORDER BY year, month`
 
@@ -122,7 +122,7 @@ const legacyTotalsInRangeSQL = `
 		AND (NULLIF($7, '') IS NULL OR type_transation::text = $7)
 		AND ($8::numeric IS NULL OR amount >= $8)
 		AND ($9::numeric IS NULL OR amount <= $9)
-		AND created_at >= $3 AND created_at <= $4`
+		AND created_at >= $3 AND created_at < $4`
 
 func legacyCategoryExpenses(ctx context.Context, q txhelper.Querier, query string, args ...any) ([]*analytics.CategoryExpenseRepository, error) {
 	rows, err := q.QueryContext(ctx, query, args...)
@@ -362,14 +362,14 @@ func (g rollupGen) mutate(ctx context.Context, tx *sql.Tx, u *rollupFixtureUser)
 	return err
 }
 
-// randomRange returns a dashboard-like [from, to] range.
+// randomRange returns a dashboard-like [from, to) range.
 func (g rollupGen) randomRange() (time.Time, time.Time) {
 	from := g.instant()
 	var to time.Time
 	switch g.rng.IntN(5) {
 	case 0: // inside one month
 		to = from.Add(time.Duration(g.rng.Int64N(int64(20 * 24 * time.Hour))))
-	case 1: // whole UTC months exactly
+	case 1: // whole UTC months exactly, as dashboardDateRange builds them
 		f := from.UTC()
 		from = time.Date(f.Year(), f.Month(), 1, 0, 0, 0, 0, time.UTC)
 		to = from.AddDate(0, 1+g.rng.IntN(14), 0)
@@ -539,7 +539,7 @@ func TestAnalyticsRollup_RandomizedEquivalence(t *testing.T) {
 							category = g.pick(u.categories)
 						}
 						txType := []string{"", "", "bill", "income"}[g.rng.IntN(4)]
-						rwhat := fmt.Sprintf("%s range [%s, %s] cat=%q type=%q", what, from.Format(time.RFC3339Nano), to.Format(time.RFC3339Nano), category, txType)
+						rwhat := fmt.Sprintf("%s range [%s, %s) cat=%q type=%q", what, from.Format(time.RFC3339Nano), to.Format(time.RFC3339Nano), category, txType)
 						if !to.Before(from) && to.Sub(from) > 62*24*time.Hour {
 							rangesViaRollup++
 						}
