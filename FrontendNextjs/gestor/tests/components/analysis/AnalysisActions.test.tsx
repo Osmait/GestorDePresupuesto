@@ -1,107 +1,116 @@
-import { render, screen } from '@testing-library/react'
-import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
-import { AnalysisActions } from '@/components/analysis/AnalysisActions'
+import { fireEvent, screen, within } from '@testing-library/react'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { AnalysisActions, switchPeriodMode } from '@/components/analysis/AnalysisActions'
+import { buildExportSnapshot } from '@/components/analysis/analysis-export'
+import { renderWithIntl } from '../../utils/intl'
+import { makeReport, TODAY } from './fixtures'
 
-// Mock translations
-vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string) => key,
+const search = vi.hoisted(() => ({ value: '' }))
+
+vi.mock('next/navigation', () => ({
+	useSearchParams: () => new URLSearchParams(search.value),
+	usePathname: () => '/app/analysis',
 }))
 
-// Mock context
-vi.mock('@/components/analysis/AnalysisContext', () => ({
-	createDefaultAnalysisFilters: () => ({}),
-	useAnalysisContext: () => ({
-		filters: {
-			filterMode: 'month',
-			month: '01',
-			year: '2024',
-			dateRange: { from: undefined, to: undefined },
-			account: 'all',
-			category: 'all',
-			type: 'all',
-			minAmount: '',
-			maxAmount: '',
-			search: '',
-		},
-		setFilters: vi.fn(),
-	}),
-}))
-
-// Mock hooks
 vi.mock('@/hooks/queries/useAccountsQuery', () => ({
-	useGetAccounts: () => ({ data: [] }),
-}))
-vi.mock('@/hooks/queries/useCategoriesQuery', () => ({
-	useGetCategories: () => ({ data: [] }),
-}))
-vi.mock('@/hooks/queries/useAnalyticsQuery', () => ({
-	useGetDashboardSummary: () => ({
-		data: {
-			total_income: 1000,
-			total_expenses: 500,
-			category_expenses: [
-				{ id: 'c1', label: 'Food', value: 300 },
-				{ id: 'c2', label: 'Rent', value: 200 },
-			],
-		},
-	}),
-}))
-vi.mock('@/hooks/queries/useBudgetsQuery', () => ({
-	useGetBudgets: () => ({ data: [] }),
+	useGetAccounts: () => ({ data: [{ id: 'acc-1', name: 'Checking' }] }),
 }))
 
-// Desktop layout: tools open as floating, non-modal dialogs (mobile uses a vaul drawer)
-vi.mock('@/hooks/useMediaQuery', () => ({
-	BREAKPOINTS: { md: '(min-width: 768px)' },
-	useMediaQuery: () => true,
+vi.mock('@/components/analysis/useAnalysisReport', async (importOriginal) => ({
+	...(await importOriginal<object>()),
+	useAnalysisReport: () => ({ report: null }),
 }))
 
-// Mock filters form
-vi.mock('@/components/analysis/AnalysisFilters', () => ({
-	AnalysisFiltersForm: () => <div data-testid='filters-form'>Filters Form</div>,
-}))
+function desktop() {
+	// Mobile and desktop controls are both in the DOM (CSS picks one); the desktop row is the last one.
+	const groups = screen.getAllByRole('group', { name: 'Period' })
+	return groups[groups.length - 1].parentElement as HTMLElement
+}
 
 describe('AnalysisActions', () => {
-	it('renders filter button', () => {
-		render(<AnalysisActions />)
-		expect(screen.getByText('filter')).toBeInTheDocument()
+	let replaceState: ReturnType<typeof vi.spyOn>
+
+	beforeEach(() => {
+		vi.useFakeTimers({ toFake: ['Date'] })
+		vi.setSystemTime(new Date(2026, 9, 11, 12))
+		search.value = ''
+		replaceState = vi.spyOn(window.history, 'replaceState')
 	})
 
-	it('opens drawer when filter button is clicked', async () => {
-		const user = userEvent.setup()
-		render(<AnalysisActions />)
-
-		await user.click(screen.getByText('filter'))
-
-		expect(await screen.findByText('filterAnalytics')).toBeInTheDocument()
-		expect(await screen.findByTestId('filters-form')).toBeInTheDocument()
+	afterEach(() => {
+		vi.useRealTimers()
+		replaceState.mockRestore()
 	})
 
-	it('opens a tool as a labelled dialog that closes with its close button', async () => {
-		const user = userEvent.setup()
-		render(<AnalysisActions />)
+	it('defaults to the current month and cannot go past it', () => {
+		renderWithIntl(<AnalysisActions />)
+		const row = desktop()
 
-		await user.click(screen.getByRole('button', { name: 'tools' }))
-		await user.click(await screen.findByRole('menuitem', { name: 'toolProjectionTitle' }))
-
-		const dialog = await screen.findByRole('dialog', { name: 'toolProjectionTitle' })
-		expect(dialog).toBeInTheDocument()
-
-		await user.click(screen.getByRole('button', { name: 'toolClose' }))
-		expect(screen.queryByRole('dialog', { name: 'toolProjectionTitle' })).not.toBeInTheDocument()
+		expect(within(row).getByText('October 2026')).toBeInTheDocument()
+		expect(within(row).getByRole('button', { name: 'Next month' })).toBeDisabled()
+		expect(within(row).getByRole('button', { name: 'Month' })).toHaveAttribute('aria-pressed', 'true')
 	})
 
-	it('closes a tool window with Escape', async () => {
-		const user = userEvent.setup()
-		render(<AnalysisActions />)
+	it('moves to the previous month through the URL', () => {
+		renderWithIntl(<AnalysisActions />)
+		fireEvent.click(within(desktop()).getByRole('button', { name: 'Previous month' }))
+		expect(replaceState).toHaveBeenCalledWith(null, '', '/app/analysis?period=2026-09')
+	})
 
-		await user.click(screen.getByRole('button', { name: 'tools' }))
-		await user.click(await screen.findByRole('menuitem', { name: 'toolExportTitle' }))
-		const dialog = await screen.findByRole('dialog', { name: 'toolExportTitle' })
+	it('keeps the account when stepping and enables "next" for a past month', () => {
+		search.value = 'period=2026-01&account=acc-1'
+		renderWithIntl(<AnalysisActions />)
+		const row = desktop()
 
-		dialog.focus()
-		await user.keyboard('{Escape}')
-		expect(screen.queryByRole('dialog', { name: 'toolExportTitle' })).not.toBeInTheDocument()
+		expect(within(row).getByText('January 2026')).toBeInTheDocument()
+		fireEvent.click(within(row).getByRole('button', { name: 'Previous month' }))
+		expect(replaceState).toHaveBeenCalledWith(null, '', '/app/analysis?period=2025-12&account=acc-1')
+		fireEvent.click(within(row).getByRole('button', { name: 'Next month' }))
+		expect(replaceState).toHaveBeenLastCalledWith(null, '', '/app/analysis?period=2026-02&account=acc-1')
+	})
+
+	it('switches to year mode', () => {
+		renderWithIntl(<AnalysisActions />)
+		fireEvent.click(within(desktop()).getByRole('button', { name: 'Year' }))
+		expect(replaceState).toHaveBeenCalledWith(null, '', '/app/analysis?period=2026')
+	})
+
+	it('has no floating tools and no dead search filter', () => {
+		renderWithIntl(<AnalysisActions />)
+		expect(screen.queryByRole('button', { name: /tools/i })).not.toBeInTheDocument()
+		expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+		expect(within(desktop()).getByRole('combobox', { name: 'Account' })).toBeInTheDocument()
+		expect(within(desktop()).getByRole('button', { name: 'Export' })).toBeInTheDocument()
+	})
+})
+
+describe('switchPeriodMode', () => {
+	it('keeps the user near the period they were looking at', () => {
+		expect(switchPeriodMode({ mode: 'month', year: 2025, month: 4 }, 'year', TODAY)).toEqual({
+			mode: 'year',
+			year: 2025,
+		})
+		expect(switchPeriodMode({ mode: 'year', year: 2025 }, 'month', TODAY)).toEqual({
+			mode: 'month',
+			year: 2025,
+			month: 12,
+		})
+		expect(switchPeriodMode({ mode: 'month', year: 2026, month: 10 }, 'range', TODAY)).toEqual({
+			mode: 'range',
+			from: '2026-10-01',
+			to: '2026-10-11',
+		})
+	})
+})
+
+describe('buildExportSnapshot', () => {
+	it('rounds every amount to cents', () => {
+		const snapshot = buildExportSnapshot(makeReport(), 'acc-1', new Date('2026-10-11T12:00:00Z'))
+		const { generated_at: _timestamp, ...numbers } = snapshot
+		expect(JSON.stringify(numbers)).not.toMatch(/\d\.\d{3,}/)
+		expect(snapshot.period).toMatchObject({ mode: 'month', from: '2026-10-01', to: '2026-10-11' })
+		expect(snapshot.totals.expense_change_percent).toBe(1.67)
+		expect(snapshot.fixed_variable).toEqual({ fixed: 45000, variable: 25100 })
+		expect(snapshot.account_id).toBe('acc-1')
 	})
 })

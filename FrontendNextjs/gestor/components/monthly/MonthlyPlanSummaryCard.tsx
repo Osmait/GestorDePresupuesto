@@ -1,13 +1,12 @@
 'use client'
 
-import { AlertTriangle, ArrowDownRight, ArrowUpRight, PieChart, Wallet } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Amount } from '@/components/shared/Amount'
-import { StatCard } from '@/components/shared/StatCard'
-import { StatGrid } from '@/components/shared/StatGrid'
+import { StatStrip, StatStripItem } from '@/components/shared/StatStrip'
 import { Progress, type ProgressTone } from '@/components/ui/progress'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
-import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
 import { PLAN_CURRENCY } from '@/lib/monthlyPlanUtils'
 import { MonthlyPlanSummary } from '@/types/monthlyPlan'
 
@@ -18,90 +17,78 @@ function committedTone(percentage: number): ProgressTone {
 	return 'default'
 }
 
-/**
- * The headline of the feature. Every number comes straight from the backend so
- * the currency conversion happens in exactly one place.
- */
-export function MonthlyPlanSummaryCard({ summary }: { summary: MonthlyPlanSummary }) {
-	const t = useTranslations('monthlyPlan')
-	const locale = useAppLocale()
+interface MonthlyPlanSummaryCardProps {
+	summary: MonthlyPlanSummary
+	/** Paused fixed expenses (the backend counts only the active ones). */
+	pausedExpenses?: number
+}
 
-	const isOvercommitted = summary.available < 0
+/**
+ * The headline of the feature as one compact strip. Every total comes straight
+ * from the backend so the currency conversion happens in exactly one place.
+ */
+export function MonthlyPlanSummaryCard({ summary, pausedExpenses = 0 }: MonthlyPlanSummaryCardProps) {
+	const t = useTranslations('monthlyPlan')
 	const formatPercent = useFormatPercent()
-	const rateFormatter = new Intl.NumberFormat(getIntlLocale(locale), {
-		minimumFractionDigits: 2,
-		maximumFractionDigits: 2,
-	})
+	const formatCurrency = useFormatCurrency()
+	const isOvercommitted = summary.available < 0
 
 	return (
-		<section aria-label={t('summaryTitle')} className='space-y-2'>
-			<StatGrid>
-				<div data-testid='summary-income'>
-					<StatCard
-						className='h-full'
-						label={t('totalIncome')}
-						icon={ArrowUpRight}
-						tone='positive'
-						value={<Amount value={summary.total_income} currency={PLAN_CURRENCY} animate />}
-						hint={t('itemsCount', { count: summary.income_count })}
+		<StatStrip
+			label={t('summaryTitle')}
+			footer={
+				summary.usd_to_dop_rate > 0
+					? t('rateNote', { rate: formatCurrency(summary.usd_to_dop_rate, PLAN_CURRENCY) })
+					: undefined
+			}
+		>
+			<StatStripItem
+				data-testid='summary-income'
+				label={t('totalIncome')}
+				tone='positive'
+				value={<Amount value={summary.total_income} currency={PLAN_CURRENCY} />}
+				hint={t('incomeHint', { count: summary.income_count })}
+			/>
+			<StatStripItem
+				data-testid='summary-expenses'
+				label={t('totalExpenses')}
+				value={<Amount value={summary.total_expenses} currency={PLAN_CURRENCY} />}
+				hint={
+					pausedExpenses > 0
+						? t('expensesHintPaused', { active: summary.expenses_count, paused: pausedExpenses })
+						: t('expensesHint', { active: summary.expenses_count })
+				}
+			/>
+			<StatStripItem
+				data-testid='summary-available'
+				label={t('available')}
+				tone={isOvercommitted ? 'negative' : 'default'}
+				value={<Amount value={summary.available} currency={PLAN_CURRENCY} />}
+				hint={
+					isOvercommitted ? (
+						<span className='flex items-center gap-1 text-destructive'>
+							<AlertTriangle className='h-3 w-3 shrink-0' aria-hidden='true' />
+							{t('overcommitted')}
+						</span>
+					) : (
+						t('availableHint')
+					)
+				}
+			/>
+			<StatStripItem
+				data-testid='summary-committed'
+				label={t('committed')}
+				value={formatPercent(summary.committed_percentage)}
+				hint={
+					// Only the bar is capped at 100%; the printed percentage still tells the truth.
+					<Progress
+						className='mt-1.5 h-1.5'
+						value={summary.committed_percentage}
+						tone={committedTone(summary.committed_percentage)}
+						aria-label={t('committedBar')}
 					/>
-				</div>
-
-				<div data-testid='summary-expenses'>
-					<StatCard
-						className='h-full'
-						label={t('totalExpenses')}
-						icon={ArrowDownRight}
-						tone='negative'
-						value={<Amount value={summary.total_expenses} currency={PLAN_CURRENCY} animate />}
-						hint={t('itemsCount', { count: summary.expenses_count })}
-					/>
-				</div>
-
-				<div data-testid='summary-available'>
-					<StatCard
-						className='h-full'
-						label={t('available')}
-						icon={Wallet}
-						tone={isOvercommitted ? 'negative' : 'default'}
-						value={<Amount value={summary.available} currency={PLAN_CURRENCY} animate />}
-						hint={
-							isOvercommitted ? (
-								<span className='flex items-center gap-1 text-destructive'>
-									<AlertTriangle className='h-3 w-3 shrink-0' aria-hidden='true' />
-									{t('overcommitted')}
-								</span>
-							) : undefined
-						}
-					/>
-				</div>
-
-				<div data-testid='summary-committed'>
-					<StatCard
-						className='h-full'
-						label={t('committed')}
-						icon={PieChart}
-						value={
-							<>
-								{/* Only the bar is capped at 100%; the printed percentage still tells the truth. */}
-								<span>{formatPercent(summary.committed_percentage)}</span>
-								<Progress
-									className='mt-3'
-									value={summary.committed_percentage}
-									tone={committedTone(summary.committed_percentage)}
-									aria-label={t('committedBar')}
-								/>
-							</>
-						}
-					/>
-				</div>
-			</StatGrid>
-
-			{summary.usd_to_dop_rate > 0 && (
-				<p className='text-xs text-muted-foreground'>
-					{t('rateNote', { rate: rateFormatter.format(summary.usd_to_dop_rate) })}
-				</p>
-			)}
-		</section>
+				}
+			/>
+		</StatStrip>
 	)
 }

@@ -274,6 +274,28 @@ function StatGridSkeleton(props: { count?: 2 | 3 | 4 | 5; className?: string }) 
 Animated counters are opt-in: `value={<Amount value={x} animate />}` (skipped under reduced motion). `STAT_TONE_CLASS` is exported if you need the same tone mapping elsewhere.
 **Semantics:** `StatGrid` renders a `<dl>` and each `StatCard` is a `dt` (label) + `dd` (value, hint) group, so put only StatCards in a StatGrid; a StatCard outside a StatGrid goes in a `<dl>` grid of its own. **Loading:** the one KPI skeleton is `<StatGridSkeleton count={n} />` (same frame as n loading StatCards); don't hand-roll `Skeleton h-[108px]` tiles.
 
+### StatStrip — `components/shared/StatStrip.tsx` (server-compatible)
+The compact KPI variant: several figures in **one** flat card (2×2 on mobile, one row from `lg`) instead of a `StatGrid` of cards. Use it when the KPIs frame the page's real content (a ledger, a long list) rather than being the content; keep `StatGrid` for dashboards where the numbers are the point.
+```ts
+interface StatStripProps { label: string; children: ReactNode; footer?: ReactNode; className?: string } // <section aria-label> + <dl>
+interface StatStripItemProps extends HTMLAttributes<HTMLDivElement> { label: ReactNode; value: ReactNode; hint?: ReactNode; tone?: StatTone; loading?: boolean }
+```
+```tsx
+<StatStrip label={t('summaryTitle')} footer={t('rateNote', { rate })}>
+	<StatStripItem label={t('totalIncome')} tone='positive' value={<Amount value={income} />} hint={t('incomeHint', { count })} />
+	<StatStripItem label={t('committed')} value={formatPercent(pct)} hint={<Progress className='mt-1.5 h-1.5' value={pct} aria-label={t('committedBar')} />} />
+</StatStrip>
+```
+Values are `text-base` → `sm:text-xl` semibold tabular figures; the hint slot also takes a thin `Progress`. Reference: `MonthlyPlanSummaryCard`.
+
+### Ledger (grouped, collapsible list) — reference: `components/monthly/MonthlyPlanLedger.tsx`
+For long lists of money rows that people scan by group (the monthly plan's items): one card, a toolbar, groups, a total row. Not a table and not cards-per-row.
+- **Toolbar** (card header): h2 title, a `type='search'` filter (label via `sr-only`, auto-expands every group while a query is active, `EmptyState compact` "No X found" when nothing matches), a **segmented control** for the grouping (a `<fieldset>` with an `sr-only` legend and `aria-pressed` buttons on a `bg-muted` track; full-width 3 columns below `sm`), optional filter toggles as `aria-pressed` buttons (`Paused (n)`), and "Expand all / Collapse all".
+- **Group header**: an `h3` wrapping a full-width `button` with `aria-expanded` + `aria-controls`: chevron (rotates, `motion-reduce:transition-none`), a 10px color dot (user category color, else `var(--color-chart-N)` by position, `success` for income), title, count, an optional share bar + percentage (hidden below `sm`, where the share moves into the count line) and the signed subtotal via `<Amount signed>`. Inside the button the share bar is a decorative `aria-hidden` span (a button only takes phrasing content); everywhere else use `Progress`.
+- **Rows**: `li` on a shared grid with the column header (`day | name | amount | menu`), ≥44px tall (48px on mobile). Badges (USD original, Paused) sit inline from `sm`; below `sm` secondary facts move to a second muted line. Paused rows: muted ink + `line-through` amount. Income `tone='positive'`, expenses neutral with the sign. Row menu = the standard 40px `MoreHorizontal` dropdown.
+- **State**: group-by choice and collapsed groups persist per user in `localStorage` (key includes the user id; every read/write in `try/catch`, defaults when unreadable). New groups start expanded.
+- **Total row**: last, `bg-muted/40`, label + signed `Amount`.
+
 ### Amount — `components/shared/Amount.tsx` (client)
 The only way to render money.
 ```ts
