@@ -20,19 +20,13 @@ describe('resolveLocale', () => {
 		expect(resolveLocale('en')).toBe('en')
 	})
 
-	it.each([
-		undefined,
-		null,
-		'',
-		'fr',
-		'EN',
-		'../../package',
-		'en/../es',
-		'es.json',
-	])('falls back to es for %s', (value) => {
-		expect(resolveLocale(value)).toBe(DEFAULT_LOCALE)
-		expect(DEFAULT_LOCALE).toBe('es')
-	})
+	it.each([undefined, null, '', 'fr', 'EN', '../../package', 'en/../es', 'es.json'])(
+		'falls back to es for %s',
+		(value) => {
+			expect(resolveLocale(value)).toBe(DEFAULT_LOCALE)
+			expect(DEFAULT_LOCALE).toBe('es')
+		},
+	)
 })
 
 describe('i18n request config', () => {
