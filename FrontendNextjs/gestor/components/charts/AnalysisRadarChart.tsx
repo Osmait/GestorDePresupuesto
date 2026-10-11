@@ -1,47 +1,50 @@
 'use client'
 
 import { ResponsiveRadar } from '@nivo/radar'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useChartTheme } from './chart-theme'
 
 interface AnalysisRadarChartProps {
-	data: any[]
-	nivoTheme: any
+	data: Record<string, string | number>[]
+	/** Accessible name of the chart (role="img"). */
+	label: string
 	t: {
 		expenses: string
 	}
 }
 
-const AnalysisRadarChart = ({ data, nivoTheme, t }: AnalysisRadarChartProps) => {
+const AnalysisRadarChart = ({ data, label, t }: AnalysisRadarChartProps) => {
+	const { theme, colors } = useChartTheme(11)
+	const formatCurrency = useFormatCurrency()
+
 	return (
-		<ResponsiveRadar
-			data={data}
-			keys={[t.expenses]}
-			indexBy='categoria'
-			maxValue='auto'
-			margin={{ top: 30, right: 30, bottom: 50, left: 60 }}
-			curve='linearClosed'
-			borderWidth={2}
-			borderColor={{ from: 'color' }}
-			gridLevels={5}
-			gridShape='circular'
-			gridLabelOffset={18}
-			enableDots={true}
-			dotSize={8}
-			dotColor={{ theme: 'background' }}
-			dotBorderWidth={2}
-			dotBorderColor={{ from: 'color' }}
-			enableDotLabel={false}
-			colors={['#f97316']}
-			fillOpacity={0.35}
-			blendMode='multiply'
-			animate={true}
-			isInteractive={true}
-			valueFormat={(value) =>
-				new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP', maximumFractionDigits: 0 }).format(
-					Number(value),
-				)
-			}
-			theme={nivoTheme}
-		/>
+		<div role='img' aria-label={label} className='h-full w-full'>
+			<ResponsiveRadar
+				data={data}
+				keys={[t.expenses]}
+				indexBy='categoria'
+				maxValue='auto'
+				margin={{ top: 32, right: 64, bottom: 32, left: 64 }}
+				curve='linearClosed'
+				borderWidth={2}
+				borderColor={{ from: 'color' }}
+				gridLevels={5}
+				gridShape='circular'
+				gridLabelOffset={16}
+				enableDots
+				dotSize={8}
+				dotColor={colors.surface}
+				dotBorderWidth={2}
+				dotBorderColor={{ from: 'color' }}
+				enableDotLabel={false}
+				colors={[colors.series[0]]}
+				fillOpacity={0.25}
+				blendMode='normal'
+				isInteractive
+				valueFormat={(value) => formatCurrency(Number(value), 'DOP')}
+				theme={theme}
+			/>
+		</div>
 	)
 }
 

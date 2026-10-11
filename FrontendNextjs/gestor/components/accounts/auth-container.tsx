@@ -13,7 +13,8 @@ import { LanguageSwitcher } from '@/components/common/LanguageSwitcher'
 import { ModeToggle } from '@/components/common/ToggleMode'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Badge } from '@/components/ui/badge'
-import { Card } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { SESSION_EXPIRED_REASON } from '@/lib/auth/callback-url'
 import { LoginForm } from './login-form'
 import { RegisterForm } from './register-form'
@@ -73,21 +74,23 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 	}
 
 	return (
-		<div className='min-h-screen bg-gradient-to-br from-background via-background to-muted/30 dark:from-background dark:via-background dark:to-muted/20 flex items-center justify-center p-4'>
-			{/* Contenedor principal */}
-			<div className='w-full max-w-md space-y-8'>
-				{/* Header con navegación y branding */}
-				<div className='text-center space-y-6'>
+		<div className='flex min-h-screen items-center justify-center bg-background p-4'>
+			<Tabs
+				value={mode}
+				onValueChange={(value) => setMode(value as 'login' | 'register')}
+				className='w-full max-w-md space-y-8'
+			>
+				<div className='space-y-6 text-center'>
 					{/* Logo y título de la aplicación */}
 					<div className='flex items-center justify-center'>
-						<Link href='/' className='group flex items-center gap-3 hover:scale-105 transition-transform duration-200'>
-							<div className='w-12 h-12 rounded-xl overflow-hidden border border-border/40 bg-background shadow-lg flex items-center justify-center'>
+						<Link href='/' className='flex items-center gap-3 rounded-lg'>
+							<div className='flex h-12 w-12 items-center justify-center overflow-hidden rounded-xl border border-border bg-background'>
 								<Image
 									src='/sbfinance-logo.webp'
 									alt='SBFinance logo'
 									width={48}
 									height={48}
-									className='w-full h-full object-cover'
+									className='h-full w-full object-cover'
 								/>
 							</div>
 							<div className='text-left'>
@@ -97,51 +100,38 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 						</Link>
 					</div>
 
-					{/* Tabs de navegación */}
+					{/* Login / register switch */}
 					<div className='flex flex-col items-center justify-center gap-4'>
-						<Card className='p-1 bg-muted/30 border-border/50'>
-							<div className='flex rounded-lg'>
-								<button
-									type='button'
-									onClick={() => setMode('login')}
-									className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-										mode === 'login'
-											? 'bg-background text-foreground shadow-sm border border-border/50'
-											: 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-									}`}
-								>
-									<LogIn className='h-4 w-4' />
-									{t('container.login')}
-								</button>
-								<button
-									type='button'
-									onClick={() => setMode('register')}
-									className={`flex items-center gap-2 px-6 py-2 rounded-md text-sm font-medium transition-all duration-200 ${
-										mode === 'register'
-											? 'bg-background text-foreground shadow-sm border border-border/50'
-											: 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-									}`}
-								>
-									<UserPlus className='h-4 w-4' />
-									{t('container.register')}
-								</button>
-							</div>
-						</Card>
+						<TabsList aria-label={t('container.modeLabel')} className='h-auto'>
+							<TabsTrigger value='login' className='gap-2 px-6 py-2'>
+								<LogIn className='h-4 w-4' aria-hidden='true' />
+								{t('container.login')}
+							</TabsTrigger>
+							<TabsTrigger value='register' className='gap-2 px-6 py-2'>
+								<UserPlus className='h-4 w-4' aria-hidden='true' />
+								{t('container.register')}
+							</TabsTrigger>
+						</TabsList>
 
-						<button
+						<Button
 							type='button'
+							variant='ghost'
 							onClick={handleDemoLogin}
 							disabled={isLoading}
-							className='flex items-center gap-2 px-4 py-2 text-sm font-medium text-primary hover:text-primary/80 hover:bg-primary/10 rounded-full transition-all duration-200'
+							aria-busy={isLoading || undefined}
 						>
-							{isLoading ? <Loader2 className='h-4 w-4 animate-spin' /> : <Play className='h-4 w-4' />}
+							{isLoading ? (
+								<Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' />
+							) : (
+								<Play className='mr-2 h-4 w-4' aria-hidden='true' />
+							)}
 							{t('demo.tryDemo')}
-						</button>
+						</Button>
 					</div>
 
 					<div className='flex items-center justify-center gap-2'>
 						{isDevelopment && (
-							<Badge variant='outline' className='text-xs border-border/50 bg-muted/30'>
+							<Badge variant='outline' className='text-xs'>
 								{t('container.devMode')}
 							</Badge>
 						)}
@@ -152,29 +142,23 @@ export function AuthContainer({ initialMode = 'login' }: AuthContainerProps) {
 
 				{sessionExpired && mode === 'login' && (
 					<Alert role='status'>
-						<Clock className='h-4 w-4' />
+						<Clock className='h-4 w-4' aria-hidden='true' />
 						<AlertDescription>{t('login.sessionExpired')}</AlertDescription>
 					</Alert>
 				)}
 
-				{/* Formulario actual */}
-				<div className='transition-all duration-300 ease-in-out'>
-					{mode === 'login' ? (
-						<LoginForm onToggleForm={toggleMode} showToggle={false} />
-					) : (
-						<RegisterForm onToggleForm={toggleMode} showToggle={false} />
-					)}
-				</div>
+				<TabsContent value='login' className='mt-0'>
+					<LoginForm onToggleForm={toggleMode} showToggle={false} />
+				</TabsContent>
+				<TabsContent value='register' className='mt-0'>
+					<RegisterForm onToggleForm={toggleMode} showToggle={false} />
+				</TabsContent>
 
-				{/* Footer con información adicional */}
-				<div className='text-center space-y-4'>
-					{/* Información del proyecto */}
-					<div className='text-xs text-muted-foreground/80 space-y-1'>
-						<p>{t('container.description')}</p>
-						<p>{t('container.tech')}</p>
-					</div>
+				<div className='space-y-1 text-center text-xs text-muted-foreground'>
+					<p>{t('container.description')}</p>
+					<p>{t('container.tech')}</p>
 				</div>
-			</div>
+			</Tabs>
 		</div>
 	)
 }

@@ -1,16 +1,20 @@
 'use client'
 
+import { Receipt } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
+import { Amount } from '@/components/shared/Amount'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { ErrorState } from '@/components/shared/ErrorState'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { getCreditCardRepository } from '@/lib/repositoryConfig'
-import { formatCurrency } from '@/lib/utils'
 import { CardPayment, CreditCard } from '@/types/creditcard'
 
 interface CreditCardPaymentHistoryProps {
@@ -22,11 +26,15 @@ interface CreditCardPaymentHistoryProps {
 export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaymentHistoryProps) {
 	const t = useTranslations('creditCards.history')
 	const locale = useAppLocale()
+	const formatCurrency = useFormatCurrency()
 	const [loading, setLoading] = useState(false)
 	const [payments, setPayments] = useState<CardPayment[]>([])
+	const [loadFailed, setLoadFailed] = useState(false)
+	const [reloadKey, setReloadKey] = useState(0)
 	const [currencyFilter, setCurrencyFilter] = useState<string>('all')
 	const { data: accounts = [] } = useGetAccounts()
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `reloadKey` re-runs the load when the user retries.
 	useEffect(() => {
 		if (!open || !card) return
 		const cardId = card.id
@@ -34,6 +42,7 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 		let cancelled = false
 		async function loadPayments() {
 			setLoading(true)
+			setLoadFailed(false)
 			try {
 				const data = await getCreditCardRepository().getPayments(cardId)
 				if (!cancelled) {
@@ -42,6 +51,7 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 			} catch {
 				if (!cancelled) {
 					setPayments([])
+					setLoadFailed(true)
 				}
 			} finally {
 				if (!cancelled) {
@@ -54,7 +64,7 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 		return () => {
 			cancelled = true
 		}
-	}, [open, card])
+	}, [open, card, reloadKey])
 
 	const paymentCurrencies = useMemo(() => {
 		const set = new Set<string>()
@@ -94,12 +104,12 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 	const accountName = (payment: CardPayment) => accountNameById[payment.from_account_id] || payment.from_account_id
 	const accountDebit = (payment: CardPayment) =>
 		payment.source_amount && payment.source_currency
-			? formatCurrency(payment.source_amount, payment.source_currency, { locale })
-			: formatCurrency(payment.amount, payment.currency, { locale })
+			? formatCurrency(payment.source_amount, payment.source_currency)
+			: formatCurrency(payment.amount, payment.currency)
 	const rate = (payment: CardPayment) => (payment.exchange_rate ? payment.exchange_rate.toFixed(4) : '-')
 	const interest = (payment: CardPayment) =>
 		payment.includes_interest && payment.interest_amount > 0
-			? formatCurrency(payment.interest_amount, payment.currency, { locale })
+			? formatCurrency(payment.interest_amount, payment.currency)
 			: '-'
 
 	return (
@@ -129,7 +139,7 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 					<div className='flex flex-wrap items-center gap-2'>
 						{Object.entries(totalsByCurrency).map(([currency, total]) => (
 							<Badge key={currency} variant='secondary'>
-								{currency}: {formatCurrency(total, currency, { locale })}
+								{currency}: {formatCurrency(total, currency)}
 							</Badge>
 						))}
 					</div>
@@ -141,8 +151,10 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 						<Skeleton className='h-10 w-full' />
 						<Skeleton className='h-10 w-full' />
 					</div>
+				) : loadFailed ? (
+					<ErrorState compact onRetry={() => setReloadKey((key) => key + 1)} />
 				) : filteredPayments.length === 0 ? (
-					<div className='py-8 text-center text-muted-foreground'>{t('empty')}</div>
+					<EmptyState compact icon={Receipt} title={t('empty')} />
 				) : (
 					<>
 						<ul className='space-y-3 md:hidden'>
@@ -150,9 +162,7 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 								<li key={payment.id} className='space-y-2 rounded-lg border p-3 text-sm'>
 									<div className='flex items-start justify-between gap-3'>
 										<span className='text-muted-foreground'>{formatPaymentDate(payment.payment_date)}</span>
-										<span className='font-semibold'>
-											{formatCurrency(payment.amount, payment.currency, { locale })}
-										</span>
+										<Amount value={payment.amount} currency={payment.currency} className='font-semibold' />
 									</div>
 									<dl className='grid grid-cols-2 gap-x-3 gap-y-1 text-xs'>
 										<dt className='text-muted-foreground'>{t('fromAccount')}</dt>
@@ -185,7 +195,9 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 									{filteredPayments.map((payment) => (
 										<TableRow key={payment.id}>
 											<TableCell className='whitespace-nowrap'>{formatPaymentDate(payment.payment_date)}</TableCell>
-											<TableCell>{formatCurrency(payment.amount, payment.currency, { locale })}</TableCell>
+											<TableCell>
+												<Amount value={payment.amount} currency={payment.currency} />
+											</TableCell>
 											<TableCell>{accountName(payment)}</TableCell>
 											<TableCell>{accountDebit(payment)}</TableCell>
 											<TableCell>{rate(payment)}</TableCell>

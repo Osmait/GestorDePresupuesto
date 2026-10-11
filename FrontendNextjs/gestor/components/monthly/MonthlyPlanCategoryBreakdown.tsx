@@ -2,9 +2,11 @@
 
 import { PieChart } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { Amount } from '@/components/shared/Amount'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatDop, groupByCategory } from '@/lib/monthlyPlanUtils'
+import { Progress } from '@/components/ui/progress'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { groupByCategory, PLAN_CURRENCY } from '@/lib/monthlyPlanUtils'
 import { MonthlyPlanItem } from '@/types/monthlyPlan'
 
 /**
@@ -19,7 +21,7 @@ export function MonthlyPlanCategoryBreakdown({
 	categoryNames: Map<string, string>
 }) {
 	const t = useTranslations('monthlyPlan')
-	const locale = useAppLocale()
+	const formatPercent = useFormatPercent()
 	const expenses = items.filter((item) => item.type === 'bill')
 	const shares = groupByCategory(expenses, categoryNames, t('uncategorized'))
 
@@ -31,7 +33,7 @@ export function MonthlyPlanCategoryBreakdown({
 		<Card>
 			<CardHeader>
 				<CardTitle className='flex items-center gap-2 text-base'>
-					<PieChart className='h-5 w-5' />
+					<PieChart className='h-5 w-5 text-muted-foreground' aria-hidden='true' />
 					{t('breakdownTitle')}
 				</CardTitle>
 			</CardHeader>
@@ -39,14 +41,13 @@ export function MonthlyPlanCategoryBreakdown({
 				{shares.map((share) => (
 					<div key={share.categoryId || 'uncategorized'} data-testid={`breakdown-${share.categoryId || 'none'}`}>
 						<div className='mb-1 flex items-center justify-between gap-3 text-sm'>
-							<span className='text-foreground truncate'>{share.label}</span>
-							<span className='text-muted-foreground shrink-0'>
-								{formatDop(share.amount, locale)} · {share.percentage.toFixed(1)}%
+							<span className='truncate text-foreground'>{share.label}</span>
+							<span className='shrink-0 text-muted-foreground tabular-nums'>
+								<Amount value={share.amount} currency={PLAN_CURRENCY} /> ·{' '}
+								{formatPercent(share.percentage, { minimumFractionDigits: 1, maximumFractionDigits: 1 })}
 							</span>
 						</div>
-						<div className='h-2 w-full overflow-hidden rounded-full bg-muted'>
-							<div className='h-full rounded-full bg-orange-500' style={{ width: `${share.percentage}%` }} />
-						</div>
+						<Progress value={share.percentage} aria-label={t('categoryShare', { name: share.label })} />
 					</div>
 				))}
 			</CardContent>

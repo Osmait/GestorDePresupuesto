@@ -1,36 +1,27 @@
 'use client'
 
 import { Check, Copy, Key, Loader2, Plus, Trash2 } from 'lucide-react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { useCreateAPIKeyMutation, useGetAPIKeys, useRevokeAPIKeyMutation } from '@/hooks/queries/useAPIKeysQuery'
-import { CreateAPIKeyResponse } from '@/types/apikey'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import type { APIKey, CreateAPIKeyResponse } from '@/types/apikey'
 
-function formatDate(dateStr: string, locale: string): string {
-	return new Date(dateStr).toLocaleDateString(locale, {
-		year: 'numeric',
-		month: 'short',
-		day: 'numeric',
-	})
-}
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = { year: 'numeric', month: 'short', day: 'numeric' }
 
 export function APIKeysSection() {
 	const t = useTranslations('settingsModal.apiKeys')
-	const locale = useLocale()
+	const locale = useAppLocale()
+	const formatDate = (value: string) => formatLocalDate(value, locale, DATE_OPTIONS)
 	const { data: apiKeys = [], isLoading } = useGetAPIKeys()
 	const createMutation = useCreateAPIKeyMutation()
 	const revokeMutation = useRevokeAPIKeyMutation()
@@ -40,7 +31,7 @@ export function APIKeysSection() {
 	const [createdKey, setCreatedKey] = useState<CreateAPIKeyResponse | null>(null)
 	const [copiedToken, setCopiedToken] = useState(false)
 	const [copiedConfig, setCopiedConfig] = useState(false)
-	const [revokeDialogId, setRevokeDialogId] = useState<string | null>(null)
+	const [toRevoke, setToRevoke] = useState<APIKey | null>(null)
 
 	const handleCreateKey = async () => {
 		if (!newKeyName.trim()) return
@@ -68,14 +59,15 @@ export function APIKeysSection() {
 		setTimeout(() => setCopiedToken(false), 2000)
 	}
 
+	// Rejects on failure so the ConfirmDialog stays open for a retry.
 	const handleRevokeKey = async () => {
-		if (!revokeDialogId) return
+		if (!toRevoke) return
 		try {
-			await revokeMutation.mutateAsync(revokeDialogId)
+			await revokeMutation.mutateAsync(toRevoke.id)
 			toast.success(t('revoked'))
-			setRevokeDialogId(null)
-		} catch {
+		} catch (error) {
 			toast.error(t('revokeError'))
+			throw error
 		}
 	}
 
@@ -109,32 +101,35 @@ export function APIKeysSection() {
 
 			{/* Create key button */}
 			<div className='flex justify-end'>
-				<Button onClick={() => setCreateDialogOpen(true)} size='sm' className='gap-2'>
-					<Plus className='h-4 w-4' />
+				<Button onClick={() => setCreateDialogOpen(true)}>
+					<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
 					{t('newKey')}
 				</Button>
 			</div>
 
 			{/* Keys list */}
 			{isLoading ? (
-				<div className='flex items-center justify-center py-8'>
-					<Loader2 className='h-5 w-5 animate-spin text-muted-foreground' />
+				<div className='flex items-center justify-center py-8' role='status'>
+					<Loader2 className='h-5 w-5 animate-spin text-muted-foreground' aria-hidden='true' />
+					<span className='sr-only'>{t('loading')}</span>
 				</div>
 			) : apiKeys.length === 0 ? (
-				<div className='flex flex-col items-center justify-center py-12 text-center border rounded-lg bg-muted/20'>
-					<Key className='h-8 w-8 text-muted-foreground mb-3' />
-					<p className='text-sm font-medium'>{t('emptyTitle')}</p>
-					<p className='text-xs text-muted-foreground mt-1'>{t('emptyDescription')}</p>
-				</div>
+				<EmptyState
+					compact
+					icon={Key}
+					title={t('emptyTitle')}
+					description={t('emptyDescription')}
+					className='rounded-lg border'
+				/>
 			) : (
 				<div className='space-y-3'>
 					{apiKeys.map((key) => (
-						<div key={key.id} className='flex items-center justify-between p-4 border rounded-lg'>
+						<div key={key.id} className='flex items-center justify-between gap-3 rounded-lg border p-4'>
 							<div className='space-y-1 min-w-0'>
 								<div className='flex items-center gap-2'>
 									<span className='font-medium text-sm truncate'>{key.name}</span>
 									{key.is_active ? (
-										<Badge variant='outline' className='text-green-500 border-green-500 shrink-0'>
+										<Badge variant='outline' className='shrink-0 border-success/50 text-success'>
 											{t('active')}
 										</Badge>
 									) : (
@@ -144,23 +139,23 @@ export function APIKeysSection() {
 									)}
 								</div>
 								<p className='text-xs text-muted-foreground font-mono'>{key.key_prefix}...</p>
-								<div className='flex gap-4 text-xs text-muted-foreground'>
-									<span>{t('createdAt', { date: formatDate(key.created_at, locale) })}</span>
+								<div className='flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground'>
+									<span>{t('createdAt', { date: formatDate(key.created_at) })}</span>
 									<span>
 										{t('lastUsedAt', {
-											date: key.last_used_at ? formatDate(key.last_used_at, locale) : t('never'),
+											date: key.last_used_at ? formatDate(key.last_used_at) : t('never'),
 										})}
 									</span>
 								</div>
 							</div>
 							<Button
 								variant='ghost'
-								size='sm'
-								className='text-destructive hover:text-destructive hover:bg-destructive/10 shrink-0'
-								onClick={() => setRevokeDialogId(key.id)}
+								size='icon'
+								className='shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
+								onClick={() => setToRevoke(key)}
 								aria-label={t('revokeAria', { name: key.name })}
 							>
-								<Trash2 className='h-4 w-4' />
+								<Trash2 className='h-4 w-4' aria-hidden='true' />
 							</Button>
 						</div>
 					))}
@@ -178,96 +173,89 @@ export function APIKeysSection() {
 				<div className='relative'>
 					<pre className='text-xs bg-muted rounded-lg p-4 overflow-x-auto border'>{claudeConfig}</pre>
 					<Button variant='outline' size='sm' className='absolute top-2 right-2 gap-1.5' onClick={handleCopyConfig}>
-						{copiedConfig ? <Check className='h-3.5 w-3.5' /> : <Copy className='h-3.5 w-3.5' />}
+						{copiedConfig ? (
+							<Check className='h-3.5 w-3.5' aria-hidden='true' />
+						) : (
+							<Copy className='h-3.5 w-3.5' aria-hidden='true' />
+						)}
 						{copiedConfig ? t('copied') : t('copy')}
 					</Button>
 				</div>
 			</div>
 
-			{/* Create key dialog */}
-			<Dialog open={createDialogOpen} onOpenChange={(open) => !open && handleCloseCreateDialog()}>
-				<DialogContent className='sm:max-w-md'>
-					<DialogHeader>
-						<DialogTitle>{t('createTitle')}</DialogTitle>
-						<DialogDescription>{t('createDescription')}</DialogDescription>
-					</DialogHeader>
-
-					{createdKey ? (
-						<div className='space-y-4'>
-							<div className='rounded-lg border border-amber-200 bg-amber-50 dark:bg-amber-900/10 dark:border-amber-900/50 p-4'>
-								<p className='text-sm font-medium text-amber-700 dark:text-amber-400'>{t('saveTokenTitle')}</p>
-								<p className='text-xs text-amber-600/80 dark:text-amber-400/80 mt-1'>{t('saveTokenDescription')}</p>
-							</div>
-							<div className='space-y-2'>
-								<Label>{t('token')}</Label>
-								<div className='flex gap-2'>
-									<code className='flex-1 text-xs bg-muted rounded-md px-3 py-2 border font-mono break-all'>
-										{createdKey.token}
-									</code>
-									<Button variant='outline' size='sm' onClick={handleCopyToken} className='shrink-0 gap-1.5'>
-										{copiedToken ? <Check className='h-3.5 w-3.5' /> : <Copy className='h-3.5 w-3.5' />}
-									</Button>
-								</div>
-							</div>
-							<DialogFooter>
-								<Button onClick={handleCloseCreateDialog} className='w-full'>
-									{t('savedClose')}
-								</Button>
-							</DialogFooter>
+			{/* Create key dialog: name form, then the one-time token */}
+			<FormDialog
+				open={createDialogOpen}
+				onOpenChange={(open) => !open && handleCloseCreateDialog()}
+				title={t('createTitle')}
+				description={t('createDescription')}
+				size='sm'
+				onSubmit={createdKey ? undefined : handleCreateKey}
+				submitLabel={t('create')}
+				cancelLabel={t('cancel')}
+				loading={createMutation.isPending}
+				submitDisabled={!newKeyName.trim()}
+				footer={
+					createdKey ? (
+						<Button type='button' onClick={handleCloseCreateDialog} className='w-full sm:w-auto'>
+							{t('savedClose')}
+						</Button>
+					) : undefined
+				}
+			>
+				{createdKey ? (
+					<div className='space-y-4'>
+						<div role='alert' className='rounded-lg border border-warning/40 bg-warning/10 p-4'>
+							<p className='text-sm font-medium text-warning'>{t('saveTokenTitle')}</p>
+							<p className='mt-1 text-xs text-foreground/80'>{t('saveTokenDescription')}</p>
 						</div>
-					) : (
-						<>
-							<div className='space-y-2'>
-								<Label htmlFor='key-name'>{t('name')}</Label>
-								<Input
-									id='key-name'
-									placeholder={t('namePlaceholder')}
-									value={newKeyName}
-									onChange={(e) => setNewKeyName(e.target.value)}
-									onKeyDown={(e) => e.key === 'Enter' && handleCreateKey()}
-								/>
-							</div>
-							<DialogFooter>
-								<Button variant='outline' onClick={handleCloseCreateDialog}>
-									{t('cancel')}
-								</Button>
+						<div className='space-y-2'>
+							<p className='text-sm font-medium'>{t('token')}</p>
+							<div className='flex gap-2'>
+								<code className='flex-1 break-all rounded-md border bg-muted px-3 py-2 font-mono text-xs'>
+									{createdKey.token}
+								</code>
 								<Button
-									onClick={handleCreateKey}
-									disabled={!newKeyName.trim() || createMutation.isPending}
-									className='gap-2'
+									type='button'
+									variant='outline'
+									size='icon'
+									onClick={handleCopyToken}
+									className='shrink-0'
+									aria-label={copiedToken ? t('copied') : t('copyToken')}
 								>
-									{createMutation.isPending && <Loader2 className='h-4 w-4 animate-spin' />}
-									{t('create')}
+									{copiedToken ? (
+										<Check className='h-4 w-4' aria-hidden='true' />
+									) : (
+										<Copy className='h-4 w-4' aria-hidden='true' />
+									)}
 								</Button>
-							</DialogFooter>
-						</>
-					)}
-				</DialogContent>
-			</Dialog>
+							</div>
+						</div>
+					</div>
+				) : (
+					<div className='space-y-2'>
+						<Label htmlFor='key-name'>{t('name')}</Label>
+						<Input
+							id='key-name'
+							placeholder={t('namePlaceholder')}
+							value={newKeyName}
+							onChange={(e) => setNewKeyName(e.target.value)}
+							autoComplete='off'
+						/>
+					</div>
+				)}
+			</FormDialog>
 
-			{/* Revoke confirmation dialog */}
-			<Dialog open={!!revokeDialogId} onOpenChange={(open) => !open && setRevokeDialogId(null)}>
-				<DialogContent className='sm:max-w-md'>
-					<DialogHeader>
-						<DialogTitle>{t('revokeTitle')}</DialogTitle>
-						<DialogDescription>{t('revokeDescription')}</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button variant='outline' onClick={() => setRevokeDialogId(null)}>
-							{t('cancel')}
-						</Button>
-						<Button
-							variant='destructive'
-							onClick={handleRevokeKey}
-							disabled={revokeMutation.isPending}
-							className='gap-2'
-						>
-							{revokeMutation.isPending && <Loader2 className='h-4 w-4 animate-spin' />}
-							{t('revoke')}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<ConfirmDialog
+				open={toRevoke !== null}
+				onOpenChange={(open) => !open && setToRevoke(null)}
+				title={t('revokeTitleNamed', { name: toRevoke?.name ?? '' })}
+				description={t('revokeDescription')}
+				confirmLabel={t('revoke')}
+				cancelLabel={t('cancel')}
+				destructive
+				onConfirm={handleRevokeKey}
+			/>
 		</div>
 	)
 }

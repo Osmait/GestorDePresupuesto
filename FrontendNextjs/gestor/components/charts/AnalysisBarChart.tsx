@@ -1,58 +1,68 @@
 'use client'
 
 import { ResponsiveBar } from '@nivo/bar'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
+import { useChartTheme } from './chart-theme'
+
+export interface AnalysisBarDatum {
+	[key: string]: string | number
+	categoria: string
+	monto: number
+}
 
 interface AnalysisBarChartProps {
-	data: any[]
-	nivoTheme: any
+	data: AnalysisBarDatum[]
+	/** Accessible name of the chart (role="img"). */
+	label: string
 	t: {
 		category: string
 		amount: string
 	}
 }
 
-const AnalysisBarChart = ({ data, nivoTheme, t }: AnalysisBarChartProps) => {
-	const palette = ['#0ea5e9', '#14b8a6', '#22c55e', '#f59e0b', '#f97316', '#ef4444', '#8b5cf6']
+const AnalysisBarChart = ({ data, label, t }: AnalysisBarChartProps) => {
+	const { theme, colors } = useChartTheme(11)
+	const formatCurrency = useFormatCurrency()
+	const compact = new Intl.NumberFormat(getIntlLocale(useAppLocale()), { notation: 'compact' })
 
 	return (
-		<ResponsiveBar
-			data={data}
-			keys={['monto']}
-			indexBy='categoria'
-			margin={{ top: 30, right: 30, bottom: 60, left: 60 }}
-			padding={0.3}
-			valueScale={{ type: 'linear' }}
-			indexScale={{ type: 'band', round: true }}
-			colors={(bar) => palette[bar.index % palette.length]}
-			borderColor={{ from: 'color', modifiers: [['darker', 1.1]] }}
-			axisTop={null}
-			axisRight={null}
-			axisBottom={{
-				tickSize: 5,
-				tickPadding: 5,
-				tickRotation: 45,
-				legend: t.category,
-				legendOffset: 48,
-				legendPosition: 'middle',
-			}}
-			axisLeft={{
-				tickSize: 5,
-				tickPadding: 5,
-				tickRotation: 0,
-				legend: t.amount,
-				legendOffset: -50,
-				legendPosition: 'middle',
-			}}
-			labelSkipWidth={12}
-			labelSkipHeight={12}
-			labelTextColor={{ from: 'color', modifiers: [['darker', 1.4]] }}
-			valueFormat={(value) =>
-				new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP', maximumFractionDigits: 0 }).format(
-					Number(value),
-				)
-			}
-			theme={nivoTheme}
-		/>
+		<div role='img' aria-label={label} className='h-full w-full'>
+			<ResponsiveBar
+				data={data}
+				keys={['monto']}
+				indexBy='categoria'
+				margin={{ top: 24, right: 24, bottom: 64, left: 56 }}
+				padding={0.3}
+				valueScale={{ type: 'linear' }}
+				indexScale={{ type: 'band', round: true }}
+				// One series (spend per category): one color; the category is already the axis label.
+				colors={[colors.series[0]]}
+				borderRadius={2}
+				axisTop={null}
+				axisRight={null}
+				axisBottom={{
+					tickSize: 5,
+					tickPadding: 5,
+					tickRotation: 45,
+					legend: t.category,
+					legendOffset: 52,
+					legendPosition: 'middle',
+				}}
+				axisLeft={{
+					tickSize: 5,
+					tickPadding: 5,
+					tickRotation: 0,
+					format: (value) => compact.format(Number(value)),
+					legend: t.amount,
+					legendOffset: -48,
+					legendPosition: 'middle',
+				}}
+				enableLabel={false}
+				valueFormat={(value) => formatCurrency(Number(value), 'DOP')}
+				theme={theme}
+			/>
+		</div>
 	)
 }
 

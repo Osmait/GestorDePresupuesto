@@ -1,24 +1,19 @@
 'use client'
 
-import { AlertTriangle, CheckCircle, Clock, Edit, MoreHorizontal, PiggyBank, Target, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle, Clock, Edit, MoreHorizontal, PiggyBank, Trash2 } from 'lucide-react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
+import { toast } from 'sonner'
+import { Amount } from '@/components/shared/Amount'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
+import { getProgressTone, Progress } from '@/components/ui/progress'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { cn } from '@/lib/utils'
 import { Budget } from '@/types/budget'
 import { Category } from '@/types/category'
 
@@ -27,202 +22,171 @@ export interface BudgetCardProps {
 	category?: Category
 	/** Expenses linked to the budget; undefined while loading. */
 	transactionCount?: number
-	onDelete: (_id: string) => void
-	onEdit: (_budget: Budget) => void
+	/** Omit both handlers for a read-only card (no menu). */
+	onDelete?: (_id: string) => unknown
+	onEdit?: (_budget: Budget) => void
+	/** Dashboard variant: drops the spent hint and the transaction count. */
+	compact?: boolean
 }
 
-export function BudgetCard({ budget, category, transactionCount, onDelete, onEdit }: BudgetCardProps) {
+export function BudgetCard({ budget, category, transactionCount, onDelete, onEdit, compact = false }: BudgetCardProps) {
 	const t = useTranslations('budgets')
-	const tForms = useTranslations('forms')
-	const locale = useAppLocale()
-	const router = useRouter()
+	const tCommon = useTranslations('common')
+	const formatPercent = useFormatPercent()
+	const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+
+	// The API sums the linked expenses converted to DOP (USD × rate), so budgets are DOP.
 	const spentAmount = budget.current_amount
 	const progressPercentage = budget.amount > 0 ? (spentAmount / budget.amount) * 100 : 0
-	// The API sums the linked expenses converted to DOP (USD × rate), so budgets are DOP.
-	const formatMoney = (value: number) => formatCurrency(value, 'DOP', { locale })
 	const remaining = budget.amount - spentAmount
 	const isOverBudget = spentAmount > budget.amount
+	const isCritical = !isOverBudget && progressPercentage > 80
+	const name = category ? category.name : `#${budget.id}`
+	const title = category ? `${t('budgetFor')} ${category.name}` : `${t('budget')} #${budget.id}`
+	const transactionsHref = `/app/transactions?budget=${budget.id}`
+	const hasActions = Boolean(onEdit || onDelete)
 
-	const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-	const [isDeleting, setIsDeleting] = useState(false)
+	const StatusIcon = isOverBudget ? AlertTriangle : progressPercentage > 90 ? Clock : CheckCircle
 
-	const handleDelete = async (e?: React.MouseEvent) => {
-		e?.stopPropagation()
-		setIsDeleting(true)
+	const handleDelete = async () => {
+		if (!onDelete) return
 		try {
 			await onDelete(budget.id)
-			setShowDeleteDialog(false)
 		} catch (error) {
-			console.error('Failed to delete budget', error)
-		} finally {
-			setIsDeleting(false)
+			toast.error(t('deleteError'))
+			throw error
 		}
-	}
-
-	const handleEdit = (e: React.MouseEvent) => {
-		e.stopPropagation()
-		onEdit(budget)
-	}
-
-	const transactionsHref = `/app/transactions?budget=${budget.id}`
-	const handleCardClick = () => {
-		router.push(transactionsHref)
-	}
-
-	const getStatusColor = () => {
-		if (isOverBudget) return 'destructive'
-		if (progressPercentage > 80) return 'default'
-		if (progressPercentage > 60) return 'secondary'
-		return 'default'
-	}
-
-	const getStatusIcon = () => {
-		if (isOverBudget) return <AlertTriangle className='h-4 w-4' />
-		if (progressPercentage > 90) return <Clock className='h-4 w-4' />
-		if (progressPercentage < 50) return <CheckCircle className='h-4 w-4' />
-		return <Target className='h-4 w-4' />
 	}
 
 	return (
 		<>
-			<Card
-				className='hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20 group cursor-pointer'
-				onClick={handleCardClick}
-			>
-				<CardContent className='p-4 sm:p-6'>
-					<div className='flex items-center justify-between gap-2 mb-4'>
-						<div className='flex min-w-0 items-center gap-3 sm:gap-4'>
-							<div className='shrink-0 p-3 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/10 dark:to-purple-500/10'>
-								<PiggyBank className='h-6 w-6 text-blue-600 dark:text-blue-400' />
-							</div>
-							<div className='min-w-0'>
+			{/* The title is a real link stretched over the card; the menu sits above it (z-10). */}
+			<Card className='relative transition-colors hover:bg-muted/40 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-background'>
+				<CardContent className='p-5'>
+					<div className='mb-4 flex items-start justify-between gap-2'>
+						<div className='flex min-w-0 items-center gap-3'>
+							{category ? (
+								<div
+									className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg'
+									style={{ backgroundColor: category.color }}
+									aria-hidden='true'
+								>
+									{category.icon}
+								</div>
+							) : (
+								<div className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted'>
+									<PiggyBank className='h-5 w-5 text-muted-foreground' aria-hidden='true' />
+								</div>
+							)}
+							<div className='min-w-0 space-y-1'>
 								<Link
 									href={transactionsHref}
-									className='block truncate font-semibold text-foreground text-lg rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2'
-									onClick={(e) => e.stopPropagation()}
+									className='block truncate text-base font-semibold text-foreground focus-visible:outline-none after:absolute after:inset-0'
 								>
-									{category ? `${t('budgetFor')} ${category.name}` : `${t('budget')} #${budget.id}`}
+									{title}
 								</Link>
-								<p className='text-sm text-muted-foreground flex items-center gap-1 truncate'>
-									{category && (
-										<>
-											<span>{category.icon}</span>
-											<span>{category.name}</span>
-										</>
+								<Badge
+									variant='outline'
+									className={cn(
+										'gap-1 font-medium',
+										isOverBudget && 'border-destructive/40 text-destructive',
+										isCritical && 'border-warning/40 text-warning',
 									)}
-								</p>
+								>
+									<StatusIcon className='h-3 w-3' aria-hidden='true' />
+									{isOverBudget ? t('exceeded') : isCritical ? t('critical') : t('active')}
+								</Badge>
 							</div>
 						</div>
 
-						<div className='flex shrink-0 items-center gap-2'>
-							<Badge variant={getStatusColor()} className='items-center gap-1 hidden sm:flex'>
-								{getStatusIcon()}
-								<span className='text-xs'>
-									{isOverBudget ? t('exceeded') : progressPercentage > 80 ? t('critical') : t('active')}
-								</span>
-							</Badge>
+						{hasActions ? (
 							<DropdownMenu>
 								<DropdownMenuTrigger asChild>
 									<Button
 										variant='ghost'
-										size='sm'
-										className='h-8 w-8 p-0'
-										onClick={(e) => e.stopPropagation()}
-										aria-label={t('edit')}
+										size='icon'
+										className='relative z-10 shrink-0'
+										aria-label={tCommon('actions.rowMenu', { name })}
 									>
 										<MoreHorizontal className='h-4 w-4' aria-hidden='true' />
 									</Button>
 								</DropdownMenuTrigger>
-								<DropdownMenuContent align='end' onClick={(e) => e.stopPropagation()}>
-									<DropdownMenuItem className='flex items-center gap-2 cursor-pointer' onClick={handleEdit}>
-										<Edit className='h-4 w-4' />
-										{t('edit')}
-									</DropdownMenuItem>
-									<DropdownMenuItem
-										className='flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400'
-										onClick={(e) => {
-											e.stopPropagation()
-											setShowDeleteDialog(true)
-										}}
-									>
-										<Trash2 className='h-4 w-4' />
-										{t('delete')}
-									</DropdownMenuItem>
+								<DropdownMenuContent align='end'>
+									{onEdit ? (
+										<DropdownMenuItem className='flex items-center gap-2' onSelect={() => onEdit(budget)}>
+											<Edit className='h-4 w-4' aria-hidden='true' />
+											{t('edit')}
+										</DropdownMenuItem>
+									) : null}
+									{onDelete ? (
+										<DropdownMenuItem
+											className='flex items-center gap-2 text-destructive focus:text-destructive'
+											onSelect={() => setShowDeleteDialog(true)}
+										>
+											<Trash2 className='h-4 w-4' aria-hidden='true' />
+											{t('delete')}
+										</DropdownMenuItem>
+									) : null}
 								</DropdownMenuContent>
 							</DropdownMenu>
-						</div>
+						) : null}
 					</div>
 
-					<div className='space-y-4'>
-						<div className='flex justify-between items-center'>
-							<span className='text-sm text-muted-foreground'>{t('budget')}</span>
-							<span className='font-bold text-lg text-foreground tabular-nums'>{formatMoney(budget.amount)}</span>
+					<dl className='space-y-2 text-sm'>
+						<div className='flex items-baseline justify-between gap-2'>
+							<dt className='text-muted-foreground'>{t('budget')}</dt>
+							<dd className='font-semibold'>
+								<Amount value={budget.amount} currency='DOP' />
+							</dd>
 						</div>
-
-						<div className='flex justify-between items-center'>
-							<span className='text-sm text-muted-foreground'>{t('spent')}</span>
-							<span
-								className={`font-bold text-lg tabular-nums ${isOverBudget ? 'text-red-600 dark:text-red-400' : 'text-orange-600 dark:text-orange-400'}`}
-							>
-								{formatMoney(spentAmount)}
-							</span>
+						<div className='flex items-baseline justify-between gap-2'>
+							<dt className='text-muted-foreground'>{t('spent')}</dt>
+							<dd className='font-semibold'>
+								<Amount value={spentAmount} currency='DOP' tone={isOverBudget ? 'negative' : 'neutral'} />
+							</dd>
 						</div>
-						<p className='text-xs text-muted-foreground -mt-2'>{t('spentHint')}</p>
-
-						<div className='flex justify-between items-center'>
-							<span className='text-sm text-muted-foreground'>{t('remaining')}</span>
-							<span
-								className={`font-bold text-lg tabular-nums ${remaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-							>
-								{formatMoney(remaining)}
-							</span>
+						<div className='flex items-baseline justify-between gap-2'>
+							<dt className='text-muted-foreground'>{t('remaining')}</dt>
+							<dd className='font-semibold'>
+								<Amount value={remaining} currency='DOP' tone={remaining < 0 ? 'negative' : 'neutral'} />
+							</dd>
 						</div>
+					</dl>
+					{compact ? null : <p className='mt-1 text-xs text-muted-foreground'>{t('spentHint')}</p>}
 
-						<div className='space-y-2'>
-							<div className='flex justify-between items-center'>
-								<span className='text-xs text-muted-foreground'>{t('progress')}</span>
-								<span className='text-xs text-muted-foreground'>{Math.round(progressPercentage)}%</span>
-							</div>
-							<div className='relative h-2 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-700'>
-								<div
-									className='h-full transition-all duration-500 rounded-full'
-									style={{
-										width: `${Math.max(Math.min(progressPercentage, 100), progressPercentage > 0 ? 5 : 0)}%`,
-										minWidth: progressPercentage > 0 ? '8px' : '0px',
-										backgroundColor:
-											progressPercentage > 80 ? '#ef4444' : progressPercentage > 60 ? '#eab308' : '#22c55e',
-									}}
-								/>
-							</div>
+					<div className='mt-4 space-y-2'>
+						<div className='flex items-center justify-between text-xs text-muted-foreground'>
+							<span>{t('progress')}</span>
+							<span className='tabular-nums'>{formatPercent(progressPercentage, { maximumFractionDigits: 0 })}</span>
 						</div>
+						<Progress
+							value={progressPercentage}
+							tone={getProgressTone(progressPercentage)}
+							aria-label={t('progressLabel', { name })}
+						/>
+					</div>
 
-						<div className='flex justify-between items-center pt-2 border-t border-border/50'>
-							<span className='text-xs text-muted-foreground'>{t('transactions')}</span>
-							<span className='text-xs text-muted-foreground'>
+					{compact ? null : (
+						<div className='mt-4 flex items-center justify-between border-t pt-3 text-xs text-muted-foreground'>
+							<span>{t('transactions')}</span>
+							<span className='tabular-nums'>
 								{transactionCount ?? '–'} {t('registered')}
 							</span>
 						</div>
-					</div>
+					)}
 				</CardContent>
 			</Card>
 
-			{/* Sibling of the Card so clicks inside the (portaled) dialog don't trigger the Card navigation. */}
-			<Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-				<DialogContent onClick={(e) => e.stopPropagation()}>
-					<DialogHeader>
-						<DialogTitle>{t('deleteTitle')}</DialogTitle>
-						<DialogDescription>{t('deleteDescription')}</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button variant='outline' onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
-							{tForms('cancel')}
-						</Button>
-						<Button variant='destructive' onClick={handleDelete} disabled={isDeleting}>
-							{isDeleting ? t('deleting') : tForms('delete')}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			{onDelete ? (
+				<ConfirmDialog
+					open={showDeleteDialog}
+					onOpenChange={setShowDeleteDialog}
+					title={t('deleteTitle', { name })}
+					description={tCommon('confirm.irreversible')}
+					destructive
+					onConfirm={handleDelete}
+				/>
+			) : null}
 		</>
 	)
 }

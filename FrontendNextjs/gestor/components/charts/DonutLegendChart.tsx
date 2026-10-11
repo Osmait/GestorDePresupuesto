@@ -13,20 +13,23 @@ export interface DonutDatum {
 interface DonutLegendChartProps {
 	data: DonutDatum[]
 	formatValue: (_value: number) => string
+	/** Accessible name of the chart (its title); the values are appended for screen readers. */
+	ariaLabel?: string
 }
 
 /** Small donut with a vertical legend on the right (the former Recharts Pie + Legend). */
-export default function DonutLegendChart({ data, formatValue }: DonutLegendChartProps) {
+export default function DonutLegendChart({ data, formatValue, ariaLabel }: DonutLegendChartProps) {
 	const { theme } = useChartTheme(12)
 	// Ids must be unique (two categories may share a name, e.g. "No category").
 	const slices = useMemo(
 		() => data.map((datum, index) => ({ id: `${index}`, label: datum.name, value: datum.value, color: datum.color })),
 		[data],
 	)
+	const summary = data.map((datum) => `${datum.name}: ${formatValue(datum.value)}`).join(', ')
 
 	return (
 		<div className='flex h-full min-w-0 items-center gap-3'>
-			<div className='h-full min-w-0 flex-1'>
+			<div role='img' aria-label={ariaLabel ? `${ariaLabel}. ${summary}` : summary} className='h-full min-w-0 flex-1'>
 				<ResponsivePie
 					data={slices}
 					margin={{ top: 8, right: 8, bottom: 8, left: 8 }}

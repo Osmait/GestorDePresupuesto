@@ -1,25 +1,16 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertCircle, Edit, Loader2, PlusCircle } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
+import { FormDialog } from '@/components/shared/FormDialog'
+import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
-
-const budgetSchema = z.object({
-	category_id: z.string().min(1, 'Required'),
-	amount: z.coerce.number().min(1, 'Required'),
-})
-type BudgetFormValues = z.infer<typeof budgetSchema>
 
 interface BudgetFormModalProps {
 	open: boolean
@@ -32,9 +23,20 @@ interface BudgetFormModalProps {
 export function BudgetFormModal({ open, setOpen, initialCategoryId, onSaved }: BudgetFormModalProps) {
 	const t = useTranslations('forms')
 	const tBudgets = useTranslations('budgets')
-	const { createBudget, updateBudget, editingBudget, setEditingBudget, isLoading, error } = useBudgetContext()
+	const { createBudget, updateBudget, editingBudget, setEditingBudget } = useBudgetContext()
 	const { data: categories = [] } = useGetCategories()
+	const [submitError, setSubmitError] = useState<string | null>(null)
 	const isEditing = !!editingBudget
+
+	const budgetSchema = useMemo(
+		() =>
+			z.object({
+				category_id: z.string().min(1, t('categoryRequired')),
+				amount: z.coerce.number().min(1, t('amountRequired')),
+			}),
+		[t],
+	)
+	type BudgetFormValues = z.infer<typeof budgetSchema>
 
 	const form = useForm<BudgetFormValues>({
 		resolver: zodResolver(budgetSchema),
@@ -45,6 +47,7 @@ export function BudgetFormModal({ open, setOpen, initialCategoryId, onSaved }: B
 	})
 
 	async function onSubmit(values: BudgetFormValues) {
+		setSubmitError(null)
 		try {
 			if (isEditing && editingBudget) {
 				await updateBudget(editingBudget.id, values.category_id, values.amount)
@@ -57,14 +60,15 @@ export function BudgetFormModal({ open, setOpen, initialCategoryId, onSaved }: B
 			setOpen(false)
 			onSaved?.()
 		} catch {
-			// Error handling is done via the error prop from context
+			setSubmitError(tBudgets('saveError'))
 		}
 	}
 
-	const handleOpenChange = (open: boolean) => {
-		setOpen(open)
-		if (!open) {
+	const handleOpenChange = (next: boolean) => {
+		setOpen(next)
+		if (!next) {
 			setEditingBudget(null)
+			setSubmitError(null)
 			form.reset()
 		}
 	}
@@ -75,77 +79,57 @@ export function BudgetFormModal({ open, setOpen, initialCategoryId, onSaved }: B
 	}, [form, initialCategoryId, isEditing, open])
 
 	return (
-		<Dialog open={open} onOpenChange={handleOpenChange}>
-			<DialogContent>
-				<DialogHeader>
-					<DialogTitle>{isEditing ? t('editBudget') : t('newBudget')}</DialogTitle>
-				</DialogHeader>
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
-						<FormField
-							control={form.control}
-							name='category_id'
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>{t('category')}</FormLabel>
+		<FormDialog
+			open={open}
+			onOpenChange={handleOpenChange}
+			title={isEditing ? t('editBudget') : t('newBudget')}
+			submitLabel={isEditing ? t('saveChanges') : t('createBudget')}
+			loading={form.formState.isSubmitting}
+			error={submitError}
+			onSubmit={form.handleSubmit(onSubmit)}
+		>
+			<Form {...form}>
+				<div className='space-y-4'>
+					<FormField
+						control={form.control}
+						name='category_id'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('category')}</FormLabel>
+								<Select value={field.value} onValueChange={field.onChange}>
 									<FormControl>
-										<Select value={field.value} onValueChange={field.onChange}>
-											<SelectTrigger>
-												<SelectValue placeholder={t('select')} />
-											</SelectTrigger>
-											<SelectContent>
-												{categories?.map((cat) => (
-													<SelectItem key={cat.id} value={cat.id}>
-														{cat.icon} {cat.name}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
+										<SelectTrigger>
+											<SelectValue placeholder={t('select')} />
+										</SelectTrigger>
 									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-						<FormField
-							control={form.control}
-							name='amount'
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>{t('amount')}</FormLabel>
-									<FormControl>
-										<Input type='number' {...field} min={1} step={0.01} />
-									</FormControl>
-									<p className='text-xs text-muted-foreground'>{tBudgets('spentHint')}</p>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-						<DialogFooter>
-							<Button type='submit' disabled={isLoading} className='w-full'>
-								{isLoading ? (
-									<Loader2 className='h-4 w-4 animate-spin mr-2' />
-								) : isEditing ? (
-									<Edit className='h-4 w-4 mr-2' />
-								) : (
-									<PlusCircle className='h-4 w-4 mr-2' />
-								)}
-								{isEditing ? t('saveChanges') : t('createBudget')}
-							</Button>
-							<DialogClose asChild>
-								<Button type='button' variant='ghost' className='w-full'>
-									{t('cancel')}
-								</Button>
-							</DialogClose>
-						</DialogFooter>
-					</form>
-				</Form>
-				{error && (
-					<Alert variant='destructive' className='mt-4'>
-						<AlertCircle className='h-4 w-4' />
-						<AlertDescription>{error}</AlertDescription>
-					</Alert>
-				)}
-			</DialogContent>
-		</Dialog>
+									<SelectContent>
+										{categories?.map((cat) => (
+											<SelectItem key={cat.id} value={cat.id}>
+												{cat.icon} {cat.name}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+					<FormField
+						control={form.control}
+						name='amount'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('amount')}</FormLabel>
+								<FormControl>
+									<Input type='number' inputMode='decimal' {...field} min={1} step={0.01} />
+								</FormControl>
+								<FormDescription>{tBudgets('spentHint')}</FormDescription>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+				</div>
+			</Form>
+		</FormDialog>
 	)
 }

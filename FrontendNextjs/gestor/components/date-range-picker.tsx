@@ -1,10 +1,11 @@
 'use client'
 
-import { CalendarIcon } from '@radix-ui/react-icons'
 import { addDays, format } from 'date-fns'
+import { CalendarIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import * as React from 'react'
 import { DateRange } from 'react-day-picker'
+import { BREAKPOINTS, useMediaQuery } from '@/hooks/useMediaQuery'
 import { useDateFnsLocale } from '@/lib/i18n/date-locale'
 import { cn } from '@/lib/utils'
 import { Button } from './ui/button'
@@ -21,7 +22,8 @@ export function CalendarDateRangePicker({
 }) {
 	const t = useTranslations('datePicker')
 	const locale = useDateFnsLocale()
-	const [isDesktop, setIsDesktop] = React.useState(false)
+	// Two months side by side only where they fit.
+	const isDesktop = useMediaQuery(BREAKPOINTS.lg)
 	const [internalDate, setInternalDate] = React.useState<DateRange | undefined>({
 		from: new Date(2023, 0, 20),
 		to: addDays(new Date(2023, 0, 20), 20),
@@ -32,19 +34,6 @@ export function CalendarDateRangePicker({
 		else setInternalDate(range)
 	}
 
-	React.useEffect(() => {
-		if (typeof window.matchMedia !== 'function') {
-			setIsDesktop(true)
-			return
-		}
-
-		const mediaQuery = window.matchMedia('(min-width: 1024px)')
-		const handleChange = () => setIsDesktop(mediaQuery.matches)
-		handleChange()
-		mediaQuery.addEventListener('change', handleChange)
-		return () => mediaQuery.removeEventListener('change', handleChange)
-	}, [])
-
 	return (
 		<div className={cn('grid gap-2', className)}>
 			<Popover>
@@ -52,9 +41,12 @@ export function CalendarDateRangePicker({
 					<Button
 						id='date'
 						variant={'outline'}
-						className={cn('w-[260px] justify-start text-left font-normal', !date && 'text-muted-foreground')}
+						className={cn(
+							'w-full justify-start text-left font-normal sm:w-auto sm:min-w-[260px]',
+							!date && 'text-muted-foreground',
+						)}
 					>
-						<CalendarIcon className='mr-2 h-4 w-4' />
+						<CalendarIcon className='mr-2 h-4 w-4 shrink-0' aria-hidden='true' />
 						{date?.from ? (
 							date.to ? (
 								<>

@@ -84,33 +84,38 @@ describe('MonthlyPlanSummaryCard', () => {
 	// The bar is capped so it cannot overflow its container, but the printed
 	// percentage must still show the real number.
 	it('caps the progress bar at 100% while printing the true percentage', () => {
-		const { container } = render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 125 })} />)
+		render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 125 })} />)
 
 		expect(screen.getByText('125%')).toBeInTheDocument()
-
-		const bar = container.querySelector('[data-testid="summary-committed"] .rounded-full > div') as HTMLElement
-		expect(bar.style.width).toBe('100%')
+		expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '100')
 	})
 
-	it('turns the bar red when overcommitted', () => {
-		const { container } = render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 125 })} />)
+	function indicator() {
+		return screen.getByRole('progressbar').firstElementChild as HTMLElement
+	}
 
-		const bar = container.querySelector('[data-testid="summary-committed"] .rounded-full > div')
-		expect(bar?.className).toContain('bg-red-500')
+	it('turns the bar red when overcommitted', () => {
+		render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 125 })} />)
+
+		expect(indicator().className).toContain('bg-destructive')
 	})
 
 	it('turns the bar amber when close to the limit', () => {
-		const { container } = render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 90 })} />)
+		render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 90 })} />)
 
-		const bar = container.querySelector('[data-testid="summary-committed"] .rounded-full > div')
-		expect(bar?.className).toContain('bg-amber-500')
+		expect(indicator().className).toContain('bg-warning')
 	})
 
-	it('keeps the bar green with room to spare', () => {
-		const { container } = render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 28.6 })} />)
+	it('keeps the bar neutral with room to spare', () => {
+		render(<MonthlyPlanSummaryCard summary={makeSummary({ committed_percentage: 28.6 })} />)
 
-		const bar = container.querySelector('[data-testid="summary-committed"] .rounded-full > div')
-		expect(bar?.className).toContain('bg-emerald-500')
+		expect(indicator().className).toContain('bg-primary')
+	})
+
+	it('labels the progress bar', () => {
+		render(<MonthlyPlanSummaryCard summary={makeSummary()} />)
+
+		expect(screen.getByRole('progressbar', { name: 'committedBar' })).toBeInTheDocument()
 	})
 
 	it('shows the exchange rate used for USD items', () => {

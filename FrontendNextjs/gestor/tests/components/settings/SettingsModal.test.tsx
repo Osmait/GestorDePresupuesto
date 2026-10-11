@@ -59,9 +59,26 @@ describe('SettingsModal', () => {
 		expect(screen.getByRole('dialog')).not.toHaveTextContent(spanish)
 
 		for (const tab of ['Security', 'Notifications', 'Data & Privacy']) {
-			await user.click(screen.getByRole('button', { name: tab }))
+			await user.click(screen.getByRole('tab', { name: tab }))
 			expect(screen.getByRole('dialog')).not.toHaveTextContent(spanish)
 		}
 		expect(screen.getByRole('button', { name: 'Delete Account' })).toBeInTheDocument()
+	})
+
+	it('exposes the sections as tabs and labels every setting control', async () => {
+		const user = userEvent.setup()
+		renderWithIntl(<SettingsModal open onOpenChange={vi.fn()} />, { locale: 'en' })
+
+		expect(screen.getByRole('tablist', { name: 'Settings' })).toBeInTheDocument()
+		expect(screen.getByRole('tab', { name: 'General' })).toHaveAttribute('aria-selected', 'true')
+		expect(screen.getByRole('switch', { name: 'Expandable sidebar' })).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'Edit' })).toHaveAccessibleDescription('Full name')
+		expect(screen.getByRole('group', { name: 'Language' })).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'English' })).toHaveAttribute('aria-pressed', 'true')
+
+		await user.click(screen.getByRole('tab', { name: 'Notifications' }))
+		for (const name of ['Email', 'Push', 'SMS']) {
+			expect(screen.getByRole('switch', { name })).toBeInTheDocument()
+		}
 	})
 })

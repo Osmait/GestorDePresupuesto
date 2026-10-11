@@ -56,6 +56,18 @@ describe('CreateUserModal', () => {
 		expect(screen.getByLabelText('Email')).toBeDefined()
 		expect(screen.getByLabelText('Password')).toBeDefined()
 		expect(screen.getByText('Role')).toBeDefined()
+		expect(screen.getByRole('button', { name: 'Cancel' })).toBeDefined()
+	})
+
+	it('toggles password visibility with a labelled, pressed-state button', () => {
+		renderWithIntl(<CreateUserModal onUserCreated={mockOnUserCreated} />)
+		fireEvent.click(screen.getByText('Add User'))
+
+		const toggle = screen.getByRole('button', { name: 'Show password' })
+		expect(toggle).toHaveAttribute('aria-pressed', 'false')
+		fireEvent.click(toggle)
+		expect(screen.getByRole('button', { name: 'Hide password' })).toHaveAttribute('aria-pressed', 'true')
+		expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'text')
 	})
 
 	it('submits form with correct data', async () => {
@@ -133,7 +145,10 @@ describe('CreateUserModal', () => {
 			expect(fetchMock).toHaveBeenCalledTimes(1)
 		})
 
-		expect(toast.error).toHaveBeenCalledWith(expect.stringContaining('Error creating user'))
+		// The server error is shown inline and the dialog stays open with the data.
+		expect(await screen.findByText(/Error creating user/)).toBeInTheDocument()
+		expect(screen.getByLabelText('First Name')).toHaveValue('John')
+		expect(toast.error).not.toHaveBeenCalled()
 		expect(mockOnUserCreated).not.toHaveBeenCalled()
 	})
 

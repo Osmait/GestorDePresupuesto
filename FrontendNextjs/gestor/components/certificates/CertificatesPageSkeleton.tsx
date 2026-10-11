@@ -1,44 +1,43 @@
 'use client'
 
+import { useTranslations } from 'next-intl'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { PageShell } from '@/components/shared/PageShell'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { CertificateSummaryCard } from './CertificateSummaryCard'
 
+/** Loading layout of the certificates page: real title, skeleton KPIs and cards. */
 export function CertificatesPageSkeleton() {
-	return (
-		<div className='container mx-auto px-4 py-8 space-y-6'>
-			<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
-				{[1, 2, 3, 4].map((i) => (
-					<Card key={i}>
-						<CardHeader className='pb-2'>
-							<Skeleton className='h-4 w-24' />
-						</CardHeader>
-						<CardContent>
-							<Skeleton className='h-8 w-32' />
-						</CardContent>
-					</Card>
-				))}
-			</div>
+	const t = useTranslations('certificates')
 
-			<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-3'>
-				{[1, 2, 3, 4, 5, 6].map((i) => (
+	return (
+		<PageShell aria-busy='true'>
+			<PageHeader title={t('title')} description={t('subtitle')} />
+			<CertificateSummaryCard summary={undefined} />
+
+			<div className='grid gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+				{[1, 2, 3].map((i) => (
 					<Card key={i}>
-						<CardHeader>
-							<div className='flex justify-between'>
-								<Skeleton className='h-6 w-32' />
-								<Skeleton className='h-6 w-16' />
+						<CardHeader className='flex flex-row items-start justify-between space-y-0'>
+							<div className='space-y-2'>
+								<Skeleton className='h-5 w-32' />
+								<Skeleton className='h-5 w-16' />
 							</div>
+							<Skeleton className='h-8 w-8' />
 						</CardHeader>
 						<CardContent className='space-y-4'>
-							<Skeleton className='h-20 w-full' />
-							<div className='flex gap-2'>
-								<Skeleton className='h-9 w-16' />
-								<Skeleton className='h-9 w-16' />
-								<Skeleton className='h-9 w-16' />
+							<Skeleton className='h-8 w-36' />
+							<div className='grid grid-cols-2 gap-4'>
+								<Skeleton className='h-9 w-full' />
+								<Skeleton className='h-9 w-full' />
+								<Skeleton className='h-9 w-full' />
+								<Skeleton className='h-9 w-full' />
 							</div>
 						</CardContent>
 					</Card>
 				))}
 			</div>
-		</div>
+		</PageShell>
 	)
 }

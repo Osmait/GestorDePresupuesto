@@ -19,7 +19,7 @@ describe('InvestmentCard', () => {
 		updated_at: '',
 	}
 
-	it('renders investment details and positive profit correctly', () => {
+	it('renders investment details and a positive profit in the success color', () => {
 		renderWithIntl(<InvestmentCard investment={mockInvestment} onEdit={vi.fn()} onDelete={vi.fn()} />)
 
 		expect(screen.getByText('Apple Inc. (AAPL)')).toBeInTheDocument()
@@ -28,32 +28,44 @@ describe('InvestmentCard', () => {
 		expect(screen.getByText('US$1,800.00')).toBeInTheDocument()
 		expect(screen.getByText('10 shares @ US$180.00')).toBeInTheDocument()
 
-		// Profit: (180 - 150) * 10 = 300
-		expect(screen.getByText((content) => content.includes('+') && content.includes('300'))).toBeInTheDocument()
-		expect(screen.getByText((content) => content.includes('+') && content.includes('300'))).toHaveClass(
-			'text-green-600',
-		)
+		// Profit: (180 - 150) * 10 = 300, signed and colored through <Amount>
+		const profit = screen.getByText('+US$300.00')
+		expect(profit).toHaveAttribute('data-tone', 'positive')
+		expect(profit).toHaveClass('text-success')
+		expect(screen.getByText(/\+20\.00%/)).toHaveClass('text-success')
 	})
 
-	it('renders negative profit correctly', () => {
+	it('renders a loss in the destructive color', () => {
 		const lossInvestment = { ...mockInvestment, current_price: 120 }
 		renderWithIntl(<InvestmentCard investment={lossInvestment} onEdit={vi.fn()} onDelete={vi.fn()} />)
 
 		// Profit: (120 - 150) * 10 = -300
-		expect(screen.getByText((content) => content.includes('300') && !content.includes('+'))).toHaveClass('text-red-600')
+		expect(screen.getByText('-US$300.00')).toHaveClass('text-destructive')
+		expect(screen.getByText(/-20\.00%/)).toHaveClass('text-destructive')
 	})
 
-	it('triggers actions', async () => {
+	it('keeps a zero gain neutral (not green)', () => {
+		const flat = { ...mockInvestment, current_price: 150 }
+		renderWithIntl(<InvestmentCard investment={flat} onEdit={vi.fn()} onDelete={vi.fn()} />)
+
+		const profit = screen.getByText('US$0.00')
+		expect(profit).toHaveAttribute('data-tone', 'neutral')
+		expect(profit).not.toHaveClass('text-success')
+	})
+
+	it('triggers edit and delete from the actions menu', async () => {
 		const user = userEvent.setup()
 		const onEdit = vi.fn()
 		const onDelete = vi.fn()
 
 		renderWithIntl(<InvestmentCard investment={mockInvestment} onEdit={onEdit} onDelete={onDelete} />)
 
-		await user.click(screen.getByRole('button', { name: 'Edit Apple Inc.' }))
+		await user.click(screen.getByRole('button', { name: 'Actions for Apple Inc.' }))
+		await user.click(await screen.findByRole('menuitem', { name: 'Edit' }))
 		expect(onEdit).toHaveBeenCalledWith(mockInvestment)
 
-		await user.click(screen.getByRole('button', { name: 'Delete Apple Inc.' }))
+		await user.click(screen.getByRole('button', { name: 'Actions for Apple Inc.' }))
+		await user.click(await screen.findByRole('menuitem', { name: 'Delete' }))
 		expect(onDelete).toHaveBeenCalledWith('inv1')
 	})
 
@@ -63,6 +75,6 @@ describe('InvestmentCard', () => {
 		})
 
 		expect(screen.getByText('10 unidades a US$180.00')).toBeInTheDocument()
-		expect(screen.getByRole('button', { name: 'Editar Apple Inc.' })).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'Acciones de Apple Inc.' })).toBeInTheDocument()
 	})
 })

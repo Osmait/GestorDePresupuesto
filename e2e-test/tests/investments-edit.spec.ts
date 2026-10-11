@@ -20,8 +20,15 @@ test.describe('Investment Edit @prod-write', () => {
 		const fundingModal = page.getByRole('dialog')
 		await expect(fundingModal).toBeVisible()
 
-		// Wait for accounts to load and auto-select (useEffect with React Query cache)
-		await expect(fundingModal.locator('button[role="combobox"]').first()).not.toHaveText(/Select account|Selecciona una cuenta/i, { timeout: 10000 })
+		// Wait for accounts to load and auto-select the first account (useEffect with React Query cache)
+		const sourceSelect = fundingModal.getByRole('combobox', { name: /^(Source account|Cuenta de origen)$/i })
+		await expect(sourceSelect).not.toHaveText(/Select account|Selecciona una cuenta/i, { timeout: 10000 })
+
+		// Fund from the account created above: the shared demo user may own other
+		// accounts (from earlier specs) whose balance is below the amount.
+		await sourceSelect.click()
+		await page.getByRole('option', { name: new RegExp(`^${accountName} `) }).click()
+		await expect(sourceSelect).toContainText(accountName)
 
 		await fundingModal.locator('input[name="sourceAmount"]').fill('5000')
 
@@ -39,8 +46,8 @@ test.describe('Investment Edit @prod-write', () => {
 		})
 		await expect(fundingModal).not.toBeVisible({ timeout: 15000 })
 
-		// --- 4. Open the add investment modal ---
-		await page.getByRole('button', { name: /^(Add investment|Agregar inversión)$/i }).click()
+		// --- 4. Open the add investment modal (the header button; an empty tab repeats it) ---
+		await page.getByRole('button', { name: /^(Add investment|Agregar inversión)$/i }).first().click()
 
 		const modal = page.getByRole('dialog')
 		await expect(modal).toBeVisible()
@@ -68,7 +75,8 @@ test.describe('Investment Edit @prod-write', () => {
 		const invCard = page.locator('div.rounded-lg.border').filter({ hasText: investmentName }).first()
 		await expect(invCard).toBeVisible({ timeout: 5000 })
 
-		await invCard.getByRole('button', { name: new RegExp(`^(Edit|Editar) ${investmentName}$`, 'i') }).click()
+		await invCard.getByRole('button', { name: new RegExp(`^(Actions for|Acciones de) ${investmentName}$`, 'i') }).click()
+		await page.getByRole('menuitem', { name: /^(Edit|Editar)$/i }).click()
 
 		const editDialog = page.getByRole('dialog')
 		await expect(editDialog).toBeVisible()
@@ -93,9 +101,12 @@ test.describe('Investment Edit @prod-write', () => {
 		const editedCard = page.locator('div.rounded-lg.border').filter({ hasText: editedName }).first()
 		await expect(editedCard).toBeVisible({ timeout: 5000 })
 
-		// Accept the native confirm() dialog that the delete button triggers
-		page.once('dialog', d => d.accept())
-		await editedCard.getByRole('button', { name: new RegExp(`^(Delete|Eliminar) ${editedName}$`, 'i') }).click()
+		// Delete from the card's actions menu and confirm in the alert dialog
+		await editedCard.getByRole('button', { name: new RegExp(`^(Actions for|Acciones de) ${editedName}$`, 'i') }).click()
+		await page.getByRole('menuitem', { name: /^(Delete|Eliminar)$/i }).click()
+		const confirmDialog = page.getByRole('alertdialog')
+		await expect(confirmDialog).toBeVisible()
+		await confirmDialog.getByRole('button', { name: /^(Delete|Eliminar)$/i }).click()
 
 		await expect(editedCard).not.toBeVisible({ timeout: 15000 })
 	})

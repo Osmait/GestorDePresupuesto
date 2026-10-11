@@ -1,37 +1,11 @@
-import { render, screen } from '@testing-library/react'
-import { vi } from 'vitest'
+import { screen } from '@testing-library/react'
 import { BudgetSummaryCard } from '@/components/budgets/BudgetSummaryCard'
+import { renderWithIntl } from '@/tests/utils/intl'
 
-vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string) => {
-		const translations: Record<string, string> = {
-			summary: 'Summary',
-			totalBudget: 'Total Budget',
-			totalSpent: 'Total Spent',
-			totalRemaining: 'Total Remaining',
-			exceededBudgets: 'Exceeded Budgets',
-		}
-		return translations[key] || key
-	},
-}))
-
-// Render the final value synchronously, formatted like the real component.
-vi.mock('@/components/ui/animated-counter', async () => {
-	const { formatCurrency } = await vi.importActual<typeof import('@/lib/utils')>('@/lib/utils')
-	return {
-		AnimatedCounter: ({
-			value,
-			prefix = '',
-			currency,
-			signDisplay,
-		}: {
-			value: number
-			prefix?: string
-			currency?: string
-			signDisplay?: 'exceptZero'
-		}) => <span>{currency ? formatCurrency(value, currency, { signDisplay }) : `${prefix}${value}`}</span>,
-	}
-})
+function statValue(label: string) {
+	const card = screen.getByText(label).closest('.p-5') as HTMLElement
+	return card.querySelector('.text-2xl') as HTMLElement
+}
 
 describe('BudgetSummaryCard', () => {
 	const mockBudgets = [
@@ -55,23 +29,20 @@ describe('BudgetSummaryCard', () => {
 		},
 	]
 
-	it('calculates totals correctly', () => {
-		render(<BudgetSummaryCard budgets={mockBudgets} />)
+	it('calculates totals in StatCards', () => {
+		renderWithIntl(<BudgetSummaryCard budgets={mockBudgets} />)
 
-		// Total Budget: 1000 + 2000 = 3000
-		expect(screen.getByText('Total Budget')).toBeInTheDocument()
-		expect(screen.getByText('RD$3,000.00')).toBeInTheDocument()
+		expect(statValue('Total Budget')).toHaveTextContent('RD$3,000.00')
+		expect(statValue('Total Spent')).toHaveTextContent('RD$2,600.00')
+		expect(statValue('Total Remaining')).toHaveTextContent('RD$400.00')
+		// Budget 2 has current_amount > amount.
+		expect(statValue('Exceeded Budgets')).toHaveTextContent('1')
+		expect(statValue('Exceeded Budgets')).toHaveClass('text-destructive')
+	})
 
-		// Total Spent: 500 + 2100 = 2600
-		expect(screen.getByText('Total Spent')).toBeInTheDocument()
-		expect(screen.getByText('RD$2,600.00')).toBeInTheDocument()
-
-		// Total Remaining: 3000 - 2600 = 400
-		expect(screen.getByText('Total Remaining')).toBeInTheDocument()
-		expect(screen.getByText('RD$400.00')).toBeInTheDocument()
-
-		// Exceeded: 1 (budget 2 has current_amount > amount)
-		expect(screen.getByText('Exceeded Budgets')).toBeInTheDocument()
-		expect(screen.getByText('1')).toBeInTheDocument()
+	it('flags a negative remaining total', () => {
+		renderWithIntl(<BudgetSummaryCard budgets={[{ ...mockBudgets[1] }]} />)
+		expect(statValue('Total Remaining')).toHaveTextContent('-RD$100.00')
+		expect(statValue('Total Remaining')).toHaveClass('text-destructive')
 	})
 })

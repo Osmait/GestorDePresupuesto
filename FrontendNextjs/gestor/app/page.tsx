@@ -65,7 +65,7 @@ const _fadeInUp = {
 // ============================================
 function Navigation() {
 	const [isScrolled, setIsScrolled] = useState(false)
-	const { theme, setTheme } = useTheme()
+	const { resolvedTheme, setTheme } = useTheme()
 	const [mounted, setMounted] = useState(false)
 
 	useEffect(() => {
@@ -125,10 +125,15 @@ function Navigation() {
 							<Button
 								variant='ghost'
 								size='icon'
-								onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
+								onClick={() => setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')}
 								className='rounded-full'
+								aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
 							>
-								{theme === 'dark' ? <Sun className='h-4 w-4' /> : <Moon className='h-4 w-4' />}
+								{resolvedTheme === 'dark' ? (
+									<Sun className='h-4 w-4' aria-hidden='true' />
+								) : (
+									<Moon className='h-4 w-4' aria-hidden='true' />
+								)}
 							</Button>
 						)}
 						<Button variant='outline' asChild className='hidden sm:flex gap-2 rounded-full'>

@@ -1,21 +1,11 @@
+import { StatGridSkeleton } from '@/components/shared/StatGrid'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
 export function MonthlyPlanSkeleton() {
 	return (
-		<div className='space-y-8'>
-			<Card>
-				<CardHeader>
-					<Skeleton className='h-5 w-40' />
-				</CardHeader>
-				<CardContent>
-					<div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-						{[1, 2, 3, 4].map((i) => (
-							<Skeleton key={i} className='h-24 w-full' />
-						))}
-					</div>
-				</CardContent>
-			</Card>
+		<div className='space-y-6' aria-busy='true'>
+			<StatGridSkeleton count={4} />
 
 			<div className='grid grid-cols-1 lg:grid-cols-2 gap-6'>
 				{[1, 2].map((column) => (

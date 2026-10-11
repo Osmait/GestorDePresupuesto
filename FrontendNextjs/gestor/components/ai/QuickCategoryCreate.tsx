@@ -1,52 +1,16 @@
 'use client'
 
-import { Loader2, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useId, useState } from 'react'
+import { CATEGORY_COLORS, ColorSwatchPicker } from '@/components/shared/ColorSwatchPicker'
+import { CATEGORY_EMOJIS, EmojiPicker } from '@/components/shared/EmojiPicker'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Input } from '@/components/ui/input'
-import { cn } from '@/lib/utils'
+import { Label } from '@/components/ui/label'
 import { Category } from '@/types/category'
 
-const EMOJI_ICONS = [
-	'🍕',
-	'🛒',
-	'🚗',
-	'💊',
-	'🎬',
-	'📱',
-	'💡',
-	'🏠',
-	'✈️',
-	'🎓',
-	'💪',
-	'🎮',
-	'📚',
-	'☕',
-	'👕',
-	'🔧',
-	'🎁',
-	'💳',
-	'🏥',
-	'🐾',
-	'🍔',
-	'⚡',
-	'🎵',
-	'💄',
-	'🌱',
-]
-
-const COLORS = [
-	{ name: 'Red', value: '#ef4444' },
-	{ name: 'Orange', value: '#f97316' },
-	{ name: 'Yellow', value: '#eab308' },
-	{ name: 'Green', value: '#22c55e' },
-	{ name: 'Blue', value: '#3b82f6' },
-	{ name: 'Purple', value: '#a855f7' },
-	{ name: 'Pink', value: '#ec4899' },
-	{ name: 'Gray', value: '#6b7280' },
-]
+const DEFAULT_ICON = CATEGORY_EMOJIS[0].value
+const DEFAULT_COLOR = CATEGORY_COLORS.find((color) => color.key === 'green')?.value ?? CATEGORY_COLORS[0].value
 
 interface QuickCategoryCreateProps {
 	open: boolean
@@ -63,9 +27,16 @@ export function QuickCategoryCreate({
 }: QuickCategoryCreateProps) {
 	const t = useTranslations('ai.quickCategory')
 	const tCommon = useTranslations('ai.common')
+	const id = useId()
 	const [name, setName] = useState('')
-	const [selectedIcon, setSelectedIcon] = useState('📦')
-	const [selectedColor, setSelectedColor] = useState(COLORS[3].value)
+	const [selectedIcon, setSelectedIcon] = useState<string>(DEFAULT_ICON)
+	const [selectedColor, setSelectedColor] = useState<string>(DEFAULT_COLOR)
+
+	const handleReset = () => {
+		setName('')
+		setSelectedIcon(DEFAULT_ICON)
+		setSelectedColor(DEFAULT_COLOR)
+	}
 
 	const handleCreate = () => {
 		if (!name.trim()) return
@@ -82,102 +53,67 @@ export function QuickCategoryCreate({
 		handleReset()
 	}
 
-	const handleReset = () => {
-		setName('')
-		setSelectedIcon('📦')
-		setSelectedColor(COLORS[3].value)
-	}
-
-	const handleClose = () => {
-		handleReset()
-		onOpenChange(false)
+	const handleOpenChange = (next: boolean) => {
+		if (!next) handleReset()
+		onOpenChange(next)
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={handleClose}>
-			<DialogContent className='sm:max-w-md'>
-				<DialogHeader>
-					<DialogTitle>{t('title')}</DialogTitle>
-					<DialogDescription>{t('description')}</DialogDescription>
-				</DialogHeader>
-
-				<div className='space-y-4'>
-					<div>
-						<label className='text-sm font-medium mb-2 block'>{t('name')}</label>
-						<Input
-							value={name}
-							onChange={(e) => setName(e.target.value)}
-							placeholder={t('namePlaceholder')}
-							disabled={isCreating}
-						/>
-					</div>
-
-					<div>
-						<label className='text-sm font-medium mb-2 block'>{t('icon')}</label>
-						<div className='grid grid-cols-9 gap-1.5'>
-							{EMOJI_ICONS.map((icon) => (
-								<button
-									key={icon}
-									type='button'
-									onClick={() => setSelectedIcon(icon)}
-									disabled={isCreating}
-									className={cn(
-										'h-8 w-8 flex items-center justify-center text-lg rounded-md transition-colors',
-										selectedIcon === icon ? 'bg-primary text-primary-foreground' : 'bg-muted hover:bg-muted/80',
-									)}
-								>
-									{icon}
-								</button>
-							))}
-						</div>
-					</div>
-
-					<div>
-						<label className='text-sm font-medium mb-2 block'>{t('color')}</label>
-						<div className='flex gap-2 flex-wrap'>
-							{COLORS.map((color) => (
-								<button
-									key={color.value}
-									type='button'
-									onClick={() => setSelectedColor(color.value)}
-									disabled={isCreating}
-									className={cn(
-										'h-8 w-8 rounded-full transition-all',
-										selectedColor === color.value ? 'ring-2 ring-offset-2 ring-primary' : 'hover:scale-110',
-									)}
-									style={{ backgroundColor: color.value }}
-									title={color.name}
-								/>
-							))}
-						</div>
-					</div>
-
-					<div className='flex items-center gap-2 p-3 bg-muted rounded-lg'>
-						<span className='text-2xl'>{selectedIcon}</span>
-						<span className='font-medium'>{name || t('preview')}</span>
-						<span className='w-3 h-3 rounded-full ml-auto' style={{ backgroundColor: selectedColor }} />
-					</div>
+		<FormDialog
+			open={open}
+			onOpenChange={handleOpenChange}
+			title={t('title')}
+			description={t('description')}
+			size='sm'
+			submitLabel={tCommon('create')}
+			cancelLabel={tCommon('cancel')}
+			loading={isCreating}
+			submitDisabled={!name.trim()}
+			onSubmit={handleCreate}
+		>
+			<div className='space-y-4'>
+				<div className='space-y-2'>
+					<Label htmlFor={`${id}-name`}>{t('name')}</Label>
+					<Input
+						id={`${id}-name`}
+						value={name}
+						onChange={(e) => setName(e.target.value)}
+						placeholder={t('namePlaceholder')}
+						disabled={isCreating}
+						autoComplete='off'
+					/>
 				</div>
 
-				<div className='flex justify-end gap-2 mt-4'>
-					<Button variant='outline' onClick={handleClose} disabled={isCreating}>
-						{tCommon('cancel')}
-					</Button>
-					<Button onClick={handleCreate} disabled={!name.trim() || isCreating}>
-						{isCreating ? (
-							<>
-								<Loader2 className='h-4 w-4 mr-2 animate-spin' />
-								{tCommon('creating')}
-							</>
-						) : (
-							<>
-								<Plus className='h-4 w-4 mr-2' />
-								{tCommon('create')}
-							</>
-						)}
-					</Button>
+				<div className='space-y-2'>
+					<p id={`${id}-icon`} className='text-sm font-medium'>
+						{t('icon')}
+					</p>
+					<EmojiPicker
+						aria-labelledby={`${id}-icon`}
+						value={selectedIcon}
+						onChange={setSelectedIcon}
+						disabled={isCreating}
+					/>
 				</div>
-			</DialogContent>
-		</Dialog>
+
+				<div className='space-y-2'>
+					<p id={`${id}-color`} className='text-sm font-medium'>
+						{t('color')}
+					</p>
+					<ColorSwatchPicker
+						aria-labelledby={`${id}-color`}
+						value={selectedColor}
+						onChange={setSelectedColor}
+						disabled={isCreating}
+					/>
+				</div>
+
+				<div className='flex items-center gap-2 rounded-lg bg-muted p-3' aria-hidden='true'>
+					<span className='text-2xl'>{selectedIcon}</span>
+					<span className='font-medium'>{name || t('preview')}</span>
+					<span className='ml-auto h-3 w-3 rounded-full' style={{ backgroundColor: selectedColor }} />
+				</div>
+			</div>
+		</FormDialog>
 	)
 }

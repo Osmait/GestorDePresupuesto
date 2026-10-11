@@ -18,8 +18,7 @@ test.describe('Accounts @prod-write', () => {
 		await expect(page.getByText(accountName).first()).toBeVisible({ timeout: 10000 })
 
 		// --- 3. Open the card dropdown and click Edit ---
-		// Fresh DB → only one account card → click the only MoreHorizontal button
-		await page.locator('button').filter({ has: page.locator('svg.lucide-ellipsis') }).first().click()
+		await page.getByRole('button', { name: new RegExp(`^(Acciones de|Actions for) ${accountName}$`) }).click()
 		await page.getByRole('menuitem', { name: /Edit|Editar/i }).click()
 
 		const editModal = page.getByRole('dialog')
@@ -29,20 +28,19 @@ test.describe('Accounts @prod-write', () => {
 		await editModal.locator('input[name="name"]').fill(updatedName)
 		await editModal.locator('input[name="bank"]').fill('Updated Bank')
 
-		// Account edit submit is hardcoded "Actualizar Cuenta" (not i18n)
-		await editModal.getByRole('button', { name: /Actualizar|Update|Save|Guardar/i }).click()
+		await editModal.getByRole('button', { name: /Save|Guardar/i }).click()
 		await expect(editModal).not.toBeVisible({ timeout: 15000 })
 
 		// --- 4. Assert the updated name is visible ---
 		await expect(page.getByText(updatedName).first()).toBeVisible({ timeout: 10000 })
 
 		// --- 5. Delete the account ---
-		await page.locator('button').filter({ has: page.locator('svg.lucide-ellipsis') }).first().click()
+		await page.getByRole('button', { name: new RegExp(`^(Acciones de|Actions for) ${updatedName}$`) }).click()
 		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
 
-		const deleteDialog = page.getByRole('dialog').last()
+		const deleteDialog = page.getByRole('alertdialog')
 		await expect(deleteDialog).toBeVisible()
-		await deleteDialog.getByRole('button', { name: /Delete|Eliminar/i }).last().click()
+		await deleteDialog.getByRole('button', { name: /^(Delete|Eliminar)$/i }).click()
 
 		await expect(page.getByText(updatedName).first()).not.toBeVisible({ timeout: 15000 })
 	})

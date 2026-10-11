@@ -1,6 +1,6 @@
 'use client'
 
-import { createContext, ReactNode, useContext } from 'react'
+import { createContext, ReactNode, useContext, useState } from 'react'
 import {
 	useCreateAccountMutation,
 	useDeleteAccountMutation,
@@ -18,6 +18,9 @@ interface AccountContextType {
 	deleteAccount: (_id: string) => Promise<void>
 	addAccount: (_acc: Account) => void
 	refetch: () => Promise<void>
+	/** The "new account" dialog (opened from the page header and the empty state). */
+	isCreateOpen: boolean
+	setCreateOpen: (_open: boolean) => void
 }
 
 const AccountContext = createContext<AccountContextType | undefined>(undefined)
@@ -28,6 +31,7 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 	const createMutation = useCreateAccountMutation()
 	const updateMutation = useUpdateAccountMutation()
 	const deleteMutation = useDeleteAccountMutation()
+	const [isCreateOpen, setCreateOpen] = useState(false)
 
 	const error = queryError ? (queryError as Error).message : null
 	const bankAccounts = Array.isArray(accounts) ? accounts.filter((acc) => (acc.type || 'bank') !== 'credit_card') : []
@@ -61,6 +65,8 @@ export function AccountProvider({ children }: { children: ReactNode }) {
 				refetch: async () => {
 					await refetch()
 				},
+				isCreateOpen,
+				setCreateOpen,
 			}}
 		>
 			{children}

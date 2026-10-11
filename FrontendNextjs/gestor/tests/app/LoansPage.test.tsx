@@ -1,15 +1,36 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, screen, waitFor } from '@testing-library/react'
+import { fireEvent, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LoansPage from '@/app/app/loans/page'
 import { renderWithIntl } from '@/tests/utils/intl'
 
+// FormDialog renders a Dialog from `md` up (a vaul Drawer below, which needs pointer capture jsdom lacks).
+beforeEach(() => {
+	vi.stubGlobal(
+		'matchMedia',
+		vi.fn((query: string) => ({
+			matches: true,
+			media: query,
+			onchange: null,
+			addEventListener: vi.fn(),
+			removeEventListener: vi.fn(),
+			addListener: vi.fn(),
+			removeListener: vi.fn(),
+			dispatchEvent: vi.fn(),
+		})),
+	)
+})
+afterEach(() => {
+	vi.unstubAllGlobals()
+})
+
 const mockCreate = vi.fn()
+const mockFindAll = vi.fn()
 
 vi.mock('@/lib/repositoryConfig', () => ({
 	getLoanRepository: () => ({
-		findAll: () => Promise.resolve([]),
+		findAll: () => mockFindAll(),
 		getSummary: () => Promise.resolve(null),
 		create: (...args: unknown[]) => mockCreate(...args),
 	}),
@@ -38,13 +59,19 @@ vi.mock('@/hooks/queries/useAccountsQuery', () => ({
 	}),
 }))
 
-async function openCreateDialog(user: ReturnType<typeof userEvent.setup>) {
-	renderWithIntl(
+function renderPage() {
+	return renderWithIntl(
 		<QueryClientProvider client={new QueryClient()}>
 			<LoansPage />
 		</QueryClientProvider>,
 	)
-	await user.click(await screen.findByRole('button', { name: /New loan/ }))
+}
+
+async function openCreateDialog(user: ReturnType<typeof userEvent.setup>) {
+	renderPage()
+	// The header's "New loan" (the empty state repeats it).
+	const [headerButton] = await screen.findAllByRole('button', { name: /New loan/ })
+	await user.click(headerButton)
 	const dialog = await screen.findByRole('dialog')
 	const [borrower] = Array.from(dialog.querySelectorAll('input'))
 	await user.type(borrower, 'Ana')
@@ -52,9 +79,35 @@ async function openCreateDialog(user: ReturnType<typeof userEvent.setup>) {
 	return { dialog, principal }
 }
 
+describe('LoansPage', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		mockFindAll.mockResolvedValue([])
+	})
+
+	it('shows the empty state with a create action when there are no loans', async () => {
+		renderPage()
+
+		expect(await screen.findByRole('heading', { level: 2, name: 'No loans yet' })).toBeInTheDocument()
+		expect(screen.getByRole('heading', { level: 1, name: 'Loans' })).toBeInTheDocument()
+	})
+
+	it('shows an error state with retry when the loans cannot be loaded', async () => {
+		const user = userEvent.setup()
+		mockFindAll.mockRejectedValueOnce(new Error('boom'))
+		renderPage()
+
+		expect(await screen.findByRole('alert')).toHaveTextContent('Could not load loans')
+		await user.click(screen.getByRole('button', { name: 'Try again' }))
+		expect(await screen.findByRole('heading', { level: 2, name: 'No loans yet' })).toBeInTheDocument()
+		expect(mockFindAll).toHaveBeenCalledTimes(2)
+	})
+})
+
 describe('LoansPage create dialog', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		mockFindAll.mockResolvedValue([])
 	})
 
 	it('shows the available balance of the source account', async () => {
@@ -87,14 +140,15 @@ describe('LoansPage create dialog', () => {
 	it('rejects a principal with more than 2 decimal places before calling the API', async () => {
 		const user = userEvent.setup()
 		const { dialog, principal } = await openCreateDialog(user)
-		// The controlled input stores Number(value): set the whole value at once.
+		// Set the whole value at once (typing would go through intermediate values).
 		fireEvent.change(principal, { target: { value: '10.005' } })
 		// Submit the form directly: the browser's own step="0.01" check is not under test here.
 		const form = dialog.querySelector('form')
 		if (!form) throw new Error('create form not found')
 		fireEvent.submit(form)
 
-		await waitFor(() => expect(screen.getByRole('alert')).toHaveTextContent('Use at most 2 decimal places'))
+		expect(await screen.findByText('Use at most 2 decimal places')).toBeInTheDocument()
+		expect(principal).toHaveAttribute('aria-invalid', 'true')
 		expect(mockCreate).not.toHaveBeenCalled()
 	})
 })

@@ -1,9 +1,10 @@
 'use client'
 
 import { formatDistanceToNow } from 'date-fns'
-import { es } from 'date-fns/locale'
-import { Bell, Check, Trash2 } from 'lucide-react'
+import { Bell, Check, Loader2, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { Amount } from '@/components/shared/Amount'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
 import {
 	DropdownMenu,
@@ -15,6 +16,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { NotificationItem, useNotificationContext } from '@/contexts/NotificationContext'
+import { useDateFnsLocale } from '@/lib/i18n/date-locale'
 import { cn } from '@/lib/utils'
 
 export function NotificationCenter() {
@@ -29,67 +31,77 @@ export function NotificationCenter() {
 		markAllAsRead,
 		clearNotifications,
 	} = useNotificationContext()
+	const t = useTranslations('nav.notificationCenter')
 	const tActions = useTranslations('common.actions')
 
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<Button variant='ghost' size='sm' className='relative'>
-					<Bell className='h-4 w-4' />
+				<Button
+					variant='ghost'
+					size='icon'
+					className='relative'
+					aria-label={unreadCount > 0 ? t('openUnread', { count: unreadCount }) : t('open')}
+				>
+					<Bell className='h-4 w-4' aria-hidden='true' />
 					{unreadCount > 0 && (
-						<span className='absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] font-medium text-white'>
+						<span
+							aria-hidden='true'
+							className='absolute top-1 right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-xs leading-none font-medium text-destructive-foreground tabular-nums'
+						>
 							{unreadCount > 9 ? '9+' : unreadCount}
 						</span>
 					)}
 				</Button>
 			</DropdownMenuTrigger>
-			<DropdownMenuContent align='end' className='w-80'>
-				<div className='flex items-center justify-between p-2'>
-					<div className='flex items-center gap-2'>
-						<DropdownMenuLabel className='p-0 font-normal'>Notificaciones ({notifications.length})</DropdownMenuLabel>
-						<div
-							className={cn('h-2 w-2 rounded-full', isConnected ? 'bg-green-500' : 'bg-red-500')}
-							title={isConnected ? 'Conectado' : 'Desconectado'}
-						/>
+			<DropdownMenuContent align='end' className='w-80 max-w-[calc(100vw-1rem)]'>
+				<div className='flex items-center justify-between gap-2 p-2'>
+					<div className='flex min-w-0 flex-col gap-0.5'>
+						<DropdownMenuLabel className='p-0'>{t('title', { count: notifications.length })}</DropdownMenuLabel>
+						<span className='flex items-center gap-1.5 text-xs text-muted-foreground'>
+							<span
+								aria-hidden='true'
+								className={cn('h-2 w-2 rounded-full', isConnected ? 'bg-success' : 'bg-muted-foreground')}
+							/>
+							{isConnected ? t('connected') : t('disconnected')}
+						</span>
 					</div>
-					<div className='flex gap-1'>
+					<div className='flex shrink-0 gap-1'>
 						{unreadCount > 0 && (
 							<Button
 								variant='ghost'
 								size='icon'
-								className='h-6 w-6'
+								aria-label={t('markAllRead')}
+								title={t('markAllRead')}
 								onClick={(e) => {
 									e.preventDefault()
 									markAllAsRead()
 								}}
-								title='Marcar todas como leídas'
 							>
-								<Check className='h-4 w-4 text-muted-foreground hover:text-primary' />
+								<Check className='h-4 w-4' aria-hidden='true' />
 							</Button>
 						)}
 						{notifications.length > 0 && (
 							<Button
 								variant='ghost'
 								size='icon'
-								className='h-6 w-6'
+								className='hover:text-destructive'
+								aria-label={t('clearAll')}
+								title={t('clearAll')}
 								onClick={(e) => {
 									e.preventDefault()
 									clearNotifications()
 								}}
-								title='Borrar todas'
 							>
-								<Trash2 className='h-4 w-4 text-muted-foreground hover:text-destructive' />
+								<Trash2 className='h-4 w-4' aria-hidden='true' />
 							</Button>
 						)}
 					</div>
 				</div>
 				<DropdownMenuSeparator />
-				<ScrollArea className='h-[300px]'>
+				<ScrollArea className='h-[300px] max-h-[60dvh]'>
 					{notifications.length === 0 ? (
-						<div className='flex flex-col items-center justify-center py-8 text-center text-muted-foreground'>
-							<Bell className='mb-2 h-8 w-8 opacity-20' />
-							<p className='text-sm'>No tienes notificaciones</p>
-						</div>
+						<EmptyState compact icon={Bell} title={t('empty')} />
 					) : (
 						<div className='flex flex-col'>
 							{notifications.map((notification) => (
@@ -101,12 +113,14 @@ export function NotificationCenter() {
 									size='sm'
 									className='m-2 text-xs'
 									disabled={isLoadingMore}
+									aria-busy={isLoadingMore || undefined}
 									onClick={(e) => {
 										e.preventDefault()
 										loadMore()
 									}}
 								>
-									{isLoadingMore ? tActions('loading') : tActions('loadMore')}
+									{isLoadingMore ? <Loader2 className='mr-2 h-3.5 w-3.5 animate-spin' aria-hidden='true' /> : null}
+									{tActions('loadMore')}
 								</Button>
 							)}
 						</div>
@@ -118,24 +132,29 @@ export function NotificationCenter() {
 }
 
 function NotificationItemRow({ item, onRead }: { item: NotificationItem; onRead: (_id: string) => void }) {
+	const t = useTranslations('nav.notificationCenter')
+	const dateLocale = useDateFnsLocale()
+
 	return (
 		<DropdownMenuItem
-			className={cn(
-				'flex flex-col items-start gap-1 p-3 cursor-pointer focus:bg-accent/50',
-				!item.read && 'bg-accent/20',
-			)}
+			className={cn('flex cursor-pointer flex-col items-start gap-1 p-3', !item.read && 'bg-accent/40')}
 			onClick={() => onRead(item.id)}
 		>
 			<div className='flex w-full items-start justify-between gap-2'>
 				<div className='text-sm font-medium leading-none'>
-					{item.type === 'recurring_executed' ? 'Transacción Recurrente' : 'Notificación'}
+					{item.type === 'recurring_executed' ? t('recurringExecuted') : t('generic')}
 				</div>
-				{!item.read && <div className='h-2 w-2 rounded-full bg-blue-500' />}
+				{!item.read && (
+					<span className='flex items-center'>
+						<span className='h-2 w-2 rounded-full bg-info' aria-hidden='true' />
+						<span className='sr-only'>{t('unread')}</span>
+					</span>
+				)}
 			</div>
-			<p className='text-xs text-muted-foreground line-clamp-2'>{item.message}</p>
-			<div className='mt-1 flex w-full items-center justify-between text-[10px] text-muted-foreground/60'>
-				<span>{formatDistanceToNow(item.timestamp, { addSuffix: true, locale: es })}</span>
-				{item.amount && <span className='font-mono font-medium text-foreground'>${item.amount.toFixed(2)}</span>}
+			<p className='line-clamp-2 text-xs text-muted-foreground'>{item.message}</p>
+			<div className='mt-1 flex w-full items-center justify-between text-xs text-muted-foreground'>
+				<span>{formatDistanceToNow(item.timestamp, { addSuffix: true, locale: dateLocale })}</span>
+				{item.amount ? <Amount className='font-medium text-foreground' value={item.amount} /> : null}
 			</div>
 		</DropdownMenuItem>
 	)

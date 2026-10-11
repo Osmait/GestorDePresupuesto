@@ -1,13 +1,19 @@
 'use client'
 
-import { ArrowDownCircle, ArrowUpCircle, TrendingUp } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, BarChart3, PieChart, Wallet } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
-import { useMemo } from 'react'
+import { type ReactNode, useMemo } from 'react'
+import { useChartTheme } from '@/components/charts/chart-theme'
+import { Amount } from '@/components/shared/Amount'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { StatCard } from '@/components/shared/StatCard'
+import { StatGrid } from '@/components/shared/StatGrid'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { isInflowTransaction } from '@/lib/transaction-utils'
-import { DEFAULT_CURRENCY, formatCurrency } from '@/lib/utils'
+import { cn, DEFAULT_CURRENCY } from '@/lib/utils'
 import { Category } from '@/types/category'
 import { Transaction } from '@/types/transaction'
 
@@ -19,7 +25,6 @@ interface AccountAnalyticsProps {
 	currency?: string
 }
 
-const COLORS = ['#10b981', '#ef4444'] // Green for Income, Red for Expense
 const TOP_CATEGORIES_COUNT = 5
 
 // Charts are client-only and load in their own chunk, after the summary cards.
@@ -46,8 +51,9 @@ export function AccountAnalytics({
 }: AccountAnalyticsProps) {
 	const t = useTranslations('analysis')
 	const locale = useAppLocale()
-	const formatMoney = (value: number, signDisplay?: 'exceptZero') =>
-		formatCurrency(value, currency, { locale, signDisplay })
+	const formatCurrency = useFormatCurrency()
+	const { colors } = useChartTheme()
+	const formatInCurrency = (value: number) => formatCurrency(value, currency)
 
 	const stats = useMemo(() => {
 		let income = 0
@@ -77,7 +83,8 @@ export function AccountAnalytics({
 					return {
 						name: cat?.name || noCategory,
 						value,
-						color: cat?.color || '#94a3b8', // fallback color
+						// Category colors are user data; uncategorized money is neutral ink.
+						color: cat?.color || colors.mutedText,
 					}
 				})
 				.sort((a, b) => b.value - a.value)
@@ -128,7 +135,7 @@ export function AccountAnalytics({
 		})
 
 		const topExpenses = Object.entries(expenseByNameMap)
-			.map(([name, value]) => ({ name, value, color: '#ef4444' }))
+			.map(([name, value]) => ({ name, value, color: colors.negative }))
 			.sort((a, b) => b.value - a.value)
 			.slice(0, TOP_CATEGORIES_COUNT)
 
@@ -140,106 +147,114 @@ export function AccountAnalytics({
 			balanceHistory,
 			topExpenses,
 		}
-	}, [transactions, categories, currentBalance, locale, t])
+	}, [transactions, categories, currentBalance, locale, t, colors])
 
 	const summaryData = [
-		{ name: t('income'), value: stats.income, color: COLORS[0] },
-		{ name: t('expenses'), value: stats.expense, color: COLORS[1] },
+		{ name: t('income'), value: stats.income, color: colors.positive },
+		{ name: t('expenses'), value: stats.expense, color: colors.negative },
 	].filter((d) => d.value > 0)
 
 	return (
-		<div className='grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8'>
-			<Card className='min-w-0'>
-				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-					<CardTitle className='text-sm font-medium'>{t('totalIncome')}</CardTitle>
-					<ArrowUpCircle className='h-4 w-4 text-green-500' />
-				</CardHeader>
-				<CardContent>
-					<div className='text-xl sm:text-2xl font-bold text-green-500 tabular-nums break-words'>
-						{formatMoney(stats.income, 'exceptZero')}
-					</div>
-				</CardContent>
-			</Card>
-			<Card className='min-w-0'>
-				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-					<CardTitle className='text-sm font-medium'>{t('totalExpenses')}</CardTitle>
-					<ArrowDownCircle className='h-4 w-4 text-red-500' />
-				</CardHeader>
-				<CardContent>
-					<div className='text-xl sm:text-2xl font-bold text-red-500 tabular-nums break-words'>
-						{formatMoney(-stats.expense, 'exceptZero')}
-					</div>
-				</CardContent>
-			</Card>
+		<div className='space-y-6'>
+			<StatGrid columns={3}>
+				<StatCard label={t('balance')} icon={Wallet} value={<Amount value={currentBalance} currency={currency} />} />
+				<StatCard
+					label={t('totalIncome')}
+					icon={ArrowUpRight}
+					value={<Amount value={stats.income} currency={currency} tone='auto' signed />}
+				/>
+				<StatCard
+					label={t('totalExpenses')}
+					icon={ArrowDownRight}
+					value={<Amount value={-stats.expense} currency={currency} tone='auto' signed />}
+				/>
+			</StatGrid>
 
-			<Card className='min-w-0 md:col-span-2 lg:row-span-2'>
-				<CardHeader>
-					<CardTitle>{t('financialSummary')}</CardTitle>
-				</CardHeader>
-				<CardContent className='h-[200px] min-w-0'>
-					<HorizontalBarChart data={summaryData} formatValue={formatMoney} labelWidth={80} />
-				</CardContent>
-			</Card>
-
-			<Card className='min-w-0 md:col-span-2'>
-				<CardHeader>
-					<CardTitle>{t('expensesByCategory')}</CardTitle>
-				</CardHeader>
-				<CardContent className='h-[200px] min-w-0'>
-					{stats.expenseByCategory.length > 0 ? (
-						<DonutLegendChart data={stats.expenseByCategory} formatValue={formatMoney} />
+			<div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
+				<ChartCard title={t('financialSummary')}>
+					{summaryData.length > 0 ? (
+						<HorizontalBarChart
+							data={summaryData}
+							formatValue={formatInCurrency}
+							labelWidth={80}
+							ariaLabel={t('financialSummary')}
+						/>
 					) : (
-						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
+						<EmptyState compact icon={BarChart3} title={t('noData')} />
 					)}
-				</CardContent>
-			</Card>
+				</ChartCard>
 
-			<Card className='min-w-0 md:col-span-2'>
-				<CardHeader>
-					<CardTitle>{t('incomeByCategory')}</CardTitle>
-				</CardHeader>
-				<CardContent className='h-[200px] min-w-0'>
-					{stats.incomeByCategory.length > 0 ? (
-						<DonutLegendChart data={stats.incomeByCategory} formatValue={formatMoney} />
-					) : (
-						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
-					)}
-				</CardContent>
-			</Card>
-
-			<Card className='min-w-0 md:col-span-2'>
-				<CardHeader>
-					<CardTitle>{t('topExpenses')}</CardTitle>
-				</CardHeader>
-				<CardContent className='h-[200px] min-w-0'>
+				<ChartCard title={t('topExpenses')}>
 					{stats.topExpenses.length > 0 ? (
 						<HorizontalBarChart
 							data={stats.topExpenses}
-							formatValue={formatMoney}
+							formatValue={formatInCurrency}
 							labelWidth={100}
 							fontSize={11}
 							padding={0.4}
+							ariaLabel={t('topExpenses')}
 						/>
 					) : (
-						<div className='h-full flex items-center justify-center text-muted-foreground text-sm'>{t('noData')}</div>
+						<EmptyState compact icon={BarChart3} title={t('noData')} />
 					)}
-				</CardContent>
-			</Card>
+				</ChartCard>
 
-			<Card className='min-w-0 md:col-span-2 lg:col-span-4 lg:mt-4'>
-				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-					<CardTitle>{t('balanceHistory')}</CardTitle>
-					<TrendingUp className='h-4 w-4 text-muted-foreground' />
-				</CardHeader>
-				<CardContent className='h-[250px] min-w-0'>
+				<ChartCard title={t('expensesByCategory')}>
+					{stats.expenseByCategory.length > 0 ? (
+						<DonutLegendChart
+							data={stats.expenseByCategory}
+							formatValue={formatInCurrency}
+							ariaLabel={t('expensesByCategory')}
+						/>
+					) : (
+						<EmptyState compact icon={PieChart} title={t('noData')} />
+					)}
+				</ChartCard>
+
+				<ChartCard title={t('incomeByCategory')}>
+					{stats.incomeByCategory.length > 0 ? (
+						<DonutLegendChart
+							data={stats.incomeByCategory}
+							formatValue={formatInCurrency}
+							ariaLabel={t('incomeByCategory')}
+						/>
+					) : (
+						<EmptyState compact icon={PieChart} title={t('noData')} />
+					)}
+				</ChartCard>
+
+				<ChartCard title={t('balanceHistory')} className='lg:col-span-2' contentClassName='h-[250px]'>
 					<AreaTrendChart
 						points={stats.balanceHistory}
-						color='#8884d8'
+						color={colors.series[0]}
 						seriesLabel={t('balance')}
-						formatValue={formatMoney}
+						formatValue={formatInCurrency}
+						ariaLabel={t('balanceHistory')}
 					/>
-				</CardContent>
-			</Card>
+				</ChartCard>
+			</div>
 		</div>
+	)
+}
+
+/** One chart per card, fixed height so the lazy chart chunk doesn't shift the layout. */
+function ChartCard({
+	title,
+	children,
+	className,
+	contentClassName = 'h-[200px]',
+}: {
+	title: string
+	children: ReactNode
+	className?: string
+	contentClassName?: string
+}) {
+	return (
+		<Card className={cn('min-w-0', className)}>
+			<CardHeader>
+				<CardTitle className='text-base'>{title}</CardTitle>
+			</CardHeader>
+			<CardContent className={cn('min-w-0', contentClassName)}>{children}</CardContent>
+		</Card>
 	)
 }

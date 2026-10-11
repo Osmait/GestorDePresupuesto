@@ -24,9 +24,15 @@ test.describe('Investments @prod-write', () => {
 		await expect(fundingModal).toBeVisible()
 
 		// Wait for accounts to load and auto-select the first account (useEffect with React Query cache)
-		await expect(fundingModal.locator('button[role="combobox"]').first()).not.toHaveText(/Select account|Selecciona una cuenta/i, { timeout: 10000 })
+		const sourceSelect = fundingModal.getByRole('combobox', { name: /^(Source account|Cuenta de origen)$/i })
+		await expect(sourceSelect).not.toHaveText(/Select account|Selecciona una cuenta/i, { timeout: 10000 })
 
-		// Fill sourceAmount; avoid Select combobox interactions (Radix portals can close Dialog)
+		// Fund from the account created above: the shared demo user may own other
+		// accounts (from earlier specs) whose balance is below the amount.
+		await sourceSelect.click()
+		await page.getByRole('option', { name: new RegExp(`^${accountName} `) }).click()
+		await expect(sourceSelect).toContainText(accountName)
+
 		await fundingModal.locator('input[name="sourceAmount"]').fill('5000')
 
 		// If exchange rate field is enabled (currencies differ), fill it
@@ -44,8 +50,8 @@ test.describe('Investments @prod-write', () => {
 		})
 		await expect(fundingModal).not.toBeVisible({ timeout: 15000 })
 
-		// --- 4. Open the add investment modal ---
-		await page.getByRole('button', { name: /^(Add investment|Agregar inversión)$/i }).click()
+		// --- 4. Open the add investment modal (the header button; an empty tab repeats it) ---
+		await page.getByRole('button', { name: /^(Add investment|Agregar inversión)$/i }).first().click()
 
 		const modal = page.getByRole('dialog')
 		await expect(modal).toBeVisible()
@@ -69,14 +75,16 @@ test.describe('Investments @prod-write', () => {
 		await expect(page.getByText(investmentName).first()).toBeVisible({ timeout: 10000 })
 
 		// --- 8. Delete the investment ---
-		// InvestmentCard has a direct delete button (aria-label "Delete <name>" / "Eliminar <name>")
-		// that triggers a native browser confirm(). Scope to the card containing our investment name.
+		// InvestmentCard keeps its actions in a menu (trigger "Actions for <name>" / "Acciones de <name>");
+		// Delete asks for confirmation in an alert dialog. Scope to the card containing our investment name.
 		const investmentCard = page.locator('div.rounded-lg.border').filter({ hasText: investmentName }).first()
 		await expect(investmentCard).toBeVisible({ timeout: 5000 })
 
-		// Accept the native confirm() dialog when it appears
-		page.once('dialog', dialog => dialog.accept())
-		await investmentCard.getByRole('button', { name: new RegExp(`^(Delete|Eliminar) ${investmentName}$`, 'i') }).click()
+		await investmentCard.getByRole('button', { name: new RegExp(`^(Actions for|Acciones de) ${investmentName}$`, 'i') }).click()
+		await page.getByRole('menuitem', { name: /^(Delete|Eliminar)$/i }).click()
+		const confirmDialog = page.getByRole('alertdialog')
+		await expect(confirmDialog).toBeVisible()
+		await confirmDialog.getByRole('button', { name: /^(Delete|Eliminar)$/i }).click()
 
 		// --- 9. Assert investment is gone ---
 		await expect(investmentCard).not.toBeVisible({ timeout: 15000 })

@@ -17,16 +17,10 @@ vi.mock('next-intl', () => ({
 	},
 }))
 
-vi.mock('@/components/common/AnimatedFlashNumber', () => ({
-	AnimatedFlashNumber: ({
-		value,
-		prefix = '',
-		formattingFn,
-	}: {
-		value: number
-		prefix?: string
-		formattingFn?: (_n: number) => string
-	}) => <span>{formattingFn ? formattingFn(value) : `${prefix}${value}`}</span>,
+// Reduced motion: <Amount animate> renders the final value instead of counting up.
+vi.mock('framer-motion', async (importOriginal) => ({
+	...(await importOriginal<typeof import('framer-motion')>()),
+	useReducedMotion: () => true,
 }))
 
 describe('TransactionSummaryCard', () => {
@@ -75,13 +69,15 @@ describe('TransactionSummaryCard', () => {
 			/>,
 		)
 
-		// Income
+		// Income: value + split by original currency
 		expect(screen.getByText('Total Income')).toBeInTheDocument()
-		expect(screen.getAllByText('RD$5,000.00').length).toBeGreaterThan(0)
+		expect(screen.getByText('RD$5,000.00')).toBeInTheDocument()
+		expect(screen.getByText('RD$5,000.00 · US$0.00')).toBeInTheDocument()
 
 		// Expenses (Bill)
 		expect(screen.getByText('Total Expenses')).toBeInTheDocument()
-		expect(screen.getAllByText('RD$1,500.00').length).toBeGreaterThan(0)
+		expect(screen.getByText('RD$1,500.00')).toBeInTheDocument()
+		expect(screen.getByText('RD$1,500.00 · US$0.00')).toBeInTheDocument()
 
 		// Count
 		expect(screen.getByText('Total Transactions')).toBeInTheDocument()

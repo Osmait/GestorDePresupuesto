@@ -1,62 +1,37 @@
 'use client'
 
-import { AlertTriangle, DollarSign, PiggyBank, TrendingDown, TrendingUp } from 'lucide-react'
+import { AlertTriangle, PiggyBank, TrendingDown, Wallet } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { AnimatedCounter } from '@/components/ui/animated-counter'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAppLocale } from '@/lib/i18n/date-locale'
+import { Amount } from '@/components/shared/Amount'
+import { StatCard } from '@/components/shared/StatCard'
+import { StatGrid } from '@/components/shared/StatGrid'
 import { Budget } from '@/types/budget'
 
+/** KPI row of the budgets page (amounts are DOP: the API converts USD expenses). */
 export function BudgetSummaryCard({ budgets }: { budgets: Budget[] }) {
 	const t = useTranslations('budgets')
-	const locale = useAppLocale()
-	const totalBudget = budgets?.reduce((sum, budget) => sum + budget.amount, 0) || 0
-	const totalSpent = budgets?.reduce((sum, budget) => sum + budget.current_amount, 0) || 0
+	const list = budgets ?? []
+	const totalBudget = list.reduce((sum, budget) => sum + budget.amount, 0)
+	const totalSpent = list.reduce((sum, budget) => sum + budget.current_amount, 0)
 	const totalRemaining = totalBudget - totalSpent
-	const overBudgetCount = budgets?.filter((budget) => budget.current_amount > budget.amount).length || 0
+	const overBudgetCount = list.filter((budget) => budget.current_amount > budget.amount).length
 
 	return (
-		<Card className='border-border/50 dark:border-border/20'>
-			<CardHeader>
-				<CardTitle className='flex items-center gap-2 text-foreground'>
-					<PiggyBank className='h-5 w-5' />
-					{t('summary')}
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4'>
-					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5'>
-						<DollarSign className='h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('totalBudget')}</p>
-						<p className='text-lg sm:text-xl font-bold break-words text-foreground'>
-							<AnimatedCounter value={totalBudget} currency='DOP' locale={locale} />
-						</p>
-					</div>
-					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 dark:from-orange-500/5 dark:to-red-500/5'>
-						<TrendingDown className='h-6 w-6 mx-auto mb-2 text-orange-600 dark:text-orange-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('totalSpent')}</p>
-						<p className='text-lg sm:text-xl font-bold break-words text-orange-600 dark:text-orange-400'>
-							<AnimatedCounter value={totalSpent} currency='DOP' locale={locale} />
-						</p>
-					</div>
-					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5'>
-						<TrendingUp className='h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('totalRemaining')}</p>
-						<p
-							className={`text-xl font-bold ${totalRemaining >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-						>
-							<AnimatedCounter value={totalRemaining} currency='DOP' locale={locale} />
-						</p>
-					</div>
-					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-red-500/10 to-pink-500/10 dark:from-red-500/5 dark:to-pink-500/5'>
-						<AlertTriangle className='h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('exceededBudgets')}</p>
-						<p className='text-lg sm:text-xl font-bold break-words text-red-600 dark:text-red-400'>
-							<AnimatedCounter value={overBudgetCount} />
-						</p>
-					</div>
-				</div>
-			</CardContent>
-		</Card>
+		<StatGrid>
+			<StatCard label={t('totalBudget')} icon={PiggyBank} value={<Amount value={totalBudget} currency='DOP' />} />
+			<StatCard label={t('totalSpent')} icon={TrendingDown} value={<Amount value={totalSpent} currency='DOP' />} />
+			<StatCard
+				label={t('totalRemaining')}
+				icon={Wallet}
+				tone={totalRemaining < 0 ? 'negative' : 'default'}
+				value={<Amount value={totalRemaining} currency='DOP' />}
+			/>
+			<StatCard
+				label={t('exceededBudgets')}
+				icon={AlertTriangle}
+				tone={overBudgetCount > 0 ? 'negative' : 'default'}
+				value={overBudgetCount}
+			/>
+		</StatGrid>
 	)
 }

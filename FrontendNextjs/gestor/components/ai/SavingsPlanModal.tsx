@@ -1,12 +1,16 @@
 'use client'
 
-import { Loader2, PiggyBank } from 'lucide-react'
+import { Loader2, Target } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useEffect, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import {
@@ -16,6 +20,9 @@ import {
 	useSavingsGoalProgressMutation,
 	useSavingsPlanMutation,
 } from '@/hooks/queries/useAIQuery'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
+import type { AISavingsGoal } from '@/types/ai'
 
 interface SavingsPlanModalProps {
 	open: boolean
@@ -25,6 +32,8 @@ interface SavingsPlanModalProps {
 export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) {
 	const t = useTranslations('ai.savingsPlan')
 	const tCommon = useTranslations('ai.common')
+	const fieldId = useId()
+	const formatCurrency = useFormatCurrency()
 	const { data: accounts = [] } = useGetAccounts()
 	const savingsPlan = useSavingsPlanMutation()
 	const listGoals = useListSavingsGoalsMutation()
@@ -38,6 +47,11 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 	const [targetDate, setTargetDate] = useState('')
 	const [accountId, setAccountId] = useState('')
 	const [selectedGoalId, setSelectedGoalId] = useState('')
+	const [goalToDelete, setGoalToDelete] = useState<AISavingsGoal | null>(null)
+
+	const currencyOf = (id?: string) => accounts.find((account) => account.id === id)?.currency
+	const planCurrency = currencyOf(accountId && accountId !== '__all__' ? accountId : undefined)
+	const formatPercent = useFormatPercent()
 
 	const result = savingsPlan.data && 'success' in savingsPlan.data && savingsPlan.data.success ? savingsPlan.data : null
 	const goals = listGoals.data && 'success' in listGoals.data && listGoals.data.success ? listGoals.data.data : []
@@ -96,7 +110,9 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 		await goalProgress.mutateAsync(goalId)
 	}
 
-	const handleDeleteGoal = async (goalId: string) => {
+	const handleDeleteGoal = async () => {
+		if (!goalToDelete) return
+		const goalId = goalToDelete.id
 		const response = await deleteGoal.mutateAsync(goalId)
 		if ('success' in response && response.success) {
 			toast.success(t('goalDeleted'))
@@ -107,21 +123,46 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 		}
 	}
 
-	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className='max-w-xl'>
-				<DialogHeader>
-					<DialogTitle className='flex items-center gap-2'>
-						<PiggyBank className='h-5 w-5 text-primary' />
-						{t('title')}
-					</DialogTitle>
-					<DialogDescription>{t('description')}</DialogDescription>
-				</DialogHeader>
+	const progressGoal = progress && selectedGoalId ? progress : null
+	const progressCurrency = currencyOf(progressGoal?.goal.account_id)
 
+	return (
+		<>
+			<FormDialog
+				open={open}
+				onOpenChange={onOpenChange}
+				title={t('title')}
+				description={t('description')}
+				onSubmit={handleCalculate}
+				submitLabel={t('calculate')}
+				cancelLabel={tCommon('cancel')}
+				footer={
+					<>
+						<Button type='button' variant='outline' className='sm:mr-auto' onClick={() => onOpenChange(false)}>
+							{tCommon('cancel')}
+						</Button>
+						<Button
+							type='button'
+							variant='outline'
+							onClick={handleCreateGoal}
+							disabled={createGoal.isPending}
+							aria-busy={createGoal.isPending || undefined}
+						>
+							{createGoal.isPending ? <Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' /> : null}
+							{t('saveGoal')}
+						</Button>
+						<Button type='submit' disabled={savingsPlan.isPending} aria-busy={savingsPlan.isPending || undefined}>
+							{savingsPlan.isPending ? <Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' /> : null}
+							{t('calculate')}
+						</Button>
+					</>
+				}
+			>
 				<div className='space-y-4'>
-					<div>
-						<label className='text-sm font-medium mb-2 block'>{t('goalName')}</label>
+					<div className='space-y-2'>
+						<Label htmlFor={`${fieldId}-name`}>{t('goalName')}</Label>
 						<Input
+							id={`${fieldId}-name`}
 							type='text'
 							value={goalName}
 							onChange={(e) => setGoalName(e.target.value)}
@@ -129,116 +170,149 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 						/>
 					</div>
 
-					<div>
-						<label className='text-sm font-medium mb-2 block'>{t('targetAmount')}</label>
-						<Input
-							type='number'
-							value={targetAmount}
-							onChange={(e) => setTargetAmount(e.target.value)}
-							min={1}
-							step={0.01}
-							placeholder='10000'
-						/>
-					</div>
+					<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+						<div className='space-y-2'>
+							<Label htmlFor={`${fieldId}-target`}>{t('targetAmount')}</Label>
+							<Input
+								id={`${fieldId}-target`}
+								type='number'
+								inputMode='decimal'
+								value={targetAmount}
+								onChange={(e) => setTargetAmount(e.target.value)}
+								min={1}
+								step={0.01}
+								placeholder='10000'
+							/>
+						</div>
 
-					<div>
-						<label className='text-sm font-medium mb-2 block'>{t('currentSaved')}</label>
-						<Input
-							type='number'
-							value={currentSaved}
-							onChange={(e) => setCurrentSaved(e.target.value)}
-							min={0}
-							step={0.01}
-							placeholder='0'
-						/>
-					</div>
+						<div className='space-y-2'>
+							<Label htmlFor={`${fieldId}-saved`}>{t('currentSaved')}</Label>
+							<Input
+								id={`${fieldId}-saved`}
+								type='number'
+								inputMode='decimal'
+								value={currentSaved}
+								onChange={(e) => setCurrentSaved(e.target.value)}
+								min={0}
+								step={0.01}
+								placeholder='0'
+							/>
+						</div>
 
-					<div>
-						<label className='text-sm font-medium mb-2 block'>{t('targetDate')}</label>
-						<Input type='date' value={targetDate} onChange={(e) => setTargetDate(e.target.value)} />
-					</div>
+						<div className='space-y-2'>
+							<Label htmlFor={`${fieldId}-date`}>{t('targetDate')}</Label>
+							<Input
+								id={`${fieldId}-date`}
+								type='date'
+								value={targetDate}
+								onChange={(e) => setTargetDate(e.target.value)}
+							/>
+						</div>
 
-					<div>
-						<label className='text-sm font-medium mb-2 block'>{t('accountOptional')}</label>
-						<Select value={accountId || '__all__'} onValueChange={setAccountId}>
-							<SelectTrigger>
-								<SelectValue placeholder={t('allAccounts')} />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value='__all__'>{t('allAccounts')}</SelectItem>
-								{accounts.map((account) => (
-									<SelectItem key={account.id} value={account.id}>
-										{account.name}
-									</SelectItem>
-								))}
-							</SelectContent>
-						</Select>
-					</div>
-
-					<div className='flex justify-end gap-2'>
-						<Button variant='outline' onClick={() => onOpenChange(false)}>
-							{tCommon('cancel')}
-						</Button>
-						<Button onClick={handleCreateGoal} disabled={createGoal.isPending} variant='outline'>
-							{createGoal.isPending ? t('savingGoal') : t('saveGoal')}
-						</Button>
-						<Button onClick={handleCalculate} disabled={savingsPlan.isPending}>
-							{savingsPlan.isPending ? (
-								<>
-									<Loader2 className='h-4 w-4 mr-2 animate-spin' />
-									{t('calculating')}
-								</>
-							) : (
-								t('calculate')
-							)}
-						</Button>
+						<div className='space-y-2'>
+							<Label htmlFor={`${fieldId}-account`}>{t('accountOptional')}</Label>
+							<Select value={accountId || '__all__'} onValueChange={setAccountId}>
+								<SelectTrigger id={`${fieldId}-account`}>
+									<SelectValue placeholder={t('allAccounts')} />
+								</SelectTrigger>
+								<SelectContent>
+									<SelectItem value='__all__'>{t('allAccounts')}</SelectItem>
+									{accounts.map((account) => (
+										<SelectItem key={account.id} value={account.id}>
+											{account.name}
+										</SelectItem>
+									))}
+								</SelectContent>
+							</Select>
+						</div>
 					</div>
 
 					{result && (
-						<div className='rounded-lg border p-4 space-y-2 text-sm'>
-							<div>{t('monthly', { value: result.data.recommended_monthly_save.toFixed(2) })}</div>
-							<div>{t('weekly', { value: result.data.recommended_weekly_save.toFixed(2) })}</div>
-							<div>{t('months', { value: result.data.estimated_months_to_target })}</div>
-							{result.data.target_date && <div>{result.data.feasible_by_date ? t('feasible') : t('notFeasible')}</div>}
+						<div role='status' className='space-y-1 rounded-lg border p-4 text-sm tabular-nums'>
+							<p>{t('monthly', { value: formatCurrency(result.data.recommended_monthly_save, planCurrency) })}</p>
+							<p>{t('weekly', { value: formatCurrency(result.data.recommended_weekly_save, planCurrency) })}</p>
+							<p>{t('months', { value: result.data.estimated_months_to_target })}</p>
+							{result.data.target_date && (
+								<p className={result.data.feasible_by_date ? 'text-success' : 'text-warning'}>
+									{result.data.feasible_by_date ? t('feasible') : t('notFeasible')}
+								</p>
+							)}
 						</div>
 					)}
 
-					<div className='rounded-lg border p-4 space-y-3'>
-						<div className='text-sm font-medium'>{t('savedGoals')}</div>
-						{goals.length === 0 && <div className='text-sm text-muted-foreground'>{t('noGoals')}</div>}
-						{goals.map((goal) => (
-							<div key={goal.id} className='rounded border p-3 space-y-2'>
-								<div className='text-sm font-medium'>{goal.name}</div>
-								<div className='text-xs text-muted-foreground'>
-									{t('goalProgressInline', {
-										saved: goal.current_saved.toFixed(2),
-										target: goal.target_amount.toFixed(2),
-										pct: goal.progress_pct.toFixed(1),
-									})}
-								</div>
-								<div className='flex gap-2'>
-									<Button size='sm' variant='outline' onClick={() => handleLoadProgress(goal.id)}>
-										{t('viewProgress')}
-									</Button>
-									<Button size='sm' variant='ghost' onClick={() => handleDeleteGoal(goal.id)}>
-										{t('deleteGoal')}
-									</Button>
-								</div>
-							</div>
-						))}
-					</div>
+					<section aria-labelledby={`${fieldId}-goals`} className='space-y-3'>
+						<h3 id={`${fieldId}-goals`} className='text-sm font-semibold'>
+							{t('savedGoals')}
+						</h3>
+						{goals.length === 0 && (
+							<EmptyState
+								compact
+								icon={Target}
+								title={t('noGoals')}
+								description={t('noGoalsDescription')}
+								className='rounded-lg border py-6'
+							/>
+						)}
+						<ul className='space-y-3'>
+							{goals.map((goal) => {
+								const goalCurrency = currencyOf(goal.account_id)
+								return (
+									<li key={goal.id} className='space-y-2 rounded-lg border p-3'>
+										<p className='text-sm font-medium'>{goal.name}</p>
+										<Progress
+											value={goal.progress_pct}
+											tone={goal.progress_pct >= 100 ? 'success' : 'default'}
+											aria-label={goal.name}
+										/>
+										<p className='text-xs text-muted-foreground tabular-nums'>
+											{t('goalProgressInline', {
+												saved: formatCurrency(goal.current_saved, goalCurrency),
+												target: formatCurrency(goal.target_amount, goalCurrency),
+												pct: formatPercent(goal.progress_pct),
+											})}
+										</p>
+										<div className='flex flex-wrap gap-2'>
+											<Button type='button' size='sm' variant='outline' onClick={() => handleLoadProgress(goal.id)}>
+												{t('viewProgress')}
+											</Button>
+											<Button
+												type='button'
+												size='sm'
+												variant='ghost'
+												className='text-destructive hover:text-destructive'
+												onClick={() => setGoalToDelete(goal)}
+											>
+												{t('deleteGoal')}
+											</Button>
+										</div>
+									</li>
+								)
+							})}
+						</ul>
+					</section>
 
-					{progress && selectedGoalId && (
-						<div className='rounded-lg border p-4 space-y-2 text-sm'>
-							<div className='font-medium'>{progress.goal.name}</div>
-							<div>{t('monthly', { value: progress.recommended_monthly_save.toFixed(2) })}</div>
-							<div>{t('weekly', { value: progress.recommended_weekly_save.toFixed(2) })}</div>
-							<div>{t('months', { value: progress.estimated_months_to_target })}</div>
-							<div>{progress.feasible_by_date ? t('feasible') : t('notFeasible')}</div>
+					{progressGoal && (
+						<div role='status' className='space-y-1 rounded-lg border p-4 text-sm tabular-nums'>
+							<p className='font-medium'>{progressGoal.goal.name}</p>
+							<p>{t('monthly', { value: formatCurrency(progressGoal.recommended_monthly_save, progressCurrency) })}</p>
+							<p>{t('weekly', { value: formatCurrency(progressGoal.recommended_weekly_save, progressCurrency) })}</p>
+							<p>{t('months', { value: progressGoal.estimated_months_to_target })}</p>
+							<p className={progressGoal.feasible_by_date ? 'text-success' : 'text-warning'}>
+								{progressGoal.feasible_by_date ? t('feasible') : t('notFeasible')}
+							</p>
 						</div>
 					)}
 				</div>
-			</DialogContent>
-		</Dialog>
+			</FormDialog>
+
+			<ConfirmDialog
+				open={goalToDelete !== null}
+				onOpenChange={(next) => !next && setGoalToDelete(null)}
+				title={t('deleteGoalTitle', { name: goalToDelete?.name ?? '' })}
+				description={t('deleteGoalDescription')}
+				destructive
+				onConfirm={handleDeleteGoal}
+			/>
+		</>
 	)
 }

@@ -1,8 +1,18 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { beforeAll, vi } from 'vitest'
 import { AIExtractionModal } from '@/components/ai/AIExtractionModal'
+
+// Desktop width: FormDialog renders its Dialog (the mobile Drawer needs pointer capture jsdom lacks).
+beforeAll(() => {
+	window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+		matches: true,
+		media: query,
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
+	})) as unknown as typeof window.matchMedia
+})
 
 // --- Mock data ---
 

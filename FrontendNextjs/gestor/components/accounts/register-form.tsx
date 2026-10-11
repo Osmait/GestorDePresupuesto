@@ -1,7 +1,7 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { AlertCircle, Check, Eye, EyeOff, Loader2, Lock, Mail, User, UserPlus } from 'lucide-react'
+import { AlertCircle, Check, Circle, Eye, EyeOff, Loader2, Lock, Mail, User, UserPlus } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { signIn } from 'next-auth/react'
 import { useTranslations } from 'next-intl'
@@ -14,6 +14,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { getAuthRepository } from '@/lib/repositoryConfig'
+import { cn } from '@/lib/utils'
+
+const FIELD_ICON = 'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground'
 
 /** Must match the backend password policy (min 8 characters). */
 export const PASSWORD_MIN_LENGTH = 8
@@ -50,6 +53,7 @@ interface RegisterFormProps {
 
 export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormProps) {
 	const t = useTranslations('auth.register')
+	const tAuth = useTranslations('auth')
 	const registerSchema = useMemo(() => buildRegisterSchema(t), [t])
 	const isDevelopment = process.env.NODE_ENV === 'development'
 	const [isLoading, setIsLoading] = useState(false)
@@ -81,13 +85,17 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 	const passwordValue = form.watch('password')
 
-	// Validaciones de contraseña en tiempo real
-	const passwordValidations = {
-		length: passwordValue?.length >= PASSWORD_MIN_LENGTH,
-		lowercase: /(?=.*[a-z])/.test(passwordValue || ''),
-		uppercase: /(?=.*[A-Z])/.test(passwordValue || ''),
-		number: /(?=.*\d)/.test(passwordValue || ''),
-	}
+	// Validaciones de contraseña en tiempo real (check vs. circle, not color alone)
+	const passwordRules = [
+		{
+			key: 'length',
+			label: t('ruleLength', { min: PASSWORD_MIN_LENGTH }),
+			met: passwordValue?.length >= PASSWORD_MIN_LENGTH,
+		},
+		{ key: 'lowercase', label: t('ruleLowercase'), met: /(?=.*[a-z])/.test(passwordValue || '') },
+		{ key: 'uppercase', label: t('ruleUppercase'), met: /(?=.*[A-Z])/.test(passwordValue || '') },
+		{ key: 'number', label: t('ruleNumber'), met: /(?=.*\d)/.test(passwordValue || '') },
+	]
 
 	const onSubmit = async (values: RegisterFormValues) => {
 		try {
@@ -137,11 +145,11 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 
 	if (success) {
 		return (
-			<Card className='w-full max-w-md mx-auto shadow-lg border-border/50'>
-				<CardContent className='p-8 text-center space-y-6'>
+			<Card className='mx-auto w-full max-w-md' role='status'>
+				<CardContent className='space-y-6 p-8 text-center'>
 					<div className='flex items-center justify-center'>
-						<div className='w-16 h-16 bg-gradient-to-br from-green-500 to-green-600 rounded-full flex items-center justify-center'>
-							<Check className='h-8 w-8 text-white' />
+						<div className='flex h-16 w-16 items-center justify-center rounded-full bg-success/10'>
+							<Check className='h-8 w-8 text-success' aria-hidden='true' />
 						</div>
 					</div>
 					<div className='space-y-2'>
@@ -157,67 +165,68 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 	}
 
 	return (
-		<Card className='w-full max-w-md mx-auto shadow-lg border-border/50'>
+		<Card className='mx-auto w-full max-w-md'>
 			<CardHeader className='space-y-1 text-center'>
-				<div className='flex items-center justify-center mb-4'>
-					<div className='w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center'>
-						<UserPlus className='h-6 w-6 text-primary-foreground' />
+				<div className='mb-4 flex items-center justify-center'>
+					<div className='flex h-12 w-12 items-center justify-center rounded-lg bg-primary'>
+						<UserPlus className='h-6 w-6 text-primary-foreground' aria-hidden='true' />
 					</div>
 				</div>
-				<CardTitle className='text-2xl font-bold text-center'>{t('title')}</CardTitle>
-				<CardDescription className='text-muted-foreground'>{t('subtitle')}</CardDescription>
+				<CardTitle className='text-center text-2xl font-bold'>{t('title')}</CardTitle>
+				<CardDescription>{t('subtitle')}</CardDescription>
 			</CardHeader>
 
 			<CardContent className='space-y-6'>
 				{error && (
 					<Alert variant='destructive'>
-						<AlertCircle className='h-4 w-4' />
+						<AlertCircle className='h-4 w-4' aria-hidden='true' />
 						<AlertDescription>{error}</AlertDescription>
 					</Alert>
 				)}
 
 				<Form {...form}>
 					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
-						<div className='grid grid-cols-2 gap-4'>
+						<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
 							<FormField
 								control={form.control}
 								name='name'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel className='text-sm font-medium'>{t('name')}</FormLabel>
-										<FormControl>
-											<div className='relative'>
-												<User className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+										<FormLabel>{t('name')}</FormLabel>
+										<div className='relative'>
+											<User className={FIELD_ICON} aria-hidden='true' />
+											<FormControl>
 												<Input
 													{...field}
+													autoComplete='given-name'
 													placeholder={t('namePlaceholder')}
 													disabled={isLoading}
-													className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
+													className='pl-10'
 												/>
-											</div>
-										</FormControl>
+											</FormControl>
+										</div>
 										<FormMessage />
 									</FormItem>
 								)}
 							/>
-
 							<FormField
 								control={form.control}
 								name='lastName'
 								render={({ field }) => (
 									<FormItem>
-										<FormLabel className='text-sm font-medium'>{t('lastName')}</FormLabel>
-										<FormControl>
-											<div className='relative'>
-												<User className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+										<FormLabel>{t('lastName')}</FormLabel>
+										<div className='relative'>
+											<User className={FIELD_ICON} aria-hidden='true' />
+											<FormControl>
 												<Input
 													{...field}
+													autoComplete='family-name'
 													placeholder={t('lastNamePlaceholder')}
 													disabled={isLoading}
-													className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
+													className='pl-10'
 												/>
-											</div>
-										</FormControl>
+											</FormControl>
+										</div>
 										<FormMessage />
 									</FormItem>
 								)}
@@ -229,19 +238,20 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							name='email'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className='text-sm font-medium'>{t('email')}</FormLabel>
-									<FormControl>
-										<div className='relative'>
-											<Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+									<FormLabel>{t('email')}</FormLabel>
+									<div className='relative'>
+										<Mail className={FIELD_ICON} aria-hidden='true' />
+										<FormControl>
 											<Input
 												{...field}
 												type='email'
+												autoComplete='email'
 												placeholder={t('emailPlaceholder')}
 												disabled={isLoading}
-												className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
+												className='pl-10'
 											/>
-										</div>
-									</FormControl>
+										</FormControl>
+									</div>
 									<FormMessage />
 								</FormItem>
 							)}
@@ -252,72 +262,53 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							name='password'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className='text-sm font-medium'>{t('password')}</FormLabel>
-									<FormControl>
-										<div className='relative'>
-											<Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+									<FormLabel>{t('password')}</FormLabel>
+									<div className='relative'>
+										<Lock className={FIELD_ICON} aria-hidden='true' />
+										<FormControl>
 											<Input
 												{...field}
 												type={showPassword ? 'text' : 'password'}
+												autoComplete='new-password'
 												placeholder='••••••••'
 												disabled={isLoading}
-												className='pl-10 pr-10 border-border/50 focus:border-primary/50 transition-colors'
+												className='pl-10 pr-11'
 											/>
-											<Button
-												type='button'
-												variant='ghost'
-												size='sm'
-												className='absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent'
-												onClick={() => setShowPassword(!showPassword)}
-												disabled={isLoading}
-											>
-												{showPassword ? (
-													<EyeOff className='h-4 w-4 text-muted-foreground' />
-												) : (
-													<Eye className='h-4 w-4 text-muted-foreground' />
-												)}
-											</Button>
-										</div>
-									</FormControl>
-
-									{/* Indicadores de validación de contraseña */}
+										</FormControl>
+										<Button
+											type='button'
+											variant='ghost'
+											size='icon'
+											className='absolute right-0 top-0 text-muted-foreground hover:bg-transparent hover:text-foreground'
+											onClick={() => setShowPassword(!showPassword)}
+											disabled={isLoading}
+											aria-label={tAuth('showPassword')}
+											aria-pressed={showPassword}
+										>
+											{showPassword ? (
+												<EyeOff className='h-4 w-4' aria-hidden='true' />
+											) : (
+												<Eye className='h-4 w-4' aria-hidden='true' />
+											)}
+										</Button>
+									</div>
 									{passwordValue && (
-										<div className='mt-2 space-y-1'>
-											<div className='grid grid-cols-2 gap-2 text-xs'>
-												<div
-													className={`flex items-center gap-1 ${passwordValidations.length ? 'text-green-600' : 'text-muted-foreground'}`}
+										<ul className='mt-2 grid grid-cols-2 gap-2 text-xs' aria-label={t('rulesLabel')}>
+											{passwordRules.map((rule) => (
+												<li
+													key={rule.key}
+													className={cn('flex items-center gap-1', rule.met ? 'text-success' : 'text-muted-foreground')}
 												>
-													<div
-														className={`w-2 h-2 rounded-full ${passwordValidations.length ? 'bg-green-600' : 'bg-muted-foreground'}`}
-													/>
-													{t('ruleLength', { min: PASSWORD_MIN_LENGTH })}
-												</div>
-												<div
-													className={`flex items-center gap-1 ${passwordValidations.lowercase ? 'text-green-600' : 'text-muted-foreground'}`}
-												>
-													<div
-														className={`w-2 h-2 rounded-full ${passwordValidations.lowercase ? 'bg-green-600' : 'bg-muted-foreground'}`}
-													/>
-													{t('ruleLowercase')}
-												</div>
-												<div
-													className={`flex items-center gap-1 ${passwordValidations.uppercase ? 'text-green-600' : 'text-muted-foreground'}`}
-												>
-													<div
-														className={`w-2 h-2 rounded-full ${passwordValidations.uppercase ? 'bg-green-600' : 'bg-muted-foreground'}`}
-													/>
-													{t('ruleUppercase')}
-												</div>
-												<div
-													className={`flex items-center gap-1 ${passwordValidations.number ? 'text-green-600' : 'text-muted-foreground'}`}
-												>
-													<div
-														className={`w-2 h-2 rounded-full ${passwordValidations.number ? 'bg-green-600' : 'bg-muted-foreground'}`}
-													/>
-													{t('ruleNumber')}
-												</div>
-											</div>
-										</div>
+													{rule.met ? (
+														<Check className='h-3 w-3 shrink-0' aria-hidden='true' />
+													) : (
+														<Circle className='h-3 w-3 shrink-0' aria-hidden='true' />
+													)}
+													{rule.label}
+													<span className='sr-only'>({rule.met ? t('ruleMet') : t('ruleNotMet')})</span>
+												</li>
+											))}
+										</ul>
 									)}
 
 									<FormMessage />
@@ -330,51 +321,50 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							name='confirmPassword'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className='text-sm font-medium'>{t('confirmPassword')}</FormLabel>
-									<FormControl>
-										<div className='relative'>
-											<Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+									<FormLabel>{t('confirmPassword')}</FormLabel>
+									<div className='relative'>
+										<Lock className={FIELD_ICON} aria-hidden='true' />
+										<FormControl>
 											<Input
 												{...field}
 												type={showConfirmPassword ? 'text' : 'password'}
+												autoComplete='new-password'
 												placeholder='••••••••'
 												disabled={isLoading}
-												className='pl-10 pr-10 border-border/50 focus:border-primary/50 transition-colors'
+												className='pl-10 pr-11'
 											/>
-											<Button
-												type='button'
-												variant='ghost'
-												size='sm'
-												className='absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent'
-												onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-												disabled={isLoading}
-											>
-												{showConfirmPassword ? (
-													<EyeOff className='h-4 w-4 text-muted-foreground' />
-												) : (
-													<Eye className='h-4 w-4 text-muted-foreground' />
-												)}
-											</Button>
-										</div>
-									</FormControl>
+										</FormControl>
+										<Button
+											type='button'
+											variant='ghost'
+											size='icon'
+											className='absolute right-0 top-0 text-muted-foreground hover:bg-transparent hover:text-foreground'
+											onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+											disabled={isLoading}
+											aria-label={tAuth('showPassword')}
+											aria-pressed={showConfirmPassword}
+										>
+											{showConfirmPassword ? (
+												<EyeOff className='h-4 w-4' aria-hidden='true' />
+											) : (
+												<Eye className='h-4 w-4' aria-hidden='true' />
+											)}
+										</Button>
+									</div>
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
 
-						<Button
-							type='submit'
-							className='w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-medium transition-all duration-200'
-							disabled={isLoading}
-						>
+						<Button type='submit' className='w-full' disabled={isLoading} aria-busy={isLoading || undefined}>
 							{isLoading ? (
 								<>
-									<Loader2 className='mr-2 h-4 w-4 animate-spin' />
+									<Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' />
 									{t('submitting')}
 								</>
 							) : (
 								<>
-									<UserPlus className='mr-2 h-4 w-4' />
+									<UserPlus className='mr-2 h-4 w-4' aria-hidden='true' />
 									{t('submit')}
 								</>
 							)}
@@ -391,9 +381,9 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							size='sm'
 							onClick={fillTestData}
 							disabled={isLoading}
-							className='text-xs border-border/50 hover:bg-muted/30'
+							className='text-xs'
 						>
-							<User className='mr-1 h-3 w-3' />
+							<User className='mr-1 h-3 w-3' aria-hidden='true' />
 							{t('fillTestData')}
 						</Button>
 					</div>
@@ -407,7 +397,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 							<Button
 								type='button'
 								variant='link'
-								className='p-0 h-auto font-semibold text-primary hover:text-primary/80'
+								className='h-auto p-0 font-semibold'
 								onClick={onToggleForm}
 								disabled={isLoading}
 							>

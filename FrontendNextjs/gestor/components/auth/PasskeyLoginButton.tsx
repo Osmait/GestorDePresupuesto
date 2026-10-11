@@ -60,7 +60,11 @@ export function PasskeyLoginButton({ className, disabled }: Props) {
 
 	return (
 		<Button type='button' variant='outline' className={className} onClick={handleClick} disabled={disabled || loading}>
-			{loading ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : <Fingerprint className='mr-2 h-4 w-4' />}
+			{loading ? (
+				<Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' />
+			) : (
+				<Fingerprint className='mr-2 h-4 w-4' aria-hidden='true' />
+			)}
 			{t('signIn')}
 		</Button>
 	)

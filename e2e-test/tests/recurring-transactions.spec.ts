@@ -17,8 +17,8 @@ test.describe('Recurring Transactions @prod-write', () => {
 		const categoryModal = page.getByRole('dialog', { name: /Category|Categoría/i })
 		await expect(categoryModal).toBeVisible()
 		await categoryModal.locator('input[name="name"]').fill(categoryName)
-		await categoryModal.locator('button.text-2xl').first().click()
-		await categoryModal.locator('.w-6.h-6.rounded-full').first().click()
+		await categoryModal.getByRole('group', { name: /Icon|Icono/i }).getByRole('button').first().click()
+		await categoryModal.getByRole('group', { name: /^Color$/i }).getByRole('button').first().click()
 		await categoryModal.getByRole('button', { name: /Create|Crear/i }).click()
 		await expect(categoryModal).not.toBeVisible({ timeout: 15000 })
 
@@ -34,7 +34,8 @@ test.describe('Recurring Transactions @prod-write', () => {
 		}
 
 		// --- 4. Open the add recurring transaction modal ---
-		await page.getByRole('button', { name: /Nueva Recurrente|New Recurring/i }).click()
+		// .first(): the empty state repeats the header's create button.
+		await page.getByRole('button', { name: /Nueva Recurrente|New Recurring/i }).first().click()
 
 		const modal = page.getByRole('dialog')
 		await expect(modal).toBeVisible()
@@ -66,16 +67,13 @@ test.describe('Recurring Transactions @prod-write', () => {
 		// --- 7. Assert the recurring transaction card appears ---
 		await expect(page.getByText(recurringName).first()).toBeVisible({ timeout: 10000 })
 
-		// --- 8. Delete ---
-		page.once('dialog', dialog => dialog.accept())
-
-		await page.locator('button').filter({ has: page.locator('svg.lucide-ellipsis') }).first().click()
+		// --- 8. Delete (confirmed in an in-app alertdialog, not window.confirm) ---
+		await page.getByRole('button', { name: new RegExp(`^(Acciones de|Actions for) ${recurringName}$`) }).click()
 		await page.getByRole('menuitem', { name: /Delete|Eliminar/i }).click()
 
-		const alertDialog = page.getByRole('dialog').last()
-		if (await alertDialog.isVisible()) {
-			await alertDialog.getByRole('button', { name: /Delete|Eliminar|Confirm|Confirmar/i }).last().click()
-		}
+		const alertDialog = page.getByRole('alertdialog')
+		await expect(alertDialog).toBeVisible({ timeout: 5000 })
+		await alertDialog.getByRole('button', { name: /^(Delete|Eliminar)$/i }).click()
 
 		await expect(page.getByText(recurringName).first()).not.toBeVisible({ timeout: 15000 })
 	})

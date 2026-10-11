@@ -1,11 +1,20 @@
 'use client'
 
 import { ResponsiveLine } from '@nivo/line'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
+import { useChartTheme } from './chart-theme'
+
+export interface AnalysisLineSeries {
+	id: string
+	data: { x: string; y: number }[]
+}
 
 interface AnalysisLineChartProps {
-	data: any[]
-	theme: string | undefined
-	nivoTheme: any
+	/** `[income, expenses]`, in that order: they take the positive/negative colors. */
+	data: AnalysisLineSeries[]
+	/** Accessible name of the chart (role="img"). */
+	label: string
 	t: {
 		income: string
 		expenses: string
@@ -14,60 +23,65 @@ interface AnalysisLineChartProps {
 	}
 }
 
-const AnalysisLineChart = ({ data, theme, nivoTheme, t }: AnalysisLineChartProps) => {
+const AnalysisLineChart = ({ data, label, t }: AnalysisLineChartProps) => {
+	const { theme, colors } = useChartTheme(11)
+	const formatCurrency = useFormatCurrency()
+	const compact = new Intl.NumberFormat(getIntlLocale(useAppLocale()), { notation: 'compact' })
+
 	return (
-		<ResponsiveLine
-			data={data}
-			theme={nivoTheme}
-			margin={{ top: 30, right: 30, bottom: 60, left: 60 }}
-			xScale={{ type: 'point' }}
-			yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false, reverse: false }}
-			curve='catmullRom'
-			axisBottom={{
-				tickSize: 5,
-				tickPadding: 5,
-				tickRotation: 45,
-				legend: t.month,
-				legendOffset: 48,
-				legendPosition: 'middle',
-			}}
-			axisLeft={{
-				tickSize: 5,
-				tickPadding: 5,
-				tickRotation: 0,
-				legend: t.amount,
-				legendOffset: -50,
-				legendPosition: 'middle',
-			}}
-			lineWidth={3}
-			enableArea={true}
-			areaOpacity={0.08}
-			pointSize={8}
-			pointColor={{ theme: 'background' }}
-			pointBorderWidth={2}
-			pointBorderColor={{ from: 'serieColor' }}
-			enablePointLabel={false}
-			useMesh={true}
-			legends={[
-				{
-					anchor: 'bottom-right',
-					direction: 'column',
-					justify: false,
-					translateX: 100,
-					translateY: 0,
-					itemsSpacing: 0,
-					itemDirection: 'left-to-right',
-					itemWidth: 80,
-					itemHeight: 20,
-					itemOpacity: 0.75,
-					symbolSize: 12,
-					symbolShape: 'circle',
-					symbolBorderColor: 'rgba(0, 0, 0, .5)',
-					itemTextColor: theme === 'dark' ? '#ffffff' : '#374151',
-					effects: [{ on: 'hover', style: { itemBackground: 'rgba(0, 0, 0, .03)', itemOpacity: 1 } }],
-				},
-			]}
-		/>
+		<div role='img' aria-label={label} className='h-full w-full'>
+			<ResponsiveLine
+				data={data}
+				theme={theme}
+				colors={[colors.positive, colors.negative]}
+				margin={{ top: 36, right: 24, bottom: 56, left: 56 }}
+				xScale={{ type: 'point' }}
+				yScale={{ type: 'linear', min: 'auto', max: 'auto', stacked: false, reverse: false }}
+				curve='monotoneX'
+				axisBottom={{
+					tickSize: 5,
+					tickPadding: 5,
+					tickRotation: 45,
+					legend: t.month,
+					legendOffset: 48,
+					legendPosition: 'middle',
+				}}
+				axisLeft={{
+					tickSize: 5,
+					tickPadding: 5,
+					tickRotation: 0,
+					format: (value) => compact.format(Number(value)),
+					legend: t.amount,
+					legendOffset: -48,
+					legendPosition: 'middle',
+				}}
+				yFormat={(value) => formatCurrency(Number(value), 'DOP')}
+				lineWidth={2}
+				enableArea
+				areaOpacity={0.08}
+				pointSize={8}
+				pointColor={colors.surface}
+				pointBorderWidth={2}
+				pointBorderColor={{ from: 'seriesColor' }}
+				enablePointLabel={false}
+				useMesh
+				legends={[
+					{
+						anchor: 'top-left',
+						direction: 'row',
+						justify: false,
+						translateX: 0,
+						translateY: -32,
+						itemsSpacing: 16,
+						itemDirection: 'left-to-right',
+						itemWidth: 96,
+						itemHeight: 20,
+						symbolSize: 10,
+						symbolShape: 'circle',
+					},
+				]}
+			/>
+		</div>
 	)
 }
 

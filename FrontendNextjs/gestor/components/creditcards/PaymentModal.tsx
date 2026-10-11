@@ -5,20 +5,19 @@ import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { ErrorState } from '@/components/shared/ErrorState'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
 import { useAppLocale } from '@/lib/i18n/date-locale'
 import { hasAtMostDecimals } from '@/lib/money-validation'
 import { getAccountRepository } from '@/lib/repositoryConfig'
-import { formatCurrency } from '@/lib/utils'
 import { Account } from '@/types/account'
 import { CreatePaymentDTO, CreditCard } from '@/types/creditcard'
 
@@ -56,13 +55,14 @@ type PaymentFormValues = z.infer<ReturnType<typeof createPaymentSchema>>
 
 export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProps) {
 	const t = useTranslations('creditCards.payment')
-	const tCards = useTranslations('creditCards')
 	const tForms = useTranslations('forms')
 	const locale = useAppLocale()
+	const formatCurrency = useFormatCurrency()
 	const paymentSchema = useMemo(() => createPaymentSchema(t, tForms), [t, tForms])
 	const [loading, setLoading] = useState(false)
 	const [submitError, setSubmitError] = useState<{ detail: string | null } | null>(null)
 	const [accounts, setAccounts] = useState<Account[]>([])
+	const [accountsError, setAccountsError] = useState(false)
 	const { data: rateData } = useExchangeRateQuery()
 
 	const form = useForm<PaymentFormValues>({
@@ -81,11 +81,13 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 	const watchedValues = form.watch()
 
 	const loadAccounts = useCallback(async () => {
+		setAccountsError(false)
 		try {
 			const data = await getAccountRepository().findAll()
 			setAccounts(data.filter((a: Account) => a.type === 'bank'))
-		} catch (error) {
-			console.error('Error loading accounts:', error)
+		} catch {
+			// Without source accounts the payment can't be made: say so and offer a retry.
+			setAccountsError(true)
 		}
 	}, [])
 
@@ -108,11 +110,11 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 	const recommendedRate =
 		needsExchangeRate && watchedValues.currency === 'USD' && sourceCurrency === 'DOP' ? rateData?.usd_to_dop : undefined
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: prefill the amount only when the modal opens or the currency changes, not on every card refetch
 	useEffect(() => {
 		if (!open || !selectedBalance) return
 		form.setValue('amount', Math.max(0, -selectedBalance.current_balance))
-		// eslint-disable-next-line react-hooks/exhaustive-deps
-	}, [watchedValues.currency, open])
+	}, [watchedValues.currency, open, form.setValue])
 
 	useEffect(() => {
 		if (!needsExchangeRate) {
@@ -175,209 +177,210 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={onClose}>
-			<DialogContent className='max-h-[90vh] w-[95vw] max-w-md overflow-y-auto'>
-				<DialogHeader>
-					<DialogTitle>{t('title')}</DialogTitle>
-				</DialogHeader>
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(handleFormSubmit)} className='space-y-4'>
+		<FormDialog
+			open={open}
+			onOpenChange={(next) => !next && onClose()}
+			title={t('title')}
+			size='sm'
+			submitLabel={t('submit')}
+			loading={loading}
+			submitDisabled={!watchedValues.fromAccountId || !exchangeRateValid || !hasValidAmount}
+			error={
+				submitError ? (
+					<>
+						<p>{t('errors.failed')}</p>
+						{submitError.detail ? <p className='text-xs opacity-90'>{submitError.detail}</p> : null}
+					</>
+				) : null
+			}
+			onSubmit={form.handleSubmit(handleFormSubmit)}
+		>
+			<Form {...form}>
+				<div className='space-y-4'>
+					<FormField
+						control={form.control}
+						name='fromAccountId'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('fromAccount')}</FormLabel>
+								{accountsError ? (
+									<ErrorState
+										compact
+										className='rounded-md border py-4'
+										title={t('errors.accountsLoad')}
+										onRetry={() => void loadAccounts()}
+									/>
+								) : null}
+								<Select value={field.value} onValueChange={field.onChange} disabled={accountsError}>
+									<FormControl>
+										<SelectTrigger>
+											<SelectValue placeholder={t('selectAccount')} />
+										</SelectTrigger>
+									</FormControl>
+									<SelectContent>
+										{accounts.map((account) => (
+											<SelectItem key={account.id} value={account.id}>
+												{account.name} ({account.bank}) - {account.currency || 'DOP'}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								{selectedAccount?.current_balance !== undefined && (
+									<p className='text-xs text-muted-foreground'>
+										{tForms('availableBalance', {
+											amount: formatCurrency(selectedAccount.current_balance, sourceCurrency),
+										})}
+									</p>
+								)}
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<FormField
+						control={form.control}
+						name='currency'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('currency')}</FormLabel>
+								<Select value={field.value} onValueChange={field.onChange}>
+									<FormControl>
+										<SelectTrigger>
+											<SelectValue />
+										</SelectTrigger>
+									</FormControl>
+									<SelectContent>
+										{card?.balances.map((b) => (
+											<SelectItem key={b.currency} value={b.currency}>
+												{t('currencyOption', {
+													currency: b.currency,
+													debt: formatCurrency(Math.max(0, -b.current_balance), b.currency),
+												})}
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<FormField
+						control={form.control}
+						name='amount'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('amount')}</FormLabel>
+								<FormControl>
+									<Input
+										type='number'
+										step='0.01'
+										inputMode='decimal'
+										placeholder={currentDebt.toString()}
+										{...field}
+									/>
+								</FormControl>
+								<p className='text-xs text-muted-foreground'>
+									{t('currentDebt', { amount: formatCurrency(currentDebt, watchedValues.currency) })}
+								</p>
+								{exceedsDebt ? (
+									<p className='text-xs text-warning'>
+										{t('exceedsDebt', { amount: formatCurrency(overpayAmount, watchedValues.currency) })}
+									</p>
+								) : null}
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					{hasValidAmount && (
+						<div className='space-y-1 rounded-md bg-muted/50 p-3 tabular-nums'>
+							<p className='text-xs text-muted-foreground'>
+								{t('debitFromAccount')}{' '}
+								<span className='font-medium text-foreground'>{formatCurrency(debitPreview, sourceCurrency)}</span>
+							</p>
+							{watchedValues.currency === 'USD' && dopEquivalent !== null && (
+								<p className='text-xs text-muted-foreground'>
+									{t('equivalentInDop')}{' '}
+									<span className='font-medium text-foreground'>{formatCurrency(dopEquivalent, 'DOP')}</span>
+								</p>
+							)}
+						</div>
+					)}
+
+					{needsExchangeRate && (
 						<FormField
 							control={form.control}
-							name='fromAccountId'
+							name='exchangeRate'
 							render={({ field }) => (
-								<FormItem>
-									<FormLabel>{t('fromAccount')}</FormLabel>
-									<Select value={field.value} onValueChange={field.onChange}>
-										<FormControl>
-											<SelectTrigger>
-												<SelectValue placeholder={t('selectAccount')} />
-											</SelectTrigger>
-										</FormControl>
-										<SelectContent>
-											{accounts.map((account) => (
-												<SelectItem key={account.id} value={account.id}>
-													{account.name} ({account.bank}) - {account.currency || 'DOP'}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-									{selectedAccount?.current_balance !== undefined && (
+								<FormItem className='rounded-md border p-3'>
+									<FormLabel>{t('exchangeRate', { from: watchedValues.currency, to: sourceCurrency })}</FormLabel>
+									<FormControl>
+										<Input
+											type='number'
+											step='0.0001'
+											placeholder={recommendedRate ? recommendedRate.toFixed(4) : t('enterRate')}
+											{...field}
+										/>
+									</FormControl>
+									{recommendedRate ? (
 										<p className='text-xs text-muted-foreground'>
-											{tForms('availableBalance', {
-												amount: formatCurrency(selectedAccount.current_balance, sourceCurrency, { locale }),
-											})}
+											{t('recommendedRate', { rate: recommendedRate.toFixed(4) })}
 										</p>
+									) : (
+										<p className='text-xs text-muted-foreground'>{t('noRecommendedRate')}</p>
 									)}
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
+					)}
 
-						<FormField
-							control={form.control}
-							name='currency'
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>{t('currency')}</FormLabel>
-									<Select value={field.value} onValueChange={field.onChange}>
-										<FormControl>
-											<SelectTrigger>
-												<SelectValue />
-											</SelectTrigger>
-										</FormControl>
-										<SelectContent>
-											{card?.balances.map((b) => (
-												<SelectItem key={b.currency} value={b.currency}>
-													{t('currencyOption', {
-														currency: b.currency,
-														debt: formatCurrency(Math.max(0, -b.current_balance), b.currency, { locale }),
-													})}
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-
-						<FormField
-							control={form.control}
-							name='amount'
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>{t('amount')}</FormLabel>
-									<FormControl>
-										<Input type='number' step='0.01' placeholder={currentDebt.toString()} {...field} />
-									</FormControl>
-									<p className='text-xs text-muted-foreground'>
-										{t('currentDebt', { amount: formatCurrency(currentDebt, watchedValues.currency, { locale }) })}
-									</p>
-									{exceedsDebt ? (
-										<p className='text-xs text-amber-600'>
-											{t('exceedsDebt', { amount: formatCurrency(overpayAmount, watchedValues.currency, { locale }) })}
-										</p>
-									) : null}
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-
-						{hasValidAmount && (
-							<div className='rounded-md border border-dashed p-3 space-y-1'>
-								<p className='text-xs text-muted-foreground'>
-									{t('debitFromAccount')}{' '}
-									<span className='font-medium text-foreground'>
-										{formatCurrency(debitPreview, sourceCurrency, { locale })}
-									</span>
-								</p>
-								{watchedValues.currency === 'USD' && dopEquivalent !== null && (
-									<p className='text-xs text-muted-foreground'>
-										{t('equivalentInDop')}{' '}
-										<span className='font-medium text-foreground'>
-											{formatCurrency(dopEquivalent, 'DOP', { locale })}
-										</span>
-									</p>
-								)}
-							</div>
-						)}
-
-						{needsExchangeRate && (
+					<div className='space-y-2'>
+						<div className='flex items-center justify-between'>
+							<Label htmlFor='interest'>{t('includesInterest')}</Label>
+							<Switch
+								id='interest'
+								checked={watchedValues.includesInterest}
+								onCheckedChange={(checked) => form.setValue('includesInterest', checked)}
+							/>
+						</div>
+						{watchedValues.includesInterest && (
 							<FormField
 								control={form.control}
-								name='exchangeRate'
+								name='interestAmount'
 								render={({ field }) => (
-									<FormItem className='rounded-md border p-3'>
-										<FormLabel>{t('exchangeRate', { from: watchedValues.currency, to: sourceCurrency })}</FormLabel>
+									<FormItem>
 										<FormControl>
 											<Input
 												type='number'
-												step='0.0001'
-												placeholder={recommendedRate ? recommendedRate.toFixed(4) : t('enterRate')}
+												step='0.01'
+												placeholder={t('interestAmount')}
+												aria-label={t('interestAmount')}
 												{...field}
 											/>
 										</FormControl>
-										{recommendedRate ? (
-											<p className='text-xs text-muted-foreground'>
-												{t('recommendedRate', { rate: recommendedRate.toFixed(4) })}
-											</p>
-										) : (
-											<p className='text-xs text-muted-foreground'>{t('noRecommendedRate')}</p>
-										)}
 										<FormMessage />
 									</FormItem>
 								)}
 							/>
 						)}
+					</div>
 
-						<div className='space-y-2'>
-							<div className='flex items-center justify-between'>
-								<Label htmlFor='interest'>{t('includesInterest')}</Label>
-								<Switch
-									id='interest'
-									checked={watchedValues.includesInterest}
-									onCheckedChange={(checked) => form.setValue('includesInterest', checked)}
-								/>
-							</div>
-							{watchedValues.includesInterest && (
-								<FormField
-									control={form.control}
-									name='interestAmount'
-									render={({ field }) => (
-										<FormItem>
-											<FormControl>
-												<Input
-													type='number'
-													step='0.01'
-													placeholder={t('interestAmount')}
-													aria-label={t('interestAmount')}
-													{...field}
-												/>
-											</FormControl>
-											<FormMessage />
-										</FormItem>
-									)}
-								/>
-							)}
-						</div>
-
-						<FormField
-							control={form.control}
-							name='notes'
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>{t('notes')}</FormLabel>
-									<FormControl>
-										<Input {...field} placeholder={t('notesPlaceholder')} />
-									</FormControl>
-								</FormItem>
-							)}
-						/>
-
-						{submitError && (
-							<Alert variant='destructive'>
-								<AlertDescription>
-									<p>{t('errors.failed')}</p>
-									{submitError.detail && <p className='text-xs opacity-90'>{submitError.detail}</p>}
-								</AlertDescription>
-							</Alert>
+					<FormField
+						control={form.control}
+						name='notes'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('notes')}</FormLabel>
+								<FormControl>
+									<Input {...field} placeholder={t('notesPlaceholder')} />
+								</FormControl>
+							</FormItem>
 						)}
-
-						<DialogFooter>
-							<Button type='button' variant='outline' onClick={onClose}>
-								{tCards('cancel')}
-							</Button>
-							<Button
-								type='submit'
-								disabled={loading || !watchedValues.fromAccountId || !exchangeRateValid || !hasValidAmount}
-							>
-								{loading ? t('processing') : t('submit')}
-							</Button>
-						</DialogFooter>
-					</form>
-				</Form>
-			</DialogContent>
-		</Dialog>
+					/>
+				</div>
+			</Form>
+		</FormDialog>
 	)
 }

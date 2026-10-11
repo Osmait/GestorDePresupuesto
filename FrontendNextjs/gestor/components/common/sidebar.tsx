@@ -65,7 +65,8 @@ function SidebarHeader({ isExpanded }: { isExpanded: boolean }) {
 						/>
 					</div>
 					<div>
-						<h2 className='text-lg font-semibold text-foreground'>SBFinance</h2>
+						{/* Brand, not a heading: the page's h1 is the first heading. */}
+						<p className='text-lg font-semibold text-foreground'>SBFinance</p>
 						<p className='text-xs text-muted-foreground'>{tCommon('appTagline')}</p>
 					</div>
 				</div>
@@ -126,6 +127,7 @@ function SidebarFooter({
 					variant='ghost'
 					size='sm'
 					onClick={toggleCollapsed}
+					aria-label={isExpanded ? t('collapse') : t('expand')}
 					className={`w-full transition-colors duration-300 ${!isExpanded && 'px-2'} group`}
 				>
 					{isExpanded ? (
@@ -146,7 +148,7 @@ function SidebarFooter({
 }
 
 // Component for main header
-function MainHeader({ isExpanded, toggleMobile }: { isExpanded: boolean; toggleMobile: () => void }) {
+function MainHeader({ toggleMobile }: { toggleMobile: () => void }) {
 	const { openModal } = useGlobalAction()
 	const t = useTranslations('nav')
 	// The title follows the current section instead of always saying "Dashboard".
@@ -165,12 +167,11 @@ function MainHeader({ isExpanded, toggleMobile }: { isExpanded: boolean; toggleM
 						<Menu className='h-4 w-4' aria-hidden='true' />
 					</Button>
 
-					{isExpanded && (
-						<div className='hidden sm:block min-w-0'>
-							<p className='text-lg sm:text-xl font-semibold text-foreground truncate'>{t(routeTitle.title)}</p>
-							<p className='text-xs sm:text-sm text-muted-foreground truncate'>{t(routeTitle.description)}</p>
-						</div>
-					)}
+					{/* Small "you are here" label that stays visible while scrolling. The page's
+					    PageHeader owns the h1 + description, so the bar never repeats them. */}
+					<p className='hidden sm:block min-w-0 truncate text-sm font-medium text-muted-foreground'>
+						{t(routeTitle.title)}
+					</p>
 				</div>
 
 				<div className='flex items-center gap-1 sm:gap-2 lg:gap-4 flex-shrink-0'>
@@ -223,6 +224,7 @@ export function Sidebar({ children }: SidebarProps) {
 	usePathname() // Used for route-based styling in child components
 	const { navItems, bottomNavItems } = useNavItems()
 	const t = useTranslations('nav')
+	const tCommon = useTranslations('common')
 
 	// Estado local para settings eliminada al moverla al UserNav
 	const handleItemClick = (_item: NavItem, _e: React.MouseEvent) => {
@@ -242,6 +244,12 @@ export function Sidebar({ children }: SidebarProps) {
 				getSidebarClassName,
 			}) => (
 				<div className='flex h-screen bg-background'>
+					<a
+						href='#main-content'
+						className='sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:rounded-md focus:bg-background focus:px-4 focus:py-2 focus:text-sm focus:font-medium focus:shadow-md focus:outline-none focus:ring-2 focus:ring-ring'
+					>
+						{tCommon('skipToContent')}
+					</a>
 					{/* Mobile Overlay */}
 					{isMobileOpen && (
 						<button
@@ -271,9 +279,11 @@ export function Sidebar({ children }: SidebarProps) {
 
 					{/* Main content */}
 					<div className='flex-1 flex flex-col min-w-0'>
-						<MainHeader isExpanded={isExpanded} toggleMobile={toggleMobile} />
+						<MainHeader toggleMobile={toggleMobile} />
 
-						<main className='flex-1 overflow-auto'>{children}</main>
+						<main id='main-content' tabIndex={-1} className='flex-1 overflow-auto focus:outline-none'>
+							{children}
+						</main>
 					</div>
 				</div>
 			)}

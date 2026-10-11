@@ -1,13 +1,14 @@
 'use client'
 
-import { DollarSign, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { ListOrdered, TrendingDown, TrendingUp } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { AnimatedFlashNumber } from '@/components/common/AnimatedFlashNumber'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
+import { Amount } from '@/components/shared/Amount'
+import { StatCard } from '@/components/shared/StatCard'
+import { StatGrid } from '@/components/shared/StatGrid'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { Transaction, TransactionSummary } from '@/types/transaction'
 
+/** KPI row of the transaction history: income, expenses and count for the current filters. */
 export default function TransactionSummaryCard({
 	transactions,
 	summary,
@@ -16,76 +17,29 @@ export default function TransactionSummaryCard({
 	summary?: TransactionSummary | null
 }) {
 	const t = useTranslations('transactions')
-	const locale = useAppLocale()
-	// Totals come from the API already converted to DOP.
-	const formatDOP = (value: number) => formatCurrency(value, 'DOP', { locale })
-	const formatUSD = (value: number) => formatCurrency(value, 'USD', { locale })
+	const formatCurrency = useFormatCurrency()
+	// Totals come from the API already converted to DOP; the hint splits them by original currency.
 	const totalIncome = summary?.total_income ?? 0
 	const totalExpenses = summary?.total_expenses ?? 0
-	const incomeDOP = summary?.income_dop ?? 0
-	const incomeUSD = summary?.income_usd ?? 0
-	const expensesDOP = summary?.expenses_dop ?? 0
-	const expensesUSD = summary?.expenses_usd ?? 0
-	const totalTransactions = transactions.length
+	const byCurrency = (dop: number, usd: number) => `${formatCurrency(dop, 'DOP')} · ${formatCurrency(usd, 'USD')}`
 
 	return (
-		<Card className='border-border/50 dark:border-border/20'>
-			<CardHeader>
-				<CardTitle className='flex items-center gap-2 text-foreground'>
-					<Wallet className='h-5 w-5' />
-					{t('summary')}
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5'>
-						<TrendingUp className='h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('totalIncome')}</p>
-						<p className='text-xl sm:text-2xl font-bold break-words'>
-							<AnimatedFlashNumber
-								value={totalIncome}
-								className='text-green-600 dark:text-green-400'
-								duration={1}
-								decimals={2}
-								formattingFn={formatDOP}
-								preserveValue={true}
-							/>
-						</p>
-						<p className='text-xs text-muted-foreground'>DOP: {formatDOP(incomeDOP)}</p>
-						<p className='text-xs text-muted-foreground'>USD: {formatUSD(incomeUSD)}</p>
-					</div>
-					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-red-500/10 to-rose-500/10 dark:from-red-500/5 dark:to-rose-500/5'>
-						<TrendingDown className='h-6 w-6 mx-auto mb-2 text-red-600 dark:text-red-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('totalExpenses')}</p>
-						<p className='text-xl sm:text-2xl font-bold break-words'>
-							<AnimatedFlashNumber
-								value={totalExpenses}
-								className='text-red-600 dark:text-red-400'
-								inverse={true}
-								duration={1}
-								decimals={2}
-								formattingFn={formatDOP}
-								preserveValue={true}
-							/>
-						</p>
-						<p className='text-xs text-muted-foreground'>DOP: {formatDOP(expensesDOP)}</p>
-						<p className='text-xs text-muted-foreground'>USD: {formatUSD(expensesUSD)}</p>
-					</div>
-					<div className='text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5'>
-						<DollarSign className='h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('totalTransactions')}</p>
-						<p className='text-xl sm:text-2xl font-bold break-words'>
-							<AnimatedFlashNumber
-								value={totalTransactions}
-								className='text-blue-600 dark:text-blue-400'
-								duration={1}
-								separator=','
-								preserveValue={true}
-							/>
-						</p>
-					</div>
-				</div>
-			</CardContent>
-		</Card>
+		<StatGrid columns={3}>
+			<StatCard
+				label={t('totalIncome')}
+				icon={TrendingUp}
+				tone='positive'
+				value={<Amount value={totalIncome} currency='DOP' animate />}
+				hint={byCurrency(summary?.income_dop ?? 0, summary?.income_usd ?? 0)}
+			/>
+			<StatCard
+				label={t('totalExpenses')}
+				icon={TrendingDown}
+				tone='negative'
+				value={<Amount value={totalExpenses} currency='DOP' animate />}
+				hint={byCurrency(summary?.expenses_dop ?? 0, summary?.expenses_usd ?? 0)}
+			/>
+			<StatCard label={t('totalTransactions')} icon={ListOrdered} value={transactions.length} />
+		</StatGrid>
 	)
 }

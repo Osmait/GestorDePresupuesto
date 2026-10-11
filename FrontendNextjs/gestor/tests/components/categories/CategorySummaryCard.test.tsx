@@ -1,22 +1,11 @@
-import { render, screen } from '@testing-library/react'
-import { vi } from 'vitest'
+import { screen } from '@testing-library/react'
 import { CategorySummaryCard } from '@/components/categories/CategorySummaryCard'
+import { renderWithIntl } from '@/tests/utils/intl'
 
-vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string) => {
-		const translations: Record<string, string> = {
-			summary: 'Summary',
-			totalCategories: 'Total Categories',
-			activeCategories: 'Active Categories',
-			averagePerCategory: 'Avg Per Category',
-		}
-		return translations[key] || key
-	},
-}))
-
-vi.mock('@/components/ui/animated-counter', () => ({
-	AnimatedCounter: ({ value }: { value: number }) => <span>{value}</span>,
-}))
+function statValue(label: string) {
+	const card = screen.getByText(label).closest('.p-5') as HTMLElement
+	return card.querySelector('.text-2xl') as HTMLElement
+}
 
 describe('CategorySummaryCard', () => {
 	const mockCategories = [
@@ -30,21 +19,13 @@ describe('CategorySummaryCard', () => {
 		{ id: 'c2', label: 'Transport', value: 100, color: '#00FF00', transaction_count: 1, dop_total: 100, usd_total: 0 },
 	]
 
-	it('calculates totals correctly', () => {
-		render(<CategorySummaryCard categories={mockCategories} categoryExpenses={mockCategoryExpenses} />)
+	it('calculates totals in StatCards', () => {
+		renderWithIntl(<CategorySummaryCard categories={mockCategories} categoryExpenses={mockCategoryExpenses} />)
 
-		expect(screen.getByText('Summary')).toBeInTheDocument()
-
-		// Total Categories: 3
-		expect(screen.getByText('Total Categories')).toBeInTheDocument()
-		expect(screen.getByText('3')).toBeInTheDocument()
-
-		// Active Categories: 2 (c1 and c2 have transactions)
-		expect(screen.getByText('Active Categories')).toBeInTheDocument()
-		// Average is also 2. Both Active Categories and Average are 2, so use getAllByText
-		expect(screen.getAllByText('2')).toHaveLength(2)
-
-		// Average: 3 transactions / 2 active categories = 1.5 -> rounded to 2
-		expect(screen.getByText('Avg Per Category')).toBeInTheDocument()
+		expect(statValue('Total Categories')).toHaveTextContent('3')
+		// c1 and c2 have transactions.
+		expect(statValue('Active Categories')).toHaveTextContent('2')
+		// 3 transactions / 2 active categories = 1.5 -> 2
+		expect(statValue('Average per Category')).toHaveTextContent('2')
 	})
 })

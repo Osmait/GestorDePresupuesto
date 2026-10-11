@@ -1,5 +1,6 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { toast } from 'sonner'
 import { vi } from 'vitest'
 import TransactionItem from '@/components/transactions/TransactionItem'
 import { TypeTransaction } from '@/types/transaction'
@@ -8,6 +9,8 @@ vi.mock('next-intl', () => ({
 	useTranslations: () => (key: string, values?: Record<string, unknown>) =>
 		values ? `${key}(${Object.values(values).join(',')})` : key,
 }))
+
+vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn() } }))
 
 // Mock dependencies
 vi.mock('lucide-react', async () => {
@@ -50,20 +53,16 @@ describe('TransactionItem', () => {
 		expect(screen.getByText((content) => content.includes('15.99'))).toBeInTheDocument()
 	})
 
-	it('renders expense with red styling', () => {
+	it('renders an expense as a negative amount in the destructive tone', () => {
 		render(<TransactionItem transaction={mockTransaction} />)
 
-		// Find Element by text might fail if split, so we find the amount number first
-		// Or check the amount text present in the card
-		const amountText = screen.getByText((content, element) => {
-			return element?.tagName.toLowerCase() === 'p' && content.includes('15.99')
-		})
-		expect(amountText).toBeInTheDocument()
-		expect(amountText).toHaveClass('text-red-600')
+		const amountText = screen.getByText((content) => content.includes('15.99'))
+		expect(amountText).toHaveAttribute('data-tone', 'negative')
+		expect(amountText).toHaveClass('text-destructive')
 		expect(amountText).toHaveTextContent('-')
 	})
 
-	it('renders income with green styling', () => {
+	it('renders an income as a positive amount in the success tone', () => {
 		const incomeTransaction = {
 			...mockTransaction,
 			name: 'Salary',
@@ -73,11 +72,9 @@ describe('TransactionItem', () => {
 
 		render(<TransactionItem transaction={incomeTransaction} />)
 
-		const amountText = screen.getByText((content, element) => {
-			return element?.tagName.toLowerCase() === 'p' && content.includes('5,000')
-		})
-		expect(amountText).toBeInTheDocument()
-		expect(amountText).toHaveClass('text-green-600')
+		const amountText = screen.getByText((content) => content.includes('5,000'))
+		expect(amountText).toHaveAttribute('data-tone', 'positive')
+		expect(amountText).toHaveClass('text-success')
 		expect(amountText).toHaveTextContent('+')
 	})
 
@@ -130,18 +127,16 @@ describe('TransactionItem', () => {
 			/>,
 		)
 
-		await user.click(screen.getByRole('button', { name: 'options' }))
+		await user.click(screen.getByRole('button', { name: 'actions.rowMenu(Netflix Subscription)' }))
 		await user.click(await screen.findByRole('menuitem', { name: 'delete' }))
 
-		const dialog = await screen.findByRole('dialog')
+		const dialog = await screen.findByRole('alertdialog')
 		expect(dialog).toHaveTextContent('deleteTitle')
-		// The confirm button is the one inside the dialog footer labelled "delete"
-		const confirm = Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'delete')
-		expect(confirm).toBeDefined()
-		await user.click(confirm!)
+		// ConfirmDialog's confirm button (common.actions.delete)
+		await user.click(within(dialog).getByRole('button', { name: 'delete' }))
 
 		await waitFor(() => expect(onTransactionDeleted).toHaveBeenCalledTimes(1))
-		await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+		await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
 		expect(onOpenDetails).not.toHaveBeenCalled()
 	})
 
@@ -152,22 +147,36 @@ describe('TransactionItem', () => {
 			<TransactionItem transaction={mockTransaction} onOpenDetails={onOpenDetails} onTransactionDeleted={vi.fn()} />,
 		)
 
-		await user.click(screen.getByRole('button', { name: 'options' }))
+		await user.click(screen.getByRole('button', { name: 'actions.rowMenu(Netflix Subscription)' }))
 		await user.click(await screen.findByRole('menuitem', { name: 'delete' }))
 		await user.click(await screen.findByRole('button', { name: 'cancel' }))
 
-		await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+		await waitFor(() => expect(screen.queryByRole('alertdialog')).not.toBeInTheDocument())
 		expect(onOpenDetails).not.toHaveBeenCalled()
+	})
+
+	it('keeps the confirmation open and reports the error when the delete fails', async () => {
+		const user = userEvent.setup()
+		const onTransactionDeleted = vi.fn().mockRejectedValue(new Error('boom'))
+		render(<TransactionItem transaction={mockTransaction} onTransactionDeleted={onTransactionDeleted} />)
+
+		await user.click(screen.getByRole('button', { name: 'actions.rowMenu(Netflix Subscription)' }))
+		await user.click(await screen.findByRole('menuitem', { name: 'delete' }))
+		const dialog = await screen.findByRole('alertdialog')
+		await user.click(within(dialog).getByRole('button', { name: 'delete' }))
+
+		await waitFor(() => expect(toast.error).toHaveBeenCalledWith('deleteError'))
+		expect(screen.getByRole('alertdialog')).toBeInTheDocument()
 	})
 
 	it('names the transaction (not its description) in the delete confirmation', async () => {
 		const user = userEvent.setup()
 		render(<TransactionItem transaction={mockTransaction} onTransactionDeleted={vi.fn()} />)
 
-		await user.click(screen.getByRole('button', { name: 'options' }))
+		await user.click(screen.getByRole('button', { name: 'actions.rowMenu(Netflix Subscription)' }))
 		await user.click(await screen.findByRole('menuitem', { name: 'delete' }))
 
-		const dialog = await screen.findByRole('dialog')
+		const dialog = await screen.findByRole('alertdialog')
 		expect(dialog).toHaveTextContent('deleteDescription(Netflix Subscription)')
 		expect(dialog).not.toHaveTextContent('Monthly payment')
 	})

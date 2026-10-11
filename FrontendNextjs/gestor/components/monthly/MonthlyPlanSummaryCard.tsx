@@ -1,11 +1,22 @@
 'use client'
 
-import { AlertTriangle, ArrowDownCircle, ArrowUpCircle, PieChart, Wallet } from 'lucide-react'
+import { AlertTriangle, ArrowDownRight, ArrowUpRight, PieChart, Wallet } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { AnimatedCounter } from '@/components/ui/animated-counter'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAppLocale } from '@/lib/i18n/date-locale'
+import { Amount } from '@/components/shared/Amount'
+import { StatCard } from '@/components/shared/StatCard'
+import { StatGrid } from '@/components/shared/StatGrid'
+import { Progress, type ProgressTone } from '@/components/ui/progress'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
+import { PLAN_CURRENCY } from '@/lib/monthlyPlanUtils'
 import { MonthlyPlanSummary } from '@/types/monthlyPlan'
+
+/** Neutral while there is room, amber close to the limit, red once expenses exceed income. */
+function committedTone(percentage: number): ProgressTone {
+	if (percentage > 100) return 'destructive'
+	if (percentage > 85) return 'warning'
+	return 'default'
+}
 
 /**
  * The headline of the feature. Every number comes straight from the backend so
@@ -16,89 +27,81 @@ export function MonthlyPlanSummaryCard({ summary }: { summary: MonthlyPlanSummar
 	const locale = useAppLocale()
 
 	const isOvercommitted = summary.available < 0
-	// Only the bar is capped at 100%; the printed percentage still tells the truth.
-	const barWidth = Math.min(Math.max(summary.committed_percentage, 0), 100)
-	const barTone =
-		summary.committed_percentage > 100
-			? 'bg-red-500'
-			: summary.committed_percentage > 85
-				? 'bg-amber-500'
-				: 'bg-emerald-500'
+	const formatPercent = useFormatPercent()
+	const rateFormatter = new Intl.NumberFormat(getIntlLocale(locale), {
+		minimumFractionDigits: 2,
+		maximumFractionDigits: 2,
+	})
 
 	return (
-		<Card className='border-border/50 dark:border-border/20'>
-			<CardHeader>
-				<CardTitle className='flex items-center gap-2 text-foreground'>
-					<Wallet className='h-5 w-5' />
-					{t('summaryTitle')}
-				</CardTitle>
-			</CardHeader>
-			<CardContent>
-				<div className='grid grid-cols-1 md:grid-cols-4 gap-4'>
-					<div
-						className='text-center p-4 rounded-lg bg-gradient-to-br from-green-500/10 to-emerald-500/10 dark:from-green-500/5 dark:to-emerald-500/5'
-						data-testid='summary-income'
-					>
-						<ArrowUpCircle className='h-6 w-6 mx-auto mb-2 text-green-600 dark:text-green-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('totalIncome')}</p>
-						<p className='text-xl font-bold text-green-600 dark:text-green-400'>
-							<AnimatedCounter value={summary.total_income} currency='DOP' locale={locale} />
-						</p>
-						<p className='text-xs text-muted-foreground mt-1'>{t('itemsCount', { count: summary.income_count })}</p>
-					</div>
-
-					<div
-						className='text-center p-4 rounded-lg bg-gradient-to-br from-orange-500/10 to-red-500/10 dark:from-orange-500/5 dark:to-red-500/5'
-						data-testid='summary-expenses'
-					>
-						<ArrowDownCircle className='h-6 w-6 mx-auto mb-2 text-orange-600 dark:text-orange-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('totalExpenses')}</p>
-						<p className='text-xl font-bold text-orange-600 dark:text-orange-400'>
-							<AnimatedCounter value={summary.total_expenses} currency='DOP' locale={locale} />
-						</p>
-						<p className='text-xs text-muted-foreground mt-1'>{t('itemsCount', { count: summary.expenses_count })}</p>
-					</div>
-
-					<div
-						className='text-center p-4 rounded-lg bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-500/5 dark:to-cyan-500/5'
-						data-testid='summary-available'
-					>
-						<Wallet className='h-6 w-6 mx-auto mb-2 text-blue-600 dark:text-blue-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('available')}</p>
-						<p
-							className={`text-xl font-bold ${isOvercommitted ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}
-						>
-							<AnimatedCounter value={summary.available} currency='DOP' locale={locale} />
-						</p>
-						{isOvercommitted && (
-							<p className='text-xs text-red-600 dark:text-red-400 mt-1 flex items-center justify-center gap-1'>
-								<AlertTriangle className='h-3 w-3' />
-								{t('overcommitted')}
-							</p>
-						)}
-					</div>
-
-					<div
-						className='text-center p-4 rounded-lg bg-gradient-to-br from-purple-500/10 to-pink-500/10 dark:from-purple-500/5 dark:to-pink-500/5'
-						data-testid='summary-committed'
-					>
-						<PieChart className='h-6 w-6 mx-auto mb-2 text-purple-600 dark:text-purple-400' />
-						<p className='text-sm font-medium text-muted-foreground'>{t('committed')}</p>
-						<p className='text-xl font-bold text-foreground'>
-							<AnimatedCounter value={summary.committed_percentage} decimals={1} suffix='%' />
-						</p>
-						<div className='mt-2 h-2 w-full overflow-hidden rounded-full bg-muted'>
-							<div className={`h-full rounded-full ${barTone}`} style={{ width: `${barWidth}%` }} />
-						</div>
-					</div>
+		<section aria-label={t('summaryTitle')} className='space-y-2'>
+			<StatGrid>
+				<div data-testid='summary-income'>
+					<StatCard
+						className='h-full'
+						label={t('totalIncome')}
+						icon={ArrowUpRight}
+						tone='positive'
+						value={<Amount value={summary.total_income} currency={PLAN_CURRENCY} animate />}
+						hint={t('itemsCount', { count: summary.income_count })}
+					/>
 				</div>
 
-				{summary.usd_to_dop_rate > 0 && (
-					<p className='text-xs text-muted-foreground mt-4 text-center'>
-						{t('rateNote', { rate: summary.usd_to_dop_rate.toFixed(2) })}
-					</p>
-				)}
-			</CardContent>
-		</Card>
+				<div data-testid='summary-expenses'>
+					<StatCard
+						className='h-full'
+						label={t('totalExpenses')}
+						icon={ArrowDownRight}
+						tone='negative'
+						value={<Amount value={summary.total_expenses} currency={PLAN_CURRENCY} animate />}
+						hint={t('itemsCount', { count: summary.expenses_count })}
+					/>
+				</div>
+
+				<div data-testid='summary-available'>
+					<StatCard
+						className='h-full'
+						label={t('available')}
+						icon={Wallet}
+						tone={isOvercommitted ? 'negative' : 'default'}
+						value={<Amount value={summary.available} currency={PLAN_CURRENCY} animate />}
+						hint={
+							isOvercommitted ? (
+								<span className='flex items-center gap-1 text-destructive'>
+									<AlertTriangle className='h-3 w-3 shrink-0' aria-hidden='true' />
+									{t('overcommitted')}
+								</span>
+							) : undefined
+						}
+					/>
+				</div>
+
+				<div data-testid='summary-committed'>
+					<StatCard
+						className='h-full'
+						label={t('committed')}
+						icon={PieChart}
+						value={
+							<>
+								{/* Only the bar is capped at 100%; the printed percentage still tells the truth. */}
+								<span>{formatPercent(summary.committed_percentage)}</span>
+								<Progress
+									className='mt-3'
+									value={summary.committed_percentage}
+									tone={committedTone(summary.committed_percentage)}
+									aria-label={t('committedBar')}
+								/>
+							</>
+						}
+					/>
+				</div>
+			</StatGrid>
+
+			{summary.usd_to_dop_rate > 0 && (
+				<p className='text-xs text-muted-foreground'>
+					{t('rateNote', { rate: rateFormatter.format(summary.usd_to_dop_rate) })}
+				</p>
+			)}
+		</section>
 	)
 }

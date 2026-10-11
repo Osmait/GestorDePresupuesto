@@ -1,40 +1,11 @@
-import { render, screen } from '@testing-library/react'
-import { vi } from 'vitest'
+import { screen } from '@testing-library/react'
 import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard'
+import { renderWithIntl } from '@/tests/utils/intl'
 
-// Mock dependencies
-vi.mock('next-intl', () => ({
-	useTranslations: () => (key: string) => {
-		const translations: Record<string, string> = {
-			summary: 'Summary',
-			currentBalance: 'Current Balance',
-			initial: 'Initial',
-			positiveAccounts: 'Positive Accounts',
-			totalDifference: 'Total Difference',
-			totalAccounts: 'Total Accounts',
-		}
-		return translations[key] || key
-	},
-}))
-
-// Mock AnimatedCounter to return simple text
-// Render the final value synchronously, formatted like the real component.
-vi.mock('@/components/ui/animated-counter', async () => {
-	const { formatCurrency } = await vi.importActual<typeof import('@/lib/utils')>('@/lib/utils')
-	return {
-		AnimatedCounter: ({
-			value,
-			prefix = '',
-			currency,
-			signDisplay,
-		}: {
-			value: number
-			prefix?: string
-			currency?: string
-			signDisplay?: 'exceptZero'
-		}) => <span>{currency ? formatCurrency(value, currency, { signDisplay }) : `${prefix}${value}`}</span>,
-	}
-})
+function statValue(label: string) {
+	const card = screen.getByText(label).closest('.p-5') as HTMLElement
+	return card.querySelector('.text-2xl') as HTMLElement
+}
 
 describe('AccountSummaryCard', () => {
 	const mockAccounts = [
@@ -60,31 +31,23 @@ describe('AccountSummaryCard', () => {
 		},
 	]
 
-	it('calculates and displays totals correctly', () => {
-		render(<AccountSummaryCard accounts={mockAccounts} />)
+	it('renders one StatCard per KPI with the totals', () => {
+		renderWithIntl(<AccountSummaryCard accounts={mockAccounts} />)
 
-		// Current Balance: 1000 + (-200) = 800
-		expect(screen.getByText('Current Balance')).toBeInTheDocument()
-		expect(screen.getByText('RD$800.00')).toBeInTheDocument()
-
-		// Positive accounts count: 1 (Bank A)
-		expect(screen.getByText('Positive Accounts')).toBeInTheDocument()
-		expect(screen.getByText('1')).toBeInTheDocument()
-
-		// Total Accounts: 2
-		expect(screen.getByText('Total Accounts')).toBeInTheDocument()
-		expect(screen.getByText('2')).toBeInTheDocument()
+		// Current balance: 1000 + (-200) = 800
+		expect(statValue('Total Balance')).toHaveTextContent('RD$800.00')
+		expect(statValue('Positive Accounts')).toHaveTextContent('1')
+		expect(statValue('Total Accounts')).toHaveTextContent('2')
 	})
 
-	it('handles empty accounts list', () => {
-		render(<AccountSummaryCard accounts={[]} />)
-		// Multiple fields will be $0 (Current Balance, Difference)
-		const zeroValues = screen.getAllByText('RD$0.00')
-		expect(zeroValues.length).toBeGreaterThan(0)
+	it('handles an empty accounts list', () => {
+		renderWithIntl(<AccountSummaryCard accounts={[]} />)
+		expect(statValue('Total Balance')).toHaveTextContent('RD$0.00')
+		expect(statValue('Total Accounts')).toHaveTextContent('0')
 	})
 
-	it('shows a negative total difference with its sign and in red (no Math.abs)', () => {
-		render(
+	it('shows a negative total difference with its sign and the destructive token (no Math.abs)', () => {
+		renderWithIntl(
 			<AccountSummaryCard
 				accounts={[
 					{
@@ -99,18 +62,21 @@ describe('AccountSummaryCard', () => {
 				]}
 			/>,
 		)
-		const difference = screen.getByText('-RD$299.50')
-		expect(difference.closest('p')).toHaveClass('text-red-600')
+		expect(screen.getByText('-RD$299.50')).toHaveClass('text-destructive')
 	})
 
-	it('shows a positive difference with an explicit plus sign in green', () => {
-		render(<AccountSummaryCard accounts={mockAccounts.slice(0, 1)} />)
-		const difference = screen.getByText('+RD$200.00')
-		expect(difference.closest('p')).toHaveClass('text-green-600')
+	it('shows a positive difference with an explicit plus sign and the success token', () => {
+		renderWithIntl(<AccountSummaryCard accounts={mockAccounts.slice(0, 1)} />)
+		expect(screen.getByText('+RD$200.00')).toHaveClass('text-success')
 	})
 
 	it('uses the shared currency of the accounts for totals', () => {
-		render(<AccountSummaryCard accounts={mockAccounts.map((account) => ({ ...account, currency: 'USD' }))} />)
-		expect(screen.getByText('US$800.00')).toBeInTheDocument()
+		renderWithIntl(<AccountSummaryCard accounts={mockAccounts.map((account) => ({ ...account, currency: 'USD' }))} />)
+		expect(statValue('Total Balance')).toHaveTextContent('US$800.00')
+	})
+
+	it('has no gradient tiles', () => {
+		const { container } = renderWithIntl(<AccountSummaryCard accounts={mockAccounts} />)
+		expect(container.innerHTML).not.toMatch(/gradient|purple|violet|cyan/)
 	})
 })

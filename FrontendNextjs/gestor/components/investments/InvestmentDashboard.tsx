@@ -1,21 +1,28 @@
 'use client'
 
+import { format } from 'date-fns'
+import { LineChart, PieChart } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
-import { useTheme } from 'next-themes'
 import { useMemo } from 'react'
+import { useChartTheme } from '@/components/charts/chart-theme'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useGetInvestments } from '@/hooks/queries/useInvestmentsQuery'
-import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { InvestmentType } from '@/types/investment'
 import { InvestmentSummaryCards } from './InvestmentSummaryCards'
 
-const KNOWN_TYPES = new Set<string>(Object.values(InvestmentType))
+/** Fixed series order per type, so a type keeps its color across renders and pages. */
+const TYPE_ORDER: readonly string[] = [InvestmentType.STOCK, InvestmentType.CRYPTO, InvestmentType.FIXED_INCOME]
+const KNOWN_TYPES = new Set<string>(TYPE_ORDER)
+// Portfolio totals are aggregated without FX conversion; positions are settled in USD by default.
+const PORTFOLIO_CURRENCY = 'USD'
 
 // Client-only chart chunks: the summary cards render without waiting for Nivo.
-const chartLoading = () => <div className='h-full w-full rounded bg-muted/20 animate-pulse' />
+const chartLoading = () => <Skeleton className='h-full w-full' />
 const InvestmentAllocationChart = dynamic(() => import('@/components/charts/InvestmentAllocationChart'), {
 	ssr: false,
 	loading: chartLoading,
@@ -28,10 +35,10 @@ const AreaTrendChart = dynamic(() => import('@/components/charts/AreaTrendChart'
 export function InvestmentDashboard() {
 	const t = useTranslations('investments')
 	const locale = useAppLocale()
-	const intlLocale = getIntlLocale(locale)
-	const money = (value: number) => formatCurrency(value, 'USD', { locale })
+	const formatCurrency = useFormatCurrency()
+	const formatPortfolioValue = (value: number) => formatCurrency(value, PORTFOLIO_CURRENCY)
 	const { data: investments, isLoading } = useGetInvestments()
-	const { theme } = useTheme()
+	const { colors } = useChartTheme()
 
 	const metrics = useMemo(() => {
 		if (!investments) return { totalValue: 0, totalCost: 0, totalProfit: 0, roi: 0, allocation: [], history: [] }
@@ -53,12 +60,13 @@ export function InvestmentDashboard() {
 		const totalProfit = totalValue - totalCost
 		const roi = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0
 
-		const allocation = Array.from(allocationMap.entries()).map(([id, value]) => ({
-			id,
-			label: KNOWN_TYPES.has(id) ? t(`types.${id as InvestmentType}`) : id,
-			value,
-			color: id === 'stock' ? '#3b82f6' : id === 'crypto' ? '#f59e0b' : '#10b981',
-		}))
+		const allocation = Array.from(allocationMap.entries())
+			.sort(([a], [b]) => orderOf(a) - orderOf(b))
+			.map(([id, value]) => ({
+				id,
+				label: KNOWN_TYPES.has(id) ? t(`types.${id as InvestmentType}`) : id,
+				value,
+			}))
 
 		const history: { x: string; y: number }[] = []
 
@@ -72,8 +80,8 @@ export function InvestmentDashboard() {
 			const cost = inv.quantity * inv.purchase_price
 			runningTotal += cost
 
-			// Format date as YYYY-MM-DD for grouping/display
-			const date = new Date(inv.created_at).toISOString().split('T')[0]
+			// Group by the user's local calendar day (YYYY-MM-DD).
+			const date = format(new Date(inv.created_at), 'yyyy-MM-dd')
 
 			// If multiple investments on same day, update last entry, else push new
 			const lastEntry = history[history.length - 1]
@@ -84,9 +92,9 @@ export function InvestmentDashboard() {
 			}
 		})
 
-		// Add today's point if needed, or ensuring at least 2 points for a line
+		// A single day draws no line: add today's point.
 		if (history.length === 1) {
-			const today = new Date().toISOString().split('T')[0]
+			const today = format(new Date(), 'yyyy-MM-dd')
 			if (history[0].x !== today) {
 				history.push({ x: today, y: runningTotal })
 			}
@@ -95,105 +103,83 @@ export function InvestmentDashboard() {
 		return { totalValue, totalCost, totalProfit, roi, allocation, history }
 	}, [investments, t])
 
-	const nivoTheme = useMemo(
-		() => ({
-			background: 'transparent',
-			text: { fill: theme === 'dark' ? '#ffffff' : '#333333', fontSize: 11 },
-			tooltip: {
-				container: {
-					background: theme === 'dark' ? '#1f2937' : '#ffffff',
-					color: theme === 'dark' ? '#ffffff' : '#333333',
-					fontSize: 12,
-					borderRadius: '6px',
-					boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-				},
-			},
-		}),
-		[theme],
+	const allocationData = useMemo(
+		() =>
+			metrics.allocation.map((slice) => ({
+				...slice,
+				color: colors.series[Math.max(orderOf(slice.id), 0) % colors.series.length],
+			})),
+		[metrics.allocation, colors.series],
 	)
 
 	const growthPoints = useMemo(
 		() =>
-			metrics.history.map((point) => {
-				const date = new Date(point.x)
-				return {
-					label: date.toLocaleDateString(intlLocale, { month: 'short', day: 'numeric', timeZone: 'UTC' }),
-					tooltipLabel: date.toLocaleDateString(intlLocale, {
-						weekday: 'short',
-						year: 'numeric',
-						month: 'short',
-						day: 'numeric',
-						timeZone: 'UTC',
-					}),
-					value: point.y,
-				}
-			}),
-		[metrics.history, intlLocale],
+			metrics.history.map((point) => ({
+				label: formatLocalDate(point.x, locale, { month: 'short', day: 'numeric' }),
+				tooltipLabel: formatLocalDate(point.x, locale, {
+					weekday: 'short',
+					year: 'numeric',
+					month: 'short',
+					day: 'numeric',
+				}),
+				value: point.y,
+			})),
+		[metrics.history, locale],
 	)
 
-	if (isLoading) {
-		return (
-			<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-8'>
-				{[1, 2, 3, 4].map((i) => (
-					<Card key={i}>
-						<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-							<Skeleton className='h-4 w-[100px]' />
-						</CardHeader>
-						<CardContent>
-							<Skeleton className='h-8 w-[120px]' />
-						</CardContent>
-					</Card>
-				))}
-			</div>
-		)
-	}
-
 	return (
-		<div className='space-y-4 mb-8'>
-			<InvestmentSummaryCards metrics={metrics} />
+		<div className='space-y-4'>
+			<InvestmentSummaryCards metrics={metrics} loading={isLoading} />
 
-			<div className='grid gap-4 md:grid-cols-2'>
-				<Card className='col-span-1'>
+			<div className='grid gap-4 lg:grid-cols-2'>
+				<Card>
 					<CardHeader>
-						<CardTitle>{t('dashboard.allocation')}</CardTitle>
+						<CardTitle className='text-base font-semibold'>{t('dashboard.allocation')}</CardTitle>
 					</CardHeader>
 					<CardContent className='h-[300px]'>
-						{metrics.allocation.length > 0 ? (
-							<InvestmentAllocationChart
-								data={metrics.allocation}
-								totalValue={metrics.totalValue}
-								isDark={theme === 'dark'}
-								nivoTheme={nivoTheme}
-								formatValue={money}
-							/>
-						) : (
-							<div className='h-full flex items-center justify-center text-muted-foreground'>
-								{t('dashboard.noData')}
+						{isLoading ? (
+							<Skeleton className='h-full w-full' />
+						) : allocationData.length > 0 ? (
+							<div role='img' aria-label={t('dashboard.allocationAria')} className='h-full w-full'>
+								<InvestmentAllocationChart
+									data={allocationData}
+									totalValue={metrics.totalValue}
+									formatValue={formatPortfolioValue}
+								/>
 							</div>
+						) : (
+							<EmptyState compact icon={PieChart} title={t('dashboard.noData')} className='h-full' />
 						)}
 					</CardContent>
 				</Card>
 
-				<Card className='col-span-1'>
+				<Card>
 					<CardHeader>
-						<CardTitle>{t('dashboard.growth')}</CardTitle>
+						<CardTitle className='text-base font-semibold'>{t('dashboard.growth')}</CardTitle>
 					</CardHeader>
 					<CardContent className='h-[300px]'>
-						{metrics.history.length > 0 ? (
-							<AreaTrendChart
-								points={growthPoints}
-								color='#2563eb'
-								seriesLabel={t('dashboard.value')}
-								formatValue={money}
-							/>
-						) : (
-							<div className='h-full flex items-center justify-center text-muted-foreground'>
-								{t('dashboard.noHistory')}
+						{isLoading ? (
+							<Skeleton className='h-full w-full' />
+						) : growthPoints.length > 0 ? (
+							<div role='img' aria-label={t('dashboard.growthAria')} className='h-full w-full'>
+								<AreaTrendChart
+									points={growthPoints}
+									color={colors.series[0]}
+									seriesLabel={t('dashboard.value')}
+									formatValue={formatPortfolioValue}
+								/>
 							</div>
+						) : (
+							<EmptyState compact icon={LineChart} title={t('dashboard.noHistory')} className='h-full' />
 						)}
 					</CardContent>
 				</Card>
 			</div>
 		</div>
 	)
+}
+
+function orderOf(type: string) {
+	const index = TYPE_ORDER.indexOf(type)
+	return index === -1 ? TYPE_ORDER.length : index
 }

@@ -85,16 +85,16 @@ export function DocumentUploader({
 	return (
 		<div className='space-y-4'>
 			<div
-				{...getRootProps()}
+				{...getRootProps({ role: 'button', 'aria-label': t('dragOrClick'), 'aria-disabled': disabled || undefined })}
 				className={cn(
-					'border-2 border-dashed rounded-lg p-8 text-center cursor-pointer transition-colors',
-					isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25',
-					disabled && 'opacity-50 cursor-not-allowed',
+					'cursor-pointer rounded-lg border-2 border-dashed p-6 text-center transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:p-8',
+					isDragActive ? 'border-primary bg-primary/5' : 'border-muted-foreground/25 hover:border-muted-foreground/50',
+					disabled && 'cursor-not-allowed opacity-50',
 					error && 'border-destructive',
 				)}
 			>
 				<input {...getInputProps()} />
-				<Upload className='mx-auto h-12 w-12 text-muted-foreground mb-4' />
+				<Upload className='mx-auto mb-3 h-10 w-10 text-muted-foreground' aria-hidden='true' />
 				{isDragActive ? (
 					<p className='text-sm text-muted-foreground'>{t('dropFiles')}</p>
 				) : (
@@ -108,8 +108,8 @@ export function DocumentUploader({
 			</div>
 
 			{error && (
-				<div className='flex items-center gap-2 text-destructive text-sm'>
-					<AlertCircle className='h-4 w-4' />
+				<div role='alert' className='flex items-center gap-2 text-sm text-destructive'>
+					<AlertCircle className='h-4 w-4 shrink-0' aria-hidden='true' />
 					{error}
 				</div>
 			)}
@@ -118,7 +118,7 @@ export function DocumentUploader({
 				<div className='space-y-2'>
 					<div className='flex items-center justify-between'>
 						<span className='text-sm text-muted-foreground'>{t('filesSelected', { count: files.length })}</span>
-						<Button variant='ghost' size='sm' onClick={clearFiles}>
+						<Button type='button' variant='ghost' size='sm' onClick={clearFiles}>
 							{t('clearAll')}
 						</Button>
 					</div>
@@ -126,17 +126,25 @@ export function DocumentUploader({
 						{files.map((file, index) => (
 							<div
 								key={`${file.name}-${file.size}`}
-								className='flex items-center justify-between p-3 bg-muted rounded-lg'
+								className='flex items-center justify-between gap-2 rounded-lg bg-muted p-3 pr-1'
 							>
-								<div className='flex items-center gap-2'>
-									<FileText className='h-4 w-4 text-muted-foreground' />
-									<div>
-										<p className='text-sm font-medium'>{file.name}</p>
-										<p className='text-xs text-muted-foreground'>{(file.size / 1024).toFixed(1)} KB</p>
+								<div className='flex min-w-0 items-center gap-2'>
+									<FileText className='h-4 w-4 shrink-0 text-muted-foreground' aria-hidden='true' />
+									<div className='min-w-0'>
+										<p className='truncate text-sm font-medium'>{file.name}</p>
+										<p className='text-xs text-muted-foreground tabular-nums'>{(file.size / 1024).toFixed(1)} KB</p>
 									</div>
 								</div>
-								<Button variant='ghost' size='icon' onClick={() => removeFile(index)} disabled={disabled}>
-									<X className='h-4 w-4' />
+								<Button
+									type='button'
+									variant='ghost'
+									size='icon'
+									className='shrink-0'
+									onClick={() => removeFile(index)}
+									disabled={disabled}
+									aria-label={t('removeFile', { name: file.name })}
+								>
+									<X className='h-4 w-4' aria-hidden='true' />
 								</Button>
 							</div>
 						))}

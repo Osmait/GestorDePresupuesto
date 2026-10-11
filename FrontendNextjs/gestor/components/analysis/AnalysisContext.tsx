@@ -3,10 +3,6 @@
 import { createContext, ReactNode, useContext, useState } from 'react'
 import { DateRange } from 'react-day-picker'
 
-const now = new Date()
-const defaultMonth = String(now.getMonth() + 1).padStart(2, '0')
-const defaultYear = String(now.getFullYear())
-
 export interface AnalysisFiltersState {
 	filterMode: 'month' | 'range'
 	month: string
@@ -25,13 +21,12 @@ interface AnalysisContextType {
 	setFilters: React.Dispatch<React.SetStateAction<AnalysisFiltersState>>
 }
 
-const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined)
-
-export function AnalysisProvider({ children }: { children: ReactNode }) {
-	const [filters, setFilters] = useState<AnalysisFiltersState>({
+/** Filters on first load and after "Clear filters": the current month, everything else unfiltered. */
+export function createDefaultAnalysisFilters(now = new Date()): AnalysisFiltersState {
+	return {
 		filterMode: 'month',
-		month: defaultMonth,
-		year: defaultYear,
+		month: String(now.getMonth() + 1).padStart(2, '0'),
+		year: String(now.getFullYear()),
 		dateRange: { from: undefined, to: undefined },
 		account: 'all',
 		category: 'all',
@@ -39,7 +34,13 @@ export function AnalysisProvider({ children }: { children: ReactNode }) {
 		minAmount: '',
 		maxAmount: '',
 		search: '',
-	})
+	}
+}
+
+const AnalysisContext = createContext<AnalysisContextType | undefined>(undefined)
+
+export function AnalysisProvider({ children }: { children: ReactNode }) {
+	const [filters, setFilters] = useState<AnalysisFiltersState>(() => createDefaultAnalysisFilters())
 
 	return <AnalysisContext.Provider value={{ filters, setFilters }}>{children}</AnalysisContext.Provider>
 }

@@ -8,6 +8,7 @@ import {
 	Key,
 	Layout,
 	Lock,
+	type LucideIcon,
 	Mail,
 	Palette,
 	Shield,
@@ -16,7 +17,7 @@ import {
 } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import { useLocale, useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { ModeToggle } from '@/components/common/ToggleMode'
 import { APIKeysSection } from '@/components/settings/APIKeysSection'
 import { PasskeyManager } from '@/components/settings/PasskeyManager'
@@ -25,10 +26,12 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
-import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Switch } from '@/components/ui/switch'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useSettings } from '@/contexts'
+import { BREAKPOINTS, useMediaQuery } from '@/hooks/useMediaQuery'
+import { switchLocale } from '@/lib/i18n/switch-locale'
 import { cn } from '@/lib/utils'
 
 /**
@@ -41,7 +44,7 @@ interface SettingsModalProps {
 
 type SettingsTab = 'general' | 'security' | 'notifications' | 'data' | 'apikeys'
 
-const sidebarNavItems: { id: SettingsTab; icon: typeof User }[] = [
+const sidebarNavItems: { id: SettingsTab; icon: LucideIcon }[] = [
 	{ id: 'general', icon: User },
 	{ id: 'security', icon: Shield },
 	{ id: 'notifications', icon: Bell },
@@ -49,8 +52,72 @@ const sidebarNavItems: { id: SettingsTab; icon: typeof User }[] = [
 	{ id: 'apikeys', icon: Key },
 ]
 
+function SettingsSection({
+	title,
+	description,
+	children,
+}: {
+	title: string
+	description: string
+	children: ReactNode
+}) {
+	return (
+		<section>
+			<h3 className='text-lg font-medium'>{title}</h3>
+			<p className='text-sm text-muted-foreground'>{description}</p>
+			<Separator className='my-4' />
+			<div className='space-y-4'>{children}</div>
+		</section>
+	)
+}
+
+interface SettingRowProps {
+	/** Base id: the title gets `${id}-label`, the description `${id}-desc`. */
+	id: string
+	icon?: LucideIcon
+	title: ReactNode
+	description: ReactNode
+	/** id of a form control (Switch) the title labels; otherwise the title is plain text that controls reference. */
+	controlId?: string
+	danger?: boolean
+	children: ReactNode
+}
+
+/** One setting: title + description on the left, its control on the right (under it on mobile). */
+function SettingRow({ id, icon: Icon, title, description, controlId, danger = false, children }: SettingRowProps) {
+	const titleClass = cn('text-sm font-medium leading-none', danger && 'text-destructive')
+	return (
+		<div
+			className={cn(
+				'flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between',
+				danger && 'border-destructive/40 bg-destructive/5',
+			)}
+		>
+			<div className='min-w-0 space-y-1'>
+				<div className='flex items-center gap-2'>
+					{Icon ? <Icon className='h-4 w-4 shrink-0 text-muted-foreground' aria-hidden='true' /> : null}
+					{controlId ? (
+						<Label id={`${id}-label`} htmlFor={controlId} className={titleClass}>
+							{title}
+						</Label>
+					) : (
+						<p id={`${id}-label`} className={titleClass}>
+							{title}
+						</p>
+					)}
+				</div>
+				<p id={`${id}-desc`} className='max-w-prose text-sm text-muted-foreground'>
+					{description}
+				</p>
+			</div>
+			<div className='flex shrink-0 items-center gap-2'>{children}</div>
+		</div>
+	)
+}
+
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 	const [activeTab, setActiveTab] = useState<SettingsTab>('general')
+	const isDesktop = useMediaQuery(BREAKPOINTS.md)
 	const { data: session } = useSession()
 	const locale = useLocale()
 	const t = useTranslations('settingsModal')
@@ -68,302 +135,227 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 		return initials.toUpperCase() || 'U'
 	}
 
-	const switchLocale = (newLocale: string) => {
-		document.cookie = `locale=${newLocale}; path=/; max-age=31536000`
-		window.location.reload()
-	}
+	const notificationRows = [
+		{ key: 'email', icon: Mail },
+		{ key: 'push', icon: Bell },
+		{ key: 'sms', icon: Smartphone },
+	] as const
 
 	return (
 		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className='max-w-4xl h-[80vh] p-0 gap-0 overflow-hidden'>
-				<div className='flex h-full'>
-					{/* Sidebar */}
-					<div className='w-64 border-r bg-muted/30 flex flex-col'>
-						<DialogHeader className='p-6 pb-4 border-b'>
+			<DialogContent className='flex h-[100dvh] max-h-[100dvh] max-w-4xl flex-col gap-0 overflow-hidden p-0 sm:h-[80vh] sm:max-h-[80vh]'>
+				<Tabs
+					value={activeTab}
+					onValueChange={(value) => setActiveTab(value as SettingsTab)}
+					orientation={isDesktop ? 'vertical' : 'horizontal'}
+					className='flex min-h-0 flex-1 flex-col md:flex-row'
+				>
+					{/* Section nav: a scrollable tab row on mobile, a sidebar from md up */}
+					<div className='flex shrink-0 flex-col border-b bg-muted/30 md:w-64 md:border-r md:border-b-0'>
+						<DialogHeader className='p-4 pr-12 text-left md:border-b md:p-6 md:pb-4'>
 							<DialogTitle>{t('title')}</DialogTitle>
 						</DialogHeader>
-						<ScrollArea className='flex-1 py-4'>
-							<nav className='grid gap-1 px-4'>
-								{sidebarNavItems.map((item) => (
-									<Button
-										key={item.id}
-										variant={activeTab === item.id ? 'secondary' : 'ghost'}
-										className={cn('justify-start gap-3', activeTab === item.id && 'bg-muted')}
-										onClick={() => setActiveTab(item.id)}
-									>
-										<item.icon className='h-4 w-4' />
-										{t(`tabs.${item.id}`)}
-									</Button>
-								))}
-							</nav>
-						</ScrollArea>
-						<div className='p-4 border-t'>
+						<TabsList
+							aria-label={t('title')}
+							className='flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none bg-transparent px-2 pb-2 md:flex-1 md:flex-col md:items-stretch md:justify-start md:overflow-y-auto md:px-4 md:py-4'
+						>
+							{sidebarNavItems.map((item) => (
+								<TabsTrigger
+									key={item.id}
+									value={item.id}
+									className='h-10 shrink-0 justify-start gap-3 rounded-md px-3 text-muted-foreground hover:bg-muted hover:text-foreground data-[state=active]:bg-muted data-[state=active]:text-foreground data-[state=active]:shadow-none'
+								>
+									<item.icon className='h-4 w-4' aria-hidden='true' />
+									{t(`tabs.${item.id}`)}
+								</TabsTrigger>
+							))}
+						</TabsList>
+						<div className='hidden border-t p-4 md:block'>
 							<div className='flex items-center gap-3'>
 								<Avatar className='h-9 w-9'>
-									<AvatarImage src={session?.user.image || ''} />
-									<AvatarFallback className='bg-primary text-primary-foreground text-xs'>
+									<AvatarImage src={session?.user.image || ''} alt='' />
+									<AvatarFallback className='bg-primary text-xs text-primary-foreground'>
 										{getInitials(session?.user.name || '', session?.user.lastName)}
 									</AvatarFallback>
 								</Avatar>
-								<div className='grid gap-0.5 text-xs'>
-									<span className='font-medium truncate max-w-[120px]'>{session?.user.name}</span>
-									<span className='text-muted-foreground truncate max-w-[120px]'>{session?.user.email}</span>
+								<div className='grid min-w-0 gap-0.5 text-xs'>
+									<span className='truncate font-medium'>{session?.user.name}</span>
+									<span className='truncate text-muted-foreground'>{session?.user.email}</span>
 								</div>
 							</div>
 						</div>
 					</div>
 
 					{/* Content */}
-					<div className='flex-1 flex flex-col bg-background h-full overflow-hidden'>
-						<ScrollArea className='flex-1'>
-							<div className='p-8 max-w-2xl mx-auto space-y-8 pb-20'>
-								{activeTab === 'general' && (
-									<div className='space-y-8 animate-in fade-in-50 duration-300'>
-										<div>
-											<h3 className='text-lg font-medium'>{t('profile.title')}</h3>
-											<p className='text-sm text-muted-foreground'>{t('profile.description')}</p>
-											<Separator className='my-4' />
-											<div className='space-y-4'>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<Label>{t('profile.fullName')}</Label>
-														<p className='text-sm text-muted-foreground'>
-															{session?.user.name} {session?.user.lastName}
-														</p>
-													</div>
-													<Button variant='outline' size='sm'>
-														{t('actions.edit')}
-													</Button>
-												</div>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<Label>{t('profile.email')}</Label>
-														<p className='text-sm text-muted-foreground'>{session?.user.email}</p>
-													</div>
-													<Button variant='outline' size='sm'>
-														{t('actions.change')}
-													</Button>
-												</div>
-											</div>
-										</div>
+					<div className='min-h-0 flex-1 overflow-y-auto bg-background'>
+						<div className='mx-auto max-w-2xl p-4 pb-12 sm:p-6 md:p-8'>
+							<TabsContent value='general' className='mt-0 space-y-8'>
+								<SettingsSection title={t('profile.title')} description={t('profile.description')}>
+									<SettingRow
+										id='setting-full-name'
+										title={t('profile.fullName')}
+										description={`${session?.user.name ?? ''} ${session?.user.lastName ?? ''}`.trim()}
+									>
+										<Button variant='outline' size='sm' aria-describedby='setting-full-name-label'>
+											{t('actions.edit')}
+										</Button>
+									</SettingRow>
+									<SettingRow id='setting-email' title={t('profile.email')} description={session?.user.email}>
+										<Button variant='outline' size='sm' aria-describedby='setting-email-label'>
+											{t('actions.change')}
+										</Button>
+									</SettingRow>
+								</SettingsSection>
 
-										<div>
-											<h3 className='text-lg font-medium'>{t('appearance.title')}</h3>
-											<p className='text-sm text-muted-foreground'>{t('appearance.description')}</p>
-											<Separator className='my-4' />
-											<div className='space-y-4'>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<div className='flex items-center gap-2'>
-															<Palette className='h-4 w-4' />
-															<Label>{t('appearance.theme')}</Label>
-														</div>
-														<p className='text-sm text-muted-foreground'>{t('appearance.themeDescription')}</p>
-													</div>
-													<ModeToggle />
-												</div>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<div className='flex items-center gap-2'>
-															<Globe className='h-4 w-4' />
-															<Label>{t('appearance.language')}</Label>
-														</div>
-														<p className='text-sm text-muted-foreground'>{t('appearance.languageDescription')}</p>
-													</div>
-													<div className='flex gap-2'>
-														<Button
-															variant={locale === 'es' ? 'default' : 'outline'}
-															size='sm'
-															onClick={() => switchLocale('es')}
-														>
-															{tCommon('language.es')}
-														</Button>
-														<Button
-															variant={locale === 'en' ? 'default' : 'outline'}
-															size='sm'
-															onClick={() => switchLocale('en')}
-														>
-															{tCommon('language.en')}
-														</Button>
-													</div>
-												</div>
-											</div>
-										</div>
+								<SettingsSection title={t('appearance.title')} description={t('appearance.description')}>
+									<SettingRow
+										id='setting-theme'
+										icon={Palette}
+										title={t('appearance.theme')}
+										description={t('appearance.themeDescription')}
+									>
+										<fieldset aria-labelledby='setting-theme-label' className='min-w-0'>
+											<ModeToggle />
+										</fieldset>
+									</SettingRow>
+									<SettingRow
+										id='setting-language'
+										icon={Globe}
+										title={t('appearance.language')}
+										description={t('appearance.languageDescription')}
+									>
+										<fieldset aria-labelledby='setting-language-label' className='flex min-w-0 gap-2'>
+											<Button
+												variant={locale === 'es' ? 'default' : 'outline'}
+												size='sm'
+												aria-pressed={locale === 'es'}
+												onClick={() => switchLocale('es')}
+											>
+												{tCommon('language.es')}
+											</Button>
+											<Button
+												variant={locale === 'en' ? 'default' : 'outline'}
+												size='sm'
+												aria-pressed={locale === 'en'}
+												onClick={() => switchLocale('en')}
+											>
+												{tCommon('language.en')}
+											</Button>
+										</fieldset>
+									</SettingRow>
+								</SettingsSection>
 
-										<div>
-											<h3 className='text-lg font-medium'>{t('navigation.title')}</h3>
-											<p className='text-sm text-muted-foreground'>{t('navigation.description')}</p>
-											<Separator className='my-4' />
-											<div className='flex items-center justify-between p-4 border rounded-lg'>
-												<div className='space-y-1'>
-													<div className='flex items-center gap-2'>
-														<Layout className='h-4 w-4' />
-														<Label htmlFor='sidebar-hover'>{t('navigation.sidebarHover')}</Label>
-													</div>
-													<p className='text-sm text-muted-foreground max-w-[300px]'>
-														{t('navigation.sidebarHoverDescription')}
-													</p>
-												</div>
-												<Switch
-													id='sidebar-hover'
-													checked={sidebarHoverEnabled}
-													onCheckedChange={setSidebarHoverEnabled}
-												/>
-											</div>
-										</div>
-									</div>
-								)}
+								<SettingsSection title={t('navigation.title')} description={t('navigation.description')}>
+									<SettingRow
+										id='setting-sidebar-hover'
+										icon={Layout}
+										title={t('navigation.sidebarHover')}
+										description={t('navigation.sidebarHoverDescription')}
+										controlId='sidebar-hover'
+									>
+										<Switch
+											id='sidebar-hover'
+											aria-describedby='setting-sidebar-hover-desc'
+											checked={sidebarHoverEnabled}
+											onCheckedChange={setSidebarHoverEnabled}
+										/>
+									</SettingRow>
+								</SettingsSection>
+							</TabsContent>
 
-								{activeTab === 'security' && (
-									<div className='space-y-8 animate-in fade-in-50 duration-300'>
-										<div>
-											<h3 className='text-lg font-medium'>{t('security.title')}</h3>
-											<p className='text-sm text-muted-foreground'>{t('security.description')}</p>
-											<Separator className='my-4' />
-											<div className='space-y-4'>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<div className='flex items-center gap-2'>
-															<Lock className='h-4 w-4' />
-															<Label>{t('security.password')}</Label>
-														</div>
-														<p className='text-sm text-muted-foreground'>{t('security.passwordUpdated')}</p>
-													</div>
-													<Button variant='outline' size='sm'>
-														{t('actions.change')}
-													</Button>
-												</div>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<div className='flex items-center gap-2'>
-															<Shield className='h-4 w-4' />
-															<Label>{t('security.twoFactor')}</Label>
-														</div>
-														<p className='text-sm text-muted-foreground'>{t('security.twoFactorDescription')}</p>
-													</div>
-													<Badge variant='outline' className='text-green-500 border-green-500'>
-														{t('security.enabled')}
-													</Badge>
-												</div>
-											</div>
-										</div>
+							<TabsContent value='security' className='mt-0 space-y-8'>
+								<SettingsSection title={t('security.title')} description={t('security.description')}>
+									<SettingRow
+										id='setting-password'
+										icon={Lock}
+										title={t('security.password')}
+										description={t('security.passwordUpdated')}
+									>
+										<Button variant='outline' size='sm' aria-describedby='setting-password-label'>
+											{t('actions.change')}
+										</Button>
+									</SettingRow>
+									<SettingRow
+										id='setting-two-factor'
+										icon={Shield}
+										title={t('security.twoFactor')}
+										description={t('security.twoFactorDescription')}
+									>
+										<Badge variant='outline' className='border-success/50 text-success'>
+											{t('security.enabled')}
+										</Badge>
+									</SettingRow>
+								</SettingsSection>
 
-										<div>
-											<h3 className='text-lg font-medium'>{t('devices.title')}</h3>
-											<p className='text-sm text-muted-foreground'>{t('devices.description')}</p>
-											<Separator className='my-4' />
-											<div className='flex items-center justify-between p-4 border rounded-lg'>
-												<div className='space-y-1'>
-													<div className='flex items-center gap-2'>
-														<Smartphone className='h-4 w-4' />
-														<Label>{t('devices.activeSessions')}</Label>
-													</div>
-													<p className='text-sm text-muted-foreground'>{t('devices.activeSessionsDescription')}</p>
-												</div>
-												<Button variant='outline' size='sm'>
-													{t('actions.manage')}
-												</Button>
-											</div>
-										</div>
+								<SettingsSection title={t('devices.title')} description={t('devices.description')}>
+									<SettingRow
+										id='setting-sessions'
+										icon={Smartphone}
+										title={t('devices.activeSessions')}
+										description={t('devices.activeSessionsDescription')}
+									>
+										<Button variant='outline' size='sm' aria-describedby='setting-sessions-label'>
+											{t('actions.manage')}
+										</Button>
+									</SettingRow>
+								</SettingsSection>
 
-										<PasskeyManager />
-									</div>
-								)}
+								<PasskeyManager />
+							</TabsContent>
 
-								{activeTab === 'notifications' && (
-									<div className='space-y-8 animate-in fade-in-50 duration-300'>
-										<div>
-											<h3 className='text-lg font-medium'>{t('notifications.title')}</h3>
-											<p className='text-sm text-muted-foreground'>{t('notifications.description')}</p>
-											<Separator className='my-4' />
-											<div className='grid gap-4'>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<div className='flex items-center gap-2'>
-															<Mail className='h-4 w-4' />
-															<Label htmlFor='email-notif'>{t('notifications.email')}</Label>
-														</div>
-														<p className='text-sm text-muted-foreground'>{t('notifications.emailDescription')}</p>
-													</div>
-													<Switch
-														id='email-notif'
-														checked={notifications.email}
-														onCheckedChange={(c) => setNotifications({ ...notifications, email: c })}
-													/>
-												</div>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<div className='flex items-center gap-2'>
-															<Bell className='h-4 w-4' />
-															<Label htmlFor='push-notif'>{t('notifications.push')}</Label>
-														</div>
-														<p className='text-sm text-muted-foreground'>{t('notifications.pushDescription')}</p>
-													</div>
-													<Switch
-														id='push-notif'
-														checked={notifications.push}
-														onCheckedChange={(c) => setNotifications({ ...notifications, push: c })}
-													/>
-												</div>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<div className='flex items-center gap-2'>
-															<Smartphone className='h-4 w-4' />
-															<Label htmlFor='sms-notif'>{t('notifications.sms')}</Label>
-														</div>
-														<p className='text-sm text-muted-foreground'>{t('notifications.smsDescription')}</p>
-													</div>
-													<Switch
-														id='sms-notif'
-														checked={notifications.sms}
-														onCheckedChange={(c) => setNotifications({ ...notifications, sms: c })}
-													/>
-												</div>
-											</div>
-										</div>
-									</div>
-								)}
+							<TabsContent value='notifications' className='mt-0 space-y-8'>
+								<SettingsSection title={t('notifications.title')} description={t('notifications.description')}>
+									{notificationRows.map(({ key, icon }) => (
+										<SettingRow
+											key={key}
+											id={`setting-${key}-notif`}
+											icon={icon}
+											title={t(`notifications.${key}`)}
+											description={t(`notifications.${key}Description`)}
+											controlId={`${key}-notif`}
+										>
+											<Switch
+												id={`${key}-notif`}
+												aria-describedby={`setting-${key}-notif-desc`}
+												checked={notifications[key]}
+												onCheckedChange={(checked) => setNotifications({ ...notifications, [key]: checked })}
+											/>
+										</SettingRow>
+									))}
+								</SettingsSection>
+							</TabsContent>
 
-								{activeTab === 'data' && (
-									<div className='space-y-8 animate-in fade-in-50 duration-300'>
-										<div>
-											<h3 className='text-lg font-medium'>{t('data.title')}</h3>
-											<p className='text-sm text-muted-foreground'>{t('data.description')}</p>
-											<Separator className='my-4' />
-											<div className='space-y-4'>
-												<div className='flex items-center justify-between p-4 border rounded-lg'>
-													<div className='space-y-1'>
-														<div className='flex items-center gap-2'>
-															<Download className='h-4 w-4' />
-															<Label>{t('data.export')}</Label>
-														</div>
-														<p className='text-sm text-muted-foreground'>{t('data.exportDescription')}</p>
-													</div>
-													<Button variant='outline' size='sm'>
-														{t('actions.exportCsv')}
-													</Button>
-												</div>
-												<div className='flex items-center justify-between p-4 border rounded-lg border-red-200 bg-red-50 dark:bg-red-900/10 dark:border-red-900/50'>
-													<div className='space-y-1'>
-														<Label className='text-red-600 dark:text-red-400'>{t('data.dangerZone')}</Label>
-														<p className='text-sm text-red-600/80 dark:text-red-400/80'>
-															{t('data.dangerZoneDescription')}
-														</p>
-													</div>
-													<Button variant='destructive' size='sm'>
-														{t('actions.deleteAccount')}
-													</Button>
-												</div>
-											</div>
-										</div>
-									</div>
-								)}
+							<TabsContent value='data' className='mt-0 space-y-8'>
+								<SettingsSection title={t('data.title')} description={t('data.description')}>
+									<SettingRow
+										id='setting-export'
+										icon={Download}
+										title={t('data.export')}
+										description={t('data.exportDescription')}
+									>
+										<Button variant='outline' size='sm' aria-describedby='setting-export-label'>
+											{t('actions.exportCsv')}
+										</Button>
+									</SettingRow>
+									<SettingRow
+										id='setting-danger'
+										title={t('data.dangerZone')}
+										description={t('data.dangerZoneDescription')}
+										danger
+									>
+										<Button variant='destructive' size='sm' aria-describedby='setting-danger-desc'>
+											{t('actions.deleteAccount')}
+										</Button>
+									</SettingRow>
+								</SettingsSection>
+							</TabsContent>
 
-								{activeTab === 'apikeys' && <APIKeysSection />}
-							</div>
-						</ScrollArea>
+							<TabsContent value='apikeys' className='mt-0'>
+								<APIKeysSection />
+							</TabsContent>
+						</div>
 					</div>
-				</div>
+				</Tabs>
 			</DialogContent>
 		</Dialog>
 	)

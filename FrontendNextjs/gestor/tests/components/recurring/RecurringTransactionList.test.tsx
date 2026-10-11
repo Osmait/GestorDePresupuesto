@@ -1,7 +1,10 @@
-import { screen } from '@testing-library/react'
+import { screen, waitFor, within } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
 import { RecurringTransactionList } from '@/components/recurring/RecurringTransactionList'
 import { renderWithIntl } from '@/tests/utils/intl'
+
+const { deleteRecurring } = vi.hoisted(() => ({ deleteRecurring: vi.fn().mockResolvedValue(undefined) }))
 
 // Mock context
 vi.mock('@/components/recurring/RecurringTransactionContext', () => ({
@@ -46,7 +49,7 @@ vi.mock('@/hooks/queries/useRecurringTransactionsQuery', () => ({
 		isLoading: false,
 	}),
 	useDeleteRecurringTransactionMutation: () => ({
-		mutate: vi.fn(),
+		mutateAsync: deleteRecurring,
 	}),
 }))
 
@@ -57,9 +60,9 @@ describe('RecurringTransactionList', () => {
 		expect(screen.getByText('Netflix Subscription')).toBeInTheDocument()
 		expect(screen.getByText('Salary')).toBeInTheDocument()
 
-		// Amounts use the account currency with two decimals
-		expect(screen.getByText('US$15.99')).toBeInTheDocument()
-		expect(screen.getByText('RD$5,000.00')).toBeInTheDocument()
+		// Amounts use the account currency with two decimals; bills are negative
+		expect(screen.getByText('-US$15.99')).toHaveAttribute('data-tone', 'negative')
+		expect(screen.getByText('RD$5,000.00')).toHaveAttribute('data-tone', 'positive')
 
 		expect(screen.getByText('Day 15 of every month')).toBeInTheDocument()
 		expect(screen.getByText('Last run: Jan 15, 2024')).toBeInTheDocument()
@@ -70,6 +73,22 @@ describe('RecurringTransactionList', () => {
 
 		expect(screen.getByText('Día 1 de cada mes')).toBeInTheDocument()
 		expect(screen.getByText(/^Última ejecución: 15 ene/)).toBeInTheDocument()
+	})
+
+	it('confirms a delete in a dialog (not window.confirm) before deleting', async () => {
+		const confirmSpy = vi.spyOn(window, 'confirm')
+		const user = userEvent.setup()
+		renderWithIntl(<RecurringTransactionList />)
+
+		await user.click(screen.getByRole('button', { name: 'Actions for Netflix Subscription' }))
+		await user.click(await screen.findByRole('menuitem', { name: /Delete/ }))
+		const dialog = await screen.findByRole('alertdialog')
+		expect(dialog).toHaveTextContent('Netflix Subscription')
+		expect(deleteRecurring).not.toHaveBeenCalled()
+
+		await user.click(within(dialog).getByRole('button', { name: 'Delete' }))
+		await waitFor(() => expect(deleteRecurring).toHaveBeenCalledWith('rt1'))
+		expect(confirmSpy).not.toHaveBeenCalled()
 	})
 
 	it('shows empty state when no transactions', () => {

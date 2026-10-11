@@ -1,21 +1,15 @@
 import { ArrowDownRight, ArrowUpRight, Calendar, Edit, MoreHorizontal, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { memo, useContext, useState } from 'react'
+import { toast } from 'sonner'
+import { Amount } from '@/components/shared/Amount'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { getSignedAmount, isInflowTransaction } from '@/lib/transaction-utils'
-import { formatCurrency } from '@/lib/utils'
 import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { TransactionActionsContext } from './TransactionContext'
@@ -32,6 +26,7 @@ const stopPropagation = (event: { stopPropagation: () => void }) => event.stopPr
 
 function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, onOpenDetails }: TransactionItemProps) {
 	const t = useTranslations('transactions')
+	const tCommon = useTranslations('common')
 	const locale = useAppLocale()
 	// Only the stable callbacks: rows must not re-render when the list data or the filters change.
 	const actions = useContext(TransactionActionsContext)
@@ -44,7 +39,6 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 	const [menuMounted, setMenuMounted] = useState(false)
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 	const [deleteDialogMounted, setDeleteDialogMounted] = useState(false)
-	const [isDeleting, setIsDeleting] = useState(false)
 
 	const isIncome = isInflowTransaction(transaction.type_transation)
 	const canEdit = Boolean(onEdit || (setEditingTransaction && setModalOpen))
@@ -73,36 +67,34 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 
 	const loanMovementLabel = getLoanMovementLabel()
 
+	// Returning the promise keeps the dialog open with a spinner until it settles;
+	// on failure it stays open and the toast explains why.
 	const handleDeleteTransaction = async () => {
 		if (!transaction.id || !onTransactionDeleted) return
-
-		setIsDeleting(true)
 		try {
 			await onTransactionDeleted()
-			setShowDeleteDialog(false)
 		} catch (error) {
-			console.error('Error deleting transaction:', error)
-		} finally {
-			setIsDeleting(false)
+			toast.error(t('deleteError'))
+			throw error
 		}
 	}
 
 	return (
 		<>
 			<Card
-				className='hover:bg-accent/40 dark:hover:bg-accent/40 transition-colors duration-300 border-border/50 dark:border-border/20 cursor-pointer'
+				className='cursor-pointer transition-colors hover:bg-muted/40'
 				onClick={() => onOpenDetails?.(transaction)}
 				data-testid='transaction-card'
 			>
 				<CardContent className='p-4 sm:p-6'>
 					<div className='flex items-start gap-3 sm:items-center sm:gap-4'>
 						<div
-							className={`shrink-0 p-2 sm:p-3 rounded-full ${isIncome ? 'bg-green-100 dark:bg-green-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}
+							className={`shrink-0 rounded-full p-2 sm:p-3 ${isIncome ? 'bg-success/10 text-success' : 'bg-destructive/10 text-destructive'}`}
 						>
 							{isIncome ? (
-								<ArrowUpRight className='h-5 w-5 text-green-600 dark:text-green-400' aria-hidden='true' />
+								<ArrowUpRight className='h-5 w-5' aria-hidden='true' />
 							) : (
-								<ArrowDownRight className='h-5 w-5 text-red-600 dark:text-red-400' aria-hidden='true' />
+								<ArrowDownRight className='h-5 w-5' aria-hidden='true' />
 							)}
 						</div>
 						<div className='min-w-0 flex-1'>
@@ -122,17 +114,20 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 									<p className='max-w-full truncate font-semibold text-foreground'>{transaction.name}</p>
 								)}
 								{loanMovementLabel && (
-									<Badge variant='secondary' className='text-[10px] font-medium'>
+									<Badge variant='secondary' className='text-xs font-medium'>
 										{loanMovementLabel}
 									</Badge>
 								)}
 								{category && (
-									<Badge
-										variant='outline'
-										className='max-w-full truncate text-xs'
-										style={{ backgroundColor: category.color }}
-									>
-										<span aria-hidden='true'>{getCategoryIcon(category.icon)}</span> {category.name}
+									<Badge variant='outline' className='max-w-full gap-1.5 truncate text-xs font-medium'>
+										{/* User-chosen color as a dot: text keeps the theme's contrast. */}
+										<span
+											aria-hidden='true'
+											className='h-2 w-2 shrink-0 rounded-full'
+											style={{ backgroundColor: category.color }}
+										/>
+										<span aria-hidden='true'>{getCategoryIcon(category.icon)}</span>
+										{category.name}
 									</Badge>
 								)}
 							</div>
@@ -153,14 +148,13 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 							</p>
 						</div>
 						<div className='flex shrink-0 items-start gap-1 sm:items-center sm:gap-4'>
-							<p
-								className={`whitespace-nowrap text-right font-bold tabular-nums text-base sm:text-xl ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-							>
-								{formatCurrency(getSignedAmount(transaction), transaction.currency, {
-									locale,
-									signDisplay: 'exceptZero',
-								})}
-							</p>
+							<Amount
+								value={getSignedAmount(transaction)}
+								currency={transaction.currency}
+								tone='auto'
+								signed
+								className='text-right text-base font-semibold sm:text-lg'
+							/>
 							<DropdownMenu
 								open={menuOpen}
 								onOpenChange={(open) => {
@@ -171,9 +165,9 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 								<DropdownMenuTrigger asChild>
 									<Button
 										variant='ghost'
-										size='sm'
-										className='h-8 w-8 shrink-0 p-0'
-										aria-label={t('options')}
+										size='icon'
+										className='shrink-0'
+										aria-label={tCommon('actions.rowMenu', { name: transaction.name })}
 										onClick={stopPropagation}
 									>
 										<MoreHorizontal className='h-4 w-4' aria-hidden='true' />
@@ -195,19 +189,19 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 													}
 												}}
 											>
-												<Edit className='h-4 w-4' />
+												<Edit className='h-4 w-4' aria-hidden='true' />
 												{t('edit')}
 											</DropdownMenuItem>
 										) : null}
 										<DropdownMenuItem
-											className='flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400'
+											className='flex cursor-pointer items-center gap-2 text-destructive focus:text-destructive'
 											onClick={(event) => {
 												event.stopPropagation()
 												setDeleteDialogMounted(true)
 												setShowDeleteDialog(true)
 											}}
 										>
-											<Trash2 className='h-4 w-4' />
+											<Trash2 className='h-4 w-4' aria-hidden='true' />
 											{t('delete')}
 										</DropdownMenuItem>
 									</DropdownMenuContent>
@@ -225,24 +219,14 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 			 * open the details of the transaction being deleted.
 			 */}
 			{deleteDialogMounted && (
-				<Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-					<DialogContent onClick={stopPropagation}>
-						<DialogHeader>
-							<DialogTitle>{t('deleteTitle')}</DialogTitle>
-							<DialogDescription>
-								{t('deleteDescription', { name: transaction.name?.trim() || transaction.description })}
-							</DialogDescription>
-						</DialogHeader>
-						<DialogFooter>
-							<Button variant='outline' onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
-								{t('cancel')}
-							</Button>
-							<Button variant='destructive' onClick={handleDeleteTransaction} disabled={isDeleting}>
-								{isDeleting ? t('deleting') : t('delete')}
-							</Button>
-						</DialogFooter>
-					</DialogContent>
-				</Dialog>
+				<ConfirmDialog
+					open={showDeleteDialog}
+					onOpenChange={setShowDeleteDialog}
+					title={t('deleteTitle')}
+					description={t('deleteDescription', { name: transaction.name?.trim() || transaction.description })}
+					destructive
+					onConfirm={handleDeleteTransaction}
+				/>
 			)}
 		</>
 	)

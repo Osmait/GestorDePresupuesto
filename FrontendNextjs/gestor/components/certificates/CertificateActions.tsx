@@ -9,19 +9,20 @@ interface CertificateActionsProps {
 	onOpenSimulator: () => void
 }
 
+/** Page-level actions for the certificates `PageHeader` (simulator, then the primary create button). */
 export function CertificateActions({ onAddNew, onOpenSimulator }: CertificateActionsProps) {
 	const t = useTranslations('certificates.actions')
 
 	return (
-		<div className='flex flex-wrap gap-2 sm:justify-end'>
+		<>
 			<Button variant='outline' onClick={onOpenSimulator}>
-				<Calculator className='h-4 w-4 mr-2' />
+				<Calculator className='mr-2 h-4 w-4' aria-hidden='true' />
 				{t('simulator')}
 			</Button>
 			<Button onClick={onAddNew}>
-				<Plus className='h-4 w-4 mr-2' />
+				<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
 				{t('newCertificate')}
 			</Button>
-		</div>
+		</>
 	)
 }

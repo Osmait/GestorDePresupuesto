@@ -23,7 +23,8 @@ test.describe('Account Detail @prod-write', () => {
 
 		// --- 5. Assert detail page content ---
 		await expect(page.getByRole('heading', { level: 1, name: accountName })).toBeVisible()
-		await expect(page.getByText('Volver a Cuentas')).toBeVisible()
+		// The back button is an icon link in the page header (accessible name only)
+		await expect(page.getByRole('link', { name: /^(Volver a Cuentas|Back to Accounts)$/ })).toBeVisible()
 		await expect(page.getByText('Detalles')).toBeVisible()
 
 		// --- 6. Assert the initial balance (5000) is displayed ---

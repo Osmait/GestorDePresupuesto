@@ -1,62 +1,37 @@
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { StatGridSkeleton } from '@/components/shared/StatGrid'
+import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 
+/** Mirrors CategoryList: three StatCards and the category card grid. */
 export function CategoriesSkeleton() {
 	return (
-		<div className='space-y-8'>
-			{/* Header Skeleton Removed - Server Side Rendered */}
-
-			{/* Summary Cards Skeleton */}
-			<div>
-				<Card>
-					<CardHeader>
-						<Skeleton className='h-6 w-48' />
-					</CardHeader>
-					<CardContent>
-						<div className='grid grid-cols-1 md:grid-cols-3 gap-4'>
-							{[1, 2, 3].map((i) => (
-								<Skeleton key={i} className='h-32 w-full rounded-lg' />
-							))}
-						</div>
-					</CardContent>
-				</Card>
-			</div>
-
-			{/* Tabs Skeleton */}
-			<div className='space-y-6'>
-				<div className='flex gap-2'>
-					<Skeleton className='h-10 w-24 rounded-full' />
-				</div>
-
-				{/* Categories Grid Skeleton */}
-				<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-					{[1, 2, 3, 4, 5, 6].map((i) => (
-						<Card key={i} className='relative'>
-							<CardContent className='p-6'>
-								<div className='flex items-center justify-between mb-4'>
-									<div className='flex items-center space-x-4'>
-										<Skeleton className='w-12 h-12 rounded-full' />
-										<div className='space-y-2'>
-											<Skeleton className='h-5 w-32' />
-											<Skeleton className='h-4 w-24' />
-										</div>
-									</div>
-									<div className='flex flex-col items-end space-y-2'>
-										<Skeleton className='h-6 w-20' />
-										<Skeleton className='h-3 w-10' />
+		<div className='space-y-6' aria-busy='true'>
+			<StatGridSkeleton count={3} />
+			<div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+				{['sk-1', 'sk-2', 'sk-3', 'sk-4', 'sk-5', 'sk-6'].map((key) => (
+					<Card key={key}>
+						<CardContent className='p-5'>
+							<div className='mb-4 flex items-start justify-between gap-2'>
+								<div className='flex items-center gap-3'>
+									<Skeleton className='h-10 w-10 rounded-full' />
+									<div className='space-y-2'>
+										<Skeleton className='h-5 w-32' />
+										<Skeleton className='h-4 w-24' />
 									</div>
 								</div>
-								<div className='flex items-center justify-between pt-3 border-t border-border/50'>
-									<div className='flex items-center gap-2'>
-										<Skeleton className='w-3 h-3 rounded-full' />
-										<Skeleton className='h-3 w-12' />
-									</div>
-									<Skeleton className='h-5 w-16 rounded-full' />
-								</div>
-							</CardContent>
-						</Card>
-					))}
-				</div>
+								<Skeleton className='h-10 w-10 rounded-md' />
+							</div>
+							<div className='flex items-center justify-between'>
+								<Skeleton className='h-5 w-20' />
+								<Skeleton className='h-7 w-28' />
+							</div>
+							<div className='mt-4 flex items-center justify-between border-t pt-3'>
+								<Skeleton className='h-4 w-40' />
+								<Skeleton className='h-5 w-16 rounded-full' />
+							</div>
+						</CardContent>
+					</Card>
+				))}
 			</div>
 		</div>
 	)

@@ -1,6 +1,5 @@
 'use client'
 
-import Cookies from 'js-cookie'
 import { Globe, LogOut, Settings, User } from 'lucide-react'
 import { signOut, useSession } from 'next-auth/react'
 import { useLocale, useTranslations } from 'next-intl'
@@ -17,6 +16,7 @@ import {
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { switchLocale } from '@/lib/i18n/switch-locale'
 
 /**
  * UserNav displays the user's avatar and a dropdown menu with profile actions.
@@ -31,7 +31,7 @@ export function UserNav() {
 	const [showSettings, setShowSettings] = useState(false)
 
 	if (status === 'loading') {
-		return <div className='h-8 w-8 rounded-full bg-muted animate-pulse' />
+		return <div className='h-10 w-10 animate-pulse rounded-full bg-muted' />
 	}
 
 	if (status === 'unauthenticated' || !session) {
@@ -47,16 +47,11 @@ export function UserNav() {
 		return initials.toUpperCase() || 'U'
 	}
 
-	const switchLocale = (newLocale: string) => {
-		Cookies.set('locale', newLocale, { path: '/', expires: 365 })
-		window.location.reload()
-	}
-
 	return (
 		<>
 			<DropdownMenu>
 				<DropdownMenuTrigger asChild>
-					<Button variant='ghost' className='relative h-8 w-8 rounded-full'>
+					<Button variant='ghost' className='relative h-10 w-10 rounded-full' aria-label={t('profile')}>
 						<Avatar className='h-8 w-8'>
 							<AvatarImage src={session.user.image || ''} alt={session.user.name || ''} />
 							<AvatarFallback className='bg-primary text-primary-foreground'>
@@ -91,7 +86,9 @@ export function UserNav() {
 								<Button
 									variant={locale === 'es' ? 'default' : 'outline'}
 									size='sm'
-									className='h-7 px-2 text-xs'
+									className='h-8 px-2 text-xs'
+									aria-pressed={locale === 'es'}
+									lang='es'
 									onClick={() => switchLocale('es')}
 								>
 									ES
@@ -99,7 +96,9 @@ export function UserNav() {
 								<Button
 									variant={locale === 'en' ? 'default' : 'outline'}
 									size='sm'
-									className='h-7 px-2 text-xs'
+									className='h-8 px-2 text-xs'
+									aria-pressed={locale === 'en'}
+									lang='en'
 									onClick={() => switchLocale('en')}
 								>
 									EN
@@ -109,16 +108,16 @@ export function UserNav() {
 					</div>
 					<DropdownMenuSeparator />
 					<DropdownMenuItem>
-						<User className='mr-2 h-4 w-4' />
+						<User className='mr-2 h-4 w-4' aria-hidden='true' />
 						<span>{t('profile')}</span>
 					</DropdownMenuItem>
 					<DropdownMenuItem onClick={() => setShowSettings(true)}>
-						<Settings className='mr-2 h-4 w-4' />
+						<Settings className='mr-2 h-4 w-4' aria-hidden='true' />
 						<span>{t('configuration')}</span>
 					</DropdownMenuItem>
 					<DropdownMenuSeparator />
 					<DropdownMenuItem onClick={handleSignOut}>
-						<LogOut className='mr-2 h-4 w-4' />
+						<LogOut className='mr-2 h-4 w-4' aria-hidden='true' />
 						<span>{t('logout')}</span>
 					</DropdownMenuItem>
 				</DropdownMenuContent>

@@ -62,7 +62,7 @@ test.describe('Credit Cards @prod-write', () => {
 
 		// Update card
 		await ensureCardBackVisible(card)
-		await card.getByRole('button', { name: /^(Card options|Opciones de la tarjeta)$/i }).dispatchEvent('pointerdown')
+		await card.getByRole('button', { name: /^(Acciones de|Actions for) /i }).dispatchEvent('pointerdown')
 		await expect(page.getByRole('menuitem', { name: /^(Edit|Editar)$/i })).toBeVisible({ timeout: 10000 })
 		await page.getByRole('menuitem', { name: /^(Edit|Editar)$/i }).click()
 
@@ -83,11 +83,11 @@ test.describe('Credit Cards @prod-write', () => {
 		await ensureCardBackVisible(updatedCard)
 
 		// Delete card
-		await updatedCard.getByRole('button', { name: /^(Card options|Opciones de la tarjeta)$/i }).dispatchEvent('pointerdown')
+		await updatedCard.getByRole('button', { name: /^(Acciones de|Actions for) /i }).dispatchEvent('pointerdown')
 		await expect(page.getByRole('menuitem', { name: /^(Delete|Eliminar)$/i })).toBeVisible({ timeout: 10000 })
 		await page.getByRole('menuitem', { name: /^(Delete|Eliminar)$/i }).click()
 
-		const deleteDialog = page.getByRole('dialog', { name: /^(Delete Credit Card|Eliminar tarjeta de crédito)$/i })
+		const deleteDialog = page.getByRole('alertdialog', { name: /^(Delete the card|¿Eliminar la tarjeta)/i })
 		await expect(deleteDialog).toBeVisible()
 		await deleteDialog.getByRole('button', { name: /^(Delete|Eliminar)$/i }).click()
 		await expect(updatedCard).not.toBeVisible({ timeout: 20000 })
