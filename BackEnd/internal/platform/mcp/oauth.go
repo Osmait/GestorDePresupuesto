@@ -2,337 +2,196 @@ package mcp
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"net/http"
+	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/plexusone/mcpkit/oauth2"
 
 	authDomain "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
-	"github.com/plexusone/mcpkit/oauth2"
 )
 
-// NewOAuthServer creates and configures an OAuth 2.1 server that delegates
-// credential validation to the application's existing AuthService.
-func NewOAuthServer(issuer string, authService *auth.AuthService) (*oauth2.Server, error) {
-	return oauth2.New(&oauth2.Config{
-		Issuer: issuer,
-		Authenticator: func(username, password string) bool {
-			_, err := authService.Login(context.Background(), &authDomain.AuthRequest{
-				Email:    username,
-				Password: password,
-			})
-			return err == nil
+// DefaultAppURL is the SBFinance web app linked from the OAuth login page.
+const DefaultAppURL = "https://presupuesto.saulburgos.com"
+
+// maxTokenRequestBody bounds the token endpoint form (mcpkit uses 1 MB).
+const maxTokenRequestBody = 64 << 10
+
+// Authenticator validates the credentials typed on the OAuth login page.
+//
+// clientIP is the trusted client IP resolved by the API middleware (gin's
+// ClientIP after ConfigureClientIP), used for the failed-login lockout.
+// It returns nil on success, an error matching auth.ErrInvalidCredentials for
+// bad credentials, a *auth.LoginLockedError while locked out, and any other
+// error for infrastructure failures.
+type Authenticator interface {
+	Authenticate(ctx context.Context, email, password, clientIP string) error
+}
+
+// AuthServiceAuthenticator adapts the application's AuthService (same
+// credential check, timing protection and per email+IP lockout as the web
+// login) to Authenticator.
+type AuthServiceAuthenticator struct {
+	Service *auth.AuthService
+}
+
+// Authenticate implements Authenticator.
+func (a AuthServiceAuthenticator) Authenticate(ctx context.Context, email, password, clientIP string) error {
+	_, err := a.Service.LoginFromIP(ctx, &authDomain.AuthRequest{Email: email, Password: password}, clientIP)
+	return err
+}
+
+// clientSecretHasher is implemented by storages that keep client secrets
+// hashed (mcpoauth.Storage): GetClient then returns the hash, so the token
+// endpoint must hash the presented secret before mcpkit compares them.
+type clientSecretHasher interface {
+	HashClientSecret(secret string) string
+}
+
+// OAuthConfig configures the MCP OAuth 2.1 provider.
+type OAuthConfig struct {
+	// Issuer is the public base URL of the API (MCP_BASE_URL).
+	Issuer string
+	// Authenticator checks the login page credentials. Required.
+	Authenticator Authenticator
+	// Storage persists clients, codes and tokens. nil means in-memory
+	// storage, which loses every connection on restart: tests only.
+	Storage oauth2.Storage
+	// AppURL is the web app linked from the login page (DefaultAppURL if empty).
+	AppURL string
+	// AuthorizationCodeExpiry defaults to 10 minutes.
+	AuthorizationCodeExpiry time.Duration
+}
+
+// OAuthProvider is the MCP OAuth 2.1 authorization server.
+//
+// The token, registration and metadata endpoints are mcpkit's. The
+// authorization endpoint (login page) is our own: mcpkit's Authenticator has
+// no access to the request, so it could not pass the client IP to the login
+// lockout, localize the page, set a CSP nonce or offer a "deny" button.
+type OAuthProvider struct {
+	server    *oauth2.Server
+	storage   oauth2.Storage
+	authorize *authorizeHandler
+}
+
+// NewOAuthProvider builds the provider.
+func NewOAuthProvider(cfg OAuthConfig) (*OAuthProvider, error) {
+	if cfg.Authenticator == nil {
+		return nil, errors.New("oauth: authenticator is required")
+	}
+	storage := cfg.Storage
+	if storage == nil {
+		storage = oauth2.NewMemoryStorage()
+	}
+	codeExpiry := cfg.AuthorizationCodeExpiry
+	if codeExpiry <= 0 {
+		codeExpiry = 10 * time.Minute
+	}
+	appURL := cfg.AppURL
+	if appURL == "" {
+		appURL = DefaultAppURL
+	}
+
+	srv, err := oauth2.New(&oauth2.Config{
+		Issuer:                  cfg.Issuer,
+		Storage:                 storage,
+		AuthorizationCodeExpiry: codeExpiry,
+		// mcpkit's own authorization handler is never mounted (see
+		// OAuthProvider); if it ever were, it must not log anybody in.
+		Authenticator: func(string, string) bool { return false },
+	})
+	if err != nil {
+		return nil, fmt.Errorf("oauth: %w", err)
+	}
+
+	return &OAuthProvider{
+		server:  srv,
+		storage: storage,
+		authorize: &authorizeHandler{
+			storage:    storage,
+			auth:       cfg.Authenticator,
+			codeExpiry: codeExpiry,
+			appURL:     appURL,
+			now:        time.Now,
 		},
-		LoginPageTemplate: oauthLoginTemplate,
+	}, nil
+}
+
+// Server returns the underlying mcpkit server.
+func (p *OAuthProvider) Server() *oauth2.Server { return p.server }
+
+// AuthorizeHandler serves GET/POST /oauth/authorize. The client IP passed to
+// the login lockout is gin's ClientIP(), i.e. the same trusted resolution
+// (PROXY_SHARED_SECRET / TRUSTED_PLATFORM_HEADER / TRUSTED_PROXIES) as the
+// rest of the API; X-Forwarded-For from untrusted peers is never used.
+func (p *OAuthProvider) AuthorizeHandler() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		p.authorize.serve(c.Writer, c.Request, c.ClientIP())
+	}
+}
+
+// ServeAuthorize serves the authorization endpoint with an already resolved
+// client IP (for callers outside gin).
+func (p *OAuthProvider) ServeAuthorize(w http.ResponseWriter, r *http.Request, clientIP string) {
+	p.authorize.serve(w, r, clientIP)
+}
+
+// TokenHandler serves POST /oauth/token (mcpkit). When the storage keeps
+// client secrets hashed, the presented secret is hashed first so mcpkit
+// compares hash with hash.
+func (p *OAuthProvider) TokenHandler() http.Handler {
+	next := p.server.TokenHandler()
+	hasher, ok := p.storage.(clientSecretHasher)
+	if !ok {
+		return next
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			r.Body = http.MaxBytesReader(w, r.Body, maxTokenRequestBody)
+			if err := r.ParseForm(); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"invalid_request","error_description":"Failed to parse form"}`))
+				return
+			}
+			hashPresentedClientSecret(r, hasher)
+		}
+		next.ServeHTTP(w, r)
 	})
 }
 
-// oauthLoginTemplate is a custom HTML template for the OAuth login/consent page.
-// It matches the visual style of the frontend login (dark theme, SBFinance branding).
-// Template data: .ClientName, .Error, .ClientID, .RedirectURI, .State, .Scope,
-// .CodeChallenge, .CodeChallengeMethod
-const oauthLoginTemplate = `<!DOCTYPE html>
-<html lang="es">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autorizar — SBFinance</title>
-    <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+// hashPresentedClientSecret replaces the client secret of a parsed token
+// request (HTTP Basic or form) with its hash. mcpkit calls ParseForm again,
+// which is a no-op once r.Form/r.PostForm are set.
+func hashPresentedClientSecret(r *http.Request, hasher clientSecretHasher) {
+	if id, secret, ok := r.BasicAuth(); ok && secret != "" {
+		r.SetBasicAuth(id, hasher.HashClientSecret(secret))
+	}
+	if secret := r.Form.Get("client_secret"); secret != "" {
+		hashed := hasher.HashClientSecret(secret)
+		r.Form.Set("client_secret", hashed)
+		if r.PostForm != nil && r.PostForm.Has("client_secret") {
+			r.PostForm.Set("client_secret", hashed)
+		}
+	}
+}
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-            min-height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 20px;
-            background: hsl(240 10% 3.9%);
-            color: hsl(0 0% 98%);
-        }
+// RegistrationHandler serves dynamic client registration (mcpkit).
+func (p *OAuthProvider) RegistrationHandler() http.Handler { return p.server.RegistrationHandler() }
 
-        .container {
-            width: 100%;
-            max-width: 420px;
-            display: flex;
-            flex-direction: column;
-            gap: 24px;
-        }
+// MetadataHandler serves the authorization server metadata (mcpkit).
+func (p *OAuthProvider) MetadataHandler() http.Handler { return p.server.MetadataHandler() }
 
-        /* Header / Branding */
-        .header {
-            text-align: center;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-        }
+// ProtectedResourceMetadataHandler serves the protected resource metadata.
+func (p *OAuthProvider) ProtectedResourceMetadataHandler(resourcePath string) http.Handler {
+	return p.server.ProtectedResourceMetadataHandler(resourcePath)
+}
 
-        .logo-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .logo-box {
-            width: 48px;
-            height: 48px;
-            background: linear-gradient(135deg, hsl(221.2 83.2% 53.3%), hsl(262.1 83.3% 57.8%));
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 22px;
-        }
-
-        .brand-text h1 {
-            font-size: 22px;
-            font-weight: 700;
-            text-align: left;
-            line-height: 1.2;
-        }
-
-        .brand-text p {
-            font-size: 13px;
-            color: hsl(240 5% 64.9%);
-            text-align: left;
-        }
-
-        /* Consent card */
-        .consent-card {
-            background: hsl(240 3.7% 15.9%);
-            border: 1px solid hsl(240 3.7% 15.9%);
-            border-radius: 12px;
-            padding: 20px;
-        }
-
-        .consent-title {
-            font-size: 14px;
-            font-weight: 500;
-            color: hsl(0 0% 98%);
-            margin-bottom: 14px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .consent-title .app-badge {
-            background: hsl(221.2 83.2% 53.3% / 0.15);
-            color: hsl(217.2 91.2% 59.8%);
-            font-size: 12px;
-            padding: 2px 8px;
-            border-radius: 6px;
-            font-weight: 600;
-        }
-
-        .permissions {
-            list-style: none;
-            padding: 0;
-        }
-
-        .permissions li {
-            padding: 6px 0;
-            font-size: 13px;
-            color: hsl(240 5% 64.9%);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .check {
-            color: hsl(142.1 76.2% 36.3%);
-            font-weight: bold;
-            font-size: 14px;
-            flex-shrink: 0;
-        }
-
-        /* Divider */
-        .divider {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            color: hsl(240 3.8% 46.1%);
-            font-size: 12px;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: "";
-            flex: 1;
-            height: 1px;
-            background: hsl(240 3.7% 15.9%);
-        }
-
-        /* Login card */
-        .login-card {
-            background: hsl(240 3.7% 15.9%);
-            border: 1px solid hsl(240 3.7% 15.9%);
-            border-radius: 12px;
-            padding: 24px;
-        }
-
-        .login-card h2 {
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 4px;
-        }
-
-        .login-card .subtitle {
-            font-size: 13px;
-            color: hsl(240 5% 64.9%);
-            margin-bottom: 20px;
-        }
-
-        label {
-            display: block;
-            font-size: 13px;
-            font-weight: 500;
-            color: hsl(0 0% 98%);
-            margin-bottom: 6px;
-        }
-
-        .input-group {
-            position: relative;
-            margin-bottom: 16px;
-        }
-
-        .input-icon {
-            position: absolute;
-            left: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: hsl(240 5% 64.9%);
-            font-size: 15px;
-        }
-
-        input[type="email"],
-        input[type="password"] {
-            width: 100%;
-            padding: 10px 12px 10px 38px;
-            background: hsl(240 10% 3.9%);
-            border: 1px solid hsl(240 3.7% 15.9%);
-            border-radius: 8px;
-            color: hsl(0 0% 98%);
-            font-size: 14px;
-            outline: none;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-
-        input:focus {
-            border-color: hsl(221.2 83.2% 53.3%);
-            box-shadow: 0 0 0 2px hsl(221.2 83.2% 53.3% / 0.2);
-        }
-
-        input::placeholder {
-            color: hsl(240 3.8% 46.1%);
-        }
-
-        .btn-authorize {
-            width: 100%;
-            padding: 10px;
-            border: none;
-            border-radius: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            background: hsl(221.2 83.2% 53.3%);
-            color: hsl(210 40% 98%);
-            transition: opacity 0.2s, transform 0.1s;
-            margin-top: 4px;
-        }
-
-        .btn-authorize:hover {
-            opacity: 0.9;
-        }
-
-        .btn-authorize:active {
-            transform: scale(0.98);
-        }
-
-        /* Error */
-        .error-box {
-            background: hsl(0 62.8% 30.6% / 0.15);
-            border: 1px solid hsl(0 62.8% 30.6% / 0.4);
-            color: hsl(0 85.7% 97.3%);
-            padding: 10px 14px;
-            border-radius: 8px;
-            font-size: 13px;
-            margin-bottom: 16px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        /* Footer */
-        .footer {
-            text-align: center;
-            font-size: 11px;
-            color: hsl(240 3.8% 46.1%);
-            line-height: 1.5;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <!-- Branding -->
-        <div class="header">
-            <div class="logo-row">
-                <div class="logo-box">💰</div>
-                <div class="brand-text">
-                    <h1>SBFinance</h1>
-                    <p>Gestor de Presupuesto</p>
-                </div>
-            </div>
-        </div>
-
-        <!-- Consent / Permissions -->
-        <div class="consent-card">
-            <div class="consent-title">
-                <span>{{.ClientName}}</span>
-                <span class="app-badge">MCP</span>
-                <span>solicita acceso</span>
-            </div>
-            <ul class="permissions">
-                <li><span class="check">✓</span> Ver tus cuentas y balances</li>
-                <li><span class="check">✓</span> Ver y crear transacciones</li>
-                <li><span class="check">✓</span> Ver categorías y presupuestos</li>
-                <li><span class="check">✓</span> Analizar tus patrones de gasto</li>
-            </ul>
-        </div>
-
-        <div class="divider">Inicia sesión para autorizar</div>
-
-        <!-- Login form -->
-        <div class="login-card">
-            <h2>Iniciar sesión</h2>
-            <p class="subtitle">Ingresa tus credenciales para autorizar el acceso</p>
-
-            {{if .Error}}
-            <div class="error-box">
-                <span>⚠</span> {{.Error}}
-            </div>
-            {{end}}
-
-            <form method="POST">
-                <label for="username">Correo electrónico</label>
-                <div class="input-group">
-                    <span class="input-icon">✉</span>
-                    <input type="email" id="username" name="username"
-                           placeholder="tu@correo.com" required autofocus>
-                </div>
-
-                <label for="password">Contraseña</label>
-                <div class="input-group">
-                    <span class="input-icon">🔒</span>
-                    <input type="password" id="password" name="password"
-                           placeholder="••••••••" required>
-                </div>
-
-                <button type="submit" class="btn-authorize">Autorizar acceso</button>
-            </form>
-        </div>
-
-        <div class="footer">
-            Al autorizar, permites que <strong>{{.ClientName}}</strong> acceda
-            a tu información financiera de forma segura a través del protocolo MCP.
-        </div>
-    </div>
-</body>
-</html>`
+// TokenVerifier resolves an access token for MCPAuthMiddleware.
+func (p *OAuthProvider) TokenVerifier() func(token string) (*oauth2.TokenInfo, error) {
+	return p.server.TokenVerifier()
+}

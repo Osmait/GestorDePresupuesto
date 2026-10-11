@@ -22,6 +22,7 @@ var allowedPoolCalls = map[string]string{
 	"internal/platform/server/middleware/rls.go":                              "acquires the request's own (single) connection",
 	"internal/platform/storage/postgress/recurring_transaction/repository.go": "scheduler transactions; the HTTP trigger is registered before RLSMiddleware",
 	"internal/platform/mcp/tools.go":                                          "MCP tools open their only transaction (routes are outside RLSMiddleware)",
+	"internal/platform/storage/postgress/mcpoauth/storage.go":                 "OAuth endpoints and the /mcp token check run outside RLSMiddleware, before any tool transaction",
 	"internal/platform/server/routes/health.routes.go":                        "health checks run before AuthMiddleware/RLSMiddleware",
 	"internal/e2e/helpers/test_helpers.go":                                    "test fixture",
 }

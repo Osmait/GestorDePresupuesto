@@ -46,7 +46,6 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 	"github.com/osmait/gestorDePresupuesto/internal/version"
-	"github.com/plexusone/mcpkit/oauth2"
 
 	_ "github.com/osmait/gestorDePresupuesto/docs"
 
@@ -81,7 +80,7 @@ type Server struct {
 	apiKeyService       *apikey.APIKeyService
 	passkeyService      *passkey.PasskeyService
 	mcpServer           *mcpPkg.MCPServer
-	oauthServer         *oauth2.Server
+	oauthServer         *mcpPkg.OAuthProvider
 	shutdownTimeout     *time.Duration
 	db                  *sql.DB
 	config              *config.Config
@@ -133,7 +132,7 @@ func New(ctx context.Context,
 	apiKeySvc *apikey.APIKeyService,
 	passkeySvc *passkey.PasskeyService,
 	mcpSrv *mcpPkg.MCPServer,
-	oauthSrv *oauth2.Server,
+	oauthSrv *mcpPkg.OAuthProvider,
 	opts ...Option,
 ) (context.Context, *Server) {
 	srv := Server{
@@ -271,7 +270,10 @@ func (s *Server) registerRoutes() {
 	if s.oauthServer != nil {
 		s.Engine.Any("/.well-known/oauth-authorization-server", gin.WrapH(s.oauthServer.MetadataHandler()))
 		s.Engine.Any("/.well-known/oauth-protected-resource", gin.WrapH(s.oauthServer.ProtectedResourceMetadataHandler("/mcp")))
-		s.Engine.Any("/oauth/authorize", gin.WrapH(s.oauthServer.AuthorizationHandler()))
+		// Login/consent page: our handler (localized, CSP, deny button) that
+		// passes the trusted c.ClientIP() to the login lockout.
+		s.Engine.GET("/oauth/authorize", s.oauthServer.AuthorizeHandler())
+		s.Engine.POST("/oauth/authorize", s.oauthServer.AuthorizeHandler())
 		s.Engine.POST("/oauth/token", func(c *gin.Context) {
 			log.Printf("[OAuth] POST /oauth/token from %s, Content-Type: %s", c.ClientIP(), c.GetHeader("Content-Type"))
 			s.oauthServer.TokenHandler().ServeHTTP(c.Writer, c.Request)

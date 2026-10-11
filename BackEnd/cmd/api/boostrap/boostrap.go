@@ -33,6 +33,7 @@ import (
 	creditcardRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/creditcard"
 	investmentRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/investment"
 	loanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/loan"
+	mcpOAuthRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/mcpoauth"
 	monthlyPlanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/monthly_plan"
 	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
 	passkeyRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/passkey"
@@ -196,7 +197,7 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 
 	// Conditionally create the MCP server if enabled in config
 	var mcpServer *mcp.MCPServer
-	var oauthSrv *oauth2.Server
+	var oauthSrv *mcp.OAuthProvider
 	if cfg.MCP.Enabled {
 		mcpServer = mcp.NewMCPServer(cfg.MCP.ServerName, cfg.MCP.ServerVersion, &mcp.Services{
 			Account:     svcs.accountService,
@@ -212,7 +213,22 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 		if issuer == "" {
 			issuer = fmt.Sprintf("http://%s:%d", cfg.Server.Host, cfg.Server.Port)
 		}
-		oauthSrv, err = mcp.NewOAuthServer(issuer, svcs.authService)
+		// OAuth clients, codes and tokens live in PostgreSQL so a redeploy
+		// does not disconnect Claude. Other database types (SQLite, local
+		// development only) keep them in memory.
+		var oauthStorage oauth2.Storage
+		if cfg.Database.Type == config.DatabaseTypePostgres {
+			oauthStorage = mcpOAuthRepo.New(db)
+		} else {
+			log.Warn().Str("db_type", string(cfg.Database.Type)).
+				Msg("MCP OAuth state is kept in memory: Claude connections are lost on restart")
+		}
+		oauthSrv, err = mcp.NewOAuthProvider(mcp.OAuthConfig{
+			Issuer:        issuer,
+			Authenticator: mcp.AuthServiceAuthenticator{Service: svcs.authService},
+			Storage:       oauthStorage,
+			AppURL:        cfg.MCP.AppURL,
+		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OAuth server: %w", err)
 		}
