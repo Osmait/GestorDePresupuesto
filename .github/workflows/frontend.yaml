@@ -2,30 +2,38 @@ name: Frontend Quality
 
 on:
   push:
-     branches: [main, development]    
-     paths:
-      - 'FrontendNextjs/**'
-  pull_request:
     branches: [main, development]
     paths:
       - 'FrontendNextjs/**'
+      - '.github/workflows/frontend.yaml'
+  pull_request:
+    paths:
+      - 'FrontendNextjs/**'
+      - '.github/workflows/frontend.yaml'
   workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   frontend-quality:
     runs-on: ubuntu-latest
-    
+
     defaults:
       run:
         working-directory: ./FrontendNextjs/gestor
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Setup Node.js
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
-          node-version: '20'
+          node-version-file: FrontendNextjs/gestor/package.json
           cache: 'npm'
           cache-dependency-path: './FrontendNextjs/gestor/package-lock.json'
 
