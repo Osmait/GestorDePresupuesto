@@ -77,7 +77,7 @@ func TestHTTPTelemetrySpanUsesRouteTemplateAndNoPII(t *testing.T) {
 		t.Fatalf("span name = %q, want route template", span.Name())
 	}
 	for _, kv := range span.Attributes() {
-		v := kv.Value.Emit()
+		v := kv.Value.String()
 		if strings.Contains(v, "3f2a9c") || strings.Contains(v, "203.0.113.9") ||
 			strings.Contains(v, "secret") {
 			t.Errorf("span leaks raw path/IP/UA/query: %s=%s", kv.Key, v)
@@ -276,7 +276,7 @@ func TestAccessLogModes(t *testing.T) {
 func attr(attrs []attribute.KeyValue, key string) string {
 	for _, kv := range attrs {
 		if string(kv.Key) == key {
-			return kv.Value.Emit()
+			return kv.Value.String()
 		}
 	}
 	return ""
