@@ -26,8 +26,14 @@ export function AIExtractionButton({
 
 	return (
 		<>
-			<Button variant={variant} size={size} onClick={() => setIsOpen(true)} className={className}>
-				<Sparkles className={`h-4 w-4 ${isSmall ? '' : 'mr-2'} sm:mr-2`} />
+			<Button
+				variant={variant}
+				size={size}
+				onClick={() => setIsOpen(true)}
+				className={className}
+				aria-label={isSmall ? t('extractFromDocument') : undefined}
+			>
+				<Sparkles className={`h-4 w-4 ${isSmall ? '' : 'mr-2'} sm:mr-2`} aria-hidden='true' />
 				<span className={`${isSmall ? 'hidden sm:inline' : ''}`}>{t('extractFromDocument')}</span>
 			</Button>
 			<AIExtractionModal open={isOpen} onOpenChange={setIsOpen} defaultAccountId={accountId} />

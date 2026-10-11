@@ -1,14 +1,17 @@
 'use client'
 
-import { Filter, Lightbulb, Link2, PiggyBank, PlusCircle } from 'lucide-react'
+import { ChevronDown, FileText, Filter, Lightbulb, Link2, PiggyBank, Plus, Sparkles } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { ComponentProps, useCallback, useEffect, useRef, useState } from 'react'
-import { AIExtractionButton, ReconciliationModal, SavingsPlanModal, SpendingInsightsModal } from '@/components/ai'
+import { ComponentProps, useCallback, useEffect, useId, useRef, useState } from 'react'
+import { ReconciliationModal, SavingsPlanModal, SpendingInsightsModal } from '@/components/ai'
+import { AIExtractionModal } from '@/components/ai/AIExtractionModal'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import TransactionFormModal from '@/components/transactions/TransactionFormModal'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
@@ -73,27 +76,24 @@ function DebouncedInput({ value, onCommit, delay = FILTER_INPUT_DEBOUNCE_MS, ...
 	)
 }
 
+/**
+ * Page-level actions of the transaction history: AI tools (one menu), the
+ * filter drawer and the primary "New transaction" button, plus the modals they
+ * open. Rendered in the page header's actions slot.
+ */
 export function TransactionActions() {
 	const t = useTranslations('transactions')
 	const tForms = useTranslations('forms')
 	const tAI = useTranslations('ai.common')
+	const fieldId = useId()
 	const [drawerOpen, setDrawerOpen] = useState(false)
 	const [insightsOpen, setInsightsOpen] = useState(false)
+	const [extractionOpen, setExtractionOpen] = useState(false)
 	const [reconciliationOpen, setReconciliationOpen] = useState(false)
 	const [savingsPlanOpen, setSavingsPlanOpen] = useState(false)
-	const formRef = useRef<{ reset: () => void } | null>(null)
 
-	const {
-		filters,
-		setFilters,
-		clearFilters,
-		createTransaction,
-		isLoading,
-		error,
-		isModalOpen,
-		setModalOpen,
-		setEditingTransaction,
-	} = useTransactionContext()
+	const { filters, setFilters, clearFilters, createTransaction, isModalOpen, setModalOpen, setEditingTransaction } =
+		useTransactionContext()
 	const { data: accounts = [] } = useGetAccounts()
 	const { data: categories = [] } = useGetCategories()
 	const { isEnabled } = useFeatureFlags()
@@ -101,115 +101,101 @@ export function TransactionActions() {
 	const canUseExtraction = isEnabled('ai_extraction')
 	const canUseReconciliation = isEnabled('ai_reconciliation')
 	const canUseSavingsPlan = isEnabled('ai_savings_plan')
+	const hasAITools = canUseExtraction || canUseReconciliation || canUseSavingsPlan
+
+	const ids = {
+		type: `${fieldId}-type`,
+		account: `${fieldId}-account`,
+		category: `${fieldId}-category`,
+		minAmount: `${fieldId}-min`,
+		maxAmount: `${fieldId}-max`,
+		search: `${fieldId}-search`,
+		dateRange: `${fieldId}-range`,
+	}
 
 	return (
-		<div className='flex flex-wrap items-center gap-2 sm:gap-3'>
-			{canUseExtraction && (
-				<Button variant='outline' size='sm' className='sm:size-default' onClick={() => setInsightsOpen(true)}>
-					<Lightbulb className='h-4 w-4 sm:mr-2' />
-					<span className='hidden sm:inline'>{tAI('insights')}</span>
-				</Button>
+		// A fragment, not a wrapper: PageHeader lays out its direct children (full width below sm).
+		<>
+			{hasAITools && (
+				<DropdownMenu>
+					<DropdownMenuTrigger asChild>
+						<Button variant='outline' aria-label={t('aiTools')}>
+							<Sparkles className='h-4 w-4 sm:mr-2' aria-hidden='true' />
+							<span className='hidden sm:inline'>{t('aiTools')}</span>
+							<ChevronDown className='ml-1 hidden h-4 w-4 opacity-60 sm:inline' aria-hidden='true' />
+						</Button>
+					</DropdownMenuTrigger>
+					<DropdownMenuContent align='end' className='w-56'>
+						{canUseExtraction && (
+							<DropdownMenuItem onSelect={() => setInsightsOpen(true)}>
+								<Lightbulb className='mr-2 h-4 w-4' aria-hidden='true' />
+								{tAI('insights')}
+							</DropdownMenuItem>
+						)}
+						{canUseExtraction && (
+							<DropdownMenuItem onSelect={() => setExtractionOpen(true)}>
+								<FileText className='mr-2 h-4 w-4' aria-hidden='true' />
+								{tAI('extractFromDocument')}
+							</DropdownMenuItem>
+						)}
+						{canUseReconciliation && (
+							<DropdownMenuItem onSelect={() => setReconciliationOpen(true)}>
+								<Link2 className='mr-2 h-4 w-4' aria-hidden='true' />
+								{tAI('reconcile')}
+							</DropdownMenuItem>
+						)}
+						{canUseSavingsPlan && (
+							<DropdownMenuItem onSelect={() => setSavingsPlanOpen(true)}>
+								<PiggyBank className='mr-2 h-4 w-4' aria-hidden='true' />
+								{tAI('savingsPlan')}
+							</DropdownMenuItem>
+						)}
+					</DropdownMenuContent>
+				</DropdownMenu>
 			)}
-			{canUseExtraction && <AIExtractionButton variant='outline' size='sm' className='sm:size-default' />}
-			{canUseReconciliation && (
-				<Button variant='outline' size='sm' className='sm:size-default' onClick={() => setReconciliationOpen(true)}>
-					<Link2 className='h-4 w-4 sm:mr-2' />
-					<span className='hidden sm:inline'>{tAI('reconcile')}</span>
-				</Button>
-			)}
-			{canUseSavingsPlan && (
-				<Button variant='outline' size='sm' className='sm:size-default' onClick={() => setSavingsPlanOpen(true)}>
-					<PiggyBank className='h-4 w-4 sm:mr-2' />
-					<span className='hidden sm:inline'>{tAI('savingsPlan')}</span>
-				</Button>
-			)}
-			<Button
-				variant='outline'
-				size='sm'
-				className='sm:size-default border-border/50'
-				onClick={() => setDrawerOpen(true)}
-			>
+			<Button variant='outline' aria-label={t('filters')} onClick={() => setDrawerOpen(true)}>
 				<Filter className='h-4 w-4 sm:mr-2' aria-hidden='true' />
 				<span className='hidden sm:inline'>{t('filters')}</span>
 			</Button>
 			<Button
-				size='sm'
-				className='sm:size-default bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70'
 				onClick={() => {
 					setEditingTransaction(null)
 					setModalOpen(true)
 				}}
 			>
-				<PlusCircle className='h-4 w-4 sm:mr-2' aria-hidden='true' />
-				<span className='hidden sm:inline'>{t('addTransaction')}</span>
+				<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
+				{t('addTransaction')}
 			</Button>
 
 			{canUseExtraction && <SpendingInsightsModal open={insightsOpen} onOpenChange={setInsightsOpen} />}
+			{canUseExtraction && <AIExtractionModal open={extractionOpen} onOpenChange={setExtractionOpen} />}
 			{canUseReconciliation && <ReconciliationModal open={reconciliationOpen} onOpenChange={setReconciliationOpen} />}
 			{canUseSavingsPlan && <SavingsPlanModal open={savingsPlanOpen} onOpenChange={setSavingsPlanOpen} />}
 
-			<TransactionFormModal
-				open={isModalOpen}
-				setOpen={(open: boolean) => {
-					setModalOpen(open)
-					if (!open) {
-						formRef.current?.reset()
-					}
-				}}
-				createTransaction={async (...args) => {
-					const [
-						name,
-						description,
-						amount,
-						type_transation,
-						account_id,
-						category_id,
-						_budget_id,
-						_currency,
-						created_at_arg,
-					] = args
-					const created_at = created_at_arg ? new Date(created_at_arg).toISOString() : new Date().toISOString()
-
-					const _optimisticTx = {
-						id: `temp-${Date.now()}`,
-						name,
-						description,
-						amount,
-						type_transation,
-						account_id,
-						category_id,
-						created_at,
-						user_id: 'current-user',
-						updated_at: new Date().toISOString(),
-					}
-
-					await createTransaction(...args)
-
-					formRef.current?.reset()
-				}}
-				isLoading={isLoading}
-				error={error}
-			/>
+			<TransactionFormModal open={isModalOpen} setOpen={setModalOpen} createTransaction={createTransaction} />
 
 			<Drawer open={drawerOpen} onOpenChange={setDrawerOpen}>
 				{/* Filter drawer has no description; opt out explicitly (Radix warns otherwise). */}
-				<DrawerContent className='w-full max-w-sm ml-auto h-full' aria-describedby={undefined}>
+				<DrawerContent className='ml-auto h-full w-full max-w-sm' aria-describedby={undefined}>
 					<DrawerHeader>
 						<DrawerTitle>{t('filterTransactions')}</DrawerTitle>
 					</DrawerHeader>
-					<div className='p-4 space-y-4 overflow-y-auto'>
-						<CalendarDateRangePicker
-							value={filters.dateRange}
-							onChange={(dateRange) => {
-								if (dateRange && typeof dateRange === 'object' && 'from' in dateRange && 'to' in dateRange) {
-									setFilters((f) => ({ ...f, dateRange }))
-								}
-							}}
-						/>
-						<div>
-							<label className='block mb-1 text-sm'>{tForms('type')}</label>
+					<div className='space-y-4 overflow-y-auto p-4'>
+						<fieldset className='min-w-0'>
+							<legend className='mb-2 text-sm font-medium'>{t('dateRange')}</legend>
+							<CalendarDateRangePicker
+								value={filters.dateRange}
+								onChange={(dateRange) => {
+									if (dateRange && typeof dateRange === 'object' && 'from' in dateRange && 'to' in dateRange) {
+										setFilters((f) => ({ ...f, dateRange }))
+									}
+								}}
+							/>
+						</fieldset>
+						<div className='space-y-2'>
+							<Label htmlFor={ids.type}>{tForms('type')}</Label>
 							<Select value={filters.type} onValueChange={(v) => setFilters((f) => ({ ...f, type: v }))}>
-								<SelectTrigger>
+								<SelectTrigger id={ids.type}>
 									<SelectValue placeholder={t('all')} />
 								</SelectTrigger>
 								<SelectContent>
@@ -219,10 +205,10 @@ export function TransactionActions() {
 								</SelectContent>
 							</Select>
 						</div>
-						<div>
-							<label className='block mb-1 text-sm'>{t('account')}</label>
+						<div className='space-y-2'>
+							<Label htmlFor={ids.account}>{t('account')}</Label>
 							<Select value={filters.account} onValueChange={(v) => setFilters((f) => ({ ...f, account: v }))}>
-								<SelectTrigger>
+								<SelectTrigger id={ids.account}>
 									<SelectValue placeholder={t('allFemale')} />
 								</SelectTrigger>
 								<SelectContent>
@@ -235,10 +221,10 @@ export function TransactionActions() {
 								</SelectContent>
 							</Select>
 						</div>
-						<div>
-							<label className='block mb-1 text-sm'>{t('category')}</label>
+						<div className='space-y-2'>
+							<Label htmlFor={ids.category}>{t('category')}</Label>
 							<Select value={filters.category} onValueChange={(v) => setFilters((f) => ({ ...f, category: v }))}>
-								<SelectTrigger>
+								<SelectTrigger id={ids.category}>
 									<SelectValue placeholder={t('allFemale')} />
 								</SelectTrigger>
 								<SelectContent>
@@ -251,21 +237,25 @@ export function TransactionActions() {
 								</SelectContent>
 							</Select>
 						</div>
-						<div className='flex gap-2'>
-							<div className='flex-1'>
-								<label className='block mb-1 text-sm'>{t('minAmount')}</label>
+						<div className='grid grid-cols-2 gap-2'>
+							<div className='space-y-2'>
+								<Label htmlFor={ids.minAmount}>{t('minAmount')}</Label>
 								<DebouncedInput
+									id={ids.minAmount}
 									type='number'
+									inputMode='decimal'
 									value={filters.minAmount}
 									onCommit={(minAmount) => setFilters((f) => ({ ...f, minAmount }))}
 									placeholder='0'
 									min={0}
 								/>
 							</div>
-							<div className='flex-1'>
-								<label className='block mb-1 text-sm'>{t('maxAmount')}</label>
+							<div className='space-y-2'>
+								<Label htmlFor={ids.maxAmount}>{t('maxAmount')}</Label>
 								<DebouncedInput
+									id={ids.maxAmount}
 									type='number'
+									inputMode='decimal'
 									value={filters.maxAmount}
 									onCommit={(maxAmount) => setFilters((f) => ({ ...f, maxAmount }))}
 									placeholder='99999'
@@ -273,23 +263,24 @@ export function TransactionActions() {
 								/>
 							</div>
 						</div>
-						<div>
-							<label className='block mb-1 text-sm'>{t('search')}</label>
+						<div className='space-y-2'>
+							<Label htmlFor={ids.search}>{t('search')}</Label>
 							<DebouncedInput
-								type='text'
+								id={ids.search}
+								type='search'
 								value={filters.search}
 								onCommit={(search) => setFilters((f) => ({ ...f, search }))}
 								placeholder={t('searchPlaceholder')}
 							/>
 						</div>
-						<div className='flex flex-col gap-2 pt-4'>
-							<Button type='button' variant='outline' onClick={() => clearFilters()}>
+						<div className='pt-2'>
+							<Button type='button' variant='outline' className='w-full' onClick={() => clearFilters()}>
 								{t('clearFilters')}
 							</Button>
 						</div>
 					</div>
 				</DrawerContent>
 			</Drawer>
-		</div>
+		</>
 	)
 }

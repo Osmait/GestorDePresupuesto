@@ -1,11 +1,12 @@
 'use client'
 
-import { ArrowDownCircle, ArrowUpCircle, PlusCircle } from 'lucide-react'
+import { ArrowDownRight, ArrowUpRight, Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { Amount } from '@/components/shared/Amount'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatDop, shareOfTotal, sumActiveDop } from '@/lib/monthlyPlanUtils'
+import { PLAN_CURRENCY, shareOfTotal, sumActiveDop } from '@/lib/monthlyPlanUtils'
 import { MonthlyPlanItem, MonthlyPlanItemType } from '@/types/monthlyPlan'
 import { MonthlyPlanItemRow } from './MonthlyPlanItemRow'
 
@@ -29,38 +30,39 @@ export function MonthlyPlanColumn({
 	onDelete,
 }: MonthlyPlanColumnProps) {
 	const t = useTranslations('monthlyPlan')
-	const locale = useAppLocale()
 	const isIncome = type === 'income'
 	// Paused items are shown but excluded from the total, matching the backend.
 	const total = sumActiveDop(items)
+	const Icon = isIncome ? ArrowUpRight : ArrowDownRight
 
 	return (
 		<Card>
 			<CardHeader>
 				<div className='flex items-center justify-between gap-3'>
 					<CardTitle className='flex items-center gap-2 text-base'>
-						{isIncome ? (
-							<ArrowUpCircle className='h-5 w-5 text-emerald-600' />
-						) : (
-							<ArrowDownCircle className='h-5 w-5 text-orange-600' />
-						)}
+						<Icon className={isIncome ? 'h-5 w-5 text-success' : 'h-5 w-5 text-destructive'} aria-hidden='true' />
 						{isIncome ? t('incomeColumn') : t('expensesColumn')}
 					</CardTitle>
-					<Button variant='ghost' size='sm' onClick={() => onCreate(type)} className='h-8'>
-						<PlusCircle className='h-4 w-4 mr-1' />
-						{t('add')}
-					</Button>
+					{items.length > 0 && (
+						<Button variant='ghost' size='sm' onClick={() => onCreate(type)}>
+							<Plus className='mr-1 h-4 w-4' aria-hidden='true' />
+							{t('add')}
+						</Button>
+					)}
 				</div>
 			</CardHeader>
 			<CardContent>
 				{items.length === 0 ? (
-					<div className='py-8 text-center'>
-						<p className='text-sm text-muted-foreground'>{isIncome ? t('noIncomes') : t('noExpenses')}</p>
-						<Button variant='outline' size='sm' className='mt-3' onClick={() => onCreate(type)}>
-							<PlusCircle className='h-4 w-4 mr-1' />
-							{isIncome ? t('addFirstIncome') : t('addFirstExpense')}
-						</Button>
-					</div>
+					<EmptyState
+						compact
+						title={isIncome ? t('noIncomes') : t('noExpenses')}
+						action={
+							<Button variant='outline' onClick={() => onCreate(type)}>
+								<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
+								{isIncome ? t('addFirstIncome') : t('addFirstExpense')}
+							</Button>
+						}
+					/>
 				) : (
 					<>
 						<div className='space-y-3'>
@@ -77,13 +79,10 @@ export function MonthlyPlanColumn({
 							))}
 						</div>
 
-						<div className='mt-4 flex items-center justify-between border-t border-border/60 pt-3'>
+						<div className='mt-4 flex items-center justify-between border-t border-border pt-3'>
 							<span className='text-sm font-medium text-muted-foreground'>{t('total')}</span>
-							<span
-								className={`text-lg font-bold ${isIncome ? 'text-emerald-600' : 'text-orange-600'}`}
-								data-testid={`column-total-${type}`}
-							>
-								{formatDop(total, locale)}
+							<span className='text-lg font-semibold' data-testid={`column-total-${type}`}>
+								<Amount value={isIncome ? total : -total} currency={PLAN_CURRENCY} tone='auto' signed />
 							</span>
 						</div>
 					</>

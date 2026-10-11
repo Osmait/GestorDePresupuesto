@@ -6,6 +6,7 @@ import { SpeedInsights } from '@vercel/speed-insights/next'
 import { NextIntlClientProvider } from 'next-intl'
 import { getLocale, getMessages } from 'next-intl/server'
 import { AuthSessionProvider } from '@/components/auth/session-provider'
+import { MotionProvider } from '@/components/common/motion-provider'
 import { ProgressBarProvider } from '@/components/common/progress-bar-provider'
 import { ReactQueryProvider } from '@/components/common/react-query-provider'
 import { ThemeProvider } from '@/components/common/theme-provider'
@@ -89,7 +90,9 @@ export default async function RootLayout({ children }: { children: React.ReactNo
 						{/* Only what client components need; route segments add theirs (ScopedIntlMessages). */}
 						<NextIntlClientProvider messages={pickMessages(messages, CLIENT_NAMESPACES.root)}>
 							<ProgressBarProvider>
-								<ReactQueryProvider>{children}</ReactQueryProvider>
+								<ReactQueryProvider>
+									<MotionProvider>{children}</MotionProvider>
+								</ReactQueryProvider>
 							</ProgressBarProvider>
 						</NextIntlClientProvider>
 					</ThemeProvider>

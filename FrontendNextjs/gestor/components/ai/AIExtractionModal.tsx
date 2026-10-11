@@ -1,11 +1,13 @@
 'use client'
 
-import { AlertCircle, AlertTriangle, CheckCircle, Loader2, Sparkles } from 'lucide-react'
+import { AlertCircle, AlertTriangle, CheckCircle, Loader2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useCallback, useState } from 'react'
+import { useCallback, useId, useState } from 'react'
 import { toast } from 'sonner'
+import { DEFAULT_CATEGORY_COLOR } from '@/components/shared/ColorSwatchPicker'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useExtractFromFile } from '@/hooks/queries/useAIQuery'
@@ -46,6 +48,7 @@ function ensureUniqueCategoryName(baseName: string, existingNames: string[]): st
 export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIExtractionModalProps) {
 	const t = useTranslations('ai.extraction')
 	const tCommon = useTranslations('ai.common')
+	const fieldId = useId()
 	const [files, setFiles] = useState<File[]>([])
 	const [documentType, setDocumentType] = useState<DocumentType>('receipt')
 	const [accountId, setAccountId] = useState<string>(defaultAccountId || '')
@@ -298,7 +301,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 			await createCategoryMutation.mutateAsync({
 				name: normalizedName,
 				icon: '📦',
-				color: '#22c55e',
+				color: DEFAULT_CATEGORY_COLOR,
 			})
 
 			const refreshed = await refetchCategories()
@@ -325,151 +328,134 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 		}
 	}
 
+	const missingCategoryCount = extractedTransactions.filter(
+		(txn, i) => selectedIndices.has(i) && !txn.category_id,
+	).length
+
+	const footer =
+		step === 'preview' ? (
+			<>
+				<Button type='button' variant='outline' className='sm:mr-auto' onClick={handleBack}>
+					{tCommon('back')}
+				</Button>
+				<Button
+					type='button'
+					onClick={handleSaveTransactions}
+					disabled={selectedIndices.size === 0 || missingCategoryCount > 0}
+				>
+					{t('saveTransactions', { count: selectedIndices.size })}
+				</Button>
+			</>
+		) : step === 'saving' ? (
+			<Button type='button' disabled aria-busy='true'>
+				<Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' />
+				{t('savingTransactions')}
+			</Button>
+		) : undefined
+
 	return (
 		<>
-			<Dialog open={open} onOpenChange={handleClose}>
-				<DialogContent className='max-w-2xl max-h-[90vh] overflow-y-auto'>
-					<DialogHeader>
-						<DialogTitle className='flex items-center gap-2'>
-							<Sparkles className='h-5 w-5 text-primary' />
-							{t('title')}
-						</DialogTitle>
-						<DialogDescription>{t('description')}</DialogDescription>
-					</DialogHeader>
-
-					{step === 'upload' && (
-						<div className='space-y-6'>
-							<div className='space-y-4'>
-								<div>
-									<label className='text-sm font-medium mb-2 block'>{t('account')}</label>
-									<Select value={accountId} onValueChange={setAccountId}>
-										<SelectTrigger>
-											<SelectValue placeholder={t('selectAccount')} />
-										</SelectTrigger>
-										<SelectContent>
-											{accounts.map((account) => (
-												<SelectItem key={account.id} value={account.id}>
-													{account.name} ({account.bank})
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-								</div>
-
-								<div>
-									<label className='text-sm font-medium mb-2 block'>{t('documentType')}</label>
-									<Select value={documentType} onValueChange={(v) => setDocumentType(v as DocumentType)}>
-										<SelectTrigger>
-											<SelectValue />
-										</SelectTrigger>
-										<SelectContent>
-											<SelectItem value='receipt'>{t('receipt')}</SelectItem>
-											<SelectItem value='invoice'>{t('invoice')}</SelectItem>
-											<SelectItem value='statement'>{t('bankStatement')}</SelectItem>
-										</SelectContent>
-									</Select>
-								</div>
+			<FormDialog
+				open={open}
+				onOpenChange={(next) => {
+					if (!next) handleClose()
+				}}
+				title={t('title')}
+				description={t('description')}
+				size='lg'
+				onSubmit={step === 'upload' ? handleExtract : undefined}
+				submitLabel={isExtracting ? t('extracting') : t('extractButton')}
+				cancelLabel={tCommon('cancel')}
+				loading={isExtracting || step === 'saving'}
+				submitDisabled={files.length === 0 || !accountId}
+				footer={footer}
+			>
+				{step === 'upload' && (
+					<div className='space-y-4'>
+						<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+							<div className='space-y-2'>
+								<Label htmlFor={`${fieldId}-account`}>{t('account')}</Label>
+								<Select value={accountId} onValueChange={setAccountId}>
+									<SelectTrigger id={`${fieldId}-account`}>
+										<SelectValue placeholder={t('selectAccount')} />
+									</SelectTrigger>
+									<SelectContent>
+										{accounts.map((account) => (
+											<SelectItem key={account.id} value={account.id}>
+												{account.name} ({account.bank})
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
 							</div>
 
-							<DocumentUploader onFilesSelected={handleFilesSelected} disabled={isExtracting} />
-
-							<div className='flex justify-end gap-2'>
-								<Button variant='outline' onClick={handleClose}>
-									{tCommon('cancel')}
-								</Button>
-								<Button onClick={handleExtract} disabled={files.length === 0 || !accountId || isExtracting}>
-									{isExtracting ? (
-										<>
-											<Loader2 className='h-4 w-4 mr-2 animate-spin' />
-											{t('extracting')}
-										</>
-									) : (
-										<>
-											<Sparkles className='h-4 w-4 mr-2' />
-											{t('extractButton')}
-										</>
-									)}
-								</Button>
+							<div className='space-y-2'>
+								<Label htmlFor={`${fieldId}-type`}>{t('documentType')}</Label>
+								<Select value={documentType} onValueChange={(v) => setDocumentType(v as DocumentType)}>
+									<SelectTrigger id={`${fieldId}-type`}>
+										<SelectValue />
+									</SelectTrigger>
+									<SelectContent>
+										<SelectItem value='receipt'>{t('receipt')}</SelectItem>
+										<SelectItem value='invoice'>{t('invoice')}</SelectItem>
+										<SelectItem value='statement'>{t('bankStatement')}</SelectItem>
+									</SelectContent>
+								</Select>
 							</div>
 						</div>
-					)}
 
-					{step === 'preview' && (
-						<div className='space-y-6'>
-							{extractData && 'data' in extractData && (
-								<div className='flex items-center gap-4 text-sm text-muted-foreground bg-muted p-3 rounded-lg'>
-									<div className='flex items-center gap-1'>
-										<CheckCircle className='h-4 w-4 text-green-500' />
-										<span>{t('transactionsFound', { count: extractData.data.count })}</span>
-									</div>
-									<div className='flex items-center gap-1'>
-										{extractData.data.unmatched_categories > 0 && (
-											<>
-												<AlertCircle className='h-4 w-4 text-yellow-500' />
-												<span>{t('needCategory', { count: extractData.data.unmatched_categories })}</span>
-											</>
-										)}
-									</div>
-									<div className='ml-auto'>
-										<span>{extractData.processing_time_ms}ms</span>
-									</div>
-								</div>
-							)}
+						<DocumentUploader onFilesSelected={handleFilesSelected} disabled={isExtracting} />
+					</div>
+				)}
 
-							<TransactionPreview
-								transactions={extractedTransactions}
-								categories={categories}
-								potentialDuplicatesByTransactionId={potentialDuplicatesByTransactionId}
-								categorySuggestionsByTransactionId={categorySuggestionsByTransactionId}
-								onEdit={handleEdit}
-								onRemove={handleRemove}
-								onSelect={handleSelect}
-								onApplyCategorySuggestion={handleApplyCategorySuggestion}
-								onCreateCategoryFromSuggestion={handleCreateCategoryFromSuggestion}
-								selectedIndices={selectedIndices}
-								onCreateCategory={handleCreateCategoryRequest}
-							/>
-
-							<div className='flex justify-between items-center'>
-								<Button variant='outline' onClick={handleBack}>
-									{tCommon('back')}
-								</Button>
-								<div className='flex items-center gap-3'>
-									{selectedIndices.size > 0 &&
-										extractedTransactions.filter(
-											(_, i) => selectedIndices.has(i) && !extractedTransactions[i].category_id,
-										).length > 0 && (
-											<span className='text-sm text-yellow-600 dark:text-yellow-400 flex items-center gap-1'>
-												<AlertTriangle className='h-4 w-4' />
-												{t('needCategory', {
-													count: extractedTransactions.filter(
-														(_, i) => selectedIndices.has(i) && !extractedTransactions[i].category_id,
-													).length,
-												})}
-											</span>
-										)}
-									<Button
-										onClick={handleSaveTransactions}
-										disabled={
-											selectedIndices.size === 0 ||
-											extractedTransactions.some((txn, i) => selectedIndices.has(i) && !txn.category_id)
-										}
-									>
-										{t('saveTransactions', { count: selectedIndices.size })}
-									</Button>
-								</div>
+				{step === 'preview' && (
+					<div className='space-y-4'>
+						{extractData && 'data' in extractData && (
+							<div className='flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg bg-muted p-3 text-sm text-muted-foreground'>
+								<span className='flex items-center gap-1'>
+									<CheckCircle className='h-4 w-4 text-success' aria-hidden='true' />
+									{t('transactionsFound', { count: extractData.data.count })}
+								</span>
+								{extractData.data.unmatched_categories > 0 && (
+									<span className='flex items-center gap-1'>
+										<AlertCircle className='h-4 w-4 text-warning' aria-hidden='true' />
+										{t('needCategory', { count: extractData.data.unmatched_categories })}
+									</span>
+								)}
+								<span className='ml-auto tabular-nums'>{extractData.processing_time_ms}ms</span>
 							</div>
-						</div>
-					)}
+						)}
 
-					{step === 'saving' && (
-						<div className='flex flex-col items-center justify-center py-12'>
-							<Loader2 className='h-12 w-12 animate-spin text-primary mb-4' />
-							<p className='text-muted-foreground'>{t('savingTransactions')}</p>
-						</div>
-					)}
-				</DialogContent>
-			</Dialog>
+						<TransactionPreview
+							transactions={extractedTransactions}
+							categories={categories}
+							potentialDuplicatesByTransactionId={potentialDuplicatesByTransactionId}
+							categorySuggestionsByTransactionId={categorySuggestionsByTransactionId}
+							onEdit={handleEdit}
+							onRemove={handleRemove}
+							onSelect={handleSelect}
+							onApplyCategorySuggestion={handleApplyCategorySuggestion}
+							onCreateCategoryFromSuggestion={handleCreateCategoryFromSuggestion}
+							selectedIndices={selectedIndices}
+							onCreateCategory={handleCreateCategoryRequest}
+						/>
+
+						{selectedIndices.size > 0 && missingCategoryCount > 0 && (
+							<p role='status' className='flex items-center gap-1 text-sm text-warning'>
+								<AlertTriangle className='h-4 w-4 shrink-0' aria-hidden='true' />
+								{t('needCategory', { count: missingCategoryCount })}
+							</p>
+						)}
+					</div>
+				)}
+
+				{step === 'saving' && (
+					<div className='flex flex-col items-center justify-center py-12' role='status'>
+						<Loader2 className='mb-4 h-10 w-10 animate-spin text-muted-foreground' aria-hidden='true' />
+						<p className='text-sm text-muted-foreground'>{t('savingTransactions')}</p>
+					</div>
+				)}
+			</FormDialog>
 
 			<QuickCategoryCreate
 				open={showQuickCategory}

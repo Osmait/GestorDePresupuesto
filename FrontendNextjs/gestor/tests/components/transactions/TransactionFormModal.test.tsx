@@ -18,6 +18,13 @@ beforeAll(() => {
 		unobserve() {}
 		disconnect() {}
 	} as unknown as typeof globalThis.ResizeObserver
+	// Desktop width: FormDialog renders its Dialog (the mobile Drawer needs pointer capture jsdom lacks).
+	window.matchMedia = vi.fn().mockImplementation((query: string) => ({
+		matches: true,
+		media: query,
+		addEventListener: vi.fn(),
+		removeEventListener: vi.fn(),
+	})) as unknown as typeof window.matchMedia
 })
 
 vi.mock('@/components/transactions/TransactionContext', () => ({
@@ -67,11 +74,35 @@ describe('TransactionFormModal draft restore', () => {
 		vi.mocked(useSession).mockReset()
 	})
 
+	it('shows an actionable inline error (not the raw API message) when saving fails', async () => {
+		window.sessionStorage.clear()
+		const user = userEvent.setup()
+		const createTransaction = vi.fn().mockRejectedValue(new Error('currency must match account currency'))
+		const setOpen = vi.fn()
+		renderWithIntl(<TransactionFormModal open setOpen={setOpen} createTransaction={createTransaction} />)
+
+		await user.type(screen.getByLabelText('Name'), 'Luz')
+		await user.clear(screen.getByLabelText('Amount'))
+		await user.type(screen.getByLabelText('Amount'), '50')
+		// Labels are wired to the controls (FormControl sits on the trigger/input).
+		await user.click(screen.getByRole('combobox', { name: 'Account' }))
+		await user.click(await screen.findByRole('option', { name: 'Checking' }))
+		await user.click(screen.getByRole('combobox', { name: 'Category' }))
+		await user.click(await screen.findByRole('option', { name: /Food/ }))
+		await user.click(screen.getByRole('button', { name: /Create Transaction/ }))
+
+		expect(
+			await screen.findByText('The transaction currency must match the bank account currency.'),
+		).toBeInTheDocument()
+		expect(screen.queryByText('currency must match account currency')).not.toBeInTheDocument()
+		expect(setOpen).not.toHaveBeenCalledWith(false)
+	})
+
 	it('shows a clean form when reopened after the restored draft was submitted', async () => {
 		const user = userEvent.setup()
 		const createTransaction = vi.fn().mockResolvedValue(undefined)
 		const setOpen = vi.fn()
-		const props = { setOpen, createTransaction, isLoading: false, error: null }
+		const props = { setOpen, createTransaction }
 
 		const { rerender } = renderWithIntl(<TransactionFormModal open {...props} />)
 

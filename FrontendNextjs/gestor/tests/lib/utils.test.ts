@@ -54,6 +54,14 @@ describe('lib/utils', () => {
 			expect(formatCurrency(0, 'USD', { locale: 'en' })).toBe('US$0.00')
 		})
 
+		it('drops decimals only when maximumFractionDigits asks for it', () => {
+			expect(formatCurrency(1500.5, 'DOP', { maximumFractionDigits: 0 })).toBe('RD$1,501')
+			expect(formatCurrency(1500.25, 'USD', { locale: 'en', maximumFractionDigits: 1 })).toBe('US$1,500.3')
+			expect(formatCurrency(-0.4, 'DOP', { maximumFractionDigits: 0 })).toBe('RD$0')
+			// The default output is unchanged.
+			expect(formatCurrency(1500, 'DOP')).toBe('RD$1,500.00')
+		})
+
 		it('never renders a negative zero', () => {
 			expect(formatCurrency(-0)).toBe('RD$0.00')
 			expect(formatCurrency(-0.004)).toBe('RD$0.00')

@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { screen } from '@testing-library/react'
+import { screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { APIKeysSection } from '@/components/settings/APIKeysSection'
@@ -68,8 +68,8 @@ describe('APIKeysSection', () => {
 	it('renders empty state when no API keys exist', () => {
 		renderSection()
 
-		expect(screen.getByText('No hay claves API')).toBeInTheDocument()
-		expect(screen.getByText('Crea una clave para conectar clientes MCP')).toBeInTheDocument()
+		expect(screen.getByText('Aún no tienes claves API')).toBeInTheDocument()
+		expect(screen.getByText('Crea una clave para conectar clientes MCP.')).toBeInTheDocument()
 	})
 
 	it('renders list of existing API keys with prefix and name', () => {
@@ -121,6 +121,30 @@ describe('APIKeysSection', () => {
 		expect(screen.getByRole('button', { name: 'Crear clave' })).toBeInTheDocument()
 	})
 
+	it('asks for confirmation before revoking a key', async () => {
+		const user = userEvent.setup()
+		mockAPIKeys = [
+			{
+				id: 'key-1',
+				user_id: 'user-1',
+				name: 'Claude Desktop',
+				key_prefix: 'sk-abc123',
+				last_used_at: null,
+				expires_at: null,
+				created_at: '2024-01-15T10:00:00Z',
+				is_active: true,
+			},
+		]
+		renderSection()
+
+		await user.click(screen.getByRole('button', { name: 'Revocar clave Claude Desktop' }))
+		const dialog = screen.getByRole('alertdialog', { name: '¿Revocar la clave API “Claude Desktop”?' })
+		expect(mockRevokeMutateAsync).not.toHaveBeenCalled()
+
+		await user.click(within(dialog).getByRole('button', { name: 'Revocar clave' }))
+		expect(mockRevokeMutateAsync).toHaveBeenCalledWith('key-1')
+	})
+
 	it('shows Claude Desktop config section', () => {
 		renderSection()
 
@@ -141,7 +165,7 @@ describe('APIKeysSection (en)', () => {
 			{ locale: 'en' },
 		)
 
-		expect(screen.getByText('No API keys')).toBeInTheDocument()
+		expect(screen.getByText('No API keys yet')).toBeInTheDocument()
 		expect(screen.getByRole('button', { name: /New key/ })).toBeInTheDocument()
 	})
 })

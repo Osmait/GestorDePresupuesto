@@ -33,6 +33,15 @@
   --color-ring: hsl(var(--ring));
   --color-sidebar: hsl(var(--sidebar));
   --color-sidebar-foreground: hsl(var(--sidebar-foreground));
+  /* Categorical chart series (identity, fixed order; see DESIGN.md > Charts) */
+  --color-chart-1: hsl(var(--chart-1));
+  --color-chart-2: hsl(var(--chart-2));
+  --color-chart-3: hsl(var(--chart-3));
+  --color-chart-4: hsl(var(--chart-4));
+  --color-chart-5: hsl(var(--chart-5));
+  --color-chart-6: hsl(var(--chart-6));
+  --color-chart-7: hsl(var(--chart-7));
+  --color-chart-8: hsl(var(--chart-8));
 
   /* Border radius */
   --radius-sm: calc(var(--radius) - 4px);
@@ -199,13 +208,16 @@
     --muted-foreground: 240 3.8% 46.1%;
     --accent: 240 4.8% 95.9%;
     --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
+    /* Status colors double as text (text-success, <Amount>) and as fills
+       (Button variants). Each one clears 4.5:1 as text on --background and
+       with its -foreground on top. Light mode: dark hue + white foreground. */
+    --destructive: 0 74% 45%; /* 5.75:1 on white, 5.51:1 with foreground */
     --destructive-foreground: 0 0% 98%;
-    --success: 142 76% 36%;
+    --success: 142 72% 29%; /* 5.07:1 on white, 4.85:1 with foreground */
     --success-foreground: 0 0% 98%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 9%;
-    --info: 199 89% 48%;
+    --warning: 26 90% 37%; /* 5.04:1 on white, 4.83:1 with foreground */
+    --warning-foreground: 0 0% 98%;
+    --info: 201 96% 32%; /* 5.94:1 on white, 5.68:1 with foreground */
     --info-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
@@ -213,6 +225,14 @@
     --radius: 0.5rem;
     --sidebar: 240 5% 96%;
     --sidebar-foreground: 240 10% 3.9%;
+    --chart-1: 213 67.7% 50.2%;
+    --chart-2: 17 82.1% 56.3%;
+    --chart-3: 159 73.3% 39.6%;
+    --chart-4: 41 100% 46.5%;
+    --chart-5: 337 70.3% 69.6%;
+    --chart-6: 120 100% 25.7%;
+    --chart-7: 248 62% 57.6%;
+    --chart-8: 0 73.5% 58.6%;
   }
 
   .dark {
@@ -231,19 +251,29 @@
     --muted-foreground: 220 9% 56%;
     --accent: 226 10% 17%;
     --accent-foreground: 210 20% 98%;
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 20% 98%;
-    --success: 142 69% 31%;
-    --success-foreground: 0 0% 98%;
-    --warning: 32 95% 44%;
+    /* Dark mode: light hue + dark foreground (white text on a red/green
+       light enough to read as text on this background cannot reach 4.5:1). */
+    --destructive: 0 91% 71%; /* 6.26:1 on background, 6.28:1 with foreground */
+    --destructive-foreground: 224 9% 11%;
+    --success: 142 69% 45%; /* 7.33:1 on background, 7.35:1 with foreground */
+    --success-foreground: 224 9% 11%;
+    --warning: 32 95% 44%; /* 5.46:1 on background, 5.69:1 with foreground */
     --warning-foreground: 0 0% 9%;
-    --info: 199 89% 48%;
-    --info-foreground: 0 0% 98%;
+    --info: 199 89% 48%; /* 6.03:1 on background, 6.05:1 with foreground */
+    --info-foreground: 224 9% 11%;
     --border: 226 10% 17%;
     --input: 226 10% 17%;
     --ring: 224 76% 48%;
     --sidebar: 224 7% 8%;
     --sidebar-foreground: 210 20% 98%;
+    --chart-1: 213 76.8% 56.1%;
+    --chart-2: 17 70.2% 50%;
+    --chart-3: 159 72.7% 35.9%;
+    --chart-4: 40 100% 39.4%;
+    --chart-5: 338 61.1% 57.6%;
+    --chart-6: 120 100% 25.7%;
+    --chart-7: 247 69.4% 71.8%;
+    --chart-8: 0 71.8% 65.3%;
   }
 }
 

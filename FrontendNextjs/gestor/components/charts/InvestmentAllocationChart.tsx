@@ -1,29 +1,28 @@
 'use client'
 
 import { ResponsivePie } from '@nivo/pie'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { CHART_TOOLTIP_CLASS, useChartTheme } from './chart-theme'
 
 export interface AllocationSlice {
 	id: string
 	label: string
 	value: number
+	/** Series color; take it from `useChartTheme().colors.series` in a fixed order per type. */
 	color: string
 }
 
 interface InvestmentAllocationChartProps {
 	data: AllocationSlice[]
 	totalValue: number
-	isDark: boolean
-	nivoTheme: any
 	formatValue: (_value: number) => string
 }
 
-export default function InvestmentAllocationChart({
-	data,
-	totalValue,
-	isDark,
-	nivoTheme,
-	formatValue,
-}: InvestmentAllocationChartProps) {
+/** Donut of portfolio value per investment type. */
+export default function InvestmentAllocationChart({ data, totalValue, formatValue }: InvestmentAllocationChartProps) {
+	const { theme, colors } = useChartTheme(11)
+	const formatPercent = useFormatPercent()
+
 	return (
 		<ResponsivePie
 			data={data}
@@ -33,26 +32,22 @@ export default function InvestmentAllocationChart({
 			cornerRadius={3}
 			activeOuterRadiusOffset={8}
 			colors={{ datum: 'data.color' }}
-			borderWidth={1}
-			borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
-			enableArcLinkLabels={true}
+			borderWidth={0}
+			enableArcLinkLabels
 			arcLinkLabelsSkipAngle={10}
-			arcLinkLabelsTextColor={isDark ? '#ffffff' : '#333333'}
+			arcLinkLabelsTextColor={colors.text}
 			arcLinkLabelsThickness={2}
 			arcLinkLabelsColor={{ from: 'color' }}
-			arcLabelsSkipAngle={10}
-			arcLabelsTextColor={{ from: 'color', modifiers: [['darker', 2]] }}
-			theme={nivoTheme}
+			enableArcLabels={false}
+			theme={theme}
 			tooltip={({ datum }) => (
-				<div
-					style={{
-						color: datum.color,
-						background: isDark ? '#333' : '#fff',
-						padding: '5px 10px',
-						borderRadius: '4px',
-					}}
-				>
-					<strong>{datum.label}</strong>: {formatValue(datum.value)} ({((datum.value / totalValue) * 100).toFixed(1)}%)
+				<div className={CHART_TOOLTIP_CLASS}>
+					<span className='mr-2 inline-block h-2.5 w-2.5 rounded-full' style={{ backgroundColor: datum.color }} />
+					<span className='font-medium'>{datum.label}</span>
+					<span className='ml-2 tabular-nums'>
+						{formatValue(datum.value)}
+						{totalValue > 0 ? ` (${formatPercent((datum.value / totalValue) * 100)})` : ''}
+					</span>
 				</div>
 			)}
 		/>

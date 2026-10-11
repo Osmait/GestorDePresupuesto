@@ -1,7 +1,7 @@
 'use client'
 
 import { useSearchParams } from 'next/navigation'
-import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
+import { KeyboardEvent, ReactNode, useCallback, useEffect, useId, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 
 interface TabItem {
@@ -33,6 +33,7 @@ export function AnimatedTabs({
 	urlParam = 'tab',
 }: AnimatedTabsProps) {
 	const searchParams = useSearchParams()
+	const idPrefix = useId()
 
 	const urlTab = urlParam ? searchParams.get(urlParam) : null
 	const validUrlTab = urlTab && tabs.some((t) => t.value === urlTab) ? urlTab : null
@@ -118,6 +119,23 @@ export function AnimatedTabs({
 
 	const activeTabContent = tabs.find((tab) => tab.value === activeTab)?.content
 
+	// WAI-ARIA tabs keyboard model: arrows move (and select) the next enabled tab, Home/End jump to the ends.
+	const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+		const prevKey = orientation === 'horizontal' ? 'ArrowLeft' : 'ArrowUp'
+		const nextKey = orientation === 'horizontal' ? 'ArrowRight' : 'ArrowDown'
+		if (![prevKey, nextKey, 'Home', 'End'].includes(event.key)) return
+		const enabled = tabs.map((tab, index) => ({ tab, index })).filter(({ tab }) => !tab.disabled)
+		if (enabled.length === 0) return
+		event.preventDefault()
+		const position = enabled.findIndex(({ index }) => index === activeIndex)
+		let target = enabled[0]
+		if (event.key === 'End') target = enabled[enabled.length - 1]
+		else if (event.key === nextKey) target = enabled[(position + 1) % enabled.length]
+		else if (event.key === prevKey) target = enabled[(position - 1 + enabled.length) % enabled.length]
+		handleTabClick(target.tab.value)
+		tabRefs.current[target.index]?.focus()
+	}
+
 	return (
 		<div className={cn('space-y-6', className)}>
 			{/* Tabs List */}
@@ -125,8 +143,9 @@ export function AnimatedTabs({
 				ref={tabsRef}
 				role='tablist'
 				aria-orientation={orientation}
+				onKeyDown={handleKeyDown}
 				className={cn(
-					'relative inline-flex h-10 items-center justify-center rounded-lg bg-muted/50 p-1 text-muted-foreground backdrop-blur-sm border border-border/50 w-full sm:w-auto',
+					'relative inline-flex h-10 w-full items-center justify-center rounded-lg border border-border/50 bg-muted/50 p-1 text-muted-foreground sm:w-auto',
 					// Many tabs (e.g. the dashboard's 5) don't fit at 390px: scroll instead of overflowing the page.
 					orientation === 'horizontal' && 'flex-row max-w-full justify-start overflow-x-auto sm:justify-center',
 					orientation === 'vertical' && 'flex-col h-auto',
@@ -196,8 +215,10 @@ export function AnimatedTabs({
 							// On mobile only the icon is visible: keep an accessible name (same text as the sm+ label).
 							aria-label={tab.icon ? tab.label : undefined}
 							aria-selected={isActive}
-							aria-controls={`tabpanel-${tab.value}`}
-							id={`tab-${tab.value}`}
+							// Only point at a panel that exists (filter-only tabs render none).
+							aria-controls={noContent ? undefined : `${idPrefix}-panel-${tab.value}`}
+							id={`${idPrefix}-tab-${tab.value}`}
+							tabIndex={isActive ? 0 : -1}
 							onClick={() => handleTabClick(tab.value)}
 							disabled={isDisabled}
 							className={cn(
@@ -241,8 +262,8 @@ export function AnimatedTabs({
 			{!noContent && (
 				<div
 					role='tabpanel'
-					id={`tabpanel-${activeTab}`}
-					aria-labelledby={`tab-${activeTab}`}
+					id={`${idPrefix}-panel-${activeTab}`}
+					aria-labelledby={`${idPrefix}-tab-${activeTab}`}
 					className='min-h-[200px] transition-opacity duration-300 ease-in-out'
 				>
 					{activeTabContent}

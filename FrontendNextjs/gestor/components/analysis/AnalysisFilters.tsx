@@ -1,6 +1,7 @@
 'use client'
 
 import { useTranslations } from 'next-intl'
+import { useId } from 'react'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -30,6 +31,8 @@ export function AnalysisFiltersForm({
 	categories: Category[]
 }) {
 	const t = useTranslations('analysis')
+	const uid = useId()
+	const fieldId = (name: string) => `${uid}-${name}`
 
 	const typeOptions = [
 		{ value: 'INCOME', label: t('income') },
@@ -53,13 +56,14 @@ export function AnalysisFiltersForm({
 	]
 
 	return (
-		<form className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8'>
-			<div className='md:col-span-2 lg:col-span-3 flex flex-col gap-2'>
-				<Label>{t('dateFilterMode')}</Label>
-				<div className='flex gap-2'>
+		<form className='grid grid-cols-1 gap-4'>
+			<fieldset className='min-w-0 space-y-2'>
+				<legend className='text-sm font-medium leading-none'>{t('dateFilterMode')}</legend>
+				<div className='flex flex-wrap gap-2'>
 					<Button
 						type='button'
 						variant={filters.filterMode === 'month' ? 'default' : 'outline'}
+						aria-pressed={filters.filterMode === 'month'}
 						onClick={() =>
 							setFilters((f) => ({ ...f, filterMode: 'month', dateRange: { from: undefined, to: undefined } }))
 						}
@@ -69,18 +73,19 @@ export function AnalysisFiltersForm({
 					<Button
 						type='button'
 						variant={filters.filterMode === 'range' ? 'default' : 'outline'}
+						aria-pressed={filters.filterMode === 'range'}
 						onClick={() => setFilters((f) => ({ ...f, filterMode: 'range', month: 'all', year: '' }))}
 					>
 						{t('dateRange')}
 					</Button>
 				</div>
-			</div>
+			</fieldset>
 			{filters.filterMode === 'month' && (
 				<>
-					<div>
-						<Label htmlFor='month'>{t('month')}</Label>
+					<div className='space-y-2'>
+						<Label htmlFor={fieldId('month')}>{t('month')}</Label>
 						<Select value={filters.month} onValueChange={(v) => setFilters((f) => ({ ...f, month: v }))}>
-							<SelectTrigger id='month' className='w-full'>
+							<SelectTrigger id={fieldId('month')} className='w-full'>
 								<SelectValue placeholder={t('selectMonth')} />
 							</SelectTrigger>
 							<SelectContent>
@@ -92,10 +97,10 @@ export function AnalysisFiltersForm({
 							</SelectContent>
 						</Select>
 					</div>
-					<div>
-						<Label htmlFor='year'>{t('year')}</Label>
+					<div className='space-y-2'>
+						<Label htmlFor={fieldId('year')}>{t('year')}</Label>
 						<Select value={filters.year} onValueChange={(v) => setFilters((f) => ({ ...f, year: v }))}>
-							<SelectTrigger id='year' className='w-full'>
+							<SelectTrigger id={fieldId('year')} className='w-full'>
 								<SelectValue placeholder={t('selectYear')} />
 							</SelectTrigger>
 							<SelectContent>
@@ -110,8 +115,8 @@ export function AnalysisFiltersForm({
 				</>
 			)}
 			{filters.filterMode === 'range' && (
-				<div className='md:col-span-2 lg:col-span-3'>
-					<Label>{t('dateRange')}</Label>
+				<fieldset className='min-w-0 space-y-2'>
+					<legend className='text-sm font-medium leading-none'>{t('dateRange')}</legend>
 					<CalendarDateRangePicker
 						value={filters.dateRange}
 						onChange={(dateRange) => {
@@ -120,12 +125,12 @@ export function AnalysisFiltersForm({
 							}
 						}}
 					/>
-				</div>
+				</fieldset>
 			)}
-			<div>
-				<Label htmlFor='account'>{t('account')}</Label>
+			<div className='space-y-2'>
+				<Label htmlFor={fieldId('account')}>{t('account')}</Label>
 				<Select value={filters.account} onValueChange={(v) => setFilters((f) => ({ ...f, account: v }))}>
-					<SelectTrigger id='account' className='w-full'>
+					<SelectTrigger id={fieldId('account')} className='w-full'>
 						<SelectValue placeholder={t('allAccounts')} />
 					</SelectTrigger>
 					<SelectContent>
@@ -138,10 +143,10 @@ export function AnalysisFiltersForm({
 					</SelectContent>
 				</Select>
 			</div>
-			<div>
-				<Label htmlFor='category'>{t('category')}</Label>
+			<div className='space-y-2'>
+				<Label htmlFor={fieldId('category')}>{t('category')}</Label>
 				<Select value={filters.category} onValueChange={(v) => setFilters((f) => ({ ...f, category: v }))}>
-					<SelectTrigger id='category' className='w-full'>
+					<SelectTrigger id={fieldId('category')} className='w-full'>
 						<SelectValue placeholder={t('allCategories')} />
 					</SelectTrigger>
 					<SelectContent>
@@ -154,10 +159,10 @@ export function AnalysisFiltersForm({
 					</SelectContent>
 				</Select>
 			</div>
-			<div>
-				<Label htmlFor='type'>{t('type')}</Label>
+			<div className='space-y-2'>
+				<Label htmlFor={fieldId('type')}>{t('type')}</Label>
 				<Select value={filters.type} onValueChange={(v) => setFilters((f) => ({ ...f, type: v }))}>
-					<SelectTrigger id='type' className='w-full'>
+					<SelectTrigger id={fieldId('type')} className='w-full'>
 						<SelectValue placeholder={t('allTypes')} />
 					</SelectTrigger>
 					<SelectContent>
@@ -170,10 +175,10 @@ export function AnalysisFiltersForm({
 					</SelectContent>
 				</Select>
 			</div>
-			<div>
-				<Label htmlFor='minAmount'>{t('minAmount')}</Label>
+			<div className='space-y-2'>
+				<Label htmlFor={fieldId('minAmount')}>{t('minAmount')}</Label>
 				<Input
-					id='minAmount'
+					id={fieldId('minAmount')}
 					type='number'
 					value={filters.minAmount}
 					onChange={(e) => setFilters((f) => ({ ...f, minAmount: e.target.value }))}
@@ -182,10 +187,10 @@ export function AnalysisFiltersForm({
 					className='w-full'
 				/>
 			</div>
-			<div>
-				<Label htmlFor='maxAmount'>{t('maxAmount')}</Label>
+			<div className='space-y-2'>
+				<Label htmlFor={fieldId('maxAmount')}>{t('maxAmount')}</Label>
 				<Input
-					id='maxAmount'
+					id={fieldId('maxAmount')}
 					type='number'
 					value={filters.maxAmount}
 					onChange={(e) => setFilters((f) => ({ ...f, maxAmount: e.target.value }))}
@@ -194,10 +199,10 @@ export function AnalysisFiltersForm({
 					className='w-full'
 				/>
 			</div>
-			<div className='md:col-span-2 lg:col-span-3'>
-				<Label htmlFor='search'>{t('searchLabel')}</Label>
+			<div className='space-y-2'>
+				<Label htmlFor={fieldId('search')}>{t('searchLabel')}</Label>
 				<Input
-					id='search'
+					id={fieldId('search')}
 					type='text'
 					value={filters.search}
 					onChange={(e) => setFilters((f) => ({ ...f, search: e.target.value }))}

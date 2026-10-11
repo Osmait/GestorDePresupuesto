@@ -5,6 +5,11 @@ import { ModeToggle } from '@/components/common/ToggleMode'
 
 const mockSetTheme = vi.fn()
 
+vi.mock('next-intl', () => ({
+	useTranslations: () => (key: string) =>
+		({ light: 'Light', dark: 'Dark', system: 'System', toggle: 'Toggle theme' })[key] ?? key,
+}))
+
 vi.mock('next-themes', () => ({
 	useTheme: () => ({
 		setTheme: mockSetTheme,
@@ -17,9 +22,9 @@ describe('ModeToggle', () => {
 		mockSetTheme.mockClear()
 	})
 
-	it('renders toggle button', () => {
+	it('renders a labelled toggle button', () => {
 		render(<ModeToggle />)
-		expect(screen.getByRole('button')).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'Toggle theme' })).toBeInTheDocument()
 	})
 
 	it('opens dropdown and shows theme options', async () => {

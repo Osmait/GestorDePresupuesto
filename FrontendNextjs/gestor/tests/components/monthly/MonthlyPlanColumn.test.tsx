@@ -27,6 +27,8 @@ vi.mock('next-intl', () => ({
 		}
 		if (key === 'dayOfMonth') return `Day ${values?.day}`
 		if (key === 'originalAmount') return `Original: ${values?.amount}`
+		if (key === 'actions.rowMenu') return `Actions for ${values?.name}`
+		if (key === 'shareOfColumn') return `${values?.name} share`
 		return translations[key] || key
 	},
 }))
@@ -131,5 +133,19 @@ describe('MonthlyPlanColumn', () => {
 		renderColumn([])
 
 		expect(screen.queryByTestId('column-total-bill')).not.toBeInTheDocument()
+	})
+
+	it('names the row menu after its item with a 40px target', () => {
+		renderColumn([makeItem()])
+
+		const trigger = screen.getByRole('button', { name: 'Actions for Alquiler' })
+		expect(trigger.className).toContain('size-10')
+	})
+
+	it('labels the share bar of each active item', () => {
+		renderColumn([makeItem({ id: '1' }), makeItem({ id: '2', name: 'Gym', is_active: false })])
+
+		expect(screen.getByRole('progressbar', { name: 'Alquiler share' })).toBeInTheDocument()
+		expect(screen.queryByRole('progressbar', { name: 'Gym share' })).not.toBeInTheDocument()
 	})
 })

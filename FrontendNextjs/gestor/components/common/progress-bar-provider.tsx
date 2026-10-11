@@ -6,7 +6,8 @@ export function ProgressBarProvider({ children }: { children: React.ReactNode })
 	return (
 		<>
 			<NextTopLoader
-				color='#22c55e'
+				// Token color (ink in light, paper in dark); no glow (DESIGN.md > No-Gradient Rule).
+				color='hsl(var(--primary))'
 				initialPosition={0.08}
 				crawlSpeed={200}
 				height={3}
@@ -14,7 +15,7 @@ export function ProgressBarProvider({ children }: { children: React.ReactNode })
 				showSpinner={false}
 				easing='ease'
 				speed={200}
-				shadow='0 0 10px #22c55e,0 0 5px #22c55e'
+				shadow={false}
 				zIndex={1600}
 				showAtBottom={false}
 			/>

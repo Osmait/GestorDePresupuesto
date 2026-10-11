@@ -1,6 +1,6 @@
 'use client'
 
-import { PlusCircle } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useMonthlyPlanContext } from '@/components/monthly/MonthlyPlanContext'
 import { Button } from '@/components/ui/button'
@@ -10,11 +10,8 @@ export function MonthlyPlanActions() {
 	const { openCreate } = useMonthlyPlanContext()
 
 	return (
-		<Button
-			className='bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70'
-			onClick={() => openCreate('bill')}
-		>
-			<PlusCircle className='h-4 w-4 mr-2' />
+		<Button onClick={() => openCreate('bill')}>
+			<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
 			{t('newItem')}
 		</Button>
 	)

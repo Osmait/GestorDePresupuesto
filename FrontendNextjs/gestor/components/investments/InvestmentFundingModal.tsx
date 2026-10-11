@@ -1,28 +1,22 @@
+'use client'
+
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRightLeft, Loader2 } from 'lucide-react'
+import { ArrowRightLeft, Wallet } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useFundBrokerMutation, useGetInvestmentFundingBalances } from '@/hooks/queries/useInvestmentsQuery'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { isFundingAccount } from '@/lib/accounts'
 import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
 import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
 
 interface InvestmentFundingModalProps {
 	isOpen: boolean
@@ -49,6 +43,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 	const tForms = useTranslations('forms')
 	const fundingSchema = useMemo(() => createFundingSchema(t), [t])
 	const locale = useAppLocale()
+	const formatCurrency = useFormatCurrency()
 	const { data: allAccounts = [] } = useGetAccounts()
 	// A credit card is debt, not cash: it cannot fund the broker wallet.
 	const accounts = useMemo(() => allAccounts.filter(isFundingAccount), [allAccounts])
@@ -122,170 +117,172 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 	}
 
 	return (
-		<Dialog open={isOpen} onOpenChange={onClose}>
-			<DialogContent className='max-h-[90vh] overflow-y-auto sm:max-w-[560px]'>
-				<DialogHeader>
-					<DialogTitle>{t('title')}</DialogTitle>
-					<DialogDescription>{t('description')}</DialogDescription>
-				</DialogHeader>
-
-				<div className='rounded-md border p-3 text-sm'>
-					<p className='font-medium'>{t('walletBalances')}</p>
-					<div className='mt-1 space-y-1 text-muted-foreground'>
-						{balances.length === 0 && <p>{t('noFunding')}</p>}
-						{balances.map((balance) => (
-							<p key={balance.currency}>
-								{balance.currency}: {formatCurrency(balance.available, balance.currency, { locale })}
-							</p>
-						))}
+		<FormDialog
+			open={isOpen}
+			onOpenChange={(open) => !open && onClose()}
+			title={t('title')}
+			description={t('description')}
+			submitLabel={t('submit')}
+			loading={fundMutation.isPending}
+			error={
+				error ? (
+					<>
+						<p>{error.message}</p>
+						{error.detail ? <p className='text-xs opacity-90'>{error.detail}</p> : null}
+					</>
+				) : null
+			}
+			onSubmit={form.handleSubmit(onSubmit)}
+		>
+			<Form {...form}>
+				<div className='space-y-4'>
+					<div className='rounded-md bg-muted/50 p-3 text-sm'>
+						<p className='font-medium'>{t('walletBalances')}</p>
+						{balances.length === 0 ? (
+							<EmptyState
+								compact
+								icon={Wallet}
+								title={t('noFunding')}
+								description={t('noFundingDescription')}
+								className='py-4'
+							/>
+						) : (
+							<div className='mt-1 space-y-1 text-muted-foreground tabular-nums'>
+								{balances.map((balance) => (
+									<p key={balance.currency}>
+										{balance.currency}: {formatCurrency(balance.available, balance.currency)}
+									</p>
+								))}
+							</div>
+						)}
 					</div>
-				</div>
 
-				{error && (
-					<Alert variant='destructive'>
-						<AlertDescription>
-							<p>{error.message}</p>
-							{error.detail && <p className='text-xs opacity-90'>{error.detail}</p>}
-						</AlertDescription>
-					</Alert>
-				)}
+					<FormField
+						control={form.control}
+						name='sourceAccountID'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('sourceAccount')}</FormLabel>
+								<Select value={field.value} onValueChange={field.onChange}>
+									<FormControl>
+										<SelectTrigger>
+											<SelectValue placeholder={t('selectAccount')} />
+										</SelectTrigger>
+									</FormControl>
+									<SelectContent>
+										{accounts.map((account) => (
+											<SelectItem key={account.id} value={account.id}>
+												{account.name} ({account.currency || 'DOP'})
+											</SelectItem>
+										))}
+									</SelectContent>
+								</Select>
+								{selectedAccount?.current_balance !== undefined && (
+									<p className='text-xs text-muted-foreground'>
+										{tForms('availableBalance', {
+											amount: formatCurrency(selectedAccount.current_balance, sourceCurrency),
+										})}
+									</p>
+								)}
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
 
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
+					<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
 						<FormField
 							control={form.control}
-							name='sourceAccountID'
+							name='sourceAmount'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>{t('sourceAccount')}</FormLabel>
-									<Select value={field.value} onValueChange={field.onChange}>
-										<FormControl>
-											<SelectTrigger>
-												<SelectValue placeholder={t('selectAccount')} />
-											</SelectTrigger>
-										</FormControl>
-										<SelectContent>
-											{accounts.map((account) => (
-												<SelectItem key={account.id} value={account.id}>
-													{account.name} ({account.currency || 'DOP'})
-												</SelectItem>
-											))}
-										</SelectContent>
-									</Select>
-									{selectedAccount?.current_balance !== undefined && (
-										<p className='text-xs text-muted-foreground'>
-											{tForms('availableBalance', {
-												amount: formatCurrency(selectedAccount.current_balance, sourceCurrency, { locale }),
-											})}
-										</p>
-									)}
+									<FormLabel>{t('amountFromAccount', { currency: sourceCurrency })}</FormLabel>
+									<FormControl>
+										<Input type='number' step='any' inputMode='decimal' {...field} />
+									</FormControl>
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
 
-						<div className='grid gap-3 md:grid-cols-2'>
-							<FormField
-								control={form.control}
-								name='sourceAmount'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('amountFromAccount', { currency: sourceCurrency })}</FormLabel>
-										<FormControl>
-											<Input type='number' step='any' {...field} />
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							<FormField
-								control={form.control}
-								name='targetCurrency'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('targetCurrency')}</FormLabel>
-										<Select value={field.value} onValueChange={field.onChange}>
-											<FormControl>
-												<SelectTrigger>
-													<SelectValue />
-												</SelectTrigger>
-											</FormControl>
-											<SelectContent>
-												{SUPPORTED_CURRENCIES.map((currency) => (
-													<SelectItem key={currency} value={currency}>
-														{currency}
-													</SelectItem>
-												))}
-											</SelectContent>
-										</Select>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							<FormField
-								control={form.control}
-								name='exchangeRate'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>
-											{t('exchangeRate', { source: sourceCurrency, target: watchedValues.targetCurrency })}
-										</FormLabel>
-										<FormControl>
-											<Input type='number' step='any' {...field} disabled={!requiresExchangeRate} />
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							<FormField
-								control={form.control}
-								name='feeAmount'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('fees', { currency: sourceCurrency })}</FormLabel>
-										<FormControl>
-											<Input type='number' step='any' {...field} />
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-						</div>
-
-						<div className='rounded-md border p-3 text-sm text-muted-foreground'>
-							<p className='font-medium text-foreground'>{t('estimatedCredit')}</p>
-							<div className='mt-1 flex flex-wrap items-center gap-2'>
-								<span>{formatCurrency(Number(watchedValues.sourceAmount) || 0, sourceCurrency, { locale })}</span>
-								<ArrowRightLeft className='h-4 w-4' />
-								<span>{formatCurrency(estimatedTargetAmount, watchedValues.targetCurrency, { locale })}</span>
-							</div>
-						</div>
-
 						<FormField
 							control={form.control}
-							name='notes'
+							name='targetCurrency'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel>{t('notes')}</FormLabel>
-									<FormControl>
-										<Input {...field} placeholder={t('notesPlaceholder')} />
-									</FormControl>
+									<FormLabel>{t('targetCurrency')}</FormLabel>
+									<Select value={field.value} onValueChange={field.onChange}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{SUPPORTED_CURRENCIES.map((currency) => (
+												<SelectItem key={currency} value={currency}>
+													{currency}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<FormMessage />
 								</FormItem>
 							)}
 						/>
 
-						<DialogFooter>
-							<Button type='submit' disabled={fundMutation.isPending}>
-								{fundMutation.isPending && <Loader2 className='mr-2 h-4 w-4 animate-spin' />}
-								{t('submit')}
-							</Button>
-						</DialogFooter>
-					</form>
-				</Form>
-			</DialogContent>
-		</Dialog>
+						<FormField
+							control={form.control}
+							name='exchangeRate'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>
+										{t('exchangeRate', { source: sourceCurrency, target: watchedValues.targetCurrency })}
+									</FormLabel>
+									<FormControl>
+										<Input type='number' step='any' inputMode='decimal' {...field} disabled={!requiresExchangeRate} />
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+
+						<FormField
+							control={form.control}
+							name='feeAmount'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>{t('fees', { currency: sourceCurrency })}</FormLabel>
+									<FormControl>
+										<Input type='number' step='any' inputMode='decimal' {...field} />
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+					</div>
+
+					<div className='rounded-md bg-muted/50 p-3 text-sm text-muted-foreground'>
+						<p className='font-medium text-foreground'>{t('estimatedCredit')}</p>
+						<div className='mt-1 flex flex-wrap items-center gap-2 tabular-nums'>
+							<span>{formatCurrency(Number(watchedValues.sourceAmount) || 0, sourceCurrency)}</span>
+							<ArrowRightLeft className='h-4 w-4' aria-hidden='true' />
+							<span>{formatCurrency(estimatedTargetAmount, watchedValues.targetCurrency)}</span>
+						</div>
+					</div>
+
+					<FormField
+						control={form.control}
+						name='notes'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('notes')}</FormLabel>
+								<FormControl>
+									<Input {...field} placeholder={t('notesPlaceholder')} />
+								</FormControl>
+							</FormItem>
+						)}
+					/>
+				</div>
+			</Form>
+		</FormDialog>
 	)
 }

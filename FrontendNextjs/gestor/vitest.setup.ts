@@ -4,6 +4,26 @@ import { vi } from 'vitest'
 // `server-only` throws outside the react-server condition; tests import server modules directly.
 vi.mock('server-only', () => ({}))
 
+// jsdom has no matchMedia. Default to a desktop viewport so responsive
+// components (FormDialog) render their Dialog, not the mobile vaul Drawer.
+// Tests that need another viewport can still override window.matchMedia.
+if (typeof window !== 'undefined' && !window.matchMedia) {
+    Object.defineProperty(window, 'matchMedia', {
+        writable: true,
+        configurable: true,
+        value: (query: string) => ({
+            matches: /min-width/.test(query),
+            media: query,
+            onchange: null,
+            addEventListener: vi.fn(),
+            removeEventListener: vi.fn(),
+            addListener: vi.fn(),
+            removeListener: vi.fn(),
+            dispatchEvent: vi.fn(),
+        }),
+    })
+}
+
 // Mock next-auth globally to avoid issues with next/server imports in JSDOM
 vi.mock('next-auth', () => ({
     default: vi.fn(),

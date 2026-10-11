@@ -1,6 +1,5 @@
 'use client'
-import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
-import { TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import { Plus, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { AccountCard } from '@/components/accounts/AccountCard'
@@ -9,99 +8,93 @@ import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard'
 import { AccountsPageSkeleton } from '@/components/accounts/AccountsPageSkeleton'
 import { AccountUpdateModal } from '@/components/accounts/AccountUpdateModal'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { ErrorState } from '@/components/shared/ErrorState'
+import { Button } from '@/components/ui/button'
 import { Account } from '@/types/account'
 
-// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
-// full feature bundle (layout, drag) is not needed.
-export default function AccountsClient() {
-	return (
-		<LazyMotion features={domAnimation}>
-			<AccountsClientView />
-		</LazyMotion>
-	)
+type BalanceFilter = 'all' | 'positive' | 'negative'
+
+function getAccountBalance(account: Account) {
+	return account.current_balance ?? account.initial_balance ?? 0
 }
 
-function AccountsClientView() {
+export default function AccountsClient() {
 	const t = useTranslations('accounts')
-	const { accounts, isLoading, updateAccount, deleteAccount, error } = useAccountContext()
+	const { accounts, isLoading, updateAccount, deleteAccount, error, refetch, setCreateOpen } = useAccountContext()
 	const [updateModalOpen, setUpdateModalOpen] = useState(false)
 	const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
+	const list = Array.isArray(accounts) ? accounts : []
 
-	// Helper function to get account balance
-	const getAccountBalance = (account: any) => account.current_balance ?? account.initial_balance ?? 0
-
-	// Handle edit account
 	const handleEditAccount = (account: Account) => {
 		setSelectedAccount(account)
 		setUpdateModalOpen(true)
-	}
-
-	// Filter functions
-	const getFilteredAccounts = (filter: 'all' | 'positive' | 'negative') => {
-		if (!Array.isArray(accounts)) return []
-
-		switch (filter) {
-			case 'positive':
-				return accounts.filter((account) => getAccountBalance(account) > 0)
-			case 'negative':
-				return accounts.filter((account) => getAccountBalance(account) < 0)
-			default:
-				return accounts
-		}
 	}
 
 	if (isLoading) {
 		return <AccountsPageSkeleton />
 	}
 
-	const renderTabContent = (filter: 'all' | 'positive' | 'negative') => {
-		const filteredAccounts = getFilteredAccounts(filter)
-		const emptyMessages = {
-			all: t('noAccountsAll'),
-			positive: t('noPositiveAccounts'),
-			negative: t('noNegativeAccounts'),
-		}
+	// A failed refetch keeps showing the cached list; only an empty failed load is an error page.
+	if (error && list.length === 0) {
+		return <ErrorState onRetry={() => void refetch()} />
+	}
 
-		if (filteredAccounts.length === 0) {
-			return <div className='text-center text-muted-foreground py-8'>{emptyMessages[filter]}</div>
-		}
-
+	if (list.length === 0) {
 		return (
-			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-				<AnimatePresence mode='popLayout' initial={false}>
-					{filteredAccounts.map((account) => (
-						<m.div
-							key={account.id}
-							initial={{ opacity: 0, y: 15 }}
-							animate={{ opacity: 1, y: 0 }}
-							exit={{ opacity: 0, scale: 0.95 }}
-							transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-						>
-							<AccountCard
-								account={account}
-								onAccountDeleted={() => deleteAccount(account.id!)}
-								onAccountEdit={handleEditAccount}
-							/>
-						</m.div>
-					))}
-				</AnimatePresence>
+			<EmptyState
+				icon={Wallet}
+				title={t('emptyTitle')}
+				description={t('emptyDescription')}
+				action={
+					<Button onClick={() => setCreateOpen(true)}>
+						<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
+						{t('addAccount')}
+					</Button>
+				}
+			/>
+		)
+	}
+
+	const filterAccounts = (filter: BalanceFilter) => {
+		switch (filter) {
+			case 'positive':
+				return list.filter((account) => getAccountBalance(account) > 0)
+			case 'negative':
+				return list.filter((account) => getAccountBalance(account) < 0)
+			default:
+				return list
+		}
+	}
+
+	const emptyMessages: Record<BalanceFilter, string> = {
+		all: t('noAccountsAll'),
+		positive: t('noPositiveAccounts'),
+		negative: t('noNegativeAccounts'),
+	}
+
+	const renderTabContent = (filter: BalanceFilter) => {
+		const filteredAccounts = filterAccounts(filter)
+		if (filteredAccounts.length === 0) {
+			return <EmptyState compact icon={Wallet} title={emptyMessages[filter]} />
+		}
+		return (
+			<div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+				{filteredAccounts.map((account) => (
+					<AccountCard
+						key={account.id}
+						account={account}
+						onAccountDeleted={() => deleteAccount(account.id!)}
+						onAccountEdit={handleEditAccount}
+					/>
+				))}
 			</div>
 		)
 	}
 
 	const tabsConfig = [
-		{
-			value: 'all',
-			label: t('all'),
-			icon: <Wallet className='h-4 w-4' />,
-			filter: 'all' as const,
-		},
-		{
-			value: 'positive',
-			label: t('positive'),
-			icon: <TrendingUp className='h-4 w-4' />,
-			filter: 'positive' as const,
-		},
+		{ value: 'all', label: t('all'), icon: <Wallet className='h-4 w-4' />, filter: 'all' as const },
+		{ value: 'positive', label: t('positive'), icon: <TrendingUp className='h-4 w-4' />, filter: 'positive' as const },
 		{
 			value: 'negative',
 			label: t('negative'),
@@ -111,16 +104,10 @@ function AccountsClientView() {
 	]
 
 	return (
-		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-			<div className='mb-8'>
-				{Array.isArray(accounts) && accounts.length > 0 ? (
-					<AccountSummaryCard accounts={accounts} />
-				) : (
-					<div className='text-center text-muted-foreground py-8'>{t('noAccountsAll')}</div>
-				)}
-			</div>
+		<div className='space-y-6'>
+			<AccountSummaryCard accounts={list} />
 
-			{/* Contenido principal con tabs animados */}
+			{/* Segmented balance filter (AnimatedTabs as a filter control, see DESIGN.md > Tabs). */}
 			<AnimatedTabs
 				defaultValue='all'
 				className='space-y-6'
@@ -137,9 +124,7 @@ function AccountsClientView() {
 				setOpen={setUpdateModalOpen}
 				account={selectedAccount}
 				updateAccount={updateAccount}
-				isLoading={isLoading}
-				error={error}
 			/>
-		</m.div>
+		</div>
 	)
 }

@@ -1,6 +1,6 @@
+import { Amount } from '@/components/shared/Amount'
 import { formatLocalDate } from '@/lib/i18n/date-locale'
-import { getSignedAmount, isInflowTransaction } from '@/lib/transaction-utils'
-import { formatCurrency } from '@/lib/utils'
+import { getSignedAmount } from '@/lib/transaction-utils'
 import type { Category } from '@/types/category'
 import type { Transaction } from '@/types/transaction'
 
@@ -14,14 +14,14 @@ export function DashboardTransactionItem({
 	category?: Category
 	locale?: string
 }) {
-	const isIncome = isInflowTransaction(transaction.type_transation)
-
 	return (
-		<div className='flex items-center justify-between gap-3 p-3 rounded-lg border border-border/40 dark:border-border/20 hover:bg-accent/50 dark:hover:bg-accent/50 transition-colors'>
+		<div className='flex items-center justify-between gap-3 rounded-lg border p-3'>
 			<div className='flex min-w-0 items-center gap-3'>
+				{/* Category color and emoji are user data; uncategorized rows use the muted fill. */}
 				<div
-					className='w-10 h-10 shrink-0 rounded-full flex items-center justify-center text-lg'
-					style={{ backgroundColor: category?.color || '#6B7280' }}
+					className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-lg'
+					style={category?.color ? { backgroundColor: category.color } : undefined}
+					aria-hidden='true'
 				>
 					{category?.icon || '💳'}
 				</div>
@@ -32,14 +32,14 @@ export function DashboardTransactionItem({
 				</div>
 			</div>
 			<div className='shrink-0 text-right'>
-				<p
-					className={`font-bold tabular-nums whitespace-nowrap ${isIncome ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-				>
-					{formatCurrency(getSignedAmount(transaction), transaction.currency, {
-						locale,
-						signDisplay: 'exceptZero',
-					})}
-				</p>
+				{/* Signed amount: income/inflows positive, expenses negative. */}
+				<Amount
+					value={getSignedAmount(transaction)}
+					currency={transaction.currency}
+					tone='auto'
+					signed
+					className='font-semibold'
+				/>
 				<p className='text-xs text-muted-foreground truncate max-w-[8rem]'>{category?.name}</p>
 			</div>
 		</div>

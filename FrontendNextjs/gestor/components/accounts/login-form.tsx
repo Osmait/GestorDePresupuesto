@@ -23,6 +23,7 @@ interface LoginFormProps {
 
 export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 	const t = useTranslations('auth.login')
+	const tAuth = useTranslations('auth')
 	const [isLoading, setIsLoading] = useState(false)
 	const [showPassword, setShowPassword] = useState(false)
 	const [error, setError] = useState<string | null>(null)
@@ -71,21 +72,21 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 	}
 
 	return (
-		<Card className='w-full max-w-md mx-auto shadow-lg border-border/50'>
+		<Card className='mx-auto w-full max-w-md'>
 			<CardHeader className='space-y-1 text-center'>
-				<div className='flex items-center justify-center mb-4'>
-					<div className='w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center'>
-						<LogIn className='h-6 w-6 text-primary-foreground' />
+				<div className='mb-4 flex items-center justify-center'>
+					<div className='flex h-12 w-12 items-center justify-center rounded-lg bg-primary'>
+						<LogIn className='h-6 w-6 text-primary-foreground' aria-hidden='true' />
 					</div>
 				</div>
-				<CardTitle className='text-2xl font-bold text-center'>{t('title')}</CardTitle>
-				<CardDescription className='text-muted-foreground'>{t('subtitle')}</CardDescription>
+				<CardTitle className='text-center text-2xl font-bold'>{t('title')}</CardTitle>
+				<CardDescription>{t('subtitle')}</CardDescription>
 			</CardHeader>
 
 			<CardContent className='space-y-6'>
 				{error && (
 					<Alert variant='destructive'>
-						<AlertCircle className='h-4 w-4' />
+						<AlertCircle className='h-4 w-4' aria-hidden='true' />
 						<AlertDescription>{error}</AlertDescription>
 					</Alert>
 				)}
@@ -97,19 +98,23 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 							name='email'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className='text-sm font-medium'>{t('email')}</FormLabel>
-									<FormControl>
-										<div className='relative'>
-											<Mail className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+									<FormLabel>{t('email')}</FormLabel>
+									<div className='relative'>
+										<Mail
+											className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground'
+											aria-hidden='true'
+										/>
+										<FormControl>
 											<Input
 												{...field}
 												type='email'
+												autoComplete='email'
 												placeholder={t('emailPlaceholder')}
 												disabled={isLoading}
-												className='pl-10 border-border/50 focus:border-primary/50 transition-colors'
+												className='pl-10'
 											/>
-										</div>
-									</FormControl>
+										</FormControl>
+									</div>
 									<FormMessage />
 								</FormItem>
 							)}
@@ -120,51 +125,53 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 							name='password'
 							render={({ field }) => (
 								<FormItem>
-									<FormLabel className='text-sm font-medium'>{t('password')}</FormLabel>
-									<FormControl>
-										<div className='relative'>
-											<Lock className='absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground' />
+									<FormLabel>{t('password')}</FormLabel>
+									<div className='relative'>
+										<Lock
+											className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground'
+											aria-hidden='true'
+										/>
+										<FormControl>
 											<Input
 												{...field}
 												type={showPassword ? 'text' : 'password'}
+												autoComplete='current-password'
 												placeholder='••••••••'
 												disabled={isLoading}
-												className='pl-10 pr-10 border-border/50 focus:border-primary/50 transition-colors'
+												className='pl-10 pr-11'
 											/>
-											<Button
-												type='button'
-												variant='ghost'
-												size='sm'
-												className='absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-transparent'
-												onClick={() => setShowPassword(!showPassword)}
-												disabled={isLoading}
-											>
-												{showPassword ? (
-													<EyeOff className='h-4 w-4 text-muted-foreground' />
-												) : (
-													<Eye className='h-4 w-4 text-muted-foreground' />
-												)}
-											</Button>
-										</div>
-									</FormControl>
+										</FormControl>
+										<Button
+											type='button'
+											variant='ghost'
+											size='icon'
+											className='absolute right-0 top-0 text-muted-foreground hover:bg-transparent hover:text-foreground'
+											onClick={() => setShowPassword(!showPassword)}
+											disabled={isLoading}
+											aria-label={tAuth('showPassword')}
+											aria-pressed={showPassword}
+										>
+											{showPassword ? (
+												<EyeOff className='h-4 w-4' aria-hidden='true' />
+											) : (
+												<Eye className='h-4 w-4' aria-hidden='true' />
+											)}
+										</Button>
+									</div>
 									<FormMessage />
 								</FormItem>
 							)}
 						/>
 
-						<Button
-							type='submit'
-							className='w-full bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 text-primary-foreground font-medium transition-all duration-200'
-							disabled={isLoading}
-						>
+						<Button type='submit' className='w-full' disabled={isLoading} aria-busy={isLoading || undefined}>
 							{isLoading ? (
 								<>
-									<Loader2 className='mr-2 h-4 w-4 animate-spin' />
+									<Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' />
 									{t('submitting')}
 								</>
 							) : (
 								<>
-									<LogIn className='mr-2 h-4 w-4' />
+									<LogIn className='mr-2 h-4 w-4' aria-hidden='true' />
 									{t('submit')}
 								</>
 							)}
@@ -173,8 +180,8 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 				</Form>
 
 				<div className='relative'>
-					<div className='absolute inset-0 flex items-center'>
-						<span className='w-full border-t border-border/50' />
+					<div className='absolute inset-0 flex items-center' aria-hidden='true'>
+						<span className='w-full border-t border-border' />
 					</div>
 					<div className='relative flex justify-center text-xs uppercase'>
 						<span className='bg-card px-2 text-muted-foreground'>{t('or')}</span>
@@ -191,7 +198,7 @@ export function LoginForm({ onToggleForm, showToggle = true }: LoginFormProps) {
 							<Button
 								type='button'
 								variant='link'
-								className='p-0 h-auto font-semibold text-primary hover:text-primary/80'
+								className='h-auto p-0 font-semibold'
 								onClick={onToggleForm}
 								disabled={isLoading}
 							>

@@ -1,24 +1,29 @@
 'use client'
 
 import Atropos from 'atropos/react'
-import { useEffect, useState } from 'react'
+import { type Ref, useEffect, useState } from 'react'
 import 'atropos/css'
 import { ArrowLeftRight, CreditCard as CardIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { CreditCard } from '@/types/creditcard'
 
 interface CreditCardAtroposVisualProps {
 	card: CreditCard
 	totalDebtByCurrency: Array<{ currency: string; debt: number }>
 	onFlip: () => void
+	flipButtonRef?: Ref<HTMLButtonElement>
 }
 
-export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: CreditCardAtroposVisualProps) {
+export function CreditCardAtroposVisual({
+	card,
+	totalDebtByCurrency,
+	onFlip,
+	flipButtonRef,
+}: CreditCardAtroposVisualProps) {
 	const t = useTranslations('creditCards.item')
-	const locale = useAppLocale()
+	const formatCurrency = useFormatCurrency()
 	const [motionEnabled, setMotionEnabled] = useState(false)
 
 	useEffect(() => {
@@ -29,21 +34,17 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 	}, [])
 
 	const visualContent = (
-		<div
-			className='relative cursor-pointer overflow-hidden rounded-xl border border-border/70 bg-card p-4 text-card-foreground'
-			onClick={onFlip}
-		>
-			<div className='pointer-events-none absolute inset-0 bg-gradient-to-br from-primary/10 via-transparent to-transparent' />
-			<div className='relative space-y-4'>
+		<div className='relative h-full cursor-pointer overflow-hidden rounded-lg border bg-card p-4 text-card-foreground shadow-sm'>
+			<div className='flex h-full flex-col gap-4'>
 				<div className='flex items-center justify-between'>
 					<div className='flex min-w-0 flex-wrap items-center gap-2'>
 						<div className='rounded-md border border-border/60 bg-muted/30 p-1.5'>
-							<CardIcon className='h-3.5 w-3.5 text-muted-foreground' />
+							<CardIcon className='h-3.5 w-3.5 text-muted-foreground' aria-hidden='true' />
 						</div>
 						{card.balances.map((balance) => (
 							<span
 								key={balance.id}
-								className='rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-[10px] font-medium text-muted-foreground'
+								className='rounded-full border border-border/60 bg-muted/20 px-2 py-0.5 text-xs font-medium text-muted-foreground'
 							>
 								{balance.currency}
 							</span>
@@ -53,21 +54,24 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 						variant='ghost'
 						size='sm'
 						type='button'
+						ref={flipButtonRef}
 						onPointerDown={(event) => event.stopPropagation()}
 						onClick={(event) => {
 							event.stopPropagation()
 							onFlip()
 						}}
-						className='h-7 gap-1 px-2 text-[11px] text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+						// The pseudo-element stretches the button's hit area over the whole card,
+						// so a click anywhere flips it while keyboard users get a real button.
+						className='h-8 gap-1 px-2 text-xs text-muted-foreground after:absolute after:inset-0 hover:bg-accent hover:text-accent-foreground'
 					>
-						<ArrowLeftRight className='h-3 w-3' />
+						<ArrowLeftRight className='h-3 w-3' aria-hidden='true' />
 						{t('viewDetails')}
 					</Button>
 				</div>
 
 				<div className='flex items-start justify-between'>
 					<div data-atropos-offset='2'>
-						<p className='text-[11px] uppercase tracking-[0.18em] text-muted-foreground'>{card.bank}</p>
+						<p className='text-xs uppercase tracking-wider text-muted-foreground'>{card.bank}</p>
 						<p className='text-base font-semibold leading-tight text-card-foreground'>{card.name}</p>
 					</div>
 					<p
@@ -79,13 +83,13 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 				</div>
 
 				<div className='space-y-1.5' data-atropos-offset='6'>
-					<p className='text-[11px] text-muted-foreground'>{t('outstanding')}</p>
+					<p className='text-xs text-muted-foreground'>{t('outstanding')}</p>
 					{totalDebtByCurrency.length > 0 ? (
 						totalDebtByCurrency.map((item) => (
 							<div key={item.currency} className='flex items-center justify-between'>
 								<span className='text-xs text-muted-foreground'>{item.currency}</span>
-								<span className='text-sm font-semibold text-card-foreground'>
-									{formatCurrency(item.debt, item.currency, { locale })}
+								<span className='text-sm font-semibold tabular-nums text-card-foreground'>
+									{formatCurrency(item.debt, item.currency)}
 								</span>
 							</div>
 						))
@@ -98,7 +102,7 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 				</div>
 
 				<div
-					className='grid grid-cols-2 gap-3 rounded-lg border border-border/60 bg-muted/20 p-2 text-xs'
+					className='mt-auto grid grid-cols-2 gap-3 rounded-lg border border-border/60 bg-muted/20 p-2 text-xs'
 					data-atropos-offset='4'
 				>
 					<div>
@@ -115,7 +119,7 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 	)
 
 	if (!motionEnabled) {
-		return <div className='w-full'>{visualContent}</div>
+		return <div className='h-full w-full'>{visualContent}</div>
 	}
 
 	return (
@@ -127,7 +131,7 @@ export function CreditCardAtroposVisual({ card, totalDebtByCurrency, onFlip }: C
 			rotateYMax={6}
 			duration={220}
 			highlight={false}
-			className='w-full'
+			className='h-full w-full'
 		>
 			{visualContent}
 		</Atropos>

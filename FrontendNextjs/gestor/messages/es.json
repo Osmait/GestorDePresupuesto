@@ -53,6 +53,9 @@
       "ruleLowercase": "Minúscula",
       "ruleUppercase": "Mayúscula",
       "ruleNumber": "Número",
+      "ruleMet": "cumplido",
+      "ruleNotMet": "pendiente",
+      "rulesLabel": "Requisitos de la contraseña",
       "submit": "Crear Cuenta",
       "submitting": "Creando cuenta...",
       "error": "Error al crear la cuenta",
@@ -66,15 +69,101 @@
       "tryDemo": "Probar Demo Interactiva",
       "welcome": "¡Bienvenido al modo Demo! 🎮",
       "error": "Error al iniciar modo demo",
-      "loginError": "Error iniciando sesión demo"
+      "loginError": "Error iniciando sesión demo",
+      "tour": {
+        "next": "Siguiente",
+        "prev": "Anterior",
+        "done": "¡Entendido!",
+        "progress": "Paso {current} de {total}",
+        "dashboard": {
+          "welcome": {
+            "title": "Bienvenido al Modo Demo",
+            "description": "Este es un entorno seguro con datos de prueba. Siéntete libre de explorar sin miedo a romper nada."
+          },
+          "stats": {
+            "title": "Métricas principales",
+            "description": "Aquí verás un resumen rápido de tu estado financiero: balance total, ingresos y gastos del mes."
+          },
+          "charts": {
+            "title": "Análisis visual",
+            "description": "Gráficas interactivas para entender mejor a dónde va tu dinero. Pasa el cursor por encima para ver detalles."
+          },
+          "recent": {
+            "title": "Tus movimientos",
+            "description": "Lista de tus últimas transacciones. Todo lo que registres aparecerá aquí automáticamente."
+          }
+        },
+        "accounts": {
+          "header": {
+            "title": "Cuentas",
+            "description": "Aquí administras tus cuentas bancarias, efectivo o tarjetas."
+          },
+          "add": {
+            "title": "Nueva cuenta",
+            "description": "Crea una cuenta ficticia para probar. Puedes ponerle el saldo inicial que quieras."
+          },
+          "list": {
+            "title": "Tus cuentas",
+            "description": "Aquí verás todas tus cuentas listadas con sus saldos actualizados."
+          }
+        },
+        "categories": {
+          "header": {
+            "title": "Categorías",
+            "description": "Organiza tus transacciones en categorías personalizadas (Comida, Transporte, Ocio, etc.)."
+          },
+          "add": {
+            "title": "Crear categoría",
+            "description": "Añade una categoría nueva con el icono y color que prefieras."
+          },
+          "list": {
+            "title": "Listado de categorías",
+            "description": "Gestiona tus categorías existentes. Puedes editarlas o eliminarlas si no tienen transacciones."
+          }
+        },
+        "budgets": {
+          "header": {
+            "title": "Presupuestos",
+            "description": "Establece límites de gasto para tus categorías y mantén tus finanzas bajo control."
+          },
+          "add": {
+            "title": "Nuevo presupuesto",
+            "description": "Define un límite mensual para una categoría. Te avisaremos si te acercas al límite."
+          },
+          "list": {
+            "title": "Seguimiento",
+            "description": "Visualiza el progreso de tus presupuestos. Las barras cambian de color según el porcentaje gastado."
+          }
+        },
+        "transactions": {
+          "header": {
+            "title": "Historial de transacciones",
+            "description": "El corazón de tu gestión. Revisa cada movimiento al detalle."
+          },
+          "add": {
+            "title": "Registrar movimiento",
+            "description": "Añade un gasto, ingreso o transferencia. Se reflejará al instante en tus cuentas y presupuestos."
+          },
+          "tabs": {
+            "title": "Vistas alternativas",
+            "description": "Cambia entre el historial completo y tus transacciones recurrentes (suscripciones, alquiler, etc.)."
+          },
+          "list": {
+            "title": "Detalles",
+            "description": "Filtra, ordena y busca transacciones específicas en esta lista."
+          }
+        }
+      }
     },
     "container": {
       "login": "Iniciar Sesión",
       "register": "Crear Cuenta",
       "devMode": "Modo Desarrollo",
       "description": "Sistema de gestión financiera personal",
-      "tech": "Desarrollado con Next.js, TypeScript y Tailwind CSS"
+      "tech": "Desarrollado con Next.js, TypeScript y Tailwind CSS",
+      "modeLabel": "Inicia sesión o crea una cuenta"
     },
+    "showPassword": "Mostrar contraseña",
     "passkey": {
       "signIn": "Iniciar sesión con passkey",
       "success": "Sesión iniciada con passkey",
@@ -129,7 +218,21 @@
     "configuration": "Configuración",
     "menu": "Menú",
     "monthlyPlan": "Plan Mensual",
-    "monthlyPlanDesc": "Gastos fijos e ingresos esperados"
+    "monthlyPlanDesc": "Gastos fijos e ingresos esperados",
+    "expand": "Expandir",
+    "notificationCenter": {
+      "open": "Notificaciones",
+      "openUnread": "Notificaciones, {count} sin leer",
+      "title": "Notificaciones ({count})",
+      "connected": "En vivo",
+      "disconnected": "Sin conexión",
+      "markAllRead": "Marcar todas como leídas",
+      "clearAll": "Borrar todas",
+      "empty": "Aún no tienes notificaciones",
+      "recurringExecuted": "Transacción recurrente",
+      "generic": "Notificación",
+      "unread": "Sin leer"
+    }
   },
   "dashboard": {
     "title": "Dashboard",
@@ -147,8 +250,8 @@
     "budgetProgress": "Progreso de Presupuestos",
     "budgetSummary": "Resumen Presupuestos",
     "viewAll": "Ver todos",
-    "noData": "Sin datos disponibles",
-    "noBudgetsConfigured": "No hay presupuestos configurados",
+    "noData": "No hay datos para este período",
+    "noBudgetsConfigured": "Aún no tienes presupuestos",
     "createBudgetHint": "Crea tu primer presupuesto para comenzar a controlar tus gastos por categoría.",
     "moreBudgets": "presupuestos más",
     "overview": "Resumen",
@@ -170,11 +273,12 @@
     "totalPatrimony": "Patrimonio Total",
     "activeItems": "activos",
     "exchangeRate": "Tasa de cambio (1 US$)",
-    "distribution": "Distribución"
+    "distribution": "Distribución",
+    "sectionsLabel": "Secciones del panel"
   },
   "accounts": {
-    "title": "Gestión de Cuentas",
-    "subtitle": "Gestión de cuentas bancarias",
+    "title": "Cuentas",
+    "subtitle": "Tus cuentas bancarias y sus saldos",
     "summary": "Resumen de Cuentas",
     "addAccount": "Nueva Cuenta",
     "editAccount": "Editar Cuenta",
@@ -194,26 +298,31 @@
     "all": "Todas",
     "positive": "Positivas",
     "negative": "Negativas",
-    "noAccountsAll": "No tienes cuentas registradas.",
-    "noPositiveAccounts": "No tienes cuentas positivas.",
-    "noNegativeAccounts": "No tienes cuentas negativas.",
+    "noAccountsAll": "Aún no tienes cuentas",
+    "noPositiveAccounts": "No tienes cuentas con saldo positivo",
+    "noNegativeAccounts": "No tienes cuentas con saldo negativo",
     "confirmDelete": "¿Estás seguro de eliminar esta cuenta?",
-    "noAccounts": "No hay cuentas",
-    "deleteTitle": "Eliminar Cuenta",
-    "deleteDescription": "¿Estás seguro de que quieres eliminar la cuenta \"{name}\"? Esta acción no se puede deshacer.",
-    "deleting": "Eliminando...",
+    "noAccounts": "Aún no tienes cuentas",
+    "deleteTitle": "¿Eliminar la cuenta \"{name}\"?",
+    "deleteError": "No se pudo eliminar la cuenta. Inténtalo de nuevo.",
+    "createError": "No se pudo crear la cuenta. Revisa los datos e inténtalo de nuevo.",
+    "saveError": "No se pudieron guardar los cambios. Inténtalo de nuevo.",
+    "editDescription": "Puedes cambiar el nombre y el banco. El saldo inicial no se puede modificar.",
+    "minChars": "Usa al menos {count} caracteres",
+    "balanceMin": "El saldo inicial no puede ser negativo",
+    "emptyTitle": "Aún no tienes cuentas",
+    "emptyDescription": "Agrega tu primera cuenta para registrar transacciones y seguir su saldo.",
     "edit": "Editar cuenta",
     "delete": "Eliminar cuenta",
     "high": "Alto",
     "medium": "Medio",
     "low": "Bajo",
-    "options": "Opciones de la cuenta {name}",
     "detail": {
       "back": "Volver a Cuentas",
       "notFoundTitle": "Cuenta no encontrada",
       "notFoundDescription": "No pudimos encontrar la cuenta que estás buscando.",
       "recentTransactions": "Últimas transacciones",
-      "noTransactions": "No hay transacciones registradas en esta cuenta además del saldo inicial.",
+      "noTransactions": "Aún no hay movimientos en esta cuenta",
       "details": "Detalles",
       "accountType": "Tipo de cuenta",
       "typeBank": "Cuenta bancaria",
@@ -224,7 +333,7 @@
   },
   "transactions": {
     "noDescription": "Sin descripción",
-    "title": "Gestión de Transacciones",
+    "title": "Transacciones",
     "subtitle": "Supervisa y analiza todas tus transacciones financieras",
     "summary": "Resumen de Transacciones",
     "totalIncome": "Total Ingresos",
@@ -283,7 +392,11 @@
     "deleting": "Eliminando…",
     "cancel": "Cancelar",
     "type": "Tipo",
-    "options": "Opciones de la transacción",
+    "emptyDescription": "No hay movimientos en este período ni con estos filtros. Registra uno nuevo o cambia los filtros.",
+    "deleteError": "No se pudo eliminar la transacción. Inténtalo de nuevo.",
+    "saveError": "No se pudo guardar la transacción. Revisa los datos e inténtalo de nuevo.",
+    "aiTools": "Herramientas IA",
+    "dateRange": "Rango de fechas",
     "types": {
       "income": "Ingreso",
       "bill": "Gasto",
@@ -293,18 +406,19 @@
       "investment_funding": "Fondeo de inversión",
       "loan_cancellation_refund": "Reembolso por cancelación de préstamo",
       "unknown": "Otro"
-    }
+    },
+    "sectionsLabel": "Secciones de transacciones"
   },
   "loans": {
     "title": "Préstamos",
     "subtitle": "Gestiona dinero prestado, intereses y cuotas",
-    "loading": "Cargando préstamos...",
     "loadError": "No se pudieron cargar los préstamos",
     "loadDetailsError": "No se pudo cargar el detalle del préstamo",
     "newLoan": "Nuevo préstamo",
     "newLoanDescription": "Registra un nuevo préstamo que saldrá de una cuenta",
     "loanPortfolio": "Portafolio de préstamos",
-    "empty": "Aún no tienes préstamos registrados",
+    "emptyTitle": "Aún no tienes préstamos",
+    "emptyDescription": "Registra el dinero que prestas para seguir sus cuotas, pagos e intereses.",
     "borrower": "Prestatario",
     "contact": "Contacto",
     "principal": "Capital",
@@ -318,6 +432,7 @@
     "registerPayment": "Registrar pago",
     "destinationAccount": "Cuenta destino",
     "sourceAccount": "Cuenta origen",
+    "selectAccount": "Selecciona una cuenta",
     "amount": "Monto",
     "paymentDate": "Fecha de pago",
     "annualRate": "Tasa anual (%)",
@@ -327,20 +442,16 @@
     "create": "Crear",
     "created": "Préstamo creado correctamente",
     "createError": "No se pudo crear el préstamo",
-    "saving": "Guardando...",
-    "cancel": "Cancelar",
     "confirmPayment": "Confirmar pago",
     "paymentRegistered": "Pago registrado correctamente",
     "paymentError": "No se pudo registrar el pago",
-    "paymentExceedsPending": "El pago no puede ser mayor al saldo pendiente",
-    "invalidPaymentAmount": "Ingresa un monto de pago valido",
     "invalidPaymentAmountDetailed": "El monto debe ser mayor que cero y usar un numero valido.",
-    "paymentValidationTitle": "Monto de pago invalido",
     "paymentExceedsPendingDetailed": "Intentas pagar {entered}, pero el saldo pendiente es {pending}.",
     "pendingAmountLabel": "Pendiente: {amount}",
     "loanDetails": "Detalle del préstamo",
     "installments": "Cuotas",
     "payments": "Pagos",
+    "noPayments": "Aún no hay pagos",
     "dueDate": "Vence",
     "principalComponent": "Capital aplicado",
     "interestComponent": "Interés aplicado",
@@ -348,15 +459,14 @@
     "totalPending": "Total pendiente",
     "totalCollected": "Total cobrado",
     "totalInterestEarned": "Interés total ganado",
+    "activeLoansCount": "{count, plural, one {# préstamo activo} other {# préstamos activos}}",
     "ofTotalInterest": "de {total}",
-    "activeLoans": "Préstamos activos",
-    "cancelLoan": "Cancelar",
     "cancelLoanTitle": "Cancelar Préstamo",
     "cancelLoanConfirm": "¿Estás seguro de cancelar el préstamo a \"{name}\"? El capital restante será devuelto a la cuenta de origen.",
     "loanCancelled": "Préstamo cancelado correctamente",
     "cancelLoanError": "No se pudo cancelar el préstamo",
-    "cancelling": "Cancelando...",
     "confirmCancel": "Confirmar cancelación",
+    "keepLoan": "Mantener préstamo",
     "statuses": {
       "active": "Activo",
       "paid": "Pagado",
@@ -369,11 +479,21 @@
       "paid": "Pagada",
       "overdue": "Vencida"
     },
-    "cancelLoanFor": "Cancelar préstamo de {name}",
-    "installmentNumber": "Número de cuota"
+    "installmentNumber": "Número de cuota",
+    "errors": {
+      "borrowerRequired": "Ingresa el nombre del prestatario",
+      "principalPositive": "El capital debe ser mayor que 0",
+      "rateMin": "La tasa debe ser 0 o mayor",
+      "termRange": "El plazo debe ser un número entero entre 1 y 120",
+      "startDateRequired": "Elige una fecha de inicio",
+      "sourceAccountRequired": "Elige la cuenta de donde sale el dinero",
+      "destinationAccountRequired": "Elige la cuenta que recibe el pago",
+      "paymentDateRequired": "Elige la fecha del pago"
+    },
+    "cancelLoanAction": "Cancelar préstamo"
   },
   "categories": {
-    "title": "Gestión de Categorías",
+    "title": "Categorías",
     "subtitle": "Organiza y clasifica tus transacciones financieras",
     "summary": "Resumen de Categorías",
     "addCategory": "Nueva Categoría",
@@ -390,23 +510,25 @@
     "editDescription": "Modifica los detalles de tu categoría.",
     "totalExpenses": "Total gastado",
     "confirmDelete": "¿Estás seguro de eliminar esta categoría?",
-    "noCategories": "No hay categorías",
+    "noCategories": "Aún no tienes categorías",
     "all": "Todas",
     "totalCategories": "Total Categorías",
     "activeCategories": "Categorías Activas",
     "averagePerCategory": "Promedio por Categoría",
-    "openMenu": "Abrir menú",
     "edit": "Editar categoría",
     "delete": "Eliminar categoría",
     "active": "Activa",
     "moderate": "Moderada",
     "inactive": "Inactiva",
-    "deleteTitle": "Eliminar Categoría",
-    "deleteDescription": "¿Estás seguro de que quieres eliminar la categoría \"{name}\"? Esta acción no se puede deshacer.",
-    "deleting": "Eliminando..."
+    "deleteTitle": "¿Eliminar la categoría \"{name}\"?",
+    "deleteError": "No se pudo eliminar la categoría. Inténtalo de nuevo.",
+    "saveError": "No se pudo guardar la categoría. Inténtalo de nuevo.",
+    "totalDop": "Total (DOP)",
+    "emptyTitle": "Aún no tienes categorías",
+    "emptyDescription": "Crea categorías para clasificar tus ingresos y gastos."
   },
   "budgets": {
-    "title": "Gestión de Presupuestos",
+    "title": "Presupuestos",
     "subtitle": "Planifica y controla tus gastos por categoría",
     "addBudget": "Nuevo Presupuesto",
     "editBudget": "Editar Presupuesto",
@@ -421,7 +543,7 @@
     "yearly": "Anual",
     "category": "Categoría",
     "progress": "Progreso",
-    "noBudgets": "No hay presupuestos creados",
+    "noBudgets": "Aún no tienes presupuestos",
     "noBudgetsDescription": "Comienza a planificar tus finanzas creando tu primer presupuesto.",
     "createFirstBudget": "Crear mi primer presupuesto",
     "deleteConfirm": "¿Estás seguro de eliminar este presupuesto?",
@@ -441,9 +563,10 @@
     "delete": "Eliminar presupuesto",
     "transactions": "Transacciones",
     "registered": "registradas",
-    "deleteTitle": "Eliminar Presupuesto",
-    "deleteDescription": "¿Estás seguro de que quieres eliminar este presupuesto? Esta acción no se puede deshacer.",
-    "deleting": "Eliminando...",
+    "deleteTitle": "¿Eliminar el presupuesto de \"{name}\"?",
+    "deleteError": "No se pudo eliminar el presupuesto. Inténtalo de nuevo.",
+    "saveError": "No se pudo guardar el presupuesto. Inténtalo de nuevo.",
+    "progressLabel": "Uso del presupuesto {name}",
     "errorLoading": "Error al cargar presupuestos",
     "tryAgain": "Intentar de nuevo",
     "spentHint": "Solo cuentan los gastos de este mes asignados a este presupuesto (los gastos en US$ se convierten a RD$)."
@@ -501,10 +624,16 @@
     "none": "Ninguna",
     "create": "Crear",
     "saveChanges": "Guardar cambios",
-    "emptyTitle": "Tu plan está vacío",
+    "emptyTitle": "Aún no tienes un plan mensual",
     "emptyDescription": "Agrega tus gastos fijos y tus ingresos esperados para ver cuánto de tu dinero ya está comprometido antes de que empiece el mes.",
     "errorLoading": "No se pudo cargar tu plan",
-    "tryAgain": "Intentar de nuevo"
+    "errorLoadingDescription": "Revisa tu conexión e inténtalo de nuevo.",
+    "tryAgain": "Intentar de nuevo",
+    "shareOfColumn": "{name}: parte del total de la columna",
+    "categoryShare": "{name}: parte de los gastos fijos",
+    "committedBar": "Parte del ingreso ya comprometida",
+    "deleteDescription": "Deja de contar en tu plan. Esta acción no se puede deshacer.",
+    "deleteError": "No se pudo eliminar el ítem. Inténtalo de nuevo."
   },
   "analysis": {
     "title": "Analíticas",
@@ -521,7 +650,7 @@
     "expense": "Gasto",
     "balance": "Balance",
     "noCategory": "Sin Categoría",
-    "noData": "Sin datos",
+    "noData": "No hay datos para este período",
     "filter": "Filtrar",
     "filterAnalytics": "Filtrar Analíticas",
     "clearFilters": "Limpiar Filtros",
@@ -561,19 +690,19 @@
     "topCategoryPeriod": "Top categoría del periodo",
     "transactionsCount": "{count} transacciones",
     "insightExpenseUpTitle": "Gasto en aumento",
-    "insightExpenseUpDetail": "Tus gastos subieron {delta}% respecto al periodo anterior.",
+    "insightExpenseUpDetail": "Tus gastos subieron {delta} respecto al periodo anterior.",
     "insightSavingsLowTitle": "Ahorro bajo",
-    "insightSavingsLowDetail": "Tu tasa de ahorro actual es {rate}%. Revisa gastos variables.",
+    "insightSavingsLowDetail": "Tu tasa de ahorro actual es {rate}. Revisa gastos variables.",
     "insightSavingsGoodTitle": "Buen nivel de ahorro",
-    "insightSavingsGoodDetail": "Mantienes una tasa de ahorro saludable de {rate}%.",
+    "insightSavingsGoodDetail": "Mantienes una tasa de ahorro saludable de {rate}.",
     "insightCategoryConcentrationTitle": "Concentración de gasto",
-    "insightCategoryConcentrationDetail": "{category} representa {share}% del gasto total.",
+    "insightCategoryConcentrationDetail": "{category} representa {share} del gasto total.",
     "insightBalancedTitle": "Comportamiento estable",
     "insightBalancedDetail": "Tus métricas están balanceadas en este periodo.",
     "budgetVsActual": "Presupuesto vs Real",
     "budgetsExceededBadge": "{count} sobrepasados",
     "budgetsOnTrackBadge": "Presupuestos en control",
-    "noBudgetsForComparison": "No hay presupuestos para comparar en esta vista.",
+    "noBudgetsForComparison": "No hay presupuestos para comparar",
     "plannedBudget": "Presupuesto planificado",
     "realSpent": "Gasto real",
     "remainingBudget": "Disponible",
@@ -616,8 +745,15 @@
     "toolCopied": "Snapshot copiado",
     "toolCopyError": "No se pudo copiar",
     "toolDownloaded": "Snapshot descargado",
-    "emptyTitle": "Aún no hay movimientos en este periodo",
-    "emptyDescription": "Registra ingresos o gastos, o cambia los filtros, para ver métricas, tendencias y recomendaciones."
+    "emptyTitle": "Aún no hay movimientos en este período",
+    "emptyDescription": "Registra ingresos o gastos, o cambia los filtros, para ver métricas, tendencias y recomendaciones.",
+    "errorTitle": "No se pudieron cargar tus analíticas",
+    "chartLabel": "Gráfico: {title}",
+    "budgetUsageLabel": "{category}: {percent} del presupuesto usado",
+    "toolMinimize": "Minimizar {tool}",
+    "toolClose": "Cerrar {tool}",
+    "toolMove": "Mover {tool} (teclas de flecha)",
+    "toolRestore": "Restaurar {tool}"
   },
   "settings": {
     "title": "Configuración",
@@ -636,11 +772,13 @@
     "theme": {
       "light": "Claro",
       "dark": "Oscuro",
-      "system": "Sistema"
+      "system": "Sistema",
+      "toggle": "Cambiar tema"
     },
     "language": {
       "es": "Español",
-      "en": "English"
+      "en": "English",
+      "switch": "Cambiar idioma"
     },
     "actions": {
       "save": "Guardar",
@@ -658,7 +796,10 @@
       "export": "Exportar",
       "import": "Importar",
       "viewAll": "Ver todas",
-      "loadMore": "Cargar más"
+      "loadMore": "Cargar más",
+      "retry": "Reintentar",
+      "saving": "Guardando…",
+      "rowMenu": "Acciones de {name}"
     },
     "messages": {
       "success": "Operación exitosa",
@@ -669,7 +810,87 @@
     },
     "moduleDisabled": {
       "message": "Este módulo está desactivado para tu cuenta.",
-      "goToDashboard": "Ir al panel"
+      "goToDashboard": "Ir al panel",
+      "title": "Módulo desactivado"
+    },
+    "skipToContent": "Saltar al contenido principal",
+    "confirm": {
+      "title": "¿Estás seguro?",
+      "irreversible": "Esta acción no se puede deshacer."
+    },
+    "error": {
+      "title": "No se pudo cargar",
+      "description": "Algo salió mal al cargar los datos. Revisa tu conexión e inténtalo de nuevo.",
+      "retry": "Reintentar",
+      "pageTitle": "Esta página no se pudo cargar",
+      "pageDescription": "Un error inesperado detuvo esta página. Inténtalo de nuevo; si sigue pasando, vuelve al panel.",
+      "goToDashboard": "Ir al panel",
+      "actionFailed": "No se pudo completar la acción. Inténtalo de nuevo."
+    },
+    "empty": {
+      "title": "Aún no hay nada aquí",
+      "noData": "No hay datos para este período",
+      "noResults": "Sin resultados",
+      "noResultsDescription": "Prueba con otros filtros u otra búsqueda."
+    },
+    "picker": {
+      "emojiLabel": "Icono",
+      "colorLabel": "Color",
+      "customColor": "Color personalizado",
+      "emojis": {
+        "tag": "Etiqueta",
+        "food": "Comida",
+        "groceries": "Supermercado",
+        "coffee": "Café",
+        "home": "Hogar",
+        "utilities": "Servicios",
+        "electricity": "Electricidad",
+        "transport": "Transporte",
+        "travel": "Viajes",
+        "tech": "Tecnología",
+        "shopping": "Compras",
+        "clothing": "Ropa",
+        "beauty": "Belleza",
+        "health": "Salud",
+        "hospital": "Hospital",
+        "fitness": "Ejercicio",
+        "work": "Trabajo",
+        "education": "Educación",
+        "books": "Libros",
+        "entertainment": "Entretenimiento",
+        "movies": "Cine",
+        "music": "Música",
+        "sports": "Deportes",
+        "money": "Dinero",
+        "cards": "Tarjetas",
+        "gifts": "Regalos",
+        "celebration": "Celebración",
+        "maintenance": "Mantenimiento",
+        "pets": "Mascotas",
+        "nature": "Naturaleza"
+      },
+      "colors": {
+        "red": "Rojo",
+        "orange": "Naranja",
+        "amber": "Ámbar",
+        "yellow": "Amarillo",
+        "lime": "Lima",
+        "green": "Verde",
+        "emerald": "Esmeralda",
+        "teal": "Verde azulado",
+        "cyan": "Cian",
+        "sky": "Celeste",
+        "blue": "Azul",
+        "indigo": "Índigo",
+        "violet": "Violeta",
+        "purple": "Morado",
+        "fuchsia": "Fucsia",
+        "pink": "Rosa",
+        "rose": "Rosa intenso",
+        "slate": "Pizarra",
+        "gray": "Gris",
+        "zinc": "Zinc"
+      }
     }
   },
   "forms": {
@@ -739,11 +960,12 @@
   "charts": {
     "expensesByCategory": "Gastos por Categoría",
     "incomeVsExpenses": "Ingresos vs Gastos por Mes",
+    "total": "Total",
     "income": "Ingresos",
     "expenses": "Gastos",
-    "noExpenses": "No hay gastos registrados",
+    "noExpenses": "No hay gastos en este período",
     "expensesHint": "Los gastos aparecerán aquí cuando realices transacciones",
-    "noTransactions": "No hay transacciones registradas",
+    "noTransactions": "No hay transacciones en este período",
     "statsHint": "Las estadísticas aparecerán cuando tengas ingresos y gastos",
     "jan": "Ene",
     "feb": "Feb",
@@ -806,10 +1028,11 @@
       "invalidFile": "Archivo inválido",
       "maxFilesExceeded": "Máximo {maxFiles} archivos permitidos",
       "filesSelected": "{count} archivo(s) seleccionado(s)",
-      "clearAll": "Limpiar todo"
+      "clearAll": "Limpiar todo",
+      "removeFile": "Quitar {name}"
     },
     "preview": {
-      "noTransactions": "No se detectaron transacciones en el documento",
+      "noTransactions": "No se encontraron transacciones en el documento",
       "selectedCount": "{selected} de {total} seleccionadas",
       "duplicateWarningTitle": "Detectamos movimientos similares o posiblemente duplicados",
       "duplicateWarningDescription": "Las transacciones marcadas como posible duplicidad quedan desmarcadas por defecto para que las revises antes de guardar.",
@@ -842,7 +1065,11 @@
         "high": "alta",
         "medium": "media",
         "low": "baja"
-      }
+      },
+      "currency": "Moneda",
+      "editTransaction": "Editar {name}",
+      "removeTransaction": "Quitar {name}",
+      "noTransactionsDescription": "Prueba con un archivo más nítido o en otro formato."
     },
     "quickCategory": {
       "title": "Crear Categoría",
@@ -863,7 +1090,6 @@
       "receipt": "Recibo",
       "invoice": "Factura",
       "preview": "Previsualizar conciliación",
-      "previewing": "Analizando...",
       "selectFilesAndAccount": "Selecciona cuenta y archivos",
       "exactCount": "{count} coincidencias exactas",
       "similarCount": "{count} coincidencias similares",
@@ -878,7 +1104,6 @@
       "actionIgnore": "Ignorar",
       "actionsSummary": "Crear: {create} | Vincular: {link}",
       "applyActions": "Aplicar acciones",
-      "saving": "Guardando...",
       "failedApply": "Error aplicando acciones de conciliación",
       "category": "Categoría",
       "selectCategory": "Seleccionar categoría",
@@ -886,7 +1111,9 @@
       "savedCount": "Guardadas {count} transacciones",
       "linkedCount": "Vinculadas {count} transacciones",
       "ignoredCount": "Ignoradas {count} transacciones",
-      "failedCount": "Error al guardar {count} transacciones"
+      "failedCount": "Error al guardar {count} transacciones",
+      "resultsLabel": "Resultado de la conciliación",
+      "actionFor": "Acción para {name}"
     },
     "savingsPlan": {
       "title": "Plan de Ahorro Automático",
@@ -899,23 +1126,24 @@
       "accountOptional": "Cuenta (opcional)",
       "allAccounts": "Todas las cuentas",
       "calculate": "Calcular plan",
-      "calculating": "Calculando...",
       "saveGoal": "Guardar meta",
-      "savingGoal": "Guardando meta...",
       "savedGoals": "Metas guardadas",
-      "noGoals": "No tienes metas guardadas",
+      "noGoals": "Aún no tienes metas guardadas",
       "viewProgress": "Ver progreso",
       "deleteGoal": "Eliminar meta",
       "goalCreated": "Meta guardada correctamente",
       "goalDeleted": "Meta eliminada",
-      "goalProgressInline": "{saved} de {target} ({pct}%)",
+      "goalProgressInline": "{saved} de {target} ({pct})",
       "invalidAmount": "Ingresa un monto válido",
       "invalidName": "Ingresa un nombre válido",
       "monthly": "Ahorro mensual recomendado: {value}",
       "weekly": "Ahorro semanal recomendado: {value}",
       "months": "Meses estimados para llegar: {value}",
       "feasible": "La meta es viable para la fecha objetivo",
-      "notFeasible": "Con el ritmo actual, la meta no es viable para esa fecha"
+      "notFeasible": "Con el ritmo actual, la meta no es viable para esa fecha",
+      "deleteGoalTitle": "¿Eliminar la meta \"{name}\"?",
+      "deleteGoalDescription": "Se borrará la meta y su progreso guardado. Esta acción no se puede deshacer.",
+      "noGoalsDescription": "Calcula un plan y guárdalo como meta para seguir tu progreso."
     },
     "insights": {
       "title": "Ideas de Gastos con IA",
@@ -934,17 +1162,28 @@
       "period": "Período: {from} a {to} ({days} días)",
       "patternsDetected": "Patrones Detectados",
       "recommendations": "Recomendaciones",
-      "potentialSavings": "ahorro potencial"
+      "potentialSavings": "ahorro potencial",
+      "priority": {
+        "high": "Alta",
+        "medium": "Media",
+        "low": "Baja"
+      }
     }
   },
   "certificates": {
     "title": "Certificados",
     "subtitle": "Gestiona tus certificados financieros y da seguimiento a los pagos de intereses",
-    "loadErrorTitle": "Error",
     "loadError": "No se pudieron cargar los certificados. Inténtalo de nuevo.",
-    "confirmCancel": "¿Estás seguro de que deseas cancelar este certificado?",
     "simulationBank": "Simulación",
-    "empty": "No se encontraron certificados. Crea tu primer certificado para comenzar.",
+    "emptyTitle": "Aún no tienes certificados",
+    "emptyDescription": "Agrega un certificado para seguir sus pagos de interés y sus proyecciones.",
+    "cancelDialog": {
+      "title": "¿Cancelar el certificado de {bank}?",
+      "description": "Dejará de generar pagos de interés. Esta acción no se puede deshacer.",
+      "confirm": "Cancelar certificado",
+      "keep": "Mantener certificado",
+      "error": "No se pudo cancelar el certificado. Inténtalo de nuevo."
+    },
     "status": {
       "active": "Activo",
       "matured": "Vencido",
@@ -978,7 +1217,7 @@
       "simulate": "Simular",
       "edit": "Editar",
       "history": "Historial",
-      "cancel": "Cancelar"
+      "cancel": "Cancelar certificado"
     },
     "form": {
       "editTitle": "Editar certificado",
@@ -997,9 +1236,7 @@
       "tax": "Impuesto (%)",
       "cutDay": "Día de corte",
       "maturity": "Vencimiento",
-      "cancel": "Cancelar",
       "simulate": "Simular",
-      "saving": "Guardando...",
       "update": "Actualizar",
       "create": "Crear",
       "errors": {
@@ -1020,7 +1257,7 @@
       "totalNetInterest": "Interés neto total",
       "historyTab": "Historial",
       "chartTab": "Gráfico",
-      "empty": "Aún no hay pagos registrados.",
+      "empty": "Aún no hay pagos",
       "date": "Fecha",
       "capital": "Capital",
       "rate": "Tasa",
@@ -1034,14 +1271,12 @@
       "netInterest": "Interés neto",
       "ratePercent": "Tasa (%)",
       "taxRatePercent": "Tasa de impuesto (%)",
-      "cancel": "Cancelar",
-      "saving": "Guardando...",
-      "save": "Guardar",
       "errors": {
         "nonNegative": "Debe ser mayor o igual a 0",
         "positive": "Debe ser mayor que 0",
         "rateRange": "Debe estar entre 0.01 y 100",
-        "taxRange": "Debe estar entre 0 y 100"
+        "taxRange": "Debe estar entre 0 y 100",
+        "saveFailed": "No se pudo guardar el pago. Inténtalo de nuevo."
       }
     },
     "simulator": {
@@ -1072,7 +1307,8 @@
         "rateRange": "La tasa debe estar entre 0.01 y 100",
         "taxRange": "El impuesto debe estar entre 0 y 100",
         "monthsRange": "Los meses deben estar entre 1 y 120"
-      }
+      },
+      "chartAria": "Gráfico de líneas del capital y del capital más el interés neto en {months} meses"
     },
     "chart": {
       "projection": "Proyección:",
@@ -1082,7 +1318,8 @@
       "showCapitalBase": "Mostrar capital base",
       "totalValue": "Valor total",
       "capitalBase": "Capital base",
-      "totalValueLegend": "Valor total (capital + intereses)"
+      "totalValueLegend": "Valor total (capital + intereses)",
+      "ariaLabel": "Gráfico de líneas del valor proyectado del certificado en los próximos {months} meses"
     }
   },
   "creditCards": {
@@ -1090,19 +1327,23 @@
     "subtitle": "Gestiona tus tarjetas de crédito y pagos",
     "addCard": "Agregar tarjeta",
     "addCreditCard": "Agregar tarjeta de crédito",
-    "generalSummary": "Resumen general",
+    "loadErrorTitle": "No se pudieron cargar tus tarjetas",
+    "kpis": {
+      "totalDebt": "Deuda total (en DOP)",
+      "debtDop": "Deuda en DOP",
+      "debtUsd": "Deuda en USD",
+      "usdInDop": "≈ {amount} a {rate} DOP por USD",
+      "utilizationHint": "{status} · meta: menos de 30%"
+    },
     "activeCards": "{count, plural, =1 {# tarjeta activa} other {# tarjetas activas}}",
-    "exchangeRate": "Tasa: 1 USD = {rate} DOP",
     "creditHealth": "Salud crediticia",
-    "utilizationTarget": "Meta: menos de 30%",
     "utilizationStatus": {
       "highRisk": "Riesgo alto",
       "watch": "Vigilar",
       "healthy": "Saludable"
     },
     "emptyTitle": "Aún no tienes tarjetas de crédito",
-    "emptyDescription": "Agrega tu primera tarjeta de crédito para empezar a controlar tu deuda",
-    "cancel": "Cancelar",
+    "emptyDescription": "Agrega tu primera tarjeta de crédito para empezar a controlar tu deuda.",
     "toasts": {
       "created": "Tarjeta de crédito creada correctamente",
       "updated": "Tarjeta de crédito actualizada correctamente",
@@ -1114,26 +1355,23 @@
       "resetError": "No se pudo reiniciar el saldo de la tarjeta"
     },
     "resetDialog": {
-      "title": "Reiniciar saldo de la tarjeta",
+      "title": "¿Reiniciar el saldo de {name}?",
       "description": "Esto pondrá en cero el saldo actual de {name} en todas las monedas. El saldo anterior quedará guardado en el historial. Úsalo después de pagar y cerrar el ciclo de facturación.",
-      "confirm": "Reiniciar saldo",
-      "resetting": "Reiniciando..."
+      "confirm": "Reiniciar saldo"
     },
     "deleteDialog": {
-      "title": "Eliminar tarjeta de crédito",
-      "description": "¿Estás seguro de que deseas eliminar {name}? Esta acción no se puede deshacer.",
-      "confirm": "Eliminar",
-      "deleting": "Eliminando..."
+      "title": "¿Eliminar la tarjeta {name}?",
+      "description": "Se eliminarán la tarjeta y sus saldos. Esta acción no se puede deshacer.",
+      "confirm": "Eliminar"
     },
     "item": {
       "back": "Volver",
-      "cardOptions": "Opciones de la tarjeta",
       "edit": "Editar",
       "resetBalance": "Reiniciar saldo",
       "delete": "Eliminar",
       "payCard": "Pagar tarjeta",
       "viewPayments": "Ver pagos",
-      "used": "{percent}% usado",
+      "used": "{percent} usado",
       "debt": "Deuda: {amount}",
       "available": "Disponible: {amount}",
       "viewDetails": "Ver detalles",
@@ -1141,7 +1379,8 @@
       "status": "Estado",
       "noDebt": "Sin deuda",
       "cutDay": "Día de corte",
-      "dueDay": "Día de pago"
+      "dueDay": "Día de pago",
+      "utilizationLabel": "Crédito usado en {currency}"
     },
     "form": {
       "addTitle": "Agregar tarjeta de crédito",
@@ -1159,7 +1398,6 @@
       "removeCurrency": "Quitar moneda",
       "creditLimit": "Límite de crédito",
       "initialDebt": "Deuda inicial",
-      "saving": "Guardando…",
       "create": "Crear",
       "update": "Actualizar",
       "errors": {
@@ -1167,7 +1405,9 @@
         "bankRequired": "El banco es obligatorio",
         "digitsOnly": "Solo se permiten dígitos",
         "dayMin": "Mínimo {min}",
-        "dayMax": "Máximo {max}"
+        "dayMax": "Máximo {max}",
+        "saveFailed": "No se pudo guardar la tarjeta. Inténtalo de nuevo.",
+        "limitRequired": "Ingresa un límite de crédito de 0 o más para cada moneda."
       }
     },
     "payment": {
@@ -1189,18 +1429,18 @@
       "interestAmount": "Monto de intereses",
       "notes": "Notas (opcional)",
       "notesPlaceholder": "Notas del pago",
-      "processing": "Procesando…",
       "submit": "Realizar pago",
       "errors": {
         "failed": "No se pudo procesar el pago. Inténtalo de nuevo.",
         "selectAccount": "Selecciona una cuenta",
-        "amountPositive": "El monto debe ser mayor que 0"
+        "amountPositive": "El monto debe ser mayor que 0",
+        "accountsLoad": "No se pudieron cargar tus cuentas"
       }
     },
     "history": {
       "title": "Historial de pagos",
       "allCurrencies": "Todas las monedas",
-      "empty": "Aún no hay pagos registrados.",
+      "empty": "Aún no hay pagos",
       "date": "Fecha",
       "cardAmount": "Monto en tarjeta",
       "fromAccount": "Cuenta de origen",
@@ -1212,7 +1452,8 @@
   },
   "investments": {
     "title": "Inversiones",
-    "loading": "Cargando inversiones...",
+    "subtitle": "Sigue tu portafolio y el saldo de tu bróker",
+    "loadErrorTitle": "No se pudieron cargar tus inversiones",
     "fundBroker": "Fondear bróker",
     "addInvestment": "Agregar inversión",
     "types": {
@@ -1240,16 +1481,18 @@
       "growth": "Crecimiento del portafolio (costo base)",
       "noData": "No hay datos para mostrar",
       "noHistory": "Aún no hay historial",
-      "value": "Valor"
+      "value": "Valor",
+      "allocationAria": "Gráfico de dona del valor del portafolio por tipo de inversión",
+      "growthAria": "Gráfico de área del costo acumulado del portafolio en el tiempo"
     },
     "list": {
-      "empty": "No se encontraron inversiones en esta categoría.",
-      "confirmDelete": "¿Seguro que deseas eliminar esta inversión?"
+      "emptyTitle": "Aún no tienes inversiones de este tipo",
+      "emptyDescription": "Agrega una posición para seguir su valor y sus ganancias.",
+      "deleteTitle": "¿Eliminar “{name}”?",
+      "deleteError": "No se pudo eliminar la inversión. Inténtalo de nuevo."
     },
     "card": {
-      "holding": "{quantity} unidades a {price}",
-      "edit": "Editar {name}",
-      "delete": "Eliminar {name}"
+      "holding": "{quantity} unidades a {price}"
     },
     "form": {
       "addTitle": "Agregar inversión",
@@ -1285,7 +1528,7 @@
       "title": "Fondear saldo del bróker",
       "description": "Mueve fondos de una cuenta bancaria a tu billetera de inversión.",
       "walletBalances": "Saldos actuales de la billetera",
-      "noFunding": "Aún no hay fondeos.",
+      "noFunding": "Aún no tienes fondos en el bróker",
       "sourceAccount": "Cuenta de origen",
       "selectAccount": "Selecciona una cuenta",
       "amountFromAccount": "Monto desde la cuenta ({currency})",
@@ -1301,8 +1544,12 @@
         "amountPositive": "El monto debe ser mayor que 0",
         "exchangeRateRequired": "La tasa de cambio es obligatoria cuando las monedas son distintas",
         "failed": "No se pudo fondear el saldo del bróker"
-      }
-    }
+      },
+      "noFundingDescription": "Transfiere desde una cuenta para empezar a invertir."
+    },
+    "typesLabel": "Tipos de inversión",
+    "emptyTitle": "Aún no tienes inversiones",
+    "emptyDescription": "Agrega tu primera posición para seguir su valor, costo y rendimiento."
   },
   "admin": {
     "meta": {
@@ -1315,7 +1562,8 @@
     "refresh": "Actualizar",
     "cleanDemos": "Limpiar demos",
     "cleaning": "Limpiando...",
-    "confirmCleanup": "¿Estás seguro? Esto eliminará TODOS los usuarios demo de inmediato.",
+    "confirmCleanup": "Se eliminan de inmediato todos los usuarios demo y sus datos. Esta acción no se puede deshacer.",
+    "cleanupTitle": "¿Eliminar todos los usuarios demo?",
     "toasts": {
       "loadUsersError": "Error al cargar usuarios: {message}",
       "saveSuccess": "{count, plural, one {# usuario actualizado} other {# usuarios actualizados}} correctamente",
@@ -1334,6 +1582,8 @@
       "description": "Edita los datos de los usuarios directamente en la tabla.",
       "total": "{count} en total",
       "searchPlaceholder": "Buscar usuarios...",
+      "searchLabel": "Buscar usuarios",
+      "cellLabel": "{field} de {user}",
       "filterByRole": "Filtrar por rol",
       "allRoles": "Todos los roles",
       "roleUsers": "Usuarios",
@@ -1350,7 +1600,7 @@
         "actions": "Acciones"
       },
       "loading": "Cargando usuarios...",
-      "empty": "No hay usuarios que coincidan con tus criterios.",
+      "empty": "Ningún usuario coincide con tus filtros",
       "disableUser": "Desactivar a {name}",
       "deleteTitle": "Eliminar usuario",
       "deleteDescription": "¿Seguro que deseas desactivar a <strong>{name}</strong>? Ya no podrá iniciar sesión.",
@@ -1407,6 +1657,9 @@
       "saveGlobal": "Guardar {count, plural, one {# cambio global} other {# cambios globales}}",
       "saving": "Guardando...",
       "searchPlaceholder": "Buscar usuario por nombre o correo",
+      "searchLabel": "Buscar usuarios para los feature flags",
+      "chooseUser": "Elegir a {name}",
+      "selectedUser": "{name} seleccionado",
       "columns": {
         "name": "Nombre",
         "email": "Correo",
@@ -1418,7 +1671,7 @@
       "searchingUsers": "Buscando usuarios...",
       "managingFor": "Gestionando funcionalidades de:",
       "loadingFlags": "Cargando funcionalidades...",
-      "noFlags": "No se encontraron funcionalidades.",
+      "noFlags": "No se encontraron funcionalidades",
       "blockedByGlobal": "Anulado por el ajuste global",
       "reset": "Restablecer",
       "saveChanges": "Guardar {count, plural, one {# cambio} other {# cambios}}",
@@ -1513,14 +1766,17 @@
       "title": "Claves API",
       "description": "Administra las claves API para integraciones con servidores MCP",
       "newKey": "Nueva clave",
-      "emptyTitle": "No hay claves API",
-      "emptyDescription": "Crea una clave para conectar clientes MCP",
+      "emptyTitle": "Aún no tienes claves API",
+      "emptyDescription": "Crea una clave para conectar clientes MCP.",
       "active": "Activa",
       "inactive": "Inactiva",
       "createdAt": "Creada: {date}",
       "lastUsedAt": "Último uso: {date}",
       "never": "Nunca",
       "revokeAria": "Revocar clave {name}",
+      "revokeTitleNamed": "¿Revocar la clave API “{name}”?",
+      "copyToken": "Copiar token",
+      "loading": "Cargando claves API…",
       "configTitle": "Configuración de Claude Desktop",
       "configDescription": "Añade esta configuración a tu archivo",
       "copy": "Copiar",
@@ -1549,7 +1805,7 @@
       "description": "Inicia sesión con tu huella o rostro en lugar de tu contraseña. Añade una por dispositivo.",
       "add": "Añadir passkey",
       "loading": "Cargando…",
-      "empty": "Aún no hay passkeys registradas.",
+      "empty": "Aún no tienes passkeys",
       "added": "Añadida el {date}",
       "lastUsed": "último uso el {date}",
       "deleteAria": "Eliminar passkey {name}",
@@ -1564,7 +1820,10 @@
       "registered": "Passkey registrada",
       "registerError": "No se pudo registrar la passkey",
       "removed": "Passkey eliminada",
-      "removeError": "No se pudo eliminar la passkey"
+      "removeError": "No se pudo eliminar la passkey",
+      "deleteTitle": "¿Eliminar la passkey “{name}”?",
+      "deleteDescription": "Ya no podrás iniciar sesión con ella en ese dispositivo. Esta acción no se puede deshacer.",
+      "emptyDescription": "Agrega una para iniciar sesión sin contraseña."
     }
   },
   "dateFilter": {
@@ -1578,10 +1837,9 @@
     "reset": "Restablecer"
   },
   "recurring": {
-    "emptyTitle": "No hay transacciones recurrentes",
+    "emptyTitle": "Aún no tienes transacciones recurrentes",
     "emptyDescription": "Configura tus gastos o ingresos fijos para que se generen automáticamente.",
     "confirmDelete": "¿Estás seguro de eliminar la transacción recurrente \"{name}\"?",
-    "openMenu": "Abrir menú de {name}",
     "actions": "Acciones",
     "edit": "Editar",
     "delete": "Eliminar",
@@ -1597,6 +1855,8 @@
     "processSuccessDescription": "Se han generado las transacciones pendientes.",
     "processError": "Error al procesar",
     "processErrorDescription": "Hubo un problema al generar las transacciones.",
+    "saveError": "No se pudo guardar la transacción recurrente. Revisa los datos e inténtalo de nuevo.",
+    "deleteError": "No se pudo eliminar la transacción recurrente. Inténtalo de nuevo.",
     "editTitle": "Editar recurrente",
     "createTitle": "Nueva transacción recurrente",
     "fieldName": "Nombre",
@@ -1626,7 +1886,7 @@
     "placeholderLong": "Buscar transacciones, cuentas...",
     "hint": "Escribe para buscar en tus transacciones, cuentas, categorías y presupuestos.",
     "searching": "Buscando...",
-    "noResults": "No se encontraron resultados.",
+    "noResults": "No se encontraron resultados",
     "transactions": "Transacciones",
     "accounts": "Cuentas",
     "categories": "Categorías",
@@ -1637,6 +1897,8 @@
     "certificates": "Certificados",
     "certificate": "Certificado",
     "open": "Abrir búsqueda",
-    "close": "Cerrar búsqueda"
+    "close": "Cerrar búsqueda",
+    "inputLabel": "Buscar transacciones, cuentas y más",
+    "resultsLabel": "Resultados de búsqueda"
   }
 }

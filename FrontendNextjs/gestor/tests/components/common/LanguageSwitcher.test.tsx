@@ -8,6 +8,7 @@ vi.mock('next-intl', () => ({
 		const translations: Record<string, string> = {
 			es: 'Español',
 			en: 'English',
+			switch: 'Change language',
 		}
 		return translations[key] || key
 	},
@@ -15,9 +16,9 @@ vi.mock('next-intl', () => ({
 }))
 
 describe('LanguageSwitcher', () => {
-	it('renders switcher button', () => {
+	it('renders a labelled switcher button', () => {
 		render(<LanguageSwitcher />)
-		expect(screen.getByRole('button')).toBeInTheDocument()
+		expect(screen.getByRole('button', { name: 'Change language' })).toBeInTheDocument()
 	})
 
 	it('shows language options in dropdown', async () => {

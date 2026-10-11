@@ -1,18 +1,17 @@
 'use client'
 import { zodResolver } from '@hookform/resolvers/zod'
-import { format } from 'date-fns'
-import { enUS, es } from 'date-fns/locale'
-import { AlertCircle, CalendarIcon, HistoryIcon, Loader2, PlusCircle } from 'lucide-react'
+import { CalendarIcon, HistoryIcon } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import { useLocale, useTranslations } from 'next-intl'
-import { useEffect, useRef, useState } from 'react'
+import { useTranslations } from 'next-intl'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { toast } from 'sonner'
 import * as z from 'zod'
+import { DEFAULT_CATEGORY_COLOR } from '@/components/shared/ColorSwatchPicker'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
-import { Dialog, DialogClose, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
@@ -23,24 +22,27 @@ import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { onSessionExpired } from '@/lib/client-session'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { getCreditCardRepository } from '@/lib/repositoryConfig'
 import { cn } from '@/lib/utils'
 import { AICategorySuggestion } from '@/types/ai'
 import { TypeTransaction } from '@/types/transaction'
 import { useTransactionContext } from './TransactionContext'
 
-const transactionSchema = z.object({
-	name: z.string().min(2, 'El nombre es requerido'),
-	description: z.string().optional(),
-	amount: z.coerce.number().min(0.01, 'El monto debe ser mayor a 0'),
-	type_transaction: z.nativeEnum(TypeTransaction, { errorMap: () => ({ message: 'Selecciona un tipo' }) }),
-	account_id: z.string().min(1, 'Selecciona una cuenta'),
-	category_id: z.string().min(1, 'Selecciona una categoría'),
-	budget_id: z.string().optional(),
-	currency: z.string().length(3, 'Selecciona una moneda'),
-	created_at: z.date(),
-})
-type TransactionFormValues = z.infer<typeof transactionSchema>
+function createTransactionSchema(t: (key: string) => string) {
+	return z.object({
+		name: z.string().min(2, t('nameRequired')),
+		description: z.string().optional(),
+		amount: z.coerce.number().min(0.01, t('amountRequired')),
+		type_transaction: z.nativeEnum(TypeTransaction, { errorMap: () => ({ message: t('selectType') }) }),
+		account_id: z.string().min(1, t('accountRequired')),
+		category_id: z.string().min(1, t('categoryRequired')),
+		budget_id: z.string().optional(),
+		currency: z.string().length(3, t('select')),
+		created_at: z.date(),
+	})
+}
+type TransactionFormValues = z.infer<ReturnType<typeof createTransactionSchema>>
 
 /**
  * Unsent form input is kept in sessionStorage when the session expires mid-edit
@@ -99,8 +101,6 @@ type TransactionFormModalProps = {
 		_currency?: string,
 		_created_at?: Date,
 	) => Promise<void>
-	isLoading: boolean
-	error: string | null
 }
 
 function ensureUniqueCategoryName(baseName: string, existingNames: string[]): string {
@@ -136,23 +136,22 @@ function isSameSuggestion(a: AICategorySuggestion | null, b: AICategorySuggestio
 	)
 }
 
-const CURRENCIES = [
-	{ code: 'DOP', name: 'Peso Dominicano', symbol: 'RD$' },
-	{ code: 'USD', name: 'Dólar Estadounidense', symbol: 'US$' },
-	{ code: 'EUR', name: 'Euro', symbol: '€' },
-]
+const CURRENCIES = ['DOP', 'USD', 'EUR'] as const
 
-export default function TransactionFormModal({
-	open,
-	setOpen,
-	createTransaction,
-	isLoading,
-	error,
-}: TransactionFormModalProps) {
+/** Maps an API error to a message the user can act on (never the raw error). */
+function getSubmitErrorKey(error: unknown): 'currencyMustMatchAccount' | 'cardCurrencyUnavailable' | null {
+	const message = error instanceof Error ? error.message : typeof error === 'string' ? error : ''
+	if (message.includes('currency must match account currency')) return 'currencyMustMatchAccount'
+	if (message.includes('card does not have a balance in currency')) return 'cardCurrencyUnavailable'
+	return null
+}
+
+export default function TransactionFormModal({ open, setOpen, createTransaction }: TransactionFormModalProps) {
 	const t = useTranslations('forms')
 	const tTx = useTranslations('transactions')
 	const tSession = useTranslations('auth.session')
-	const locale = useLocale()
+	const locale = useAppLocale()
+	const transactionSchema = useMemo(() => createTransactionSchema(t), [t])
 	const { data: session } = useSession()
 	const userId = session?.user?.id
 	const { data: accounts = [] } = useGetAccounts()
@@ -175,6 +174,7 @@ export default function TransactionFormModal({
 	const [cardCurrenciesLoaded, setCardCurrenciesLoaded] = useState(false)
 	const [categorySuggestion, setCategorySuggestion] = useState<AICategorySuggestion | null>(null)
 	const [draftRestored, setDraftRestored] = useState(false)
+	const [submitError, setSubmitError] = useState<string | null>(null)
 	const draftKey = userId ? transactionDraftKey(userId, editingTransaction?.id) : null
 
 	const form = useForm<TransactionFormValues>({
@@ -414,6 +414,7 @@ export default function TransactionFormModal({
 	])
 
 	async function onSubmit(values: TransactionFormValues) {
+		setSubmitError(null)
 		try {
 			if (isEditing) {
 				await updateTransaction(
@@ -445,10 +446,17 @@ export default function TransactionFormModal({
 			setDraftRestored(false)
 			form.reset()
 			setOpen(false)
-		} catch {
-			// Error is handled via the error prop (a 401 also triggers the
+		} catch (error) {
+			// Shown inline above the footer (a 401 also triggers the
 			// session-expired listener above, which saves the draft).
+			const key = getSubmitErrorKey(error)
+			setSubmitError(key ? t(key) : tTx('saveError'))
 		}
+	}
+
+	function handleOpenChange(next: boolean) {
+		if (!next) setSubmitError(null)
+		setOpen(next)
 	}
 
 	const applyCategorySuggestion = () => {
@@ -476,7 +484,7 @@ export default function TransactionFormModal({
 			await createCategoryMutation.mutateAsync({
 				name: suggestedName,
 				icon: '📦',
-				color: '#22c55e',
+				color: DEFAULT_CATEGORY_COLOR,
 			})
 
 			const refreshed = await refetchCategories()
@@ -508,303 +516,264 @@ export default function TransactionFormModal({
 		}
 	}
 
+	const availableCurrencies =
+		selectedAccountType === 'credit_card' && cardCurrencies.length > 0
+			? CURRENCIES.filter((code) => cardCurrencies.includes(code))
+			: CURRENCIES
+
 	return (
-		<Dialog open={open} onOpenChange={setOpen}>
-			<DialogContent className='sm:max-w-[600px]'>
-				<DialogHeader>
-					<DialogTitle>{isEditing ? t('editTransaction') : t('newTransaction')}</DialogTitle>
-				</DialogHeader>
-				{draftRestored && (
-					<Alert role='status'>
-						<HistoryIcon className='h-4 w-4' />
-						<AlertDescription className='flex items-center justify-between gap-2'>
-							<span>{tSession('draftRestored')}</span>
-							<Button type='button' variant='ghost' size='sm' onClick={discardDraft}>
-								{tSession('discardDraft')}
-							</Button>
-						</AlertDescription>
-					</Alert>
-				)}
-				<Form {...form}>
-					<form onSubmit={form.handleSubmit(onSubmit)} className='space-y-4'>
-						{/* Row 1: Nombre */}
-						<FormField
-							control={form.control}
-							name='name'
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>{t('name')}</FormLabel>
-									<FormControl>
-										<Input {...field} placeholder={t('namePlaceholder')} autoFocus />
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-
-						{/* Row 2: Monto, Moneda y Tipo */}
-						<div className='grid grid-cols-3 gap-4'>
-							<FormField
-								control={form.control}
-								name='amount'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('amount')}</FormLabel>
-										<FormControl>
-											<div className='relative'>
-												<span className='absolute left-3 top-2.5 text-muted-foreground'>$</span>
-												<Input type='number' {...field} min={0.01} step={0.01} className='pl-7' />
-											</div>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							<FormField
-								control={form.control}
-								name='currency'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('currency')}</FormLabel>
-										<FormControl>
-											<Select
-												value={field.value}
-												onValueChange={field.onChange}
-												disabled={selectedAccountType === 'bank'}
-											>
-												<SelectTrigger>
-													<SelectValue placeholder='DOP' />
-												</SelectTrigger>
-												<SelectContent>
-													{(selectedAccountType === 'credit_card' && cardCurrencies.length > 0
-														? CURRENCIES.filter((c) => cardCurrencies.includes(c.code))
-														: CURRENCIES
-													).map((c) => (
-														<SelectItem key={c.code} value={c.code}>
-															{c.code}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</FormControl>
-										{selectedAccountType === 'bank' && selectedAccountId ? (
-											<p className='text-xs text-muted-foreground'>
-												{t('bankCurrencyFixed', { currency: selectedAccountCurrency })}
-											</p>
-										) : null}
-										{selectedAccountType === 'credit_card' &&
-										selectedAccountId &&
-										cardCurrenciesLoaded &&
-										cardCurrencies.length === 0 ? (
-											<p className='text-xs text-destructive'>{t('cardWithoutBalances')}</p>
-										) : null}
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							<FormField
-								control={form.control}
-								name='type_transaction'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('type')}</FormLabel>
-										<FormControl>
-											<Select value={field.value} onValueChange={field.onChange}>
-												<SelectTrigger>
-													<SelectValue placeholder={t('select')} />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value={TypeTransaction.INCOME}>{tTx('income')}</SelectItem>
-													<SelectItem value={TypeTransaction.BILL}>{tTx('expense')}</SelectItem>
-												</SelectContent>
-											</Select>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-						</div>
-
-						{/* Row 3: Cuenta y Categoría */}
-						<div className='grid grid-cols-2 gap-4'>
-							<FormField
-								control={form.control}
-								name='account_id'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('account')}</FormLabel>
-										<FormControl>
-											<Select
-												value={field.value}
-												onValueChange={(value) => {
-													void handleAccountChange(value, field.onChange)
-												}}
-											>
-												<SelectTrigger>
-													<SelectValue placeholder={t('select')} />
-												</SelectTrigger>
-												<SelectContent>
-													{accounts.map((acc) => (
-														<SelectItem key={acc.id} value={acc.id}>
-															{acc.name}
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</FormControl>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							<FormField
-								control={form.control}
-								name='category_id'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('category')}</FormLabel>
-										<FormControl>
-											<Select value={field.value} onValueChange={field.onChange}>
-												<SelectTrigger>
-													<SelectValue placeholder={t('select')} />
-												</SelectTrigger>
-												<SelectContent>
-													{categories.map((cat) => (
-														<SelectItem key={cat.id} value={cat.id}>
-															<span className='flex items-center gap-2'>
-																{cat.icon} {cat.name}
-															</span>
-														</SelectItem>
-													))}
-												</SelectContent>
-											</Select>
-										</FormControl>
-										<FormMessage />
-										{categorySuggestion && (
-											<div className='mt-2 flex items-center justify-between rounded-md border border-primary/30 bg-primary/5 px-2 py-1 text-xs'>
-												<span>
-													{t('aiSuggestionLabel', {
-														name: categorySuggestion.category_name,
-														confidence: t(`confidence.${categorySuggestion.confidence}`),
-													})}
-												</span>
-												<Button type='button' variant='ghost' size='sm' onClick={applyCategorySuggestion}>
-													{t('apply')}
-												</Button>
-												<Button
-													type='button'
-													variant='outline'
-													size='sm'
-													onClick={createCategoryFromSuggestion}
-													disabled={createCategoryMutation.isPending}
-													title={ensureUniqueCategoryName(
-														categorySuggestion.new_category_name || categorySuggestion.category_name,
-														categories.map((category) => category.name),
-													)}
-												>
-													{t('createSuggestedCategory')}
-												</Button>
-											</div>
-										)}
-									</FormItem>
-								)}
-							/>
-						</div>
-
-						{/* Row 4: Fecha y Presupuesto (Opcional) */}
-						<div className='grid grid-cols-2 gap-4'>
-							<FormField
-								control={form.control}
-								name='created_at'
-								render={({ field }) => (
-									<FormItem>
-										<FormLabel>{t('date')}</FormLabel>
-										<Popover>
-											<PopoverTrigger asChild>
-												<FormControl>
-													<Button
-														variant={'outline'}
-														className={cn('w-full pl-3 text-left font-normal', !field.value && 'text-muted-foreground')}
-													>
-														{field.value ? (
-															format(field.value, 'PPP', { locale: locale === 'es' ? es : enUS })
-														) : (
-															<span>{t('selectDate')}</span>
-														)}
-														<CalendarIcon className='ml-auto h-4 w-4 opacity-50' />
-													</Button>
-												</FormControl>
-											</PopoverTrigger>
-											<PopoverContent className='w-auto p-0' align='start'>
-												<Calendar
-													mode='single'
-													selected={field.value}
-													onSelect={field.onChange}
-													disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-													initialFocus
-												/>
-											</PopoverContent>
-										</Popover>
-										<FormMessage />
-									</FormItem>
-								)}
-							/>
-
-							{/* Si quisieras agregar el campo de Presupuesto (budget_id), iría aquí.
-                  Actualmente no lo veo explícito en el formulario original salvo en interfaces. 
-                  Si no se usa, este espacio puede quedar vacío o extender la fecha.
-                  Asumo que no se estaba mostrando antes (aunque estaba en props).
-                  Si se debe mostrar, descomentar abajo. */}
-							{/* <FormField control={form.control} name="budget_id" ... /> */}
-						</div>
-
-						{/* Row 5: Descripción */}
-						<FormField
-							control={form.control}
-							name='description'
-							render={({ field }) => (
-								<FormItem>
-									<FormLabel>{t('description')}</FormLabel>
-									<FormControl>
-										<Input {...field} placeholder={t('descriptionPlaceholder')} />
-									</FormControl>
-									<FormMessage />
-								</FormItem>
-							)}
-						/>
-
-						<DialogFooter className='pt-4'>
-							<DialogClose asChild>
-								<Button type='button' variant='ghost'>
-									{t('cancel')}
+		<FormDialog
+			open={open}
+			onOpenChange={handleOpenChange}
+			title={isEditing ? t('editTransaction') : t('newTransaction')}
+			size='lg'
+			submitLabel={isEditing ? t('saveChanges') : t('createTransaction')}
+			loading={form.formState.isSubmitting}
+			error={submitError}
+			onSubmit={form.handleSubmit(onSubmit)}
+		>
+			<Form {...form}>
+				<div className='space-y-4'>
+					{draftRestored && (
+						<Alert role='status'>
+							<HistoryIcon className='h-4 w-4' aria-hidden='true' />
+							<AlertDescription className='flex flex-wrap items-center justify-between gap-2'>
+								<span>{tSession('draftRestored')}</span>
+								<Button type='button' variant='outline' size='sm' onClick={discardDraft}>
+									{tSession('discardDraft')}
 								</Button>
-							</DialogClose>
-							<Button type='submit' disabled={isLoading}>
-								{isLoading ? (
-									<Loader2 className='h-4 w-4 animate-spin mr-2' />
-								) : (
-									<PlusCircle className='h-4 w-4 mr-2' />
-								)}
-								{isEditing ? t('saveChanges') : t('createTransaction')}
-							</Button>
-						</DialogFooter>
-					</form>
-				</Form>
-				{error && (
-					<Alert variant='destructive' className='mt-4'>
-						<AlertCircle className='h-4 w-4' />
-						<AlertDescription>
-							{error.includes('currency must match account currency')
-								? t('currencyMustMatchAccount')
-								: error.includes('card does not have a balance in currency')
-									? t('cardCurrencyUnavailable')
-									: error}
-						</AlertDescription>
-					</Alert>
-				)}
-			</DialogContent>
-		</Dialog>
+							</AlertDescription>
+						</Alert>
+					)}
+
+					<FormField
+						control={form.control}
+						name='name'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('name')}</FormLabel>
+								<FormControl>
+									<Input {...field} placeholder={t('namePlaceholder')} autoFocus />
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<div className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
+						<FormField
+							control={form.control}
+							name='amount'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>{t('amount')}</FormLabel>
+									<FormControl>
+										<Input type='number' inputMode='decimal' {...field} min={0.01} step={0.01} />
+									</FormControl>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+
+						<FormField
+							control={form.control}
+							name='currency'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>{t('currency')}</FormLabel>
+									<Select value={field.value} onValueChange={field.onChange} disabled={selectedAccountType === 'bank'}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue placeholder='DOP' />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{availableCurrencies.map((code) => (
+												<SelectItem key={code} value={code}>
+													{code}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									{selectedAccountType === 'bank' && selectedAccountId ? (
+										<p className='text-xs text-muted-foreground'>
+											{t('bankCurrencyFixed', { currency: selectedAccountCurrency })}
+										</p>
+									) : null}
+									{selectedAccountType === 'credit_card' &&
+									selectedAccountId &&
+									cardCurrenciesLoaded &&
+									cardCurrencies.length === 0 ? (
+										<p className='text-xs text-destructive'>{t('cardWithoutBalances')}</p>
+									) : null}
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+
+						<FormField
+							control={form.control}
+							name='type_transaction'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>{t('type')}</FormLabel>
+									<Select value={field.value} onValueChange={field.onChange}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue placeholder={t('select')} />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											<SelectItem value={TypeTransaction.INCOME}>{tTx('income')}</SelectItem>
+											<SelectItem value={TypeTransaction.BILL}>{tTx('expense')}</SelectItem>
+										</SelectContent>
+									</Select>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+					</div>
+
+					<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+						<FormField
+							control={form.control}
+							name='account_id'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>{t('account')}</FormLabel>
+									<Select
+										value={field.value}
+										onValueChange={(value) => {
+											void handleAccountChange(value, field.onChange)
+										}}
+									>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue placeholder={t('select')} />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{accounts.map((acc) => (
+												<SelectItem key={acc.id} value={acc.id}>
+													{acc.name}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<FormMessage />
+								</FormItem>
+							)}
+						/>
+
+						<FormField
+							control={form.control}
+							name='category_id'
+							render={({ field }) => (
+								<FormItem>
+									<FormLabel>{t('category')}</FormLabel>
+									<Select value={field.value} onValueChange={field.onChange}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue placeholder={t('select')} />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{categories.map((cat) => (
+												<SelectItem key={cat.id} value={cat.id}>
+													<span className='flex items-center gap-2'>
+														<span aria-hidden='true'>{cat.icon}</span> {cat.name}
+													</span>
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									<FormMessage />
+									{categorySuggestion && (
+										<div className='flex flex-wrap items-center gap-2 rounded-md border border-primary/30 bg-primary/5 px-2 py-1.5 text-xs'>
+											<span className='min-w-0 flex-1'>
+												{t('aiSuggestionLabel', {
+													name: categorySuggestion.category_name,
+													confidence: t(`confidence.${categorySuggestion.confidence}`),
+												})}
+											</span>
+											<Button type='button' variant='ghost' size='sm' onClick={applyCategorySuggestion}>
+												{t('apply')}
+											</Button>
+											<Button
+												type='button'
+												variant='outline'
+												size='sm'
+												onClick={createCategoryFromSuggestion}
+												disabled={createCategoryMutation.isPending}
+												title={ensureUniqueCategoryName(
+													categorySuggestion.new_category_name || categorySuggestion.category_name,
+													categories.map((category) => category.name),
+												)}
+											>
+												{t('createSuggestedCategory')}
+											</Button>
+										</div>
+									)}
+								</FormItem>
+							)}
+						/>
+					</div>
+
+					<FormField
+						control={form.control}
+						name='created_at'
+						render={({ field }) => (
+							<FormItem className='flex flex-col'>
+								<FormLabel>{t('date')}</FormLabel>
+								<Popover>
+									<PopoverTrigger asChild>
+										<FormControl>
+											<Button
+												variant='outline'
+												className={cn(
+													'w-full pl-3 text-left font-normal sm:w-1/2',
+													!field.value && 'text-muted-foreground',
+												)}
+											>
+												{field.value ? (
+													formatLocalDate(field.value, locale, { dateStyle: 'long' })
+												) : (
+													<span>{t('selectDate')}</span>
+												)}
+												<CalendarIcon className='ml-auto h-4 w-4 opacity-50' aria-hidden='true' />
+											</Button>
+										</FormControl>
+									</PopoverTrigger>
+									<PopoverContent className='w-auto p-0' align='start'>
+										<Calendar
+											mode='single'
+											selected={field.value}
+											onSelect={field.onChange}
+											disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+											initialFocus
+										/>
+									</PopoverContent>
+								</Popover>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+
+					<FormField
+						control={form.control}
+						name='description'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('description')}</FormLabel>
+								<FormControl>
+									<Input {...field} placeholder={t('descriptionPlaceholder')} />
+								</FormControl>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
+				</div>
+			</Form>
+		</FormDialog>
 	)
 }

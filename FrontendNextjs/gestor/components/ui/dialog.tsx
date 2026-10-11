@@ -42,6 +42,8 @@ type DialogContentProps = React.ComponentPropsWithoutRef<typeof DialogPrimitive.
    * `common.actions.close` message.
    */
   closeLabel?: string
+  /** Disables the built-in close button (e.g. while a form submits). */
+  closeDisabled?: boolean
 }
 
 const FALLBACK_CLOSE_LABEL = "Close"
@@ -86,7 +88,7 @@ function syncDescribedBy(node: HTMLElement, descriptionIdRef: React.MutableRefOb
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
->(({ className, children, description, closeLabel, ...props }, forwardedRef) => {
+>(({ className, children, description, closeLabel, closeDisabled, ...props }, forwardedRef) => {
   const defaultCloseLabel = useCloseLabel()
   const contentRef = React.useRef<HTMLDivElement | null>(null)
   const descriptionIdRef = React.useRef<string | null>(null)
@@ -124,8 +126,12 @@ const DialogContent = React.forwardRef<
         </DialogPrimitive.Description>
       ) : null}
       {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <X className="h-4 w-4" />
+      {/* 40px hit area around the 16px icon. */}
+      <DialogPrimitive.Close
+        disabled={closeDisabled}
+        className="absolute right-2 top-2 inline-flex h-10 w-10 items-center justify-center rounded-md text-muted-foreground ring-offset-background transition-colors hover:bg-accent hover:text-foreground focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
         <span className="sr-only">{closeLabel ?? defaultCloseLabel}</span>
       </DialogPrimitive.Close>
     </DialogPrimitive.Content>

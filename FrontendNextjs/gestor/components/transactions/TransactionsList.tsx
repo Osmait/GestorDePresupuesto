@@ -1,11 +1,14 @@
 'use client'
 
 import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
-import { CreditCard, TrendingDown, TrendingUp } from 'lucide-react'
+import { CreditCard, Plus, Receipt, TrendingDown, TrendingUp } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
+import { Amount } from '@/components/shared/Amount'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { ErrorState } from '@/components/shared/ErrorState'
 import TransactionItem from '@/components/transactions/TransactionItem'
 import TransactionSummaryCard from '@/components/transactions/TransactionSummaryCard'
 import { TransactionsPageSkeleton } from '@/components/transactions/TransactionsPageSkeleton'
@@ -14,8 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
-import { getSignedAmount, getTransactionTypeKey, isInflowTransaction } from '@/lib/transaction-utils'
-import { formatCurrency } from '@/lib/utils'
+import { getSignedAmount, getTransactionTypeKey } from '@/lib/transaction-utils'
 import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { useTransactionActions, useTransactionContext } from './TransactionContext'
@@ -83,8 +85,9 @@ function TransactionsListView() {
 	const t = useTranslations('transactions')
 	const tCommon = useTranslations('common')
 	const locale = useAppLocale()
-	const { transactions, pagination, summary, isLoading: isLoadingTx } = useTransactionContext()
-	const { deleteTransaction, clearFilters } = useTransactionActions()
+	const { transactions, pagination, summary, isLoading: isLoadingTx, error } = useTransactionContext()
+	const { deleteTransaction, clearFilters, reloadCurrentView, setEditingTransaction, setModalOpen } =
+		useTransactionActions()
 
 	const { data: categories = [], isLoading: isLoadingCat } = useGetCategories()
 	const { data: accounts = [], isLoading: isLoadingAcc } = useGetAccounts()
@@ -136,36 +139,63 @@ function TransactionsListView() {
 		}
 	}, [currentFilter, transactions, incomeTransactions, expenseTransactions])
 
-	const renderTransactionList = (transactionList: Transaction[]) => (
-		<ul className='space-y-4 min-h-[50vh]'>
-			{/* AnimatePresence mode="sync" is cheaper than "popLayout":
-                "popLayout" measures every sibling's layout on each change (O(n)),
-                while "sync" only animates the entering/exiting element.
-                The `layout` prop is intentionally omitted for the same reason. */}
-			<AnimatePresence mode='sync' initial={false}>
-				{transactionList.map((transaction) => (
-					<TransactionRow
-						key={transaction.id}
-						transaction={transaction}
-						category={categoriesById.get(transaction.category_id)}
-						highlighted={highlightedTransactionId === transaction.id}
-						onOpenDetails={setSelectedTransaction}
-						onDelete={handleDelete}
-					/>
-				))}
-			</AnimatePresence>
-			{transactionList.length === 0 && (
-				<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className='text-center py-10 text-muted-foreground'>
-					{t('noTransactions')}
-				</m.div>
-			)}
-		</ul>
-	)
+	const hasUrlFilters = searchParams.toString().length > 0
+
+	const renderTransactionList = (transactionList: Transaction[]) => {
+		if (transactionList.length === 0) {
+			return (
+				<EmptyState
+					icon={Receipt}
+					title={t('noTransactions')}
+					description={t('emptyDescription')}
+					action={
+						<>
+							<Button
+								onClick={() => {
+									setEditingTransaction(null)
+									setModalOpen(true)
+								}}
+							>
+								<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
+								{t('addTransaction')}
+							</Button>
+							{hasUrlFilters && (
+								<Button variant='outline' onClick={clearFilters}>
+									{t('clearFilters')}
+								</Button>
+							)}
+						</>
+					}
+				/>
+			)
+		}
+
+		return (
+			<ul className='min-h-[50vh] space-y-3'>
+				{/* AnimatePresence mode="sync" is cheaper than "popLayout":
+	                "popLayout" measures every sibling's layout on each change (O(n)),
+	                while "sync" only animates the entering/exiting element.
+	                The `layout` prop is intentionally omitted for the same reason. */}
+				<AnimatePresence mode='sync' initial={false}>
+					{transactionList.map((transaction) => (
+						<TransactionRow
+							key={transaction.id}
+							transaction={transaction}
+							category={categoriesById.get(transaction.category_id)}
+							highlighted={highlightedTransactionId === transaction.id}
+							onOpenDetails={setSelectedTransaction}
+							onDelete={handleDelete}
+						/>
+					))}
+				</AnimatePresence>
+			</ul>
+		)
+	}
 
 	const tabsConfig = [
-		{ value: 'all', label: t('all'), icon: <CreditCard className='h-4 w-4' />, content: <></> },
-		{ value: 'income', label: t('income'), icon: <TrendingUp className='h-4 w-4' />, content: <></> },
-		{ value: 'expense', label: t('expense'), icon: <TrendingDown className='h-4 w-4' />, content: <></> },
+		{ value: 'all', label: t('all'), icon: <CreditCard className='h-4 w-4' />, content: null },
+		{ value: 'income', label: t('income'), icon: <TrendingUp className='h-4 w-4' />, content: null },
+		{ value: 'expense', label: t('expense'), icon: <TrendingDown className='h-4 w-4' />, content: null },
 	]
 
 	useEffect(() => {
@@ -188,37 +218,43 @@ function TransactionsListView() {
 		return <TransactionsPageSkeleton />
 	}
 
-	return (
-		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-			<div className='mb-8'>
-				<TransactionSummaryCard transactions={transactions} summary={summary} />
-			</div>
+	// A failed first load has no data to show: offer a retry instead of an empty list.
+	if (error && transactions.length === 0) {
+		return <ErrorState onRetry={reloadCurrentView} />
+	}
 
-			<div className='flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4'>
+	return (
+		<div className='space-y-6'>
+			<TransactionSummaryCard transactions={transactions} summary={summary} />
+
+			<div className='space-y-3'>
+				<div className='flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'>
+					<AnimatedTabs
+						defaultValue='all'
+						onValueChange={setCurrentFilter}
+						tabs={tabsConfig}
+						noContent={true}
+						className='space-y-0'
+					/>
+					<TransactionSort />
+				</div>
 				{pagination && (
-					<div className='flex flex-wrap items-center gap-2 text-sm text-muted-foreground'>
-						<span>
+					<div className='flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground'>
+						<span className='tabular-nums'>
 							{t('showing')} {transactions.length} {t('of')} {pagination.total_records} {t('transactionsCount')}
 							{pagination.total_pages > 1 &&
 								` (${t('page')} ${pagination.current_page} ${t('of')} ${pagination.total_pages})`}
 						</span>
-						{searchParams.toString().length > 0 && (
-							<Button variant='link' size='sm' onClick={clearFilters} className='h-auto p-0 ml-2'>
+						{hasUrlFilters && (
+							<Button variant='link' size='sm' onClick={clearFilters} className='h-auto p-0'>
 								{tCommon('actions.viewAll')}
 							</Button>
 						)}
 					</div>
 				)}
-				<div className='ml-auto'>
-					<TransactionSort />
-				</div>
 			</div>
 
-			<div className='space-y-6'>
-				<AnimatedTabs defaultValue='all' onValueChange={setCurrentFilter} tabs={tabsConfig} noContent={true} />
-
-				{renderTransactionList(filteredTransactions)}
-			</div>
+			{renderTransactionList(filteredTransactions)}
 
 			<Dialog open={Boolean(selectedTransaction)} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
 				<DialogContent>
@@ -233,13 +269,14 @@ function TransactionsListView() {
 							<div className='grid grid-cols-2 gap-3'>
 								<div className='min-w-0'>
 									<p className='text-xs text-muted-foreground'>{t('amount')}</p>
-									<p
-										className={`font-semibold tabular-nums break-words ${isInflowTransaction(selectedTransaction.type_transation) ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-									>
-										{formatCurrency(getSignedAmount(selectedTransaction), selectedTransaction.currency, {
-											locale,
-											signDisplay: 'exceptZero',
-										})}
+									<p className='font-semibold'>
+										<Amount
+											value={getSignedAmount(selectedTransaction)}
+											currency={selectedTransaction.currency}
+											tone='auto'
+											signed
+											icon
+										/>
 									</p>
 								</div>
 								<div className='min-w-0'>
@@ -275,6 +312,6 @@ function TransactionsListView() {
 					)}
 				</DialogContent>
 			</Dialog>
-		</m.div>
+		</div>
 	)
 }

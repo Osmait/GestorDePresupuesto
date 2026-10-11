@@ -1,4 +1,5 @@
 import { render, screen } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { beforeAll, describe, expect, it, vi } from 'vitest'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 
@@ -35,5 +36,39 @@ describe('AnimatedTabs', () => {
 		expect(screen.getByTestId('icon').parentElement).toHaveAttribute('aria-hidden', 'true')
 		// Text-only tabs keep their visible text as the name.
 		expect(screen.getByRole('tab', { name: 'Sin icono' })).not.toHaveAttribute('aria-label')
+	})
+
+	it('moves the selection with the arrow keys (roving tabindex) and skips missing panels in filter mode', async () => {
+		const user = userEvent.setup()
+		const onValueChange = vi.fn()
+		render(
+			<AnimatedTabs
+				defaultValue='all'
+				urlParam={false}
+				noContent
+				onValueChange={onValueChange}
+				tabs={[
+					{ value: 'all', label: 'Todos', content: null },
+					{ value: 'income', label: 'Ingresos', content: null },
+					{ value: 'expense', label: 'Gastos', content: null },
+				]}
+			/>,
+		)
+
+		const all = screen.getByRole('tab', { name: 'Todos' })
+		expect(all).toHaveAttribute('tabindex', '0')
+		expect(screen.getByRole('tab', { name: 'Ingresos' })).toHaveAttribute('tabindex', '-1')
+		expect(all).not.toHaveAttribute('aria-controls')
+
+		all.focus()
+		await user.keyboard('{ArrowRight}')
+		expect(onValueChange).toHaveBeenLastCalledWith('income')
+		expect(screen.getByRole('tab', { name: 'Ingresos' })).toHaveFocus()
+		expect(screen.getByRole('tab', { name: 'Ingresos' })).toHaveAttribute('aria-selected', 'true')
+
+		await user.keyboard('{End}')
+		expect(onValueChange).toHaveBeenLastCalledWith('expense')
+		await user.keyboard('{ArrowRight}')
+		expect(onValueChange).toHaveBeenLastCalledWith('all')
 	})
 })

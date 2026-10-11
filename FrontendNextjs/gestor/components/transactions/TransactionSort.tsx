@@ -1,30 +1,51 @@
 'use client'
 
-import { ArrowDownAZ, ArrowUpZA, CalendarDays, DollarSign, SortAsc } from 'lucide-react'
+import { ArrowUpDown } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { Button } from '@/components/ui/button'
 import {
 	DropdownMenu,
 	DropdownMenuContent,
-	DropdownMenuGroup,
-	DropdownMenuItem,
 	DropdownMenuLabel,
+	DropdownMenuRadioGroup,
+	DropdownMenuRadioItem,
 	DropdownMenuSeparator,
 	DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { useTransactionContext } from './TransactionContext'
 
+type SortOrder = 'asc' | 'desc'
+
+const SORT_GROUPS = [
+	{
+		label: 'date',
+		options: [
+			{ sortBy: 'created_at', sortOrder: 'desc', label: 'newestFirst' },
+			{ sortBy: 'created_at', sortOrder: 'asc', label: 'oldestFirst' },
+		],
+	},
+	{
+		label: 'amount',
+		options: [
+			{ sortBy: 'amount', sortOrder: 'desc', label: 'highestFirst' },
+			{ sortBy: 'amount', sortOrder: 'asc', label: 'lowestFirst' },
+		],
+	},
+	{
+		label: 'name',
+		options: [
+			{ sortBy: 'transaction_name', sortOrder: 'asc', label: 'nameAZ' },
+			{ sortBy: 'transaction_name', sortOrder: 'desc', label: 'nameZA' },
+		],
+	},
+] as const satisfies ReadonlyArray<{
+	label: string
+	options: ReadonlyArray<{ sortBy: string; sortOrder: SortOrder; label: string }>
+}>
+
 export function TransactionSort() {
 	const t = useTranslations('transactions')
 	const { filters, setFilters } = useTransactionContext()
-
-	const handleSortChange = (sortBy: string, sortOrder: 'asc' | 'desc') => {
-		setFilters((prev) => ({
-			...prev,
-			sortBy,
-			sortOrder,
-		}))
-	}
 
 	const currentSortLabel = () => {
 		if (filters.sortBy === 'amount') return filters.sortOrder === 'desc' ? t('sortAmountDesc') : t('sortAmountAsc')
@@ -32,66 +53,36 @@ export function TransactionSort() {
 		return filters.sortOrder === 'asc' ? t('sortDateOld') : t('sortDateNew')
 	}
 
+	const handleSortChange = (value: string) => {
+		const [sortBy, sortOrder] = value.split(':') as [string, SortOrder]
+		setFilters((prev) => ({ ...prev, sortBy, sortOrder }))
+	}
+
 	return (
 		<DropdownMenu>
 			<DropdownMenuTrigger asChild>
-				<Button variant='outline' size='sm' className='h-8 gap-2'>
-					<SortAsc className='h-3.5 w-3.5' />
+				<Button variant='outline' size='sm' aria-label={`${t('sortBy')}: ${currentSortLabel()}`}>
+					<ArrowUpDown className='h-4 w-4 sm:mr-2' aria-hidden='true' />
 					<span className='hidden sm:inline'>{currentSortLabel()}</span>
 				</Button>
 			</DropdownMenuTrigger>
 			<DropdownMenuContent align='end' className='w-56'>
 				<DropdownMenuLabel>{t('sortBy')}</DropdownMenuLabel>
-				<DropdownMenuSeparator />
-				<DropdownMenuGroup>
-					<DropdownMenuLabel className='text-xs text-muted-foreground font-normal'>{t('date')}</DropdownMenuLabel>
-					<DropdownMenuItem onClick={() => handleSortChange('created_at', 'desc')}>
-						<CalendarDays className='mr-2 h-4 w-4' />
-						{t('newestFirst')}
-						{filters.sortBy === 'created_at' && filters.sortOrder === 'desc' && (
-							<span className='ml-auto text-xs'>✓</span>
-						)}
-					</DropdownMenuItem>
-					<DropdownMenuItem onClick={() => handleSortChange('created_at', 'asc')}>
-						<CalendarDays className='mr-2 h-4 w-4' />
-						{t('oldestFirst')}
-						{filters.sortBy === 'created_at' && filters.sortOrder === 'asc' && (
-							<span className='ml-auto text-xs'>✓</span>
-						)}
-					</DropdownMenuItem>
-				</DropdownMenuGroup>
-				<DropdownMenuSeparator />
-				<DropdownMenuGroup>
-					<DropdownMenuLabel className='text-xs text-muted-foreground font-normal'>{t('amount')}</DropdownMenuLabel>
-					<DropdownMenuItem onClick={() => handleSortChange('amount', 'desc')}>
-						<DollarSign className='mr-2 h-4 w-4' />
-						{t('highestFirst')}
-						{filters.sortBy === 'amount' && filters.sortOrder === 'desc' && <span className='ml-auto text-xs'>✓</span>}
-					</DropdownMenuItem>
-					<DropdownMenuItem onClick={() => handleSortChange('amount', 'asc')}>
-						<DollarSign className='mr-2 h-4 w-4' />
-						{t('lowestFirst')}
-						{filters.sortBy === 'amount' && filters.sortOrder === 'asc' && <span className='ml-auto text-xs'>✓</span>}
-					</DropdownMenuItem>
-				</DropdownMenuGroup>
-				<DropdownMenuSeparator />
-				<DropdownMenuGroup>
-					<DropdownMenuLabel className='text-xs text-muted-foreground font-normal'>{t('name')}</DropdownMenuLabel>
-					<DropdownMenuItem onClick={() => handleSortChange('transaction_name', 'asc')}>
-						<ArrowDownAZ className='mr-2 h-4 w-4' />
-						{t('nameAZ')}
-						{filters.sortBy === 'transaction_name' && filters.sortOrder === 'asc' && (
-							<span className='ml-auto text-xs'>✓</span>
-						)}
-					</DropdownMenuItem>
-					<DropdownMenuItem onClick={() => handleSortChange('transaction_name', 'desc')}>
-						<ArrowUpZA className='mr-2 h-4 w-4' />
-						{t('nameZA')}
-						{filters.sortBy === 'transaction_name' && filters.sortOrder === 'desc' && (
-							<span className='ml-auto text-xs'>✓</span>
-						)}
-					</DropdownMenuItem>
-				</DropdownMenuGroup>
+				<DropdownMenuRadioGroup value={`${filters.sortBy}:${filters.sortOrder}`} onValueChange={handleSortChange}>
+					{SORT_GROUPS.map((group) => (
+						<div key={group.label}>
+							<DropdownMenuSeparator />
+							<DropdownMenuLabel className='text-xs font-normal text-muted-foreground'>
+								{t(group.label)}
+							</DropdownMenuLabel>
+							{group.options.map((option) => (
+								<DropdownMenuRadioItem key={option.label} value={`${option.sortBy}:${option.sortOrder}`}>
+									{t(option.label)}
+								</DropdownMenuRadioItem>
+							))}
+						</div>
+					))}
+				</DropdownMenuRadioGroup>
 			</DropdownMenuContent>
 		</DropdownMenu>
 	)

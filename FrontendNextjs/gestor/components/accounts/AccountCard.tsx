@@ -1,58 +1,44 @@
 'use client'
-import { ArrowDownRight, ArrowUpRight, Building, Edit, MoreHorizontal, Trash2 } from 'lucide-react'
+import { Building, Edit, MoreHorizontal, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
+import { toast } from 'sonner'
+import { Amount } from '@/components/shared/Amount'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { DEFAULT_CURRENCY, formatCurrency } from '@/lib/utils'
+import { DEFAULT_CURRENCY } from '@/lib/utils'
 import { Account } from '@/types/account'
 
 interface AccountCardProps {
 	account: Account
+	/** Deletes the account (after confirmation). Omit both handlers for a read-only card (no menu). */
 	onAccountDeleted?: () => void | Promise<void>
 	onAccountEdit?: (_account: Account) => void
 }
 
 export function AccountCard({ account, onAccountDeleted, onAccountEdit }: AccountCardProps) {
 	const t = useTranslations('accounts')
-	const tForms = useTranslations('forms')
-	const locale = useAppLocale()
+	const tCommon = useTranslations('common')
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-	const [isDeleting, setIsDeleting] = useState(false)
 
 	const currency = account.currency || DEFAULT_CURRENCY
 	const currentBalance = account.current_balance ?? account.initial_balance ?? 0
 	const initialBalance = account.initial_balance ?? 0
 	const balanceDelta = currentBalance - initialBalance
-	const isPositive = currentBalance > 0
-	const hasGrowth = balanceDelta > 0
-	const formatMoney = (value: number, signDisplay?: 'exceptZero') =>
-		formatCurrency(value, currency, { locale, signDisplay })
+	const hasActions = Boolean(onAccountEdit || onAccountDeleted)
 
 	const handleDeleteAccount = async () => {
 		if (!account.id || !onAccountDeleted) return
-
-		setIsDeleting(true)
 		try {
 			await onAccountDeleted()
-			setShowDeleteDialog(false)
 		} catch (error) {
-			console.error('Error deleting account:', error)
-		} finally {
-			setIsDeleting(false)
+			toast.error(t('deleteError'))
+			throw error
 		}
 	}
 
@@ -63,88 +49,82 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
 			 * (after:absolute after:inset-0), so the card is reachable with the
 			 * keyboard and announced as a link. The menu sits above it (z-10).
 			 */}
-			<Card className='relative hover:bg-accent/40 dark:hover:bg-accent/40 transition-colors duration-300 border-border/50 dark:border-border/20 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-background'>
-				<CardContent className='p-4 sm:p-6'>
-					<div className='flex items-center justify-between gap-2 mb-4'>
-						<div className='flex min-w-0 items-center gap-3 sm:gap-4'>
-							<Avatar className='h-12 w-12 sm:h-14 sm:w-14 shrink-0 border-2 border-primary/20'>
-								<AvatarFallback className='bg-gradient-to-br from-primary/80 to-primary text-primary-foreground font-semibold text-lg'>
+			<Card className='relative transition-colors hover:bg-muted/40 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-background'>
+				<CardContent className='p-5'>
+					<div className='mb-4 flex items-center justify-between gap-2'>
+						<div className='flex min-w-0 items-center gap-3'>
+							<Avatar className='h-10 w-10 shrink-0'>
+								<AvatarFallback className='bg-muted font-semibold text-foreground'>
 									{(account.name ?? '').charAt(0).toUpperCase()}
 								</AvatarFallback>
 							</Avatar>
 							<div className='min-w-0'>
 								<Link
 									href={`/app/accounts/${account.id}`}
-									className='block truncate font-semibold text-foreground text-lg focus-visible:outline-none after:absolute after:inset-0'
+									className='block truncate text-base font-semibold text-foreground focus-visible:outline-none after:absolute after:inset-0'
 								>
 									{account.name}
 								</Link>
-								<p className='text-sm text-muted-foreground flex items-center gap-1 min-w-0'>
+								<p className='flex min-w-0 items-center gap-1 text-sm text-muted-foreground'>
 									<Building className='h-4 w-4 shrink-0' aria-hidden='true' />
 									<span className='truncate'>{account.bank}</span>
 								</p>
 							</div>
 						</div>
-						<DropdownMenu>
-							<DropdownMenuTrigger asChild>
-								<Button
-									variant='ghost'
-									size='sm'
-									className='relative z-10 h-8 w-8 shrink-0 p-0'
-									aria-label={t('options', { name: account.name })}
-								>
-									<MoreHorizontal className='h-4 w-4' aria-hidden='true' />
-								</Button>
-							</DropdownMenuTrigger>
-							<DropdownMenuContent align='end'>
-								<DropdownMenuItem
-									className='flex items-center gap-2 cursor-pointer'
-									onClick={() => onAccountEdit?.(account)}
-								>
-									<Edit className='h-4 w-4' />
-									{t('edit')}
-								</DropdownMenuItem>
-								<DropdownMenuItem
-									className='flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400'
-									onClick={() => setShowDeleteDialog(true)}
-								>
-									<Trash2 className='h-4 w-4' />
-									{t('delete')}
-								</DropdownMenuItem>
-							</DropdownMenuContent>
-						</DropdownMenu>
+						{hasActions ? (
+							<DropdownMenu>
+								<DropdownMenuTrigger asChild>
+									<Button
+										variant='ghost'
+										size='icon'
+										className='relative z-10 shrink-0'
+										aria-label={tCommon('actions.rowMenu', { name: account.name })}
+									>
+										<MoreHorizontal className='h-4 w-4' aria-hidden='true' />
+									</Button>
+								</DropdownMenuTrigger>
+								<DropdownMenuContent align='end'>
+									{onAccountEdit ? (
+										<DropdownMenuItem className='flex items-center gap-2' onSelect={() => onAccountEdit(account)}>
+											<Edit className='h-4 w-4' aria-hidden='true' />
+											{t('edit')}
+										</DropdownMenuItem>
+									) : null}
+									{onAccountDeleted ? (
+										<DropdownMenuItem
+											className='flex items-center gap-2 text-destructive focus:text-destructive'
+											onSelect={() => setShowDeleteDialog(true)}
+										>
+											<Trash2 className='h-4 w-4' aria-hidden='true' />
+											{t('delete')}
+										</DropdownMenuItem>
+									) : null}
+								</DropdownMenuContent>
+							</DropdownMenu>
+						) : null}
 					</div>
-					<div className='space-y-3'>
-						<div className='flex flex-wrap justify-between items-center gap-x-2'>
+					<div className='space-y-2'>
+						<div className='flex flex-wrap items-baseline justify-between gap-x-2'>
 							<span className='text-sm text-muted-foreground'>{t('currentBalance')}</span>
-							<div className='flex min-w-0 items-center gap-2'>
-								{isPositive ? (
-									<ArrowUpRight className='h-4 w-4 shrink-0 text-green-600 dark:text-green-400' aria-hidden='true' />
-								) : (
-									<ArrowDownRight className='h-4 w-4 shrink-0 text-red-600 dark:text-red-400' aria-hidden='true' />
-								)}
-								<span
-									className={`font-bold text-xl sm:text-2xl tabular-nums break-all ${isPositive ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-								>
-									{formatMoney(currentBalance)}
-								</span>
-							</div>
+							<Amount
+								value={currentBalance}
+								currency={currency}
+								tone='auto'
+								icon
+								className='min-w-0 text-2xl font-semibold tracking-tight'
+							/>
 						</div>
 						{balanceDelta !== 0 && (
-							<div className='flex flex-wrap justify-between items-center gap-x-2 text-xs'>
+							<div className='flex flex-wrap items-center justify-between gap-x-2 text-xs'>
 								<span className='text-muted-foreground'>
-									{t('initial')}: {formatMoney(initialBalance)}
+									{t('initial')}: <Amount value={initialBalance} currency={currency} />
 								</span>
-								<span
-									className={`font-medium tabular-nums ${hasGrowth ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}
-								>
-									{formatMoney(balanceDelta, 'exceptZero')}
-								</span>
+								<Amount value={balanceDelta} currency={currency} tone='auto' signed className='font-medium' />
 							</div>
 						)}
-						<div className='flex justify-between items-center pt-2 border-t border-border/50'>
+						<div className='flex items-center justify-between border-t pt-3'>
 							<span className='text-xs text-muted-foreground'>{currency}</span>
-							<Badge variant='outline' className='bg-muted/30 dark:bg-muted/20'>
+							<Badge variant='outline'>
 								{currentBalance > 10000 ? t('high') : currentBalance > 5000 ? t('medium') : t('low')}
 							</Badge>
 						</div>
@@ -152,22 +132,16 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
 				</CardContent>
 			</Card>
 
-			<Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>{t('deleteTitle')}</DialogTitle>
-						<DialogDescription>{t('deleteDescription', { name: account.name })}</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button variant='outline' onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
-							{tForms('cancel')}
-						</Button>
-						<Button variant='destructive' onClick={handleDeleteAccount} disabled={isDeleting}>
-							{isDeleting ? t('deleting') : tForms('delete')}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			{onAccountDeleted ? (
+				<ConfirmDialog
+					open={showDeleteDialog}
+					onOpenChange={setShowDeleteDialog}
+					title={t('deleteTitle', { name: account.name })}
+					description={tCommon('confirm.irreversible')}
+					destructive
+					onConfirm={handleDeleteAccount}
+				/>
+			) : null}
 		</>
 	)
 }

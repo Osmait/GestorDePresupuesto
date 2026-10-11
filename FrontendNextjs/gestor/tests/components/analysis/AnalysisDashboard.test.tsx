@@ -6,18 +6,17 @@ import { AnalysisDashboard, hasPlottableValues } from '@/components/analysis/Ana
 vi.mock('next/dynamic', () => ({
 	default: vi.fn((_loader: any) => {
 		const MockComponent = (props: any) => {
-			// Identify chart by specific props passed in AnalysisDashboard.tsx
+			// Identify chart by the props AnalysisDashboard.tsx passes to each one
 			let testId = 'dynamic-chart'
-			if (props.t?.income && props.t?.month && !props.t?.day) testId = 'nivo-line'
-			if (props.t?.category) testId = 'nivo-bar'
-			if (props.nivoTheme && !props.t) testId = 'nivo-pie'
-			if (props.t?.expenses && !props.t?.month && !props.t?.day) testId = 'nivo-radar'
-			if (props.t?.day) testId = 'nivo-heatmap'
+			if (props.t?.income && props.t?.month) testId = 'nivo-line'
+			else if (props.t?.category) testId = 'nivo-bar'
+			else if (props.t?.expenses) testId = 'nivo-radar'
+			else if (!props.t) testId = 'nivo-pie'
 
 			// Filter out non-DOM props to avoid React warnings
-			const { nivoTheme, t, theme, ...domProps } = props
+			const { t, data, label, ...domProps } = props
 			return (
-				<div {...domProps} data-testid={testId}>
+				<div {...domProps} role='img' aria-label={label} data-testid={testId}>
 					{testId}
 				</div>
 			)
@@ -88,15 +87,21 @@ vi.mock('@/hooks/queries/useCategoriesQuery', () => ({
 	useGetCategories: () => ({ data: [], isLoading: false }),
 }))
 vi.mock('@/hooks/queries/useBudgetsQuery', () => ({
-	useGetBudgets: () => ({ data: [], isLoading: false }),
+	useGetBudgets: () => ({ data: budgetsState.data, isLoading: false }),
 }))
 vi.mock('@/hooks/queries/useTransactionsQuery', () => ({
 	useGetAllTransactions: () => ({ data: [], isLoading: false }),
 }))
-const summaryState = vi.hoisted(() => ({ data: null as any }))
+const summaryState = vi.hoisted(() => ({ data: null as any, isError: false, refetch: vi.fn() }))
+const budgetsState = vi.hoisted(() => ({ data: [] as any[] }))
 
 vi.mock('@/hooks/queries/useAnalyticsQuery', () => ({
-	useGetDashboardSummary: () => ({ data: summaryState.data, isLoading: false }),
+	useGetDashboardSummary: () => ({
+		data: summaryState.data,
+		isLoading: false,
+		isError: summaryState.isError,
+		refetch: summaryState.refetch,
+	}),
 }))
 
 const fullSummary = {
@@ -130,6 +135,9 @@ const emptySummary = {
 describe('AnalysisDashboard', () => {
 	beforeEach(() => {
 		summaryState.data = fullSummary
+		summaryState.isError = false
+		summaryState.refetch.mockClear()
+		budgetsState.data = []
 	})
 
 	it('renders all chart components when data is loaded', async () => {
@@ -140,14 +148,15 @@ describe('AnalysisDashboard', () => {
 		expect(screen.getByText('expensesByCategory')).toBeInTheDocument()
 		expect(screen.getByText('categoryDistribution')).toBeInTheDocument()
 		expect(screen.getByText('categoryRadar')).toBeInTheDocument()
-		expect(screen.getByText('weeklyHeatmap')).toBeInTheDocument()
+		// The weekly heat map was mock data; it is not rendered until the API provides it
+		expect(screen.queryByText('weeklyHeatmap')).not.toBeInTheDocument()
 
 		// Verify all charts are rendered (use findBy since they are loaded dynamically)
 		expect(await screen.findByTestId('nivo-line')).toBeInTheDocument()
 		expect(await screen.findByTestId('nivo-bar')).toBeInTheDocument()
 		expect(await screen.findByTestId('nivo-pie')).toBeInTheDocument()
 		expect(await screen.findByTestId('nivo-radar')).toBeInTheDocument()
-		expect(await screen.findByTestId('nivo-heatmap')).toBeInTheDocument()
+		expect(screen.getAllByRole('img', { name: 'chartLabel' })).toHaveLength(4)
 	})
 
 	it('shows an empty state instead of charts and a fake "low savings" insight when there is no data', () => {
@@ -163,6 +172,34 @@ describe('AnalysisDashboard', () => {
 		expect(screen.queryByTestId('nivo-pie')).not.toBeInTheDocument()
 		expect(screen.queryByTestId('nivo-radar')).not.toBeInTheDocument()
 		expect(screen.getAllByText('noData').length).toBe(4)
+	})
+})
+
+describe('AnalysisDashboard states', () => {
+	beforeEach(() => {
+		summaryState.data = fullSummary
+		summaryState.isError = false
+		summaryState.refetch.mockClear()
+		budgetsState.data = []
+	})
+
+	it('shows an error state with retry when the summary fails to load', async () => {
+		summaryState.data = undefined
+		summaryState.isError = true
+		render(<AnalysisDashboard />)
+
+		expect(screen.getByRole('alert')).toHaveTextContent('errorTitle')
+		screen.getByRole('button', { name: /retry/i }).click()
+		expect(summaryState.refetch).toHaveBeenCalled()
+	})
+
+	it('renders budget usage as labelled progress bars', () => {
+		budgetsState.data = [{ id: 'b1', category_id: 'cat1', category_name: 'Food', amount: 200 }]
+		render(<AnalysisDashboard />)
+
+		const bar = screen.getByRole('progressbar', { name: 'budgetUsageLabel' })
+		// 300 spent of 200 → clamped to a full bar
+		expect(bar).toHaveAttribute('aria-valuenow', '100')
 	})
 })
 

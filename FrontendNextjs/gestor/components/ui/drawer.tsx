@@ -12,6 +12,7 @@ const Drawer = ({
 }: React.ComponentProps<typeof DrawerPrimitive.Root> & { side?: 'bottom' | 'right' }) => (
   <DrawerPrimitive.Root
     shouldScaleBackground={shouldScaleBackground}
+    direction={side}
     {...props}
   />
 )

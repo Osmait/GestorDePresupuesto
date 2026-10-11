@@ -1,9 +1,11 @@
 'use client'
 
+import { Flag, Loader2, Search, Users } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import type { AdminFeatureItem } from '@/app/repository/adminRepository'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -12,6 +14,9 @@ import { getAdminRepository } from '@/lib/repositoryConfig'
 import { UserResponse } from '@/types/user'
 
 type FeatureItem = AdminFeatureItem
+
+/** Feature keys used as DOM ids (keys may contain dots). */
+const scopeId = (key: string) => key.replace(/[^a-zA-Z0-9_-]/g, '-')
 
 interface FeatureFlagsPanelProps {
 	users: UserResponse[]
@@ -228,23 +233,25 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 	}
 
 	return (
-		<Card className='border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden'>
+		<Card className='overflow-hidden'>
 			<CardHeader>
 				<CardTitle>{t('title')}</CardTitle>
 				<CardDescription>{t('description')}</CardDescription>
 			</CardHeader>
 			<CardContent className='space-y-4'>
 				<div className='space-y-2'>
-					<div className='text-sm font-medium'>{t('globalOverrides')}</div>
+					<h4 className='text-sm font-medium'>{t('globalOverrides')}</h4>
 					{catalogFeatures.map((feature) => (
 						<div
 							key={`global-${feature.key}`}
-							className='rounded border p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+							className='flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between'
 						>
 							<div className='min-w-0'>
-								<div className='text-sm font-medium'>{feature.name}</div>
+								<div id={`global-flag-${scopeId(feature.key)}`} className='text-sm font-medium'>
+									{feature.name}
+								</div>
 								<div className='text-xs text-muted-foreground truncate'>{feature.description || feature.key}</div>
-								<div className='text-[11px] text-muted-foreground mt-1'>
+								<div className='mt-1 text-xs text-muted-foreground'>
 									{t('globalMeta', {
 										defaultState: onOff(feature.default_enabled),
 										overrideState: yesNo(feature.has_global_override),
@@ -262,6 +269,7 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 									variant='outline'
 									onClick={() => resetGlobalOverride(feature.key)}
 									disabled={!feature.has_global_override}
+									aria-describedby={`global-flag-${scopeId(feature.key)}`}
 								>
 									{t('resetGlobal')}
 								</Button>
@@ -270,6 +278,7 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 					))}
 					<div className='flex justify-end'>
 						<Button onClick={saveGlobalChanges} disabled={isSaving || Object.keys(pendingGlobal).length === 0}>
+							{isSaving ? <Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' /> : null}
 							{isSaving ? t('saving') : t('saveGlobal', { count: Object.keys(pendingGlobal).length })}
 						</Button>
 					</div>
@@ -277,19 +286,25 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 
 				<div className='border-t pt-4' />
 
-				<div className='max-w-md'>
+				<div className='relative w-full sm:max-w-md'>
+					<Search
+						className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground'
+						aria-hidden='true'
+					/>
 					<Input
+						type='search'
 						value={userSearch}
 						onChange={(e) => setUserSearch(e.target.value)}
 						placeholder={t('searchPlaceholder')}
-						aria-label={t('searchPlaceholder')}
+						aria-label={t('searchLabel')}
+						className='pl-9'
 					/>
 				</div>
 
-				<div className='max-w-3xl rounded border bg-background/50 overflow-hidden'>
+				<div className='max-w-3xl overflow-hidden rounded-md border'>
 					<div className='max-h-64 overflow-y-auto'>
 						<table className='w-full text-sm'>
-							<thead className='sticky top-0 bg-background border-b'>
+							<thead className='sticky top-0 border-b bg-card'>
 								<tr className='text-left text-xs text-muted-foreground'>
 									<th className='px-3 py-2 font-medium'>{t('columns.name')}</th>
 									<th className='px-3 py-2 font-medium'>{t('columns.email')}</th>
@@ -313,6 +328,10 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 													size='sm'
 													variant={isSelected ? 'default' : 'outline'}
 													onClick={() => setSelectedUserId(user.id)}
+													aria-pressed={isSelected}
+													aria-label={t(isSelected ? 'selectedUser' : 'chooseUser', {
+														name: `${user.name} ${user.last_name}`,
+													})}
 												>
 													{isSelected ? t('selected') : t('choose')}
 												</Button>
@@ -322,8 +341,8 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 								})}
 								{!isSearchingUsers && usersForSelect.length === 0 && (
 									<tr>
-										<td colSpan={3} className='px-3 py-3 text-sm text-muted-foreground'>
-											{t('noUsers')}
+										<td colSpan={3}>
+											<EmptyState compact icon={Users} title={t('noUsers')} className='py-6' />
 										</td>
 									</tr>
 								)}
@@ -331,7 +350,9 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 						</table>
 					</div>
 					{isSearchingUsers && (
-						<div className='px-3 py-2 text-xs text-muted-foreground border-t'>{t('searchingUsers')}</div>
+						<div className='border-t px-3 py-2 text-xs text-muted-foreground' role='status'>
+							{t('searchingUsers')}
+						</div>
 					)}
 				</div>
 
@@ -345,20 +366,26 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 				)}
 
 				<div className='space-y-2'>
-					{isLoading && <div className='text-sm text-muted-foreground'>{t('loadingFlags')}</div>}
+					{isLoading && (
+						<div className='text-sm text-muted-foreground' role='status'>
+							{t('loadingFlags')}
+						</div>
+					)}
 					{!isLoading && selectedUserId && features.length === 0 && (
-						<div className='text-sm text-muted-foreground'>{t('noFlags')}</div>
+						<EmptyState compact icon={Flag} title={t('noFlags')} />
 					)}
 
 					{features.map((feature) => (
 						<div
 							key={feature.key}
-							className='rounded border p-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between'
+							className='flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-center sm:justify-between'
 						>
 							<div className='min-w-0'>
-								<div className='text-sm font-medium'>{feature.name}</div>
+								<div id={`flag-${scopeId(feature.key)}`} className='text-sm font-medium'>
+									{feature.name}
+								</div>
 								<div className='text-xs text-muted-foreground truncate'>{feature.description || feature.key}</div>
-								<div className='text-[11px] text-muted-foreground mt-1'>
+								<div className='mt-1 text-xs text-muted-foreground'>
 									{t('userMeta', {
 										defaultState: onOff(feature.default_enabled),
 										overrideState: yesNo(!!feature.has_override),
@@ -366,7 +393,7 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 									})}
 								</div>
 								{feature.blocked_by_global && (
-									<div className='text-[11px] text-amber-600 mt-1'>{t('blockedByGlobal')}</div>
+									<div className='mt-1 text-xs font-medium text-warning'>{t('blockedByGlobal')}</div>
 								)}
 							</div>
 							<div className='flex items-center gap-2'>
@@ -375,7 +402,12 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 									onCheckedChange={(value) => handleToggle(feature.key, value)}
 									aria-label={feature.name}
 								/>
-								<Button size='sm' variant='outline' onClick={() => resetOverride(feature.key)}>
+								<Button
+									size='sm'
+									variant='outline'
+									onClick={() => resetOverride(feature.key)}
+									aria-describedby={`flag-${scopeId(feature.key)}`}
+								>
 									{t('reset')}
 								</Button>
 							</div>
@@ -385,6 +417,7 @@ export function FeatureFlagsPanel({ users }: FeatureFlagsPanelProps) {
 
 				<div className='flex justify-end'>
 					<Button onClick={saveChanges} disabled={isSaving || Object.keys(pending).length === 0}>
+						{isSaving ? <Loader2 className='mr-2 h-4 w-4 animate-spin' aria-hidden='true' /> : null}
 						{isSaving ? t('saving') : t('saveChanges', { count: Object.keys(pending).length })}
 					</Button>
 				</div>

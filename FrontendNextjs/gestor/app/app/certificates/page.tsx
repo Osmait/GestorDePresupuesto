@@ -1,10 +1,10 @@
 'use client'
 
-import { AlertCircle } from 'lucide-react'
 import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useState } from 'react'
+import { toast } from 'sonner'
 import { CertificateActions } from '@/components/certificates/CertificateActions'
 import { CertificateProvider, useCertificates } from '@/components/certificates/CertificateContext'
 import { CertificateFormModal } from '@/components/certificates/CertificateFormModal'
@@ -13,8 +13,11 @@ import { CertificateSummaryCard } from '@/components/certificates/CertificateSum
 import { CertificatesList } from '@/components/certificates/CertificatesList'
 import { CertificatesPageSkeleton } from '@/components/certificates/CertificatesPageSkeleton'
 import { PaymentSimulator } from '@/components/certificates/PaymentSimulator'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { Button } from '@/components/ui/button'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { ErrorState } from '@/components/shared/ErrorState'
+import { ModuleDisabled } from '@/components/shared/ModuleDisabled'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { PageShell } from '@/components/shared/PageShell'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { isFundingAccount } from '@/lib/accounts'
@@ -22,7 +25,7 @@ import { Certificate, CreateCertificateDTO, UpdateCertificateDTO } from '@/types
 
 function CertificatesContent() {
 	const t = useTranslations('certificates')
-	const { certificates, summary, isLoading, error, createCertificate, updateCertificate, deleteCertificate } =
+	const { certificates, summary, isLoading, error, createCertificate, updateCertificate, deleteCertificate, refetch } =
 		useCertificates()
 	const { data: accountsData } = useGetAccounts()
 	const [isFormOpen, setIsFormOpen] = useState(false)
@@ -30,6 +33,7 @@ function CertificatesContent() {
 	const [historyCertificateId, setHistoryCertificateId] = useState<string | null>(null)
 	const [isSimulatorOpen, setIsSimulatorOpen] = useState(false)
 	const [simulatorCertificate, setSimulatorCertificate] = useState<Certificate | null>(null)
+	const [certificateToCancel, setCertificateToCancel] = useState<Certificate | null>(null)
 	const router = useRouter()
 	const pathname = usePathname()
 	const searchParams = useSearchParams()
@@ -54,9 +58,17 @@ function CertificatesContent() {
 		setIsFormOpen(true)
 	}
 
-	const handleDelete = async (id: string) => {
-		if (confirm(t('confirmCancel'))) {
-			await deleteCertificate(id)
+	const handleDelete = (id: string) => {
+		setCertificateToCancel(certificates?.find((certificate) => certificate.id === id) ?? null)
+	}
+
+	const handleConfirmCancel = async () => {
+		if (!certificateToCancel) return
+		try {
+			await deleteCertificate(certificateToCancel.id)
+		} catch (cancelError) {
+			toast.error(t('cancelDialog.error'))
+			throw cancelError
 		}
 	}
 
@@ -136,30 +148,28 @@ function CertificatesContent() {
 		return <CertificatesPageSkeleton />
 	}
 
+	const header = (
+		<PageHeader
+			title={t('title')}
+			description={t('subtitle')}
+			actions={<CertificateActions onAddNew={handleAddNew} onOpenSimulator={handleOpenSimulator} />}
+		/>
+	)
+
 	if (error) {
 		return (
-			<div className='container mx-auto px-4 py-8'>
-				<Alert variant='destructive'>
-					<AlertCircle className='h-4 w-4' />
-					<AlertTitle>{t('loadErrorTitle')}</AlertTitle>
-					<AlertDescription>{t('loadError')}</AlertDescription>
-				</Alert>
-			</div>
+			<PageShell>
+				{header}
+				<ErrorState description={t('loadError')} onRetry={() => void refetch()} />
+			</PageShell>
 		)
 	}
 
 	return (
-		<div className='container mx-auto px-4 py-8 space-y-6'>
-			<div className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
-				<div className='min-w-0'>
-					<h1 className='text-2xl font-bold sm:text-3xl'>{t('title')}</h1>
-					<p className='text-muted-foreground'>{t('subtitle')}</p>
-				</div>
-			</div>
+		<PageShell>
+			{header}
 
 			<CertificateSummaryCard summary={summary} />
-
-			<CertificateActions onAddNew={handleAddNew} onOpenSimulator={handleOpenSimulator} />
 
 			<CertificatesList
 				certificates={certificates || []}
@@ -167,6 +177,7 @@ function CertificatesContent() {
 				onDelete={handleDelete}
 				onViewHistory={handleViewHistory}
 				onSimulate={handleSimulate}
+				onAddNew={handleAddNew}
 				selectedId={selectedCertificateId}
 			/>
 
@@ -186,13 +197,23 @@ function CertificatesContent() {
 			/>
 
 			<PaymentSimulator open={isSimulatorOpen} onOpenChange={setIsSimulatorOpen} certificate={simulatorCertificate} />
-		</div>
+
+			<ConfirmDialog
+				open={certificateToCancel !== null}
+				onOpenChange={(open) => !open && setCertificateToCancel(null)}
+				title={t('cancelDialog.title', { bank: certificateToCancel?.bank ?? '' })}
+				description={t('cancelDialog.description')}
+				confirmLabel={t('cancelDialog.confirm')}
+				cancelLabel={t('cancelDialog.keep')}
+				destructive
+				onConfirm={handleConfirmCancel}
+			/>
+		</PageShell>
 	)
 }
 
 export default function CertificatesPage() {
 	const t = useTranslations('certificates')
-	const tCommon = useTranslations('common.moduleDisabled')
 	const { status } = useSession()
 	const router = useRouter()
 	const { isEnabled, isLoading: isFeatureFlagsLoading } = useFeatureFlags()
@@ -209,15 +230,7 @@ export default function CertificatesPage() {
 	}
 
 	if (!isCertificatesModuleEnabled) {
-		return (
-			<div className='container mx-auto px-4 py-8 space-y-4'>
-				<h1 className='text-2xl font-semibold'>{t('title')}</h1>
-				<p className='text-muted-foreground'>{tCommon('message')}</p>
-				<Button variant='outline' onClick={() => router.push('/app')}>
-					{tCommon('goToDashboard')}
-				</Button>
-			</div>
-		)
+		return <ModuleDisabled title={t('title')} />
 	}
 
 	return (

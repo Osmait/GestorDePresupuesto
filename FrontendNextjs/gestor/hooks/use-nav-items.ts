@@ -23,7 +23,8 @@ import { useFeatureFlags } from './useFeatureFlags'
  * @property title - The display title of the item.
  * @property href - The URL path the item links to.
  * @property icon - The icon component to display.
- * @property badge - Optional badge text to display (e.g., "New").
+ * @property badge - Optional short badge text. Only for a time-limited launch
+ *   (remove it after a release or two); never a permanent "New".
  * @property description - A brief description of the item.
  */
 interface NavItem {
@@ -79,7 +80,6 @@ export function useNavItems() {
 			title: t('monthlyPlan'),
 			href: '/app/monthly',
 			icon: CalendarClock,
-			badge: t('new'),
 			description: t('monthlyPlanDesc'),
 		},
 		...(isFeatureFlagsLoading || isEnabled('module_investments')
@@ -88,7 +88,6 @@ export function useNavItems() {
 						title: t('investments'),
 						href: '/app/investments',
 						icon: TrendingUp,
-						badge: t('new'),
 						description: t('investmentsDesc'),
 					},
 				]
@@ -119,7 +118,6 @@ export function useNavItems() {
 						title: t('creditCards'),
 						href: '/app/credit-cards',
 						icon: CreditCardIcon,
-						badge: t('new'),
 						description: t('creditCardsDesc'),
 					},
 				]

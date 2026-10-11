@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 export function TransactionSkeleton() {
 	return (
 		<Card className='relative'>
-			<CardContent className='p-6'>
+			<CardContent className='p-4 sm:p-6'>
 				<div className='flex items-center justify-between'>
 					<div className='flex items-center space-x-4 w-full'>
 						{/* Icon skeleton - Adjusted to h-11 w-11 (44px) to exact match Content (p-3 + w-5) */}
@@ -28,7 +28,7 @@ export function TransactionSkeleton() {
 							<Skeleton className='h-4 w-8 ml-auto' />
 						</div>
 						{/* Menu button skeleton */}
-						<Skeleton className='h-8 w-8 rounded-md' />
+						<Skeleton className='h-10 w-10 rounded-md' />
 					</div>
 				</div>
 			</CardContent>

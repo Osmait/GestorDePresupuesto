@@ -93,10 +93,3 @@ export function formatCurrency(amount: number, currency: string = 'DOP'): string
 		currency,
 	}).format(amount)
 }
-
-export function getUtilizationColor(percent: number): string {
-	if (percent < 30) return 'text-green-500'
-	if (percent < 60) return 'text-yellow-500'
-	if (percent < 80) return 'text-orange-500'
-	return 'text-red-500'
-}

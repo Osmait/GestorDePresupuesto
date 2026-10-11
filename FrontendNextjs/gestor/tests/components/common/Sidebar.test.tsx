@@ -35,7 +35,7 @@ vi.mock('@/components/common/search', () => ({
 }))
 
 vi.mock('@/components/common/sidebar-controller', () => ({
-	SidebarController: ({ children }: { children: Function }) =>
+	SidebarController: ({ children }: { children: (props: Record<string, unknown>) => unknown }) =>
 		children({
 			isMobileOpen: false,
 			isExpanded: true,
@@ -90,5 +90,35 @@ describe('Sidebar', () => {
 		)
 		expect(screen.getByTestId('user-nav')).toBeInTheDocument()
 		expect(screen.getByTestId('search')).toBeInTheDocument()
+	})
+
+	it('renders a skip link to the main landmark', () => {
+		render(
+			<Sidebar>
+				<div>Content</div>
+			</Sidebar>,
+		)
+		const skip = screen.getByRole('link', { name: 'skipToContent' })
+		expect(skip).toHaveAttribute('href', '#main-content')
+		expect(screen.getByRole('main')).toHaveAttribute('id', 'main-content')
+	})
+
+	it('shows only the small section label in the top bar (no subtitle, no heading)', () => {
+		render(
+			<Sidebar>
+				<div>Content</div>
+			</Sidebar>,
+		)
+		expect(screen.queryByRole('heading')).not.toBeInTheDocument()
+		expect(screen.queryByText('dashboardDesc')).not.toBeInTheDocument()
+	})
+
+	it('names the collapse toggle', () => {
+		render(
+			<Sidebar>
+				<div>Content</div>
+			</Sidebar>,
+		)
+		expect(screen.getByRole('button', { name: 'collapse' })).toBeInTheDocument()
 	})
 })

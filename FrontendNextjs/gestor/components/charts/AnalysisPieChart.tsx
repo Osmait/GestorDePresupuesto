@@ -1,37 +1,53 @@
 'use client'
 
 import { ResponsivePie } from '@nivo/pie'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useChartTheme } from './chart-theme'
 
-interface AnalysisPieChartProps {
-	data: any[]
-	theme: string | undefined
-	nivoTheme: any
+export interface AnalysisPieDatum {
+	id: string
+	label: string
+	value: number
+	/** The category's own color (user data); falls back to the series palette. */
+	color?: string
 }
 
-const AnalysisPieChart = ({ data, theme, nivoTheme }: AnalysisPieChartProps) => {
+interface AnalysisPieChartProps {
+	data: AnalysisPieDatum[]
+	/** Accessible name of the chart (role="img"). */
+	label: string
+}
+
+const AnalysisPieChart = ({ data, label }: AnalysisPieChartProps) => {
+	const { theme, colors } = useChartTheme(11)
+	const formatCurrency = useFormatCurrency()
+	const slices = data.map((datum, index) => ({
+		...datum,
+		color: datum.color || colors.series[index % colors.series.length],
+	}))
+
 	return (
-		<ResponsivePie
-			data={data}
-			margin={{ top: 30, right: 30, bottom: 50, left: 60 }}
-			innerRadius={0.5}
-			padAngle={0.7}
-			cornerRadius={3}
-			activeOuterRadiusOffset={8}
-			borderWidth={1}
-			borderColor={{ from: 'color', modifiers: [['darker', 0.2]] }}
-			arcLinkLabelsSkipAngle={10}
-			arcLinkLabel={(d) => String(d.label)}
-			arcLinkLabelsTextColor={theme === 'dark' ? '#ffffff' : '#333333'}
-			arcLinkLabelsThickness={2}
-			arcLinkLabelsColor={{ from: 'color' }}
-			enableArcLabels={false}
-			valueFormat={(value) =>
-				new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP', maximumFractionDigits: 0 }).format(
-					Number(value),
-				)
-			}
-			theme={nivoTheme}
-		/>
+		<div role='img' aria-label={label} className='h-full w-full'>
+			<ResponsivePie
+				data={slices}
+				colors={{ datum: 'data.color' }}
+				margin={{ top: 24, right: 72, bottom: 24, left: 72 }}
+				innerRadius={0.55}
+				padAngle={0.7}
+				cornerRadius={3}
+				activeOuterRadiusOffset={6}
+				borderWidth={1}
+				borderColor={colors.surface}
+				arcLinkLabelsSkipAngle={10}
+				arcLinkLabel={(d) => String(d.label)}
+				arcLinkLabelsTextColor={colors.text}
+				arcLinkLabelsThickness={2}
+				arcLinkLabelsColor={{ from: 'color' }}
+				enableArcLabels={false}
+				valueFormat={(value) => formatCurrency(Number(value), 'DOP')}
+				theme={theme}
+			/>
+		</div>
 	)
 }
 

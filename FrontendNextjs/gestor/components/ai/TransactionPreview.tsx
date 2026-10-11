@@ -1,14 +1,18 @@
 'use client'
 
-import { format } from 'date-fns'
 import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
-import { AlertTriangle, Calendar, Check, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { AlertTriangle, Calendar, Check, FileSearch, Pencil, Plus, Trash2, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { useState } from 'react'
+import { type ReactNode, useId, useState } from 'react'
+import { Amount } from '@/components/shared/Amount'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
+import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { cn } from '@/lib/utils'
 import { AICategorySuggestion, AIPotentialDuplicate } from '@/types/ai'
 import { Category } from '@/types/category'
@@ -46,6 +50,22 @@ function buildUniqueCategoryName(baseName: string, existingNames: string[]): str
 	return candidate
 }
 
+type ChipTone = 'destructive' | 'warning' | 'success' | 'muted'
+
+const CHIP_TONE: Record<ChipTone, string> = {
+	destructive: 'bg-destructive/10 text-destructive',
+	warning: 'bg-warning/10 text-warning',
+	success: 'bg-success/10 text-success',
+	muted: 'bg-muted text-muted-foreground',
+}
+
+/** Small status label. Tokens only (DESIGN.md > Status colors). */
+function Chip({ tone, children }: { tone: ChipTone; children: ReactNode }) {
+	return <span className={cn('rounded px-2 py-0.5 text-xs font-medium', CHIP_TONE[tone])}>{children}</span>
+}
+
+const CONFIDENCE_TONE: Record<string, ChipTone> = { high: 'success', medium: 'warning', low: 'muted' }
+
 // m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
 // full feature bundle (layout, drag) is not needed.
 export function TransactionPreview(props: TransactionPreviewProps) {
@@ -71,6 +91,8 @@ function TransactionPreviewView({
 }: TransactionPreviewProps) {
 	const t = useTranslations('ai.preview')
 	const tCommon = useTranslations('ai.common')
+	const locale = useAppLocale()
+	const idPrefix = useId()
 	const [editingIndex, setEditingIndex] = useState<number | null>(null)
 	const [editForm, setEditForm] = useState<Transaction | null>(null)
 
@@ -103,15 +125,14 @@ function TransactionPreviewView({
 	}
 
 	const formatDate = (dateString: string) => {
-		try {
-			return format(new Date(dateString), 'MMM d, yyyy')
-		} catch {
-			return t('invalidDate')
-		}
+		const formatted = formatLocalDate(dateString, locale)
+		return formatted === '-' ? t('invalidDate') : formatted
 	}
 
 	if (transactions.length === 0) {
-		return <div className='text-center py-8 text-muted-foreground'>{t('noTransactions')}</div>
+		return (
+			<EmptyState compact icon={FileSearch} title={t('noTransactions')} description={t('noTransactionsDescription')} />
+		)
 	}
 
 	const duplicateEntries = Object.values(potentialDuplicatesByTransactionId || {})
@@ -120,47 +141,43 @@ function TransactionPreviewView({
 
 	return (
 		<div className='space-y-3'>
-			{potentialDuplicatesByTransactionId && Object.keys(potentialDuplicatesByTransactionId).length > 0 && (
-				<div className='rounded-lg border border-orange-300/50 bg-orange-50/70 dark:bg-orange-950/20 p-3 text-sm'>
-					<div className='flex items-center gap-2 text-orange-700 dark:text-orange-300 font-medium'>
-						<AlertTriangle className='h-4 w-4' />
+			{duplicateEntries.length > 0 && (
+				<div role='status' className='rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm'>
+					<div className='flex items-center gap-2 font-medium text-warning'>
+						<AlertTriangle className='h-4 w-4 shrink-0' aria-hidden='true' />
 						<span>{t('duplicateWarningTitle')}</span>
 					</div>
-					<p className='text-muted-foreground mt-1'>{t('duplicateWarningDescription')}</p>
-					<div className='mt-2 flex flex-wrap gap-2 text-xs'>
+					<p className='mt-1 text-foreground/80'>{t('duplicateWarningDescription')}</p>
+					<div className='mt-2 flex flex-wrap gap-2'>
 						{duplicateCount > 0 && (
-							<span className='px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'>
-								{t('possibleDuplicateCount', { count: duplicateCount })}
-							</span>
+							<Chip tone='destructive'>{t('possibleDuplicateCount', { count: duplicateCount })}</Chip>
 						)}
-						{similarCount > 0 && (
-							<span className='px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'>
-								{t('similarTransactionCount', { count: similarCount })}
-							</span>
-						)}
+						{similarCount > 0 && <Chip tone='warning'>{t('similarTransactionCount', { count: similarCount })}</Chip>}
 					</div>
 				</div>
 			)}
 
-			<div className='flex items-center justify-between mb-4'>
-				<span className='text-sm text-muted-foreground'>
+			<div className='flex flex-wrap items-center justify-between gap-2'>
+				<span className='text-sm text-muted-foreground tabular-nums' aria-live='polite'>
 					{t('selectedCount', { selected: selectedIndices.size, total: transactions.length })}
 				</span>
 				<div className='flex gap-2'>
 					<Button
+						type='button'
 						variant='outline'
 						size='sm'
 						onClick={() => {
-							transactions.forEach((_, i) => onSelect(i, true))
+							for (let i = 0; i < transactions.length; i++) onSelect(i, true)
 						}}
 					>
 						{t('selectAll')}
 					</Button>
 					<Button
+						type='button'
 						variant='outline'
 						size='sm'
 						onClick={() => {
-							transactions.forEach((_, i) => onSelect(i, false))
+							for (let i = 0; i < transactions.length; i++) onSelect(i, false)
 						}}
 					>
 						{t('deselectAll')}
@@ -168,174 +185,180 @@ function TransactionPreviewView({
 				</div>
 			</div>
 
-			<AnimatePresence>
-				{transactions.map((transaction, index) => {
-					const isEditing = editingIndex === index
-					const isSelected = selectedIndices.has(index)
-					const isIncome = transaction.type_transation === TypeTransaction.INCOME
-					const hasCategory = !!transaction.category_id
-					const duplicateInfo = potentialDuplicatesByTransactionId?.[transaction.id]
-					const categorySuggestion = categorySuggestionsByTransactionId?.[transaction.id]
-					const createSuggestedName = categorySuggestion
-						? buildUniqueCategoryName(
-								categorySuggestion.new_category_name || categorySuggestion.category_name,
-								categories.map((category) => category.name),
-							)
-						: ''
-					const isPossibleDuplicate = duplicateInfo?.match_type === 'duplicate'
-					const isSimilarTransaction = duplicateInfo?.match_type === 'similar'
+			<ul className='space-y-3'>
+				<AnimatePresence>
+					{transactions.map((transaction, index) => {
+						const isEditing = editingIndex === index
+						const isSelected = selectedIndices.has(index)
+						const isIncome = transaction.type_transation === TypeTransaction.INCOME
+						const hasCategory = !!transaction.category_id
+						const duplicateInfo = potentialDuplicatesByTransactionId?.[transaction.id]
+						const categorySuggestion = categorySuggestionsByTransactionId?.[transaction.id]
+						const createSuggestedName = categorySuggestion
+							? buildUniqueCategoryName(
+									categorySuggestion.new_category_name || categorySuggestion.category_name,
+									categories.map((category) => category.name),
+								)
+							: ''
+						const isPossibleDuplicate = duplicateInfo?.match_type === 'duplicate'
+						const isSimilarTransaction = duplicateInfo?.match_type === 'similar'
+						const rowId = `${idPrefix}-${index}`
 
-					return (
-						<m.div
-							key={`transaction-${index}`}
-							initial={{ opacity: 0, y: 10 }}
-							animate={{ opacity: 1, y: 0 }}
-							exit={{ opacity: 0, x: -10 }}
-							className={cn(
-								'p-4 rounded-lg border transition-colors',
-								isSelected ? 'border-primary bg-primary/5' : 'border-border',
-								!hasCategory && 'border-yellow-500/50',
-								isPossibleDuplicate && 'border-red-400/70 bg-red-50/40 dark:bg-red-950/20',
-								isSimilarTransaction && 'border-orange-400/70 bg-orange-50/30 dark:bg-orange-950/20',
-							)}
-						>
-							{isEditing && editForm ? (
-								<div className='space-y-4'>
-									<div className='grid grid-cols-2 gap-3'>
-										<div>
-											<label className='text-xs text-muted-foreground mb-1 block'>{t('name')}</label>
-											<Input
-												value={editForm.name}
-												onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
-												placeholder={t('name')}
-											/>
-										</div>
-										<div>
-											<label className='text-xs text-muted-foreground mb-1 block'>{t('amount')}</label>
-											<Input
-												type='number'
-												value={editForm.amount}
-												onChange={(e) =>
-													setEditForm({
-														...editForm,
-														amount: parseFloat(e.target.value) || 0,
-													})
-												}
-												placeholder={t('amount')}
-											/>
-										</div>
-										<div>
-											<label className='text-xs text-muted-foreground mb-1 block'>Currency</label>
-											<Select
-												value={editForm.currency || 'DOP'}
-												onValueChange={(v) => setEditForm({ ...editForm, currency: v as 'DOP' | 'USD' })}
-											>
-												<SelectTrigger>
-													<SelectValue placeholder='DOP' />
-												</SelectTrigger>
-												<SelectContent>
-													<SelectItem value='DOP'>DOP</SelectItem>
-													<SelectItem value='USD'>USD</SelectItem>
-												</SelectContent>
-											</Select>
-										</div>
-									</div>
-
-									<div>
-										<label className='text-xs text-muted-foreground mb-1 block'>{t('description')}</label>
-										<Input
-											value={editForm.description || ''}
-											onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
-											placeholder={t('description')}
-										/>
-									</div>
-
-									<div className='grid grid-cols-2 gap-3'>
-										<div>
-											<label className='text-xs text-muted-foreground mb-1 block'>{t('date')}</label>
-											<DatePicker
-												value={editForm.created_at ? new Date(editForm.created_at) : new Date()}
-												onChange={(date) =>
-													setEditForm({
-														...editForm,
-														created_at: date?.toISOString() || '',
-													})
-												}
-												placeholder={t('date')}
-											/>
-										</div>
-
-										<div>
-											<label className='text-xs text-muted-foreground mb-1 block'>{t('category')}</label>
-											<Select
-												value={editForm.category_id || ''}
-												onValueChange={(v) => {
-													if (v === '__create_new__') {
-														onCreateCategory?.()
-													} else {
-														setEditForm({ ...editForm, category_id: v })
+						return (
+							<m.li
+								key={transaction.id || `transaction-${index}`}
+								initial={{ opacity: 0, y: 10 }}
+								animate={{ opacity: 1, y: 0 }}
+								exit={{ opacity: 0, x: -10 }}
+								className={cn(
+									'rounded-lg border p-3 transition-colors sm:p-4',
+									isSelected ? 'border-primary bg-primary/5' : 'border-border',
+									!hasCategory && 'border-warning/60',
+									isPossibleDuplicate && 'border-destructive/60 bg-destructive/5',
+									isSimilarTransaction && 'border-warning/60 bg-warning/5',
+								)}
+							>
+								{isEditing && editForm ? (
+									<div className='space-y-4'>
+										<div className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
+											<div className='space-y-1.5 sm:col-span-3'>
+												<Label htmlFor={`${rowId}-name`}>{t('name')}</Label>
+												<Input
+													id={`${rowId}-name`}
+													value={editForm.name}
+													onChange={(e) => setEditForm({ ...editForm, name: e.target.value })}
+												/>
+											</div>
+											<div className='space-y-1.5 sm:col-span-2'>
+												<Label htmlFor={`${rowId}-amount`}>{t('amount')}</Label>
+												<Input
+													id={`${rowId}-amount`}
+													type='number'
+													inputMode='decimal'
+													value={editForm.amount}
+													onChange={(e) =>
+														setEditForm({
+															...editForm,
+															amount: parseFloat(e.target.value) || 0,
+														})
 													}
-												}}
-											>
-												<SelectTrigger>
-													<SelectValue placeholder={t('selectCategory')} />
-												</SelectTrigger>
-												<SelectContent>
-													{categories.map((cat) => (
-														<SelectItem key={cat.id} value={cat.id}>
-															{cat.icon} {cat.name}
+												/>
+											</div>
+											<div className='space-y-1.5'>
+												<Label htmlFor={`${rowId}-currency`}>{t('currency')}</Label>
+												<Select
+													value={editForm.currency || 'DOP'}
+													onValueChange={(v) => setEditForm({ ...editForm, currency: v as 'DOP' | 'USD' })}
+												>
+													<SelectTrigger id={`${rowId}-currency`}>
+														<SelectValue placeholder='DOP' />
+													</SelectTrigger>
+													<SelectContent>
+														<SelectItem value='DOP'>DOP</SelectItem>
+														<SelectItem value='USD'>USD</SelectItem>
+													</SelectContent>
+												</Select>
+											</div>
+										</div>
+
+										<div className='space-y-1.5'>
+											<Label htmlFor={`${rowId}-description`}>{t('description')}</Label>
+											<Input
+												id={`${rowId}-description`}
+												value={editForm.description || ''}
+												onChange={(e) => setEditForm({ ...editForm, description: e.target.value })}
+											/>
+										</div>
+
+										<div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
+											<fieldset className='min-w-0'>
+												<legend className='mb-1.5 text-sm font-medium leading-none'>{t('date')}</legend>
+												<DatePicker
+													value={editForm.created_at ? new Date(editForm.created_at) : new Date()}
+													onChange={(date) =>
+														setEditForm({
+															...editForm,
+															created_at: date?.toISOString() || '',
+														})
+													}
+													placeholder={t('date')}
+												/>
+											</fieldset>
+
+											<div className='space-y-1.5'>
+												<Label htmlFor={`${rowId}-category`}>{t('category')}</Label>
+												<Select
+													value={editForm.category_id || ''}
+													onValueChange={(v) => {
+														if (v === '__create_new__') {
+															onCreateCategory?.()
+														} else {
+															setEditForm({ ...editForm, category_id: v })
+														}
+													}}
+												>
+													<SelectTrigger id={`${rowId}-category`}>
+														<SelectValue placeholder={t('selectCategory')} />
+													</SelectTrigger>
+													<SelectContent>
+														{categories.map((cat) => (
+															<SelectItem key={cat.id} value={cat.id}>
+																<span aria-hidden='true'>{cat.icon}</span> {cat.name}
+															</SelectItem>
+														))}
+														<SelectSeparator />
+														<SelectItem value='__create_new__'>
+															<Plus className='mr-1 inline h-4 w-4' aria-hidden='true' /> {t('createNewCategory')}
 														</SelectItem>
-													))}
-													<SelectSeparator />
-													<SelectItem value='__create_new__'>
-														<Plus className='h-4 w-4 mr-1 inline' /> {t('createNewCategory')}
-													</SelectItem>
-												</SelectContent>
-											</Select>
+													</SelectContent>
+												</Select>
+											</div>
+										</div>
+
+										<div className='flex justify-end gap-2'>
+											<Button type='button' size='sm' variant='outline' onClick={cancelEdit}>
+												<X className='mr-1 h-4 w-4' aria-hidden='true' />
+												{tCommon('cancel')}
+											</Button>
+											<Button type='button' size='sm' onClick={saveEdit}>
+												<Check className='mr-1 h-4 w-4' aria-hidden='true' />
+												{tCommon('save')}
+											</Button>
 										</div>
 									</div>
-
-									<div className='flex justify-end gap-2'>
-										<Button size='sm' variant='outline' onClick={cancelEdit}>
-											<X className='h-4 w-4 mr-1' />
-											{tCommon('cancel')}
-										</Button>
-										<Button size='sm' onClick={saveEdit}>
-											<Check className='h-4 w-4 mr-1' />
-											{tCommon('save')}
-										</Button>
-									</div>
-								</div>
-							) : (
-								<div className='flex items-start justify-between'>
+								) : (
 									<div className='flex items-start gap-3'>
-										<input
-											type='checkbox'
+										<Checkbox
+											id={`${rowId}-select`}
 											checked={isSelected}
-											onChange={(e) => onSelect(index, e.target.checked)}
-											className='mt-1 h-4 w-4 rounded border-gray-300'
+											onCheckedChange={(checked) => onSelect(index, checked === true)}
+											className='mt-1'
 										/>
-										<div>
-											<div className='flex items-center gap-2'>
-												<span className='font-medium'>{transaction.name}</span>
-												{isPossibleDuplicate && (
-													<span className='text-[11px] px-2 py-0.5 rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'>
-														{t('possibleDuplicate')}
-													</span>
-												)}
-												{isSimilarTransaction && (
-													<span className='text-[11px] px-2 py-0.5 rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300'>
-														{t('similarTransaction')}
-													</span>
-												)}
-												{!hasCategory && (
-													<span className='text-yellow-500' title={t('noCategoryMatched')}>
-														<AlertTriangle className='h-4 w-4' />
-													</span>
-												)}
+										<div className='min-w-0 flex-1 space-y-1'>
+											<div className='flex flex-wrap items-start justify-between gap-x-3 gap-y-1'>
+												<div className='flex min-w-0 flex-wrap items-center gap-2'>
+													<Label htmlFor={`${rowId}-select`} className='cursor-pointer break-words font-medium'>
+														{transaction.name}
+													</Label>
+													{isPossibleDuplicate && <Chip tone='destructive'>{t('possibleDuplicate')}</Chip>}
+													{isSimilarTransaction && <Chip tone='warning'>{t('similarTransaction')}</Chip>}
+													{!hasCategory && (
+														<span className='inline-flex items-center gap-1 text-xs text-warning'>
+															<AlertTriangle className='h-3.5 w-3.5' aria-hidden='true' />
+															{t('noCategoryMatched')}
+														</span>
+													)}
+												</div>
+												<Amount
+													value={isIncome ? transaction.amount : -transaction.amount}
+													currency={transaction.currency || 'DOP'}
+													tone='auto'
+													signed
+													className='text-base font-semibold'
+												/>
 											</div>
 											{duplicateInfo && duplicateInfo.candidates.length > 0 && (
-												<p className='text-xs text-muted-foreground mt-1'>
+												<p className='text-xs text-muted-foreground'>
 													{t('matchedWith', {
 														name: duplicateInfo.candidates[0].name,
 														date: formatDate(duplicateInfo.candidates[0].created_at),
@@ -344,23 +367,15 @@ function TransactionPreviewView({
 											)}
 											{categorySuggestion &&
 												(!hasCategory || transaction.category_id !== categorySuggestion.category_id) && (
-													<div className='mt-2 flex items-center gap-2 flex-wrap'>
-														<span
-															className={cn(
-																'text-[11px] px-2 py-0.5 rounded',
-																categorySuggestion.confidence === 'high'
-																	? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
-																	: categorySuggestion.confidence === 'medium'
-																		? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
-																		: 'bg-slate-100 text-slate-700 dark:bg-slate-900/40 dark:text-slate-300',
-															)}
-														>
+													<div className='flex flex-wrap items-center gap-2 pt-1'>
+														<Chip tone={CONFIDENCE_TONE[categorySuggestion.confidence] ?? 'muted'}>
 															{t('suggestedCategory', {
 																name: categorySuggestion.category_name,
 																confidence: t(`confidence.${categorySuggestion.confidence}`),
 															})}
-														</span>
+														</Chip>
 														<Button
+															type='button'
 															variant='outline'
 															size='sm'
 															onClick={() => onApplyCategorySuggestion?.(transaction.id)}
@@ -368,6 +383,7 @@ function TransactionPreviewView({
 															{t('applySuggestion')}
 														</Button>
 														<Button
+															type='button'
 															variant='secondary'
 															size='sm'
 															title={createSuggestedName}
@@ -377,47 +393,49 @@ function TransactionPreviewView({
 														</Button>
 													</div>
 												)}
-											<p className='text-sm text-muted-foreground'>{transaction.description}</p>
-											<div className='flex items-center gap-2 mt-1 flex-wrap'>
-												<span className='text-lg'>{isIncome ? '💰' : getCategoryIcon(transaction.category_id)}</span>
-												<span className='text-xs text-muted-foreground'>
+											{transaction.description && (
+												<p className='text-sm text-muted-foreground'>{transaction.description}</p>
+											)}
+											<div className='flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground'>
+												<span className='inline-flex items-center gap-1'>
+													<span aria-hidden='true'>{isIncome ? '💰' : getCategoryIcon(transaction.category_id)}</span>
 													{getCategoryName(transaction.category_id)}
 												</span>
-												<span
-													className={cn(
-														'text-xs px-2 py-0.5 rounded',
-														isIncome
-															? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-															: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-													)}
-												>
-													{isIncome ? t('income') : t('expense')}
-												</span>
-												<span className='text-xs text-muted-foreground flex items-center gap-1'>
-													<Calendar className='h-3 w-3' />
+												<Chip tone={isIncome ? 'success' : 'destructive'}>{isIncome ? t('income') : t('expense')}</Chip>
+												<span className='inline-flex items-center gap-1'>
+													<Calendar className='h-3 w-3' aria-hidden='true' />
 													{formatDate(transaction.created_at)}
 												</span>
 											</div>
 										</div>
+										<div className='-mr-2 -mt-2 flex shrink-0 items-center'>
+											<Button
+												type='button'
+												variant='ghost'
+												size='icon'
+												onClick={() => startEdit(index, transaction)}
+												aria-label={t('editTransaction', { name: transaction.name })}
+											>
+												<Pencil className='h-4 w-4' aria-hidden='true' />
+											</Button>
+											<Button
+												type='button'
+												variant='ghost'
+												size='icon'
+												className='text-destructive hover:text-destructive'
+												onClick={() => onRemove(index)}
+												aria-label={t('removeTransaction', { name: transaction.name })}
+											>
+												<Trash2 className='h-4 w-4' aria-hidden='true' />
+											</Button>
+										</div>
 									</div>
-									<div className='flex items-center gap-2'>
-										<span className={cn('text-lg font-semibold', isIncome ? 'text-green-600' : 'text-red-600')}>
-											{isIncome ? '+' : '-'}
-											{transaction.currency || 'DOP'} {transaction.amount.toFixed(2)}
-										</span>
-										<Button variant='ghost' size='icon' onClick={() => startEdit(index, transaction)}>
-											<Pencil className='h-4 w-4' />
-										</Button>
-										<Button variant='ghost' size='icon' onClick={() => onRemove(index)}>
-											<Trash2 className='h-4 w-4 text-destructive' />
-										</Button>
-									</div>
-								</div>
-							)}
-						</m.div>
-					)
-				})}
-			</AnimatePresence>
+								)}
+							</m.li>
+						)
+					})}
+				</AnimatePresence>
+			</ul>
 		</div>
 	)
 }

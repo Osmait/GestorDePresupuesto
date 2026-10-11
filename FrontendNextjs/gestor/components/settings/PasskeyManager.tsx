@@ -2,30 +2,22 @@
 
 import { startRegistration } from '@simplewebauthn/browser'
 import { Fingerprint, Loader2, Plus, Trash2 } from 'lucide-react'
-import { useLocale, useTranslations } from 'next-intl'
+import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { type PasskeySummary, passkeyRepository } from '@/app/repository/passkeyRepository'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
-function formatDate(dateStr: string, locale: string): string {
-	return new Date(dateStr).toLocaleDateString(locale, { year: 'numeric', month: 'short', day: '2-digit' })
-}
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 
 export function PasskeyManager() {
 	const t = useTranslations('settingsModal.passkeys')
-	const locale = useLocale()
+	const locale = useAppLocale()
 	// Keep `load` stable: `t` may change identity between renders.
 	const tRef = useRef(t)
 	tRef.current = t
@@ -34,7 +26,7 @@ export function PasskeyManager() {
 	const [addOpen, setAddOpen] = useState(false)
 	const [newName, setNewName] = useState('')
 	const [registering, setRegistering] = useState(false)
-	const [deletingId, setDeletingId] = useState<string | null>(null)
+	const [toDelete, setToDelete] = useState<PasskeySummary | null>(null)
 
 	const load = useCallback(async () => {
 		setLoading(true)
@@ -80,8 +72,8 @@ export function PasskeyManager() {
 		}
 	}
 
+	// Rejects on failure so the ConfirmDialog stays open for a retry.
 	const handleDelete = async (id: string) => {
-		setDeletingId(id)
 		try {
 			await passkeyRepository.delete(id)
 			toast.success(t('removed'))
@@ -89,54 +81,58 @@ export function PasskeyManager() {
 		} catch (err) {
 			console.error('Passkey delete error:', err)
 			toast.error(t('removeError'))
-		} finally {
-			setDeletingId(null)
+			throw err
 		}
 	}
 
 	return (
 		<Card>
-			<CardHeader className='flex flex-row items-center justify-between'>
-				<div>
-					<CardTitle className='flex items-center gap-2'>
-						<Fingerprint className='h-5 w-5' />
+			<CardHeader className='flex flex-col gap-4 space-y-0 sm:flex-row sm:items-start sm:justify-between'>
+				<div className='min-w-0 space-y-1.5'>
+					<CardTitle className='flex items-center gap-2 text-lg'>
+						<Fingerprint className='h-5 w-5 text-muted-foreground' aria-hidden='true' />
 						{t('title')}
 					</CardTitle>
 					<CardDescription>{t('description')}</CardDescription>
 				</div>
-				<Button onClick={() => setAddOpen(true)}>
-					<Plus className='mr-2 h-4 w-4' />
+				<Button onClick={() => setAddOpen(true)} className='shrink-0'>
+					<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
 					{t('add')}
 				</Button>
 			</CardHeader>
 			<CardContent>
 				{loading ? (
-					<div className='flex items-center gap-2 text-sm text-muted-foreground'>
-						<Loader2 className='h-4 w-4 animate-spin' />
+					<div className='flex items-center gap-2 text-sm text-muted-foreground' role='status'>
+						<Loader2 className='h-4 w-4 animate-spin' aria-hidden='true' />
 						{t('loading')}
 					</div>
 				) : passkeys.length === 0 ? (
-					<p className='text-sm text-muted-foreground'>{t('empty')}</p>
+					<EmptyState
+						compact
+						icon={Fingerprint}
+						title={t('empty')}
+						description={t('emptyDescription')}
+						className='py-6'
+					/>
 				) : (
 					<div className='space-y-2'>
 						{passkeys.map((pk) => (
-							<div key={pk.id} className='flex items-center justify-between rounded-md border border-border/50 p-3'>
-								<div className='space-y-0.5'>
-									<p className='font-medium'>{pk.name}</p>
+							<div key={pk.id} className='flex items-center justify-between gap-3 rounded-md border p-3'>
+								<div className='min-w-0 space-y-0.5'>
+									<p className='truncate font-medium'>{pk.name}</p>
 									<p className='text-xs text-muted-foreground'>
-										{t('added', { date: formatDate(pk.created_at, locale) })}
-										{pk.last_used_at ? ` • ${t('lastUsed', { date: formatDate(pk.last_used_at, locale) })}` : ''}
+										{t('added', { date: formatLocalDate(pk.created_at, locale) })}
+										{pk.last_used_at ? ` • ${t('lastUsed', { date: formatLocalDate(pk.last_used_at, locale) })}` : ''}
 									</p>
 								</div>
 								<Button
 									variant='ghost'
-									size='sm'
-									onClick={() => handleDelete(pk.id)}
-									disabled={deletingId === pk.id}
+									size='icon'
+									onClick={() => setToDelete(pk)}
 									aria-label={t('deleteAria', { name: pk.name })}
-									className='text-destructive hover:text-destructive'
+									className='shrink-0 text-muted-foreground hover:bg-destructive/10 hover:text-destructive'
 								>
-									{deletingId === pk.id ? <Loader2 className='h-4 w-4 animate-spin' /> : <Trash2 className='h-4 w-4' />}
+									<Trash2 className='h-4 w-4' aria-hidden='true' />
 								</Button>
 							</div>
 						))}
@@ -144,33 +140,40 @@ export function PasskeyManager() {
 				)}
 			</CardContent>
 
-			<Dialog open={addOpen} onOpenChange={setAddOpen}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>{t('addTitle')}</DialogTitle>
-						<DialogDescription>{t('addDescription')}</DialogDescription>
-					</DialogHeader>
-					<div className='space-y-2 py-4'>
-						<Label htmlFor='passkey-name'>{t('deviceName')}</Label>
-						<Input
-							id='passkey-name'
-							placeholder={t('deviceNamePlaceholder')}
-							value={newName}
-							onChange={(e) => setNewName(e.target.value)}
-							disabled={registering}
-						/>
-					</div>
-					<DialogFooter>
-						<Button variant='outline' onClick={() => setAddOpen(false)} disabled={registering}>
-							{t('cancel')}
-						</Button>
-						<Button onClick={handleRegister} disabled={registering}>
-							{registering ? <Loader2 className='mr-2 h-4 w-4 animate-spin' /> : null}
-							{t('enroll')}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+			<FormDialog
+				open={addOpen}
+				onOpenChange={(open) => {
+					setAddOpen(open)
+					if (!open) setNewName('')
+				}}
+				title={t('addTitle')}
+				description={t('addDescription')}
+				size='sm'
+				submitLabel={t('enroll')}
+				cancelLabel={t('cancel')}
+				loading={registering}
+				onSubmit={handleRegister}
+			>
+				<div className='space-y-2'>
+					<Label htmlFor='passkey-name'>{t('deviceName')}</Label>
+					<Input
+						id='passkey-name'
+						placeholder={t('deviceNamePlaceholder')}
+						value={newName}
+						onChange={(e) => setNewName(e.target.value)}
+						autoComplete='off'
+					/>
+				</div>
+			</FormDialog>
+
+			<ConfirmDialog
+				open={toDelete !== null}
+				onOpenChange={(open) => !open && setToDelete(null)}
+				title={t('deleteTitle', { name: toDelete?.name ?? '' })}
+				description={t('deleteDescription')}
+				destructive
+				onConfirm={() => (toDelete ? handleDelete(toDelete.id) : undefined)}
+			/>
 		</Card>
 	)
 }

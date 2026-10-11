@@ -40,7 +40,7 @@ function Calendar({
         month_grid: "w-full border-collapse space-y-1",
         weekdays: "flex",
         weekday:
-          "text-muted-foreground rounded-md w-9 font-normal text-[0.8rem]",
+          "text-muted-foreground rounded-md w-9 font-normal text-xs",
         week: "flex w-full mt-2",
         range_start: "rounded-l-md",
         range_end: "rounded-r-md",

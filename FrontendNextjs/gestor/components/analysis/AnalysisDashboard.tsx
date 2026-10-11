@@ -1,44 +1,63 @@
 'use client'
 
 import { domAnimation, LazyMotion, m } from 'framer-motion'
-import { BarChart3, CalendarRange, TrendingDown, TrendingUp, Wallet } from 'lucide-react'
+import {
+	AlertTriangle,
+	ArrowDownRight,
+	ArrowUpRight,
+	BarChart3,
+	CalendarRange,
+	CheckCircle2,
+	Info,
+	PiggyBank,
+	Plus,
+	Wallet,
+} from 'lucide-react'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useTheme } from 'next-themes'
-import { useMemo } from 'react'
+import { type ComponentType, type ReactNode, useMemo } from 'react'
+import { Amount } from '@/components/shared/Amount'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { ErrorState } from '@/components/shared/ErrorState'
+import { StatCard } from '@/components/shared/StatCard'
+import { StatGrid } from '@/components/shared/StatGrid'
 import { AnalyticsSkeleton } from '@/components/skeletons/analytics-skeleton'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getProgressTone, Progress } from '@/components/ui/progress'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetDashboardSummary } from '@/hooks/queries/useAnalyticsQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
-import { AnalyticsQueryFilters } from '@/types/analytics'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { cn } from '@/lib/utils'
 import { useAnalysisContext } from './AnalysisContext'
+import { buildAnalyticsFilters, buildPreviousPeriodFilters, daysBetween, fromApiDate } from './analysis-query'
+
+function ChartLoading() {
+	return <div className='h-full w-full animate-pulse rounded-md bg-muted/40' />
+}
 
 const AnalysisLineChart = dynamic(() => import('@/components/charts/AnalysisLineChart'), {
 	ssr: false,
-	loading: () => <div className='h-full w-full bg-muted/20 animate-pulse rounded' />,
+	loading: ChartLoading,
 })
 const AnalysisBarChart = dynamic(() => import('@/components/charts/AnalysisBarChart'), {
 	ssr: false,
-	loading: () => <div className='h-full w-full bg-muted/20 animate-pulse rounded' />,
+	loading: ChartLoading,
 })
 const AnalysisPieChart = dynamic(() => import('@/components/charts/AnalysisPieChart'), {
 	ssr: false,
-	loading: () => <div className='h-full w-full bg-muted/20 animate-pulse rounded' />,
+	loading: ChartLoading,
 })
 const AnalysisRadarChart = dynamic(() => import('@/components/charts/AnalysisRadarChart'), {
 	ssr: false,
-	loading: () => <div className='h-full w-full bg-muted/20 animate-pulse rounded' />,
-})
-const AnalysisHeatMap = dynamic(() => import('@/components/charts/AnalysisHeatMap'), {
-	ssr: false,
-	loading: () => <div className='h-full w-full bg-muted/20 animate-pulse rounded' />,
+	loading: ChartLoading,
 })
 
 /** True when there is at least one finite, non-zero value: nivo renders `d="null"`/NaN paths otherwise. */
@@ -46,25 +65,26 @@ export function hasPlottableValues(values: Array<number | null | undefined>): bo
 	return values.some((value) => typeof value === 'number' && Number.isFinite(value) && value !== 0)
 }
 
-function ChartEmptyState({ label }: { label: string }) {
+type InsightTone = 'neutral' | 'warning' | 'positive'
+
+const INSIGHT_ICON: Record<InsightTone, { icon: ComponentType<{ className?: string }>; className: string }> = {
+	warning: { icon: AlertTriangle, className: 'text-warning' },
+	positive: { icon: CheckCircle2, className: 'text-success' },
+	neutral: { icon: Info, className: 'text-info' },
+}
+
+function ChartCard({ title, className, children }: { title: string; className?: string; children: ReactNode }) {
 	return (
-		<div className='flex h-full items-center justify-center text-sm text-muted-foreground' role='status'>
-			{label}
-		</div>
+		<Card className={className}>
+			<CardHeader>
+				<CardTitle className='text-lg'>{title}</CardTitle>
+			</CardHeader>
+			<CardContent className='h-[300px]'>{children}</CardContent>
+		</Card>
 	)
 }
 
-const mockHeat = [
-	{
-		id: 'Lun',
-		data: [
-			{ x: 'Ene', y: 2 },
-			{ x: 'Feb', y: 3 },
-		],
-	},
-]
-
-// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
+// m + LazyMotion(domAnimation) instead of motion: only a fade is used, so the
 // full feature bundle (layout, drag) is not needed.
 export function AnalysisDashboard() {
 	return (
@@ -75,145 +95,40 @@ export function AnalysisDashboard() {
 }
 
 function AnalysisDashboardView() {
-	const { theme } = useTheme()
 	const router = useRouter()
 	const t = useTranslations('analysis')
 	const locale = useAppLocale()
+	const formatCurrency = useFormatCurrency()
+	const formatPercent = useFormatPercent()
 	const { filters } = useAnalysisContext()
-	const categoryPalette = ['#22c55e', '#0ea5e9', '#f59e0b', '#f97316', '#eab308', '#14b8a6', '#ef4444', '#8b5cf6']
 	const { data: accounts = [] } = useGetAccounts()
 	const { data: categories = [] } = useGetCategories()
 	const { data: budgets = [] } = useGetBudgets()
 
-	const formatDate = (date: Date) => date.toISOString().split('T')[0]
+	const activeFilters = useMemo(() => buildAnalyticsFilters(filters), [filters])
+	const previousPeriodFilters = useMemo(() => buildPreviousPeriodFilters(activeFilters), [activeFilters])
 
-	const activeFilters = useMemo((): AnalyticsQueryFilters => {
-		const next: AnalyticsQueryFilters = {}
-
-		if (filters.filterMode === 'month') {
-			const selectedYear = Number(filters.year || new Date().getFullYear())
-			if (filters.month && filters.month !== 'all') {
-				const selectedMonth = Number(filters.month)
-				const from = new Date(selectedYear, selectedMonth - 1, 1)
-				const to = new Date(selectedYear, selectedMonth, 0)
-				next.date_from = formatDate(from)
-				next.date_to = formatDate(to)
-			} else {
-				const from = new Date(selectedYear, 0, 1)
-				const to = new Date(selectedYear, 11, 31)
-				next.date_from = formatDate(from)
-				next.date_to = formatDate(to)
-			}
-		} else if (filters.dateRange?.from && filters.dateRange?.to) {
-			next.date_from = formatDate(filters.dateRange.from)
-			next.date_to = formatDate(filters.dateRange.to)
-		}
-
-		if (filters.account !== 'all') next.account_id = filters.account
-		if (filters.category !== 'all') next.category_id = filters.category
-		if (filters.type === 'INCOME') next.type = 'income'
-		if (filters.type === 'BILL') next.type = 'bill'
-
-		const minAmount = Number(filters.minAmount)
-		if (filters.minAmount !== '' && !Number.isNaN(minAmount) && minAmount >= 0) {
-			next.min_amount = minAmount
-		}
-
-		const maxAmount = Number(filters.maxAmount)
-		if (filters.maxAmount !== '' && !Number.isNaN(maxAmount) && maxAmount >= 0) {
-			next.max_amount = maxAmount
-		}
-
-		return next
-	}, [filters, formatDate])
-
-	const previousPeriodFilters = useMemo((): AnalyticsQueryFilters | undefined => {
-		if (!activeFilters.date_from || !activeFilters.date_to) return undefined
-
-		const from = new Date(`${activeFilters.date_from}T00:00:00`)
-		const to = new Date(`${activeFilters.date_to}T00:00:00`)
-		if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime())) return undefined
-
-		const diffMs = to.getTime() - from.getTime()
-		const prevTo = new Date(from.getTime() - 24 * 60 * 60 * 1000)
-		const prevFrom = new Date(prevTo.getTime() - diffMs)
-
-		return {
-			...activeFilters,
-			date_from: formatDate(prevFrom),
-			date_to: formatDate(prevTo),
-		}
-	}, [activeFilters, formatDate])
-
-	// TanStack Query Hooks
-	const { data: dashboardSummary, isLoading: isLoadingDashboardSummary } = useGetDashboardSummary(activeFilters)
+	const {
+		data: dashboardSummary,
+		isLoading: isLoadingDashboardSummary,
+		isError,
+		refetch,
+	} = useGetDashboardSummary(activeFilters)
 	const { data: previousSummary } = useGetDashboardSummary(previousPeriodFilters)
+
+	if (isLoadingDashboardSummary) return <AnalyticsSkeleton />
+	if (isError && !dashboardSummary) {
+		return (
+			<Card>
+				<ErrorState title={t('errorTitle')} onRetry={() => refetch()} />
+			</Card>
+		)
+	}
 
 	const categoryExpenses = dashboardSummary?.category_expenses || []
 	const monthlySummary = dashboardSummary?.monthly_summary || []
-
-	const nivoTheme = useMemo(
-		() => ({
-			background: 'transparent',
-			text: {
-				fill: theme === 'dark' ? '#ffffff' : '#333333',
-				fontSize: 11,
-			},
-			axis: {
-				domain: {
-					line: {
-						stroke: theme === 'dark' ? '#525252' : '#e5e7eb',
-						strokeWidth: 1,
-					},
-				},
-				legend: {
-					text: {
-						fill: theme === 'dark' ? '#ffffff' : '#333333',
-						fontSize: 12,
-						fontWeight: 500,
-					},
-				},
-				ticks: {
-					line: {
-						stroke: theme === 'dark' ? '#525252' : '#e5e7eb',
-						strokeWidth: 1,
-					},
-					text: {
-						fill: theme === 'dark' ? '#ffffff' : '#333333',
-						fontSize: 11,
-					},
-				},
-			},
-			grid: {
-				line: {
-					stroke: theme === 'dark' ? '#444444' : '#e5e7eb',
-					strokeWidth: 1,
-				},
-			},
-			legends: {
-				text: {
-					fill: theme === 'dark' ? '#ffffff' : '#333333',
-					fontSize: 11,
-				},
-			},
-			tooltip: {
-				container: {
-					background: theme === 'dark' ? '#1f2937' : '#ffffff',
-					color: theme === 'dark' ? '#ffffff' : '#333333',
-					fontSize: 12,
-					borderRadius: '6px',
-					boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)',
-				},
-			},
-		}),
-		[theme],
-	)
-
-	// ... (rest of the code)
-
-	const loading = isLoadingDashboardSummary
-
-	if (loading) return <AnalyticsSkeleton />
+	// Analytics amounts come from the API converted to DOP.
+	const formatDOP = (value: number) => formatCurrency(value, 'DOP')
 
 	const totalIncome = dashboardSummary?.total_income || 0
 	const totalExpenses = dashboardSummary?.total_expenses || 0
@@ -221,19 +136,16 @@ function AnalysisDashboardView() {
 	// Without income there is no meaningful savings rate (avoid "Ahorro bajo 0.0%").
 	const savingsRate = totalIncome > 0 ? (netAmount / totalIncome) * 100 : null
 
-	const selectedFrom = activeFilters.date_from ? new Date(`${activeFilters.date_from}T00:00:00`) : null
-	const selectedTo = activeFilters.date_to ? new Date(`${activeFilters.date_to}T00:00:00`) : null
-	const daysInRange =
-		selectedFrom && selectedTo
-			? Math.max(1, Math.floor((selectedTo.getTime() - selectedFrom.getTime()) / (24 * 60 * 60 * 1000)) + 1)
-			: 30
+	const selectedFrom = activeFilters.date_from ? fromApiDate(activeFilters.date_from) : null
+	const selectedTo = activeFilters.date_to ? fromApiDate(activeFilters.date_to) : null
+	const daysInRange = selectedFrom && selectedTo ? daysBetween(selectedFrom, selectedTo) : 30
 
 	const avgDailySpend = totalExpenses / daysInRange
 
-	const monthsWithExpenses = monthlySummary.filter((m) => Math.abs(m.Gastos) > 0)
+	const monthsWithExpenses = monthlySummary.filter((month) => Math.abs(month.Gastos) > 0)
 	const avgMonthlyExpense =
 		monthsWithExpenses.length > 0
-			? monthsWithExpenses.reduce((sum, m) => sum + Math.abs(m.Gastos), 0) / monthsWithExpenses.length
+			? monthsWithExpenses.reduce((sum, month) => sum + Math.abs(month.Gastos), 0) / monthsWithExpenses.length
 			: 0
 
 	const previousExpenses = previousSummary?.total_expenses || 0
@@ -243,18 +155,24 @@ function AnalysisDashboardView() {
 	const normalizeAmount = (value: number) => Math.round(Math.abs(value) * 100) / 100
 	const topCategoryShare = totalExpenses > 0 && topCategory ? (topCategory.value / totalExpenses) * 100 : 0
 	const hasBudgetForTopCategory = topCategory ? budgets.some((budget) => budget.category_id === topCategory.id) : false
-	// Analytics amounts come from the API converted to DOP.
-	const formatDOP = (value: number) => formatCurrency(value, 'DOP', { locale })
 
-	const accountName = accounts.find((a) => a.id === filters.account)?.name
-	const categoryName = categories.find((c) => c.id === filters.category)?.name
+	const accountName = accounts.find((account) => account.id === filters.account)?.name
+	const categoryName = categories.find((category) => category.id === filters.category)?.name
+
+	const periodBadge =
+		filters.filterMode === 'month'
+			? filters.month === 'all'
+				? `${t('year')}: ${filters.year}`
+				: formatLocalDate(new Date(Number(filters.year), Number(filters.month) - 1, 1), locale, {
+						month: 'long',
+						year: 'numeric',
+					})
+			: selectedFrom && selectedTo
+				? `${formatLocalDate(selectedFrom, locale)} – ${formatLocalDate(selectedTo, locale)}`
+				: null
 
 	const activeFilterBadges = [
-		filters.filterMode === 'month'
-			? `${t('month')}: ${filters.month === 'all' ? t('all') : filters.month}/${filters.year}`
-			: activeFilters.date_from && activeFilters.date_to
-				? `${activeFilters.date_from} - ${activeFilters.date_to}`
-				: null,
+		periodBadge,
 		accountName ? `${t('account')}: ${accountName}` : null,
 		categoryName ? `${t('category')}: ${categoryName}` : null,
 		activeFilters.type ? `${t('type')}: ${activeFilters.type === 'income' ? t('income') : t('expense')}` : null,
@@ -277,7 +195,7 @@ function AnalysisDashboardView() {
 	const insights: {
 		title: string
 		detail: string
-		tone: 'neutral' | 'warning' | 'positive'
+		tone: InsightTone
 		actionLabel?: string
 		onAction?: () => void
 	}[] = []
@@ -325,6 +243,7 @@ function AnalysisDashboardView() {
 	const projectionRatio = elapsedDays > 0 ? daysInMonth / elapsedDays : 1
 	const projectedSpent = totalBudgetSpent * projectionRatio
 	const projectedVsBudget = totalBudgetPlanned > 0 ? (projectedSpent / totalBudgetPlanned) * 100 : 0
+	const projectedTone = getProgressTone(projectedVsBudget)
 
 	const openCategoryTransactions = (categoryId?: string) => {
 		if (!categoryId) return
@@ -346,7 +265,7 @@ function AnalysisDashboardView() {
 	if (expenseDelta > 12) {
 		insights.push({
 			title: t('insightExpenseUpTitle'),
-			detail: t('insightExpenseUpDetail', { delta: expenseDelta.toFixed(1) }),
+			detail: t('insightExpenseUpDetail', { delta: formatPercent(expenseDelta) }),
 			tone: 'warning',
 			actionLabel: t('viewTransactions'),
 			onAction: openTransactionsForCurrentFilters,
@@ -359,7 +278,7 @@ function AnalysisDashboardView() {
 	if (savingsRate !== null && savingsRate < 10) {
 		insights.push({
 			title: t('insightSavingsLowTitle'),
-			detail: t('insightSavingsLowDetail', { rate: savingsRate.toFixed(1) }),
+			detail: t('insightSavingsLowDetail', { rate: formatPercent(savingsRate) }),
 			tone: 'warning',
 			actionLabel: t('viewTransactions'),
 			onAction: openTransactionsForCurrentFilters,
@@ -367,7 +286,7 @@ function AnalysisDashboardView() {
 	} else if (savingsRate !== null && savingsRate >= 20) {
 		insights.push({
 			title: t('insightSavingsGoodTitle'),
-			detail: t('insightSavingsGoodDetail', { rate: savingsRate.toFixed(1) }),
+			detail: t('insightSavingsGoodDetail', { rate: formatPercent(savingsRate) }),
 			tone: 'positive',
 		})
 	}
@@ -377,7 +296,7 @@ function AnalysisDashboardView() {
 			title: t('insightCategoryConcentrationTitle'),
 			detail: t('insightCategoryConcentrationDetail', {
 				category: topCategory.label,
-				share: topCategoryShare.toFixed(1),
+				share: formatPercent(topCategoryShare),
 			}),
 			tone: 'neutral',
 			actionLabel: hasBudgetForTopCategory ? t('viewTransactions') : t('createBudgetCta'),
@@ -395,135 +314,106 @@ function AnalysisDashboardView() {
 		})
 	}
 
+	const savingsTone =
+		savingsRate === null ? 'default' : savingsRate >= 20 ? 'positive' : savingsRate < 0 ? 'negative' : 'default'
+	const noDataState = <EmptyState compact icon={BarChart3} title={t('noData')} className='h-full' />
+
 	return (
-		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }} className='space-y-6 mb-10'>
+		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.2 }} className='space-y-6'>
 			{activeFilterBadges.length > 0 && (
-				<Card>
-					<CardContent className='pt-6'>
-						<div className='mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground'>
-							{t('activeFilters')}
-						</div>
-						<div className='flex flex-wrap gap-2'>
-							{activeFilterBadges.map((badge) => (
-								<Badge key={badge} variant='secondary'>
-									{badge}
-								</Badge>
-							))}
-						</div>
-					</CardContent>
-				</Card>
+				<div className='flex flex-wrap items-center gap-2'>
+					<span className='text-sm text-muted-foreground'>{t('activeFilters')}:</span>
+					{activeFilterBadges.map((badge) => (
+						<Badge key={badge} variant='secondary' className='font-medium'>
+							{badge}
+						</Badge>
+					))}
+				</div>
 			)}
 
-			<div className='grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-5'>
-				<Card>
-					<CardHeader className='pb-1'>
-						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('income')}</CardTitle>
-					</CardHeader>
-					<CardContent className='pt-0'>
-						<p className='text-2xl font-semibold'>{formatDOP(totalIncome)}</p>
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader className='pb-1'>
-						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('expense')}</CardTitle>
-					</CardHeader>
-					<CardContent className='pt-0'>
-						<div className='flex items-center gap-2'>
-							<p className='text-2xl font-semibold'>{formatDOP(totalExpenses)}</p>
-							{expenseDelta !== 0 && (
-								<span className={`text-xs font-medium ${expenseDelta > 0 ? 'text-destructive' : 'text-success'}`}>
-									{expenseDelta > 0 ? '+' : ''}
-									{expenseDelta.toFixed(1)}%
-								</span>
-							)}
-						</div>
-						<p className='text-xs text-muted-foreground'>{t('vsPreviousPeriod')}</p>
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader className='pb-1'>
-						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('savingsRate')}</CardTitle>
-					</CardHeader>
-					<CardContent className='pt-0'>
-						<div className='flex items-center gap-2'>
-							<p className='text-2xl font-semibold'>{savingsRate === null ? '—' : `${savingsRate.toFixed(1)}%`}</p>
-							{savingsRate === null ? null : savingsRate >= 20 ? (
-								<TrendingUp className='h-4 w-4 text-success' aria-hidden='true' />
-							) : (
-								<TrendingDown className='h-4 w-4 text-destructive' aria-hidden='true' />
-							)}
-						</div>
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader className='pb-1'>
-						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('dailySpend')}</CardTitle>
-					</CardHeader>
-					<CardContent className='pt-0'>
-						<div className='flex items-center gap-2'>
-							<Wallet className='h-4 w-4 text-muted-foreground' />
-							<p className='text-2xl font-semibold'>{formatDOP(avgDailySpend)}</p>
-						</div>
-						<p className='text-xs text-muted-foreground'>{t('daysAnalyzed', { days: daysInRange })}</p>
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader className='pb-1'>
-						<CardTitle className='text-sm font-medium text-muted-foreground'>{t('monthlyAvgExpense')}</CardTitle>
-					</CardHeader>
-					<CardContent className='pt-0'>
-						<div className='flex items-center gap-2'>
-							<CalendarRange className='h-4 w-4 text-muted-foreground' />
-							<p className='text-2xl font-semibold'>{formatDOP(avgMonthlyExpense)}</p>
-						</div>
-						<p className='text-xs text-muted-foreground'>
-							{monthsWithExpenses.length > 0
-								? t('monthsAnalyzed', { months: monthsWithExpenses.length })
-								: t('noMonthlyData')}
-						</p>
-					</CardContent>
-				</Card>
-			</div>
+			<StatGrid columns={5}>
+				<StatCard
+					label={t('income')}
+					icon={ArrowUpRight}
+					tone='positive'
+					value={<Amount value={totalIncome} currency='DOP' />}
+				/>
+				<StatCard
+					label={t('expense')}
+					icon={ArrowDownRight}
+					tone='negative'
+					value={<Amount value={totalExpenses} currency='DOP' />}
+					hint={
+						expenseDelta !== 0 ? (
+							<>
+								<span
+									className={cn('font-medium tabular-nums', expenseDelta > 0 ? 'text-destructive' : 'text-success')}
+								>
+									{formatPercent(expenseDelta, { signDisplay: 'exceptZero' })}
+								</span>{' '}
+								{t('vsPreviousPeriod')}
+							</>
+						) : undefined
+					}
+				/>
+				<StatCard
+					label={t('savingsRate')}
+					icon={PiggyBank}
+					tone={savingsTone}
+					value={savingsRate === null ? '—' : formatPercent(savingsRate)}
+				/>
+				<StatCard
+					label={t('dailySpend')}
+					icon={Wallet}
+					value={<Amount value={avgDailySpend} currency='DOP' />}
+					hint={t('daysAnalyzed', { days: daysInRange })}
+				/>
+				<StatCard
+					label={t('monthlyAvgExpense')}
+					icon={CalendarRange}
+					value={<Amount value={avgMonthlyExpense} currency='DOP' />}
+					hint={
+						monthsWithExpenses.length > 0
+							? t('monthsAnalyzed', { months: monthsWithExpenses.length })
+							: t('noMonthlyData')
+					}
+				/>
+			</StatGrid>
 
 			{!hasActivity && (
 				<Card>
-					<CardContent className='flex flex-col items-center gap-2 py-10 text-center'>
-						<BarChart3 className='h-10 w-10 text-muted-foreground/60' aria-hidden='true' />
-						<p className='font-semibold text-foreground'>{t('emptyTitle')}</p>
-						<p className='max-w-md text-sm text-muted-foreground'>{t('emptyDescription')}</p>
-					</CardContent>
+					<EmptyState
+						icon={BarChart3}
+						title={t('emptyTitle')}
+						description={t('emptyDescription')}
+						className='min-h-0'
+					/>
 				</Card>
 			)}
 
-			<div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
-				{insights.slice(0, 3).map((insight) => (
-					<Card key={insight.title}>
-						<CardContent className='pt-6'>
-							<p
-								className={`text-sm font-semibold ${insight.tone === 'warning' ? 'text-amber-600' : insight.tone === 'positive' ? 'text-emerald-600' : 'text-foreground'}`}
-							>
-								{insight.title}
-							</p>
-							<p className='mt-1 text-sm text-muted-foreground'>{insight.detail}</p>
-							{insight.actionLabel && insight.onAction && (
-								<Button
-									type='button'
-									variant='ghost'
-									size='sm'
-									className='mt-2 h-7 px-2 text-xs'
-									onClick={insight.onAction}
-								>
-									{insight.actionLabel}
-								</Button>
-							)}
-						</CardContent>
-					</Card>
-				))}
-			</div>
+			{insights.length > 0 && (
+				<div className='grid grid-cols-1 gap-4 md:grid-cols-3'>
+					{insights.slice(0, 3).map((insight) => {
+						const { icon: InsightIcon, className: iconClass } = INSIGHT_ICON[insight.tone]
+						return (
+							<Card key={insight.title}>
+								<CardContent className='flex gap-3 pt-6'>
+									<InsightIcon className={cn('mt-0.5 h-4 w-4 shrink-0', iconClass)} aria-hidden='true' />
+									<div className='min-w-0'>
+										<p className='text-sm font-semibold text-foreground'>{insight.title}</p>
+										<p className='mt-1 text-sm text-muted-foreground'>{insight.detail}</p>
+										{insight.actionLabel && insight.onAction && (
+											<Button type='button' variant='outline' size='sm' className='mt-3' onClick={insight.onAction}>
+												{insight.actionLabel}
+											</Button>
+										)}
+									</div>
+								</CardContent>
+							</Card>
+						)
+					})}
+				</div>
+			)}
 
 			{topCategory && (
 				<Card>
@@ -531,7 +421,8 @@ function AnalysisDashboardView() {
 						<p className='text-sm text-muted-foreground'>{t('topCategoryPeriod')}</p>
 						<p className='text-lg font-semibold text-foreground'>{topCategory.label}</p>
 						<p className='text-sm text-muted-foreground'>
-							{formatDOP(topCategory.value)} · {t('transactionsCount', { count: topCategory.transaction_count })}
+							<Amount value={topCategory.value} currency='DOP' /> ·{' '}
+							{t('transactionsCount', { count: topCategory.transaction_count })}
 						</p>
 					</CardContent>
 				</Card>
@@ -539,8 +430,8 @@ function AnalysisDashboardView() {
 
 			<Card>
 				<CardHeader>
-					<div className='flex items-center justify-between gap-3'>
-						<CardTitle>{t('budgetVsActual')}</CardTitle>
+					<div className='flex flex-wrap items-center justify-between gap-3'>
+						<CardTitle className='text-lg'>{t('budgetVsActual')}</CardTitle>
 						{budgetVsRealRows.length > 0 && (
 							<Badge variant={overBudgetCount > 0 ? 'destructive' : 'secondary'}>
 								{overBudgetCount > 0 ? t('budgetsExceededBadge', { count: overBudgetCount }) : t('budgetsOnTrackBadge')}
@@ -550,215 +441,180 @@ function AnalysisDashboardView() {
 				</CardHeader>
 				<CardContent>
 					{budgetVsRealRows.length === 0 ? (
-						<p className='text-sm text-muted-foreground'>{t('noBudgetsForComparison')}</p>
+						<EmptyState
+							compact
+							icon={PiggyBank}
+							title={t('noBudgetsForComparison')}
+							action={
+								<Button asChild variant='outline' size='sm'>
+									<Link href='/app/budget?create=1'>
+										<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
+										{t('createBudgetCta')}
+									</Link>
+								</Button>
+							}
+						/>
 					) : (
 						<>
-							<div className='grid grid-cols-1 gap-4 md:grid-cols-4 mb-6'>
-								<div className='rounded-lg border border-border/60 p-3'>
-									<p className='text-xs text-muted-foreground'>{t('plannedBudget')}</p>
-									<p className='text-lg font-semibold'>{formatDOP(totalBudgetPlanned)}</p>
+							<dl className='mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4'>
+								<div className='rounded-lg border p-3'>
+									<dt className='text-xs text-muted-foreground'>{t('plannedBudget')}</dt>
+									<dd className='text-lg font-semibold'>
+										<Amount value={totalBudgetPlanned} currency='DOP' />
+									</dd>
 								</div>
-								<div className='rounded-lg border border-border/60 p-3'>
-									<p className='text-xs text-muted-foreground'>{t('realSpent')}</p>
-									<p className='text-lg font-semibold'>{formatDOP(totalBudgetSpent)}</p>
+								<div className='rounded-lg border p-3'>
+									<dt className='text-xs text-muted-foreground'>{t('realSpent')}</dt>
+									<dd className='text-lg font-semibold'>
+										<Amount value={totalBudgetSpent} currency='DOP' />
+									</dd>
 								</div>
-								<div className='rounded-lg border border-border/60 p-3'>
-									<p className='text-xs text-muted-foreground'>{t('remainingBudget')}</p>
-									<p
-										className={`text-lg font-semibold ${totalBudgetRemaining >= 0 ? 'text-emerald-600' : 'text-destructive'}`}
-									>
-										{formatDOP(totalBudgetRemaining)}
-									</p>
+								<div className='rounded-lg border p-3'>
+									<dt className='text-xs text-muted-foreground'>{t('remainingBudget')}</dt>
+									<dd className='text-lg font-semibold'>
+										<Amount value={totalBudgetRemaining} currency='DOP' tone='auto' />
+									</dd>
 								</div>
-								<div className='rounded-lg border border-border/60 p-3'>
-									<p className='text-xs text-muted-foreground'>{t('projectedMonthClose')}</p>
-									<p
-										className={`text-lg font-semibold ${projectedVsBudget > 100 ? 'text-destructive' : 'text-amber-600'}`}
-									>
-										{formatDOP(projectedSpent)}
-									</p>
+								<div className='rounded-lg border p-3'>
+									<dt className='text-xs text-muted-foreground'>{t('projectedMonthClose')}</dt>
+									<dd className='text-lg font-semibold'>
+										<Amount
+											value={projectedSpent}
+											currency='DOP'
+											tone={
+												projectedTone === 'destructive'
+													? 'negative'
+													: projectedTone === 'warning'
+														? 'warning'
+														: 'neutral'
+											}
+										/>
+									</dd>
 								</div>
-							</div>
+							</dl>
 
-							<div className='space-y-3'>
-								{budgetVsRealRows.slice(0, 6).map((row) => {
-									const cappedProgress = Math.min(Math.max(row.progress, 0), 100)
-									const progressToneClass =
-										row.progress > 100 ? 'bg-red-500' : row.progress > 85 ? 'bg-amber-500' : 'bg-emerald-500'
-
-									return (
-										<div key={row.id} className='rounded-lg border border-border/50 p-3'>
-											<div className='mb-1 flex flex-wrap items-center justify-between gap-x-3 gap-y-1'>
-												<p className='min-w-0 truncate text-sm font-medium text-foreground'>{row.categoryLabel}</p>
-												<div className='flex flex-wrap items-center gap-2'>
-													<p className='text-xs text-muted-foreground'>
-														{formatDOP(row.spent)} / {formatDOP(row.budgetAmount)}
-													</p>
-													<Button
-														type='button'
-														variant='ghost'
-														size='sm'
-														className='h-7 px-2 text-xs'
-														onClick={() => openCategoryTransactions(row.categoryId)}
-													>
-														{t('viewTransactions')}
-													</Button>
-												</div>
-											</div>
-											<div className='mb-2 h-2 w-full overflow-hidden rounded-full bg-muted'>
-												<div
-													className={`h-full rounded-full ${progressToneClass}`}
-													style={{ width: `${Math.max(cappedProgress, cappedProgress > 0 ? 4 : 0)}%` }}
-												/>
-											</div>
-											<div className='flex items-center justify-between text-xs'>
-												<span className={row.remaining >= 0 ? 'text-emerald-600' : 'text-destructive'}>
-													{row.remaining >= 0
-														? t('budgetRemainingValue', { amount: formatDOP(row.remaining) })
-														: t('budgetExceededValue', { amount: formatDOP(Math.abs(row.remaining)) })}
-												</span>
-												<span className='text-muted-foreground'>{row.progress.toFixed(1)}%</span>
+							<ul className='space-y-3'>
+								{budgetVsRealRows.slice(0, 6).map((row) => (
+									<li key={row.id} className='rounded-lg border p-3'>
+										<div className='mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1'>
+											<p className='min-w-0 truncate text-sm font-medium text-foreground'>{row.categoryLabel}</p>
+											<div className='flex flex-wrap items-center gap-2'>
+												<p className='text-xs text-muted-foreground tabular-nums'>
+													{formatDOP(row.spent)} / {formatDOP(row.budgetAmount)}
+												</p>
+												<Button
+													type='button'
+													variant='ghost'
+													size='sm'
+													onClick={() => openCategoryTransactions(row.categoryId)}
+												>
+													{t('viewTransactions')}
+												</Button>
 											</div>
 										</div>
-									)
-								})}
-							</div>
+										<Progress
+											value={row.progress}
+											tone={getProgressTone(row.progress, { warningAt: 85, dangerAt: 100.01 })}
+											aria-label={t('budgetUsageLabel', {
+												category: row.categoryLabel,
+												percent: formatPercent(row.progress),
+											})}
+											className='mb-2'
+										/>
+										<div className='flex items-center justify-between gap-2 text-xs'>
+											<span className={row.remaining >= 0 ? 'text-success' : 'text-destructive'}>
+												{row.remaining >= 0
+													? t('budgetRemainingValue', { amount: formatDOP(row.remaining) })
+													: t('budgetExceededValue', { amount: formatDOP(Math.abs(row.remaining)) })}
+											</span>
+											<span className='text-muted-foreground tabular-nums'>{formatPercent(row.progress)}</span>
+										</div>
+									</li>
+								))}
+							</ul>
 						</>
 					)}
 				</CardContent>
 			</Card>
 
-			<div className='grid grid-cols-1 md:grid-cols-2 gap-8'>
-				<Card>
-					<CardHeader>
-						<CardTitle>{t('incomeExpensesByMonth')}</CardTitle>
-					</CardHeader>
-					<CardContent style={{ height: 300 }}>
-						{!hasPlottableValues(monthlySummary.flatMap((m) => [m.Ingresos, m.Gastos])) ? (
-							<ChartEmptyState label={t('noData')} />
-						) : (
-							<AnalysisLineChart
-								data={
-									monthlySummary && monthlySummary.length > 0
-										? [
-												{
-													id: t('income'),
-													color: '#22c55e',
-													data: monthlySummary.map((m) => ({ x: m.month, y: m.Ingresos })),
-												},
-												{
-													id: t('expenses'),
-													color: '#f97316',
-													data: monthlySummary.map((m) => ({ x: m.month, y: Math.abs(m.Gastos) })),
-												},
-											]
-										: []
-								}
-								theme={theme}
-								nivoTheme={nivoTheme}
-								t={{
-									income: t('income'),
-									expenses: t('expenses'),
-									month: t('month'),
-									amount: t('amount'),
-								}}
-							/>
-						)}
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader>
-						<CardTitle>{t('expensesByCategory')}</CardTitle>
-					</CardHeader>
-					<CardContent style={{ height: 300 }}>
-						{!hasPlottableValues(categoryExpenses.map((cat) => cat.value)) ? (
-							<ChartEmptyState label={t('noData')} />
-						) : (
-							<AnalysisBarChart
-								data={
-									categoryExpenses && categoryExpenses.length > 0
-										? categoryExpenses.map((cat) => ({ categoria: cat.label, monto: normalizeAmount(cat.value) }))
-										: []
-								}
-								nivoTheme={nivoTheme}
-								t={{
-									category: t('category'),
-									amount: t('amount'),
-								}}
-							/>
-						)}
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader>
-						<CardTitle>{t('categoryDistribution')}</CardTitle>
-					</CardHeader>
-					<CardContent style={{ height: 300 }}>
-						{!hasPlottableValues(categoryExpenses.map((cat) => cat.value)) ? (
-							<ChartEmptyState label={t('noData')} />
-						) : (
-							<AnalysisPieChart
-								data={
-									categoryExpenses && categoryExpenses.length > 0
-										? categoryExpenses.map((cat, index) => ({
-												id: cat.label || cat.id,
-												label: cat.label || cat.id,
-												value: normalizeAmount(cat.value),
-												color: cat.color || categoryPalette[index % categoryPalette.length],
-											}))
-										: []
-								}
-								theme={theme}
-								nivoTheme={nivoTheme}
-							/>
-						)}
-					</CardContent>
-				</Card>
-
-				<Card>
-					<CardHeader>
-						<CardTitle>{t('categoryRadar')}</CardTitle>
-					</CardHeader>
-					<CardContent style={{ height: 300 }}>
-						{/* A radar needs at least 3 axes to draw a polygon. */}
-						{categoryExpenses.length < 3 || !hasPlottableValues(categoryExpenses.map((cat) => cat.value)) ? (
-							<ChartEmptyState label={t('noData')} />
-						) : (
-							<AnalysisRadarChart
-								data={
-									categoryExpenses && categoryExpenses.length > 0
-										? categoryExpenses.map((cat) => ({
-												categoria: cat.label,
-												[t('expenses')]: normalizeAmount(cat.value),
-											}))
-										: []
-								}
-								nivoTheme={nivoTheme}
-								t={{
-									expenses: t('expenses'),
-								}}
-							/>
-						)}
-					</CardContent>
-				</Card>
-
-				<Card className='md:col-span-2'>
-					<CardHeader>
-						<CardTitle>{t('weeklyHeatmap')}</CardTitle>
-					</CardHeader>
-					<CardContent style={{ height: 300 }}>
-						<AnalysisHeatMap
-							data={mockHeat}
-							nivoTheme={nivoTheme}
+			<div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
+				<ChartCard title={t('incomeExpensesByMonth')}>
+					{!hasPlottableValues(monthlySummary.flatMap((month) => [month.Ingresos, month.Gastos])) ? (
+						noDataState
+					) : (
+						<AnalysisLineChart
+							label={t('chartLabel', { title: t('incomeExpensesByMonth') })}
+							data={[
+								{
+									id: t('income'),
+									data: monthlySummary.map((month) => ({ x: month.month, y: month.Ingresos })),
+								},
+								{
+									id: t('expenses'),
+									data: monthlySummary.map((month) => ({ x: month.month, y: Math.abs(month.Gastos) })),
+								},
+							]}
 							t={{
+								income: t('income'),
+								expenses: t('expenses'),
 								month: t('month'),
-								day: t('day'),
+								amount: t('amount'),
 							}}
 						/>
-					</CardContent>
-				</Card>
+					)}
+				</ChartCard>
+
+				<ChartCard title={t('expensesByCategory')}>
+					{!hasPlottableValues(categoryExpenses.map((category) => category.value)) ? (
+						noDataState
+					) : (
+						<AnalysisBarChart
+							label={t('chartLabel', { title: t('expensesByCategory') })}
+							data={categoryExpenses.map((category) => ({
+								categoria: category.label,
+								monto: normalizeAmount(category.value),
+							}))}
+							t={{
+								category: t('category'),
+								amount: t('amount'),
+							}}
+						/>
+					)}
+				</ChartCard>
+
+				<ChartCard title={t('categoryDistribution')}>
+					{!hasPlottableValues(categoryExpenses.map((category) => category.value)) ? (
+						noDataState
+					) : (
+						<AnalysisPieChart
+							label={t('chartLabel', { title: t('categoryDistribution') })}
+							data={categoryExpenses.map((category) => ({
+								id: category.label || category.id,
+								label: category.label || category.id,
+								value: normalizeAmount(category.value),
+								color: category.color || undefined,
+							}))}
+						/>
+					)}
+				</ChartCard>
+
+				<ChartCard title={t('categoryRadar')}>
+					{/* A radar needs at least 3 axes to draw a polygon. */}
+					{categoryExpenses.length < 3 || !hasPlottableValues(categoryExpenses.map((category) => category.value)) ? (
+						noDataState
+					) : (
+						<AnalysisRadarChart
+							label={t('chartLabel', { title: t('categoryRadar') })}
+							data={categoryExpenses.map((category) => ({
+								categoria: category.label,
+								[t('expenses')]: normalizeAmount(category.value),
+							}))}
+							t={{
+								expenses: t('expenses'),
+							}}
+						/>
+					)}
+				</ChartCard>
 			</div>
 		</m.div>
 	)

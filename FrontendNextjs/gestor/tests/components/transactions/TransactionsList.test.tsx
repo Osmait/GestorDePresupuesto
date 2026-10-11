@@ -1,8 +1,15 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { vi } from 'vitest'
+import { afterEach, vi } from 'vitest'
 import TransactionsList from '@/components/transactions/TransactionsList'
 import { TypeTransaction } from '@/types/transaction'
+
+const listState = vi.hoisted(() => ({
+	transactions: null as any[] | null,
+	error: null as string | null,
+	reloadCurrentView: vi.fn(),
+	setModalOpen: vi.fn(),
+}))
 
 // Mock Hooks
 vi.mock('next/navigation', () => ({
@@ -16,7 +23,8 @@ vi.mock('next-intl', () => ({
 // Mock Contexts
 vi.mock('@/components/transactions/TransactionContext', () => ({
 	useTransactionContext: () => ({
-		transactions: [
+		error: listState.error,
+		transactions: listState.transactions ?? [
 			{
 				id: 't1',
 				name: 'Salary',
@@ -39,7 +47,9 @@ vi.mock('@/components/transactions/TransactionContext', () => ({
 	useTransactionActions: () => ({
 		deleteTransaction: vi.fn(),
 		clearFilters: vi.fn(),
-		reloadCurrentView: vi.fn(),
+		reloadCurrentView: listState.reloadCurrentView,
+		setEditingTransaction: vi.fn(),
+		setModalOpen: listState.setModalOpen,
 	}),
 }))
 
@@ -91,6 +101,33 @@ vi.mock('@/components/transactions/TransactionSort', () => ({
 }))
 
 describe('TransactionsList', () => {
+	afterEach(() => {
+		listState.transactions = null
+		listState.error = null
+	})
+
+	it('shows an empty state whose action opens the create modal', async () => {
+		listState.transactions = []
+		const user = userEvent.setup()
+		render(<TransactionsList />)
+
+		expect(screen.getByRole('heading', { name: 'noTransactions' })).toBeInTheDocument()
+		await user.click(screen.getByRole('button', { name: 'addTransaction' }))
+		expect(listState.setModalOpen).toHaveBeenCalledWith(true)
+	})
+
+	it('shows an error state with retry when the first load fails', async () => {
+		listState.transactions = []
+		listState.error = 'Network error'
+		const user = userEvent.setup()
+		render(<TransactionsList />)
+
+		expect(screen.getByRole('alert')).toBeInTheDocument()
+		expect(screen.queryByText('Network error')).not.toBeInTheDocument()
+		await user.click(screen.getByRole('button', { name: 'retry' }))
+		expect(listState.reloadCurrentView).toHaveBeenCalled()
+	})
+
 	it('renders list of transactions', () => {
 		render(<TransactionsList />)
 		expect(screen.getByTestId('summary-card')).toBeInTheDocument()
@@ -106,7 +143,7 @@ describe('TransactionsList', () => {
 		await user.click(screen.getByRole('button', { name: 'open-t2' }))
 		const dialog = await screen.findByRole('dialog')
 		// Expense: negative sign, RD$ (default currency), 2 decimals; never "+$"
-		expect(within(dialog).getByText('-RD$1,000.00')).toHaveClass('text-red-600')
+		expect(within(dialog).getByText('-RD$1,000.00')).toHaveClass('text-destructive')
 		// Raw value "bill" is mapped to the i18n key transactions.types.bill
 		expect(within(dialog).getByText('types.bill')).toBeInTheDocument()
 		expect(within(dialog).queryByText('bill')).not.toBeInTheDocument()
@@ -118,7 +155,7 @@ describe('TransactionsList', () => {
 
 		await user.click(screen.getByRole('button', { name: 'open-t1' }))
 		const dialog = await screen.findByRole('dialog')
-		expect(within(dialog).getByText('+RD$5,000.00')).toHaveClass('text-green-600')
+		expect(within(dialog).getByText('+RD$5,000.00')).toHaveClass('text-success')
 		expect(within(dialog).getByText('types.income')).toBeInTheDocument()
 	})
 

@@ -1,18 +1,12 @@
 'use client'
 
 import { format } from 'date-fns'
-import { ChevronDown, ChevronsUpDown, ChevronUp, Filter, Save, Search, Trash2, X } from 'lucide-react'
+import { ChevronDown, ChevronsUpDown, ChevronUp, Save, Search, Trash2, Users, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useMemo, useState } from 'react'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -40,6 +34,7 @@ const CHANGE_FIELD_LABELS = {
 export function EditableUserTable({ users, onSave, onDelete, isLoading }: EditableUserTableProps) {
 	const t = useTranslations('admin.users')
 	const tRoles = useTranslations('admin.roles')
+	const tCommon = useTranslations('common')
 	const dateLocale = useDateFnsLocale()
 	const roleLabel = (role: string) => (role === 'ADMIN' || role === 'USER' ? tRoles(role) : role)
 	const [editedUsers, setEditedUsers] = useState<Record<string, UserResponse>>({})
@@ -138,33 +133,52 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 		setEditedUsers({})
 	}
 
-	const SortIcon = ({ field }: { field: SortField }) => {
-		if (sortField !== field) return <ChevronsUpDown className='ml-1 h-3 w-3' />
-		return sortOrder === 'asc' ? (
-			<ChevronUp className='ml-1 h-3 w-3 text-primary' />
-		) : (
-			<ChevronDown className='ml-1 h-3 w-3 text-primary' />
+	function sortState(field: SortField): 'ascending' | 'descending' | 'none' {
+		if (sortField !== field || !sortOrder) return 'none'
+		return sortOrder === 'asc' ? 'ascending' : 'descending'
+	}
+
+	function renderSortableHead(field: SortField, label: string, className: string) {
+		const state = sortState(field)
+		const Icon = state === 'ascending' ? ChevronUp : state === 'descending' ? ChevronDown : ChevronsUpDown
+		return (
+			<TableHead key={field} className={className} aria-sort={state}>
+				<button
+					type='button'
+					onClick={() => handleSort(field)}
+					className='-mx-2 inline-flex h-10 items-center gap-1 rounded-md px-2 font-medium transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+				>
+					{label}
+					<Icon className={state === 'none' ? 'h-3 w-3' : 'h-3 w-3 text-foreground'} aria-hidden='true' />
+				</button>
+			</TableHead>
 		)
 	}
+
+	const cellInputClass = (isEdited: boolean) =>
+		`h-10 border-transparent hover:border-border focus-visible:border-ring ${isEdited ? 'border-primary/40 bg-primary/5' : ''}`
 
 	return (
 		<div className='space-y-4 w-full overflow-hidden'>
 			{/* Search and Filters */}
 			<div className='flex flex-col sm:flex-row items-center gap-4'>
 				<div className='relative w-full sm:max-w-xs'>
-					<Search className='absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground' />
+					<Search
+						className='pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground'
+						aria-hidden='true'
+					/>
 					<Input
+						type='search'
 						placeholder={t('searchPlaceholder')}
-						aria-label={t('searchPlaceholder')}
+						aria-label={t('searchLabel')}
 						value={searchTerm}
 						onChange={(e) => setSearchTerm(e.target.value)}
-						className='pl-9 h-9'
+						className='pl-9'
 					/>
 				</div>
-				<div className='flex items-center gap-2 w-full sm:w-auto'>
-					<Filter className='h-4 w-4 text-muted-foreground' />
+				<div className='w-full sm:w-auto'>
 					<Select value={roleFilter} onValueChange={setRoleFilter}>
-						<SelectTrigger className='h-9 w-[160px]' aria-label={t('filterByRole')}>
+						<SelectTrigger className='w-full sm:w-[180px]' aria-label={t('filterByRole')}>
 							<SelectValue placeholder={t('filterByRole')} />
 						</SelectTrigger>
 						<SelectContent>
@@ -176,81 +190,53 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 				</div>
 
 				{hasChanges && (
-					<div className='flex flex-wrap items-center gap-2 sm:ml-auto animate-in fade-in slide-in-from-right-2 duration-300'>
-						<Button variant='outline' size='sm' onClick={handleCancel} className='gap-2 h-9'>
-							<X className='h-4 w-4' />
+					<div className='flex flex-wrap items-center gap-2 sm:ml-auto'>
+						<Button variant='outline' onClick={handleCancel}>
+							<X className='mr-2 h-4 w-4' aria-hidden='true' />
 							{t('cancel')}
 						</Button>
-						<Button size='sm' onClick={() => setIsConfirmOpen(true)} className='gap-2 h-9'>
-							<Save className='h-4 w-4' />
+						<Button onClick={() => setIsConfirmOpen(true)}>
+							<Save className='mr-2 h-4 w-4' aria-hidden='true' />
 							{t('saveChanges', { count: Object.keys(editedUsers).length })}
 						</Button>
 					</div>
 				)}
 			</div>
 
-			<div className='rounded-md border border-border/50 bg-card/50 max-w-full overflow-hidden'>
+			<div className='max-w-full overflow-hidden rounded-md border'>
 				<div className='overflow-x-auto w-full'>
 					<Table className='min-w-[800px] w-max'>
 						<TableHeader className='bg-muted/50'>
 							<TableRow>
-								<TableHead
-									className='min-w-[150px] cursor-pointer hover:text-primary transition-colors'
-									onClick={() => handleSort('name')}
-								>
-									<div className='flex items-center'>
-										{t('columns.name')} <SortIcon field='name' />
-									</div>
-								</TableHead>
-								<TableHead
-									className='min-w-[150px] cursor-pointer hover:text-primary transition-colors'
-									onClick={() => handleSort('last_name')}
-								>
-									<div className='flex items-center'>
-										{t('columns.lastName')} <SortIcon field='last_name' />
-									</div>
-								</TableHead>
-								<TableHead
-									className='min-w-[200px] cursor-pointer hover:text-primary transition-colors'
-									onClick={() => handleSort('email')}
-								>
-									<div className='flex items-center'>
-										{t('columns.email')} <SortIcon field='email' />
-									</div>
-								</TableHead>
-								<TableHead
-									className='min-w-[120px] cursor-pointer hover:text-primary transition-colors'
-									onClick={() => handleSort('role')}
-								>
-									<div className='flex items-center'>
-										{t('columns.role')} <SortIcon field='role' />
-									</div>
-								</TableHead>
-								<TableHead
-									className='min-w-[150px] cursor-pointer hover:text-primary transition-colors'
-									onClick={() => handleSort('created_at')}
-								>
-									<div className='flex items-center'>
-										{t('columns.created')} <SortIcon field='created_at' />
-									</div>
-								</TableHead>
+								{renderSortableHead('name', t('columns.name'), 'min-w-[150px]')}
+								{renderSortableHead('last_name', t('columns.lastName'), 'min-w-[150px]')}
+								{renderSortableHead('email', t('columns.email'), 'min-w-[200px]')}
+								{renderSortableHead('role', t('columns.role'), 'min-w-[120px]')}
+								{renderSortableHead('created_at', t('columns.created'), 'min-w-[150px]')}
 								<TableHead className='text-right min-w-[100px]'>{t('columns.id')}</TableHead>
-								<TableHead className='min-w-[80px]'>{t('columns.actions')}</TableHead>
+								<TableHead className='min-w-[64px]'>
+									<span className='sr-only'>{t('columns.actions')}</span>
+								</TableHead>
 							</TableRow>
 						</TableHeader>
 						<TableBody>
 							{isLoading ? (
 								<TableRow>
 									<TableCell colSpan={7} className='h-24 text-center'>
-										<div className='flex items-center justify-center gap-2'>
-											<span className='animate-pulse'>{t('loading')}</span>
+										<div className='flex items-center justify-center gap-2' role='status'>
+											<span className='text-muted-foreground'>{t('loading')}</span>
 										</div>
 									</TableCell>
 								</TableRow>
 							) : filteredAndSortedUsers.length === 0 ? (
 								<TableRow>
-									<TableCell colSpan={7} className='h-24 text-center text-muted-foreground'>
-										{t('empty')}
+									<TableCell colSpan={7}>
+										<EmptyState
+											compact
+											icon={Users}
+											title={t('empty')}
+											description={tCommon('empty.noResultsDescription')}
+										/>
 									</TableCell>
 								</TableRow>
 							) : (
@@ -258,6 +244,8 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 									const edit = editedUsers[user.id]
 									const isEdited = !!edit
 									const currentUser = edit || user
+									const fullName = `${user.name} ${user.last_name}`
+									const cellLabel = (column: string) => t('cellLabel', { field: column, user: fullName })
 
 									return (
 										<TableRow
@@ -267,29 +255,30 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 											<TableCell className='p-2'>
 												<Input
 													value={currentUser.name}
+													aria-label={cellLabel(t('columns.name'))}
 													onChange={(e) => handleEdit(user.id, 'name', e.target.value)}
-													className={`h-8 border-transparent hover:border-border transition-all focus:border-primary focus-visible:ring-0 ${isEdited && 'border-primary/50 bg-primary/5'}`}
+													className={cellInputClass(isEdited)}
 												/>
 											</TableCell>
 											<TableCell className='p-2'>
 												<Input
 													value={currentUser.last_name}
+													aria-label={cellLabel(t('columns.lastName'))}
 													onChange={(e) => handleEdit(user.id, 'last_name', e.target.value)}
-													className={`h-8 border-transparent hover:border-border transition-all focus:border-primary focus-visible:ring-0 ${isEdited && 'border-primary/50 bg-primary/5'}`}
+													className={cellInputClass(isEdited)}
 												/>
 											</TableCell>
 											<TableCell className='p-2'>
 												<Input
 													value={currentUser.email}
+													aria-label={cellLabel(t('columns.email'))}
 													onChange={(e) => handleEdit(user.id, 'email', e.target.value)}
-													className={`h-8 border-transparent hover:border-border transition-all focus:border-primary focus-visible:ring-0 ${isEdited && 'border-primary/50 bg-primary/5'}`}
+													className={cellInputClass(isEdited)}
 												/>
 											</TableCell>
 											<TableCell className='p-2'>
 												<Select value={currentUser.role} onValueChange={(value) => handleEdit(user.id, 'role', value)}>
-													<SelectTrigger
-														className={`h-8 border-transparent hover:border-border transition-all focus:ring-0 focus:border-primary ${isEdited && 'border-primary/50 bg-primary/5'}`}
-													>
+													<SelectTrigger aria-label={cellLabel(t('columns.role'))} className={cellInputClass(isEdited)}>
 														<SelectValue />
 													</SelectTrigger>
 													<SelectContent>
@@ -301,18 +290,18 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 											<TableCell className='text-muted-foreground whitespace-nowrap px-4 py-2'>
 												{format(new Date(user.created_at), 'PP', { locale: dateLocale })}
 											</TableCell>
-											<TableCell className='text-right font-mono text-xs text-muted-foreground px-4 py-2 opacity-50 group-hover:opacity-100 transition-opacity'>
+											<TableCell className='px-4 py-2 text-right font-mono text-xs text-muted-foreground'>
 												{user.id.slice(0, 8)}...
 											</TableCell>
 											<TableCell className='px-2 py-2'>
 												<Button
 													variant='ghost'
-													size='sm'
-													className='h-8 w-8 p-0 text-muted-foreground hover:text-destructive'
-													aria-label={t('disableUser', { name: `${user.name} ${user.last_name}` })}
+													size='icon'
+													className='text-muted-foreground hover:text-destructive'
+													aria-label={t('disableUser', { name: fullName })}
 													onClick={() => setDeleteTargetId(user.id)}
 												>
-													<Trash2 className='h-4 w-4' />
+													<Trash2 className='h-4 w-4' aria-hidden='true' />
 												</Button>
 											</TableCell>
 										</TableRow>
@@ -324,89 +313,70 @@ export function EditableUserTable({ users, onSave, onDelete, isLoading }: Editab
 				</div>
 			</div>
 
-			{/* Delete Confirmation Dialog */}
-			<Dialog
+			<ConfirmDialog
 				open={!!deleteTargetId}
 				onOpenChange={(open) => {
 					if (!open) setDeleteTargetId(null)
 				}}
+				title={t('deleteTitle')}
+				description={t.rich('deleteDescription', {
+					name: deleteTarget ? `${deleteTarget.name} ${deleteTarget.last_name}` : '',
+					strong: (chunks) => <span className='font-semibold text-foreground'>{chunks}</span>,
+				})}
+				confirmLabel={t('deleteConfirm')}
+				cancelLabel={t('cancel')}
+				destructive
+				onConfirm={handleConfirmDelete}
+			/>
+
+			<ConfirmDialog
+				open={isConfirmOpen}
+				onOpenChange={setIsConfirmOpen}
+				title={t('confirmTitle')}
+				description={t('confirmDescription', { count: Object.keys(editedUsers).length })}
+				confirmLabel={t('confirmSave')}
+				cancelLabel={t('back')}
+				onConfirm={handleConfirmSave}
 			>
-				<DialogContent className='max-w-md'>
-					<DialogHeader>
-						<DialogTitle>{t('deleteTitle')}</DialogTitle>
-						<DialogDescription>
-							{t.rich('deleteDescription', {
-								name: deleteTarget ? `${deleteTarget.name} ${deleteTarget.last_name}` : '',
-								strong: (chunks) => <span className='font-semibold text-foreground'>{chunks}</span>,
-							})}
-						</DialogDescription>
-					</DialogHeader>
-					<DialogFooter className='mt-6'>
-						<Button variant='outline' onClick={() => setDeleteTargetId(null)}>
-							{t('cancel')}
-						</Button>
-						<Button variant='destructive' onClick={handleConfirmDelete} className='gap-2'>
-							<Trash2 className='h-4 w-4' />
-							{t('deleteConfirm')}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+				<ScrollArea className='max-h-[300px] rounded-md border bg-muted/30 p-4'>
+					<div className='space-y-4'>
+						{Object.entries(editedUsers).map(([id, editedUser]) => {
+							const original = users.find((u) => u.id === id)
+							if (!original) return null
 
-			{/* Save Confirmation Modal */}
-			<Dialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-				<DialogContent className='max-w-md'>
-					<DialogHeader>
-						<DialogTitle>{t('confirmTitle')}</DialogTitle>
-						<DialogDescription>{t('confirmDescription', { count: Object.keys(editedUsers).length })}</DialogDescription>
-					</DialogHeader>
+							const changedFields = (['name', 'last_name', 'email', 'role'] as const).filter(
+								(f) => editedUser[f] !== original[f],
+							)
 
-					<ScrollArea className='max-h-[300px] mt-4 rounded-md border p-4 bg-muted/30'>
-						<div className='space-y-4'>
-							{Object.entries(editedUsers).map(([id, editedUser]) => {
-								const original = users.find((u) => u.id === id)
-								if (!original) return null
-
-								const changedFields = (['name', 'last_name', 'email', 'role'] as const).filter(
-									(f) => editedUser[f] !== original[f],
-								)
-
-								return (
-									<div key={id} className='text-sm border-b pb-2 last:border-0 last:pb-0'>
-										<p className='font-semibold text-primary'>
-											{original.name} {original.last_name}
-										</p>
-										<div className='mt-1 space-y-1'>
-											{changedFields.map((f) => (
-												<div key={f} className='flex items-center gap-2 text-xs'>
-													<span className='text-muted-foreground w-20 shrink-0'>{t(CHANGE_FIELD_LABELS[f])}:</span>
-													<span className='line-through text-destructive/70 break-all'>
+							return (
+								<div key={id} className='border-b pb-2 text-sm last:border-0 last:pb-0'>
+									<p className='font-semibold'>
+										{original.name} {original.last_name}
+									</p>
+									<dl className='mt-1 space-y-1'>
+										{changedFields.map((f) => (
+											<div key={f} className='flex items-center gap-2 text-xs'>
+												<dt className='w-20 shrink-0 text-muted-foreground'>{t(CHANGE_FIELD_LABELS[f])}:</dt>
+												<dd className='flex min-w-0 flex-wrap items-center gap-2'>
+													<del className='break-all text-muted-foreground'>
 														{f === 'role' ? roleLabel(original[f]) : original[f]}
+													</del>
+													<span className='text-muted-foreground' aria-hidden='true'>
+														→
 													</span>
-													<span className='text-muted-foreground'>→</span>
-													<span className='text-green-500 font-medium break-all'>
+													<ins className='break-all font-medium no-underline'>
 														{f === 'role' ? roleLabel(editedUser[f]) : editedUser[f]}
-													</span>
-												</div>
-											))}
-										</div>
-									</div>
-								)
-							})}
-						</div>
-					</ScrollArea>
-
-					<DialogFooter className='mt-6'>
-						<Button variant='outline' onClick={() => setIsConfirmOpen(false)}>
-							{t('back')}
-						</Button>
-						<Button onClick={handleConfirmSave} className='gap-2'>
-							<Save className='h-4 w-4' />
-							{t('confirmSave')}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
+													</ins>
+												</dd>
+											</div>
+										))}
+									</dl>
+								</div>
+							)
+						})}
+					</div>
+				</ScrollArea>
+			</ConfirmDialog>
 		</div>
 	)
 }

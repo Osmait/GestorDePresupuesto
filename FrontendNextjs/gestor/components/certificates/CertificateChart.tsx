@@ -2,12 +2,13 @@
 
 import { ResponsiveLine } from '@nivo/line'
 import { useTranslations } from 'next-intl'
-import { useMemo, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
+import { CHART_TOOLTIP_CLASS, useChartTheme } from '@/components/charts/chart-theme'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
-import { getIntlLocale, useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { Certificate, CertificatePayment } from '@/types/certificate'
 
 interface ChartDataPoint {
@@ -33,8 +34,14 @@ function addMonths(date: Date, months: number): Date {
 	return result
 }
 
-function formatDate(date: Date, locale: string): string {
-	return date.toLocaleDateString(getIntlLocale(locale), { month: 'short', year: '2-digit' })
+function formatDate(date: Date | string, locale: string): string {
+	return formatLocalDate(date, locale, { month: 'short', year: '2-digit' })
+}
+
+/** 'YYYY-MM-DD…' API dates as local calendar dates (no shift to the previous day west of UTC). */
+function parseCalendarDate(value: string): Date {
+	const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
+	return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(value)
 }
 
 function getMonthsUntilMaturity(maturityDate: string | undefined): number {
@@ -48,8 +55,12 @@ function getMonthsUntilMaturity(maturityDate: string | undefined): number {
 export function CertificateChart({ certificate, payments }: CertificateChartProps) {
 	const t = useTranslations('certificates.chart')
 	const locale = useAppLocale()
+	const formatCurrency = useFormatCurrency()
 	const currency = certificate.currency || 'DOP'
-	const money = (value: number) => formatCurrency(value, currency, { locale })
+	const formatAmount = (value: number) => formatCurrency(value, currency)
+	const { theme, colors } = useChartTheme(11)
+	const projectionId = useId()
+	const capitalBaseId = useId()
 	const [projectionMonths, setProjectionMonths] = useState<string>('12')
 	const [showCapitalBase, setShowCapitalBase] = useState(true)
 
@@ -74,12 +85,12 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 		historicalPayments.forEach((payment) => {
 			accumulatedNet += payment.net_interest
 			data.totalValue.push({
-				x: formatDate(new Date(payment.payment_date), locale),
+				x: formatDate(payment.payment_date, locale),
 				y: certificate.base_capital + accumulatedNet,
 				isProjection: false,
 			})
 			data.capitalBase.push({
-				x: formatDate(new Date(payment.payment_date), locale),
+				x: formatDate(payment.payment_date, locale),
 				y: certificate.base_capital,
 				isProjection: false,
 			})
@@ -90,7 +101,7 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 
 		const lastPaymentDate =
 			historicalPayments.length > 0
-				? new Date(historicalPayments[historicalPayments.length - 1].payment_date)
+				? parseCalendarDate(historicalPayments[historicalPayments.length - 1].payment_date)
 				: new Date(certificate.created_at)
 
 		for (let i = 1; i <= monthsToShow; i++) {
@@ -125,14 +136,14 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 		{
 			id: t('totalValue'),
 			data: chartData.totalValue,
-			color: 'hsl(142, 76%, 36%)',
+			color: colors.series[0],
 		},
 		...(showCapitalBase
 			? [
 					{
 						id: t('capitalBase'),
 						data: chartData.capitalBase,
-						color: 'hsl(215, 16%, 47%)',
+						color: colors.mutedText,
 					},
 				]
 			: []),
@@ -143,11 +154,11 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 			<div className='flex flex-wrap items-center justify-between gap-4'>
 				<div className='flex flex-wrap items-center gap-4'>
 					<div className='flex flex-wrap items-center gap-2'>
-						<Label htmlFor='projection' className='text-sm'>
+						<Label htmlFor={projectionId} className='text-sm'>
 							{t('projection')}
 						</Label>
 						<Select value={projectionMonths} onValueChange={setProjectionMonths}>
-							<SelectTrigger className='w-[160px]'>
+							<SelectTrigger id={projectionId} className='w-[160px]'>
 								<SelectValue />
 							</SelectTrigger>
 							<SelectContent>
@@ -161,14 +172,14 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 					</div>
 				</div>
 				<div className='flex items-center gap-2'>
-					<Switch id='showCapitalBase' checked={showCapitalBase} onCheckedChange={setShowCapitalBase} />
-					<Label htmlFor='showCapitalBase' className='text-sm font-normal'>
+					<Switch id={capitalBaseId} checked={showCapitalBase} onCheckedChange={setShowCapitalBase} />
+					<Label htmlFor={capitalBaseId} className='text-sm font-normal'>
 						{t('showCapitalBase')}
 					</Label>
 				</div>
 			</div>
 
-			<div className='h-[300px] w-full'>
+			<div className='h-[300px] w-full' role='img' aria-label={t('ariaLabel', { months: monthsToShow })}>
 				<ResponsiveLine
 					data={nivoData}
 					margin={{ top: 20, right: 30, bottom: 50, left: 70 }}
@@ -187,66 +198,38 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 						tickSize: 5,
 						tickPadding: 5,
 						tickRotation: 0,
-						format: (value) => money(Number(value)),
+						format: (value) => formatAmount(Number(value)),
 					}}
 					enablePoints={true}
 					pointSize={6}
 					pointColor={{ from: 'color' }}
 					pointBorderWidth={2}
-					pointBorderColor={{ from: 'serieColor' }}
-					pointLabel={(d) => money(Number(d.y))}
+					pointBorderColor={{ from: 'seriesColor' }}
+					pointLabel={(d) => formatAmount(Number(d.y))}
 					useMesh={true}
 					colors={{ datum: 'color' }}
-					legends={[
-						{
-							anchor: 'top-right',
-							direction: 'row',
-							justify: false,
-							translateX: 0,
-							translateY: -10,
-							itemsSpacing: 0,
-							itemDirection: 'left-to-right',
-							itemWidth: 100,
-							itemHeight: 20,
-							itemOpacity: 0.75,
-							symbolSize: 12,
-							symbolShape: 'circle',
-							symbolBorderColor: 'rgba(0, 0, 0, .5)',
-						},
-					]}
 					tooltip={({ point }) => (
-						<div className='bg-background border rounded-md px-3 py-2 shadow-md'>
+						<div className={CHART_TOOLTIP_CLASS}>
 							<p className='text-xs text-muted-foreground'>{point.data.xFormatted}</p>
-							<p className='text-sm font-semibold'>{money(point.data.y as number)}</p>
+							<p className='font-semibold tabular-nums'>{formatAmount(point.data.y as number)}</p>
 						</div>
 					)}
-					theme={{
-						axis: {
-							ticks: {
-								text: {
-									fill: 'hsl(var(--muted-foreground))',
-									fontSize: 11,
-								},
-							},
-						},
-						grid: {
-							line: {
-								stroke: 'hsl(var(--border))',
-								strokeWidth: 1,
-							},
-						},
-					}}
+					theme={theme}
 				/>
 			</div>
 
 			<div className='flex flex-wrap justify-center gap-x-6 gap-y-2 text-xs text-muted-foreground'>
 				<div className='flex items-center gap-2'>
-					<div className='w-8 h-0.5 bg-green-600' />
+					<div className='h-0.5 w-8' style={{ backgroundColor: colors.series[0] }} aria-hidden='true' />
 					<span>{t('totalValueLegend')}</span>
 				</div>
 				{showCapitalBase && (
 					<div className='flex items-center gap-2'>
-						<div className='w-8 h-0.5 border-t-2 border-dashed border-slate-400' />
+						<div
+							className='w-8 border-t-2 border-dashed'
+							style={{ borderColor: colors.mutedText }}
+							aria-hidden='true'
+						/>
 						<span>{t('capitalBase')}</span>
 					</div>
 				)}

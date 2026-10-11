@@ -7,20 +7,22 @@ import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
+import { Amount } from '@/components/shared/Amount'
+import { FormDialog } from '@/components/shared/FormDialog'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { Certificate, InterestType } from '@/types/certificate'
 
 // Only shown after a simulation runs: load the chart code on demand.
 const SimulationLineChart = dynamic(() => import('@/components/charts/SimulationLineChart'), {
 	ssr: false,
-	loading: () => <div className='h-full w-full rounded bg-muted/20 animate-pulse' />,
+	loading: () => <Skeleton className='h-full w-full' />,
 })
 
 function createSimulatorSchema(t: (key: string) => string) {
@@ -54,21 +56,14 @@ interface PaymentSimulatorProps {
 export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSimulatorProps) {
 	const t = useTranslations('certificates.simulator')
 	const tType = useTranslations('certificates.interestType')
+	const tActions = useTranslations('common.actions')
 	const simulatorSchema = useMemo(() => createSimulatorSchema(t), [t])
-	const locale = useAppLocale()
+	const formatCurrency = useFormatCurrency()
 	const currency = certificate?.currency || 'DOP'
-	const money = (value: number) => formatCurrency(value, currency, { locale })
 	const [results, setResults] = useState<SimulationResult[]>([])
 	const [showDetail, setShowDetail] = useState(false)
 
-	const {
-		register,
-		handleSubmit,
-		setValue,
-		watch,
-		reset,
-		formState: { errors },
-	} = useForm<FormData>({
+	const form = useForm<FormData>({
 		resolver: zodResolver(simulatorSchema),
 		defaultValues: {
 			capital: 100000,
@@ -79,9 +74,9 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 			reinvestInterest: false,
 		},
 	})
+	const { watch, reset } = form
 
 	const interestType = watch('interestType')
-	const reinvestInterest = watch('reinvestInterest')
 
 	useEffect(() => {
 		if (certificate) {
@@ -160,160 +155,184 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 				}))
 			: []
 
+	const numberFields = [
+		{ name: 'capital', label: t('capital'), step: '0.01', inputMode: 'decimal' },
+		{ name: 'interestRate', label: t('interestRate'), step: '0.01', inputMode: 'decimal' },
+		{ name: 'taxRate', label: t('taxRate'), step: '0.01', inputMode: 'decimal' },
+		{ name: 'months', label: t('months'), step: '1', inputMode: 'numeric' },
+	] as const
+
 	return (
-		<Dialog open={open} onOpenChange={onOpenChange}>
-			<DialogContent className='w-[95vw] sm:max-w-[900px] max-h-[90vh] overflow-y-auto'>
-				<DialogHeader>
-					<DialogTitle className='flex items-center gap-2'>
-						<Calculator className='h-5 w-5' />
-						{t('title')}
-					</DialogTitle>
-				</DialogHeader>
-
-				<form onSubmit={handleSubmit(onFormSubmit)} className='space-y-4'>
-					<div className='grid grid-cols-1 sm:grid-cols-2 gap-4'>
-						<div className='space-y-2'>
-							<Label htmlFor='capital'>{t('capital')}</Label>
-							<Input id='capital' type='number' step='0.01' {...register('capital')} />
-							{errors.capital && <p className='text-sm text-red-500'>{errors.capital.message}</p>}
-						</div>
-
-						<div className='space-y-2'>
-							<Label htmlFor='interestRate'>{t('interestRate')}</Label>
-							<Input id='interestRate' type='number' step='0.01' {...register('interestRate')} />
-							{errors.interestRate && <p className='text-sm text-red-500'>{errors.interestRate.message}</p>}
-						</div>
-
-						<div className='space-y-2'>
-							<Label htmlFor='taxRate'>{t('taxRate')}</Label>
-							<Input id='taxRate' type='number' step='0.01' {...register('taxRate')} />
-							{errors.taxRate && <p className='text-sm text-red-500'>{errors.taxRate.message}</p>}
-						</div>
-
-						<div className='space-y-2'>
-							<Label htmlFor='months'>{t('months')}</Label>
-							<Input id='months' type='number' min={1} max={120} {...register('months')} />
-							{errors.months && <p className='text-sm text-red-500'>{errors.months.message}</p>}
-						</div>
+		<FormDialog
+			open={open}
+			onOpenChange={onOpenChange}
+			title={
+				<span className='flex items-center gap-2'>
+					<Calculator className='h-5 w-5 text-muted-foreground' aria-hidden='true' />
+					{t('title')}
+				</span>
+			}
+			size='lg'
+			// A simulator saves nothing: "Close" instead of "Cancel".
+			cancelLabel={tActions('close')}
+			submitLabel={t('calculate')}
+			onSubmit={form.handleSubmit(onFormSubmit)}
+		>
+			<Form {...form}>
+				<div className='space-y-4'>
+					<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
+						{numberFields.map((item) => (
+							<FormField
+								key={item.name}
+								control={form.control}
+								name={item.name}
+								render={({ field }) => (
+									<FormItem>
+										<FormLabel>{item.label}</FormLabel>
+										<FormControl>
+											<Input type='number' step={item.step} inputMode={item.inputMode} {...field} />
+										</FormControl>
+										<FormMessage />
+									</FormItem>
+								)}
+							/>
+						))}
 					</div>
 
-					<div className='space-y-2'>
-						<Label>{t('interestType')}</Label>
-						<Select value={interestType} onValueChange={(value: InterestType) => setValue('interestType', value)}>
-							<SelectTrigger>
-								<SelectValue />
-							</SelectTrigger>
-							<SelectContent>
-								<SelectItem value='simple'>{tType('simple')}</SelectItem>
-								<SelectItem value='compound'>{tType('compound')}</SelectItem>
-							</SelectContent>
-						</Select>
-					</div>
+					<FormField
+						control={form.control}
+						name='interestType'
+						render={({ field }) => (
+							<FormItem>
+								<FormLabel>{t('interestType')}</FormLabel>
+								<Select value={field.value} onValueChange={(value: InterestType) => field.onChange(value)}>
+									<FormControl>
+										<SelectTrigger>
+											<SelectValue />
+										</SelectTrigger>
+									</FormControl>
+									<SelectContent>
+										<SelectItem value='simple'>{tType('simple')}</SelectItem>
+										<SelectItem value='compound'>{tType('compound')}</SelectItem>
+									</SelectContent>
+								</Select>
+								<FormMessage />
+							</FormItem>
+						)}
+					/>
 
 					{showReinvestToggle && (
-						<div className='flex items-center gap-2'>
-							<Switch
-								id='reinvestInterest'
-								checked={reinvestInterest}
-								onCheckedChange={(checked) => setValue('reinvestInterest', checked)}
+						<FormField
+							control={form.control}
+							name='reinvestInterest'
+							render={({ field }) => (
+								<FormItem className='flex items-center gap-2 space-y-0'>
+									<FormControl>
+										<Switch checked={field.value} onCheckedChange={field.onChange} />
+									</FormControl>
+									<FormLabel className='font-normal'>{t('reinvest')}</FormLabel>
+								</FormItem>
+							)}
+						/>
+					)}
+				</div>
+			</Form>
+
+			{results.length > 0 && totals && (
+				<div className='mt-4 space-y-4 border-t pt-4'>
+					<dl className='grid grid-cols-1 gap-4 sm:grid-cols-3'>
+						<div className='rounded-lg border p-3'>
+							<dt className='text-xs text-muted-foreground'>{t('totalGross')}</dt>
+							<dd className='text-lg font-semibold'>
+								<Amount value={totals.totalGross} currency={currency} />
+							</dd>
+						</div>
+						<div className='rounded-lg border p-3'>
+							<dt className='text-xs text-muted-foreground'>{t('totalTax')}</dt>
+							<dd className='text-lg font-semibold'>
+								<Amount value={-totals.totalTax} currency={currency} tone='auto' />
+							</dd>
+						</div>
+						<div className='rounded-lg border p-3'>
+							<dt className='text-xs text-muted-foreground'>{t('totalNet')}</dt>
+							<dd className='text-lg font-semibold'>
+								<Amount value={totals.totalNet} currency={currency} tone='auto' />
+							</dd>
+						</div>
+					</dl>
+
+					<div className='rounded-lg border p-3'>
+						<p className='mb-3 text-xs text-muted-foreground'>{t('monthlyEvolution')}</p>
+						<div className='h-56 w-full'>
+							<SimulationLineChart
+								rows={chartData}
+								labels={{
+									capital: t('capitalSeries'),
+									totalWithNet: t('capitalPlusNet'),
+									month: (month) => t('monthLabel', { month: String(month) }),
+									chart: t('chartAria', { months: results.length }),
+								}}
+								formatValue={(value) => formatCurrency(value, currency)}
 							/>
-							<Label htmlFor='reinvestInterest' className='font-normal'>
-								{t('reinvest')}
-							</Label>
+						</div>
+					</div>
+
+					<Button
+						type='button'
+						variant='outline'
+						size='sm'
+						onClick={() => setShowDetail(!showDetail)}
+						className='w-full'
+						aria-expanded={showDetail}
+					>
+						{showDetail ? (
+							<ChevronUp className='mr-2 h-4 w-4' aria-hidden='true' />
+						) : (
+							<ChevronDown className='mr-2 h-4 w-4' aria-hidden='true' />
+						)}
+						{showDetail ? t('hideDetail') : t('showDetail')}
+					</Button>
+
+					{showDetail && (
+						<div className='overflow-x-auto rounded-lg border'>
+							<Table className='min-w-[640px]'>
+								<TableHeader>
+									<TableRow>
+										<TableHead className='whitespace-nowrap'>{t('month')}</TableHead>
+										<TableHead className='whitespace-nowrap text-right'>{t('capitalSeries')}</TableHead>
+										<TableHead className='whitespace-nowrap text-right'>{t('gross')}</TableHead>
+										<TableHead className='whitespace-nowrap text-right'>{t('tax')}</TableHead>
+										<TableHead className='whitespace-nowrap text-right'>{t('net')}</TableHead>
+										<TableHead className='whitespace-nowrap text-right'>{t('accumulated')}</TableHead>
+									</TableRow>
+								</TableHeader>
+								<TableBody>
+									{results.map((row) => (
+										<TableRow key={row.month}>
+											<TableCell className='tabular-nums'>{row.month}</TableCell>
+											<TableCell className='text-right'>
+												<Amount value={row.capital} currency={currency} />
+											</TableCell>
+											<TableCell className='text-right'>
+												<Amount value={row.grossInterest} currency={currency} />
+											</TableCell>
+											<TableCell className='text-right'>
+												<Amount value={-row.taxWithheld} currency={currency} tone='auto' />
+											</TableCell>
+											<TableCell className='text-right'>
+												<Amount value={row.netInterest} currency={currency} tone='auto' />
+											</TableCell>
+											<TableCell className='text-right font-medium'>
+												<Amount value={row.accumulatedNet} currency={currency} />
+											</TableCell>
+										</TableRow>
+									))}
+								</TableBody>
+							</Table>
 						</div>
 					)}
-
-					<Button type='submit' className='w-full'>
-						<Calculator className='h-4 w-4 mr-2' />
-						{t('calculate')}
-					</Button>
-				</form>
-
-				{results.length > 0 && totals && (
-					<div className='space-y-4 mt-4 pt-4 border-t'>
-						<div className='grid grid-cols-1 sm:grid-cols-3 gap-4'>
-							<div className='p-3 rounded-lg bg-muted'>
-								<p className='text-xs text-muted-foreground'>{t('totalGross')}</p>
-								<p className='text-lg font-semibold'>{money(totals.totalGross)}</p>
-							</div>
-							<div className='p-3 rounded-lg bg-orange-500/10'>
-								<p className='text-xs text-muted-foreground'>{t('totalTax')}</p>
-								<p className='text-lg font-semibold text-orange-500'>{money(totals.totalTax)}</p>
-							</div>
-							<div className='p-3 rounded-lg bg-green-500/10'>
-								<p className='text-xs text-muted-foreground'>{t('totalNet')}</p>
-								<p className='text-lg font-semibold text-green-500'>{money(totals.totalNet)}</p>
-							</div>
-						</div>
-
-						<div className='rounded-lg border p-3'>
-							<p className='mb-3 text-xs text-muted-foreground'>{t('monthlyEvolution')}</p>
-							<div className='h-56 w-full'>
-								<SimulationLineChart
-									rows={chartData}
-									labels={{
-										capital: t('capitalSeries'),
-										totalWithNet: t('capitalPlusNet'),
-										month: (month) => t('monthLabel', { month: String(month) }),
-									}}
-									formatValue={money}
-								/>
-							</div>
-						</div>
-
-						<Button variant='outline' size='sm' onClick={() => setShowDetail(!showDetail)} className='w-full'>
-							{showDetail ? (
-								<>
-									<ChevronUp className='h-4 w-4 mr-2' />
-									{t('hideDetail')}
-								</>
-							) : (
-								<>
-									<ChevronDown className='h-4 w-4 mr-2' />
-									{t('showDetail')}
-								</>
-							)}
-						</Button>
-
-						{showDetail && (
-							<div className='rounded-lg border overflow-hidden'>
-								<div className='w-full max-w-full overflow-x-auto'>
-									<table className='w-full min-w-[640px] table-auto text-sm'>
-										<thead className='bg-muted'>
-											<tr>
-												<th className='px-3 py-2 text-left whitespace-nowrap'>{t('month')}</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('capitalSeries')}</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('gross')}</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('tax')}</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('net')}</th>
-												<th className='px-3 py-2 text-right whitespace-nowrap'>{t('accumulated')}</th>
-											</tr>
-										</thead>
-										<tbody>
-											{results.map((row) => (
-												<tr key={row.month} className='border-t'>
-													<td className='px-3 py-2 whitespace-nowrap'>{row.month}</td>
-													<td className='px-3 py-2 text-right whitespace-nowrap'>{money(row.capital)}</td>
-													<td className='px-3 py-2 text-right whitespace-nowrap'>{money(row.grossInterest)}</td>
-													<td className='px-3 py-2 text-right text-orange-500 whitespace-nowrap'>
-														-{money(row.taxWithheld)}
-													</td>
-													<td className='px-3 py-2 text-right text-green-500 whitespace-nowrap'>
-														{money(row.netInterest)}
-													</td>
-													<td className='px-3 py-2 text-right font-medium whitespace-nowrap'>
-														{money(row.accumulatedNet)}
-													</td>
-												</tr>
-											))}
-										</tbody>
-									</table>
-								</div>
-							</div>
-						)}
-					</div>
-				)}
-			</DialogContent>
-		</Dialog>
+				</div>
+			)}
+		</FormDialog>
 	)
 }

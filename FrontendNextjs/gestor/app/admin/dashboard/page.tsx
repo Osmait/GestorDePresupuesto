@@ -1,10 +1,13 @@
 'use client'
 
-import { RefreshCw, Trash2, Users } from 'lucide-react'
+import { Loader2, RefreshCw, Trash2, Users } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { PageShell } from '@/components/shared/PageShell'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +26,7 @@ export default function AdminDashboard() {
 	const [isLoadingUsers, setIsLoadingUsers] = useState(true)
 	const [isCleaning, setIsCleaning] = useState(false)
 	const [isSaving, setIsSaving] = useState(false)
+	const [cleanupOpen, setCleanupOpen] = useState(false)
 
 	const fetchUsers = useCallback(async () => {
 		setIsLoadingUsers(true)
@@ -69,8 +73,6 @@ export default function AdminDashboard() {
 	}
 
 	const handleCleanup = async () => {
-		if (!confirm(t('confirmCleanup'))) return
-
 		setIsCleaning(true)
 		try {
 			await getAdminRepository().cleanupDemoUsers()
@@ -86,72 +88,67 @@ export default function AdminDashboard() {
 
 	if (isAdminLoading || !isAdmin) {
 		return (
-			<div className='flex h-[calc(100vh-4rem)] items-center justify-center'>
+			<div className='flex h-[calc(100vh-4rem)] items-center justify-center' role='status'>
 				<div className='text-center'>
-					<RefreshCw className='h-8 w-8 animate-spin mx-auto mb-4 text-primary' />
+					<Loader2 className='mx-auto mb-4 h-8 w-8 animate-spin text-muted-foreground' aria-hidden='true' />
 					<p className='text-muted-foreground'>{t('checkingAccess')}</p>
 				</div>
 			</div>
 		)
 	}
 
+	const busy = isLoadingUsers || isSaving
+
 	return (
-		<div className='flex-1 space-y-4 sm:space-y-6 p-4 sm:p-8 pt-4 sm:pt-6 bg-background/50 overflow-x-hidden'>
-			<div className='flex flex-col sm:flex-row sm:items-center justify-between gap-4'>
-				<div className='min-w-0'>
-					<h2 className='text-2xl sm:text-3xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent truncate'>
-						{t('title')}
-					</h2>
-					<p className='text-sm text-muted-foreground'>{t('subtitle')}</p>
-				</div>
-				<div className='flex items-center gap-2 w-full sm:w-auto'>
-					<CreateUserModal onUserCreated={fetchUsers} />
-					<Button
-						variant='outline'
-						size='sm'
-						onClick={fetchUsers}
-						disabled={isLoadingUsers || isSaving}
-						className='gap-2 flex-1 sm:flex-none'
-						aria-label={t('refresh')}
-					>
-						<RefreshCw className={`h-4 w-4 ${isLoadingUsers || isSaving ? 'animate-spin' : ''}`} />
-						<span className='hidden sm:inline'>{t('refresh')}</span>
-					</Button>
-					<Button
-						variant='destructive'
-						size='sm'
-						onClick={handleCleanup}
-						disabled={isCleaning || isSaving}
-						className='gap-2 flex-1 sm:flex-none'
-						aria-label={t('cleanDemos')}
-					>
-						<Trash2 className='h-4 w-4' />
-						<span className='hidden sm:inline'>{isCleaning ? t('cleaning') : t('cleanDemos')}</span>
-					</Button>
-				</div>
-			</div>
+		<PageShell>
+			<PageHeader
+				title={t('title')}
+				description={t('subtitle')}
+				actions={
+					<>
+						<Button variant='outline' onClick={fetchUsers} disabled={busy}>
+							<RefreshCw className={`mr-2 h-4 w-4 ${busy ? 'animate-spin' : ''}`} aria-hidden='true' />
+							{t('refresh')}
+						</Button>
+						<Button variant='outline' onClick={() => setCleanupOpen(true)} disabled={isCleaning || isSaving}>
+							<Trash2 className='mr-2 h-4 w-4' aria-hidden='true' />
+							{t('cleanDemos')}
+						</Button>
+						<CreateUserModal onUserCreated={fetchUsers} />
+					</>
+				}
+			/>
 
-			<div className='grid gap-4 sm:gap-6'>
-				<Card className='border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden'>
-					<CardHeader className='flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 sm:p-6'>
-						<div className='min-w-0'>
-							<CardTitle className='flex items-center gap-2 text-base sm:text-lg'>
-								<Users className='h-4 w-4 sm:h-5 sm:w-5 text-primary flex-shrink-0' />
-								{t('users.title')}
-							</CardTitle>
-							<CardDescription className='text-xs sm:text-sm'>{t('users.description')}</CardDescription>
-						</div>
-						<Badge variant='secondary' className='font-mono self-start sm:self-auto'>
-							{t('users.total', { count: users.length })}
-						</Badge>
-					</CardHeader>
-					<CardContent className='p-4 sm:p-6 pt-0'>
-						<EditableUserTable users={users} onSave={handleSave} onDelete={handleDelete} isLoading={isLoadingUsers} />
-					</CardContent>
-				</Card>
+			<Card className='overflow-hidden'>
+				<CardHeader className='flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between'>
+					<div className='min-w-0 space-y-1.5'>
+						<CardTitle className='flex items-center gap-2 text-lg'>
+							<Users className='h-5 w-5 shrink-0 text-muted-foreground' aria-hidden='true' />
+							{t('users.title')}
+						</CardTitle>
+						<CardDescription>{t('users.description')}</CardDescription>
+					</div>
+					<Badge variant='secondary' className='self-start tabular-nums sm:self-auto'>
+						{t('users.total', { count: users.length })}
+					</Badge>
+				</CardHeader>
+				<CardContent>
+					<EditableUserTable users={users} onSave={handleSave} onDelete={handleDelete} isLoading={isLoadingUsers} />
+				</CardContent>
+			</Card>
 
-				<FeatureFlagsPanel users={users} />
-			</div>
-		</div>
+			<FeatureFlagsPanel users={users} />
+
+			<ConfirmDialog
+				open={cleanupOpen}
+				onOpenChange={setCleanupOpen}
+				title={t('cleanupTitle')}
+				description={t('confirmCleanup')}
+				confirmLabel={t('cleanDemos')}
+				destructive
+				loading={isCleaning}
+				onConfirm={handleCleanup}
+			/>
+		</PageShell>
 	)
 }

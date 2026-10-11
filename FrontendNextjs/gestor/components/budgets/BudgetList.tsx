@@ -1,40 +1,39 @@
 'use client'
 
-import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
-import { AlertTriangle, PiggyBank, PlusCircle } from 'lucide-react'
+import { PiggyBank, Plus } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import { useEffect } from 'react'
+import { type ReactNode, useEffect } from 'react'
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { ErrorState } from '@/components/shared/ErrorState'
 import { Button } from '@/components/ui/button'
 import { useBudgetTransactionCounts } from '@/hooks/queries/useBudgetsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { cn } from '@/lib/utils'
 import { Budget } from '@/types/budget'
 import { BudgetCard } from './BudgetCard'
 import { BudgetFormModal } from './BudgetFormModal'
 import { BudgetSummaryCard } from './BudgetSummaryCard'
 import { BudgetsPageSkeleton } from './BudgetsPageSkeleton'
 
-// m + LazyMotion(domAnimation) instead of motion: only fades/scales are used, so the
-// full feature bundle (layout, drag) is not needed.
 export function BudgetList() {
-	return (
-		<LazyMotion features={domAnimation}>
-			<BudgetListView />
-		</LazyMotion>
-	)
-}
-
-function BudgetListView() {
 	const t = useTranslations('budgets')
 	const router = useRouter()
 	const searchParams = useSearchParams()
-	const { budgets, isLoading, error, deleteBudget, setEditingBudget, isModalOpen, setModalOpen } = useBudgetContext()
+	const { budgets, isLoading, error, refetch, deleteBudget, setEditingBudget, isModalOpen, setModalOpen } =
+		useBudgetContext()
 	const { data: categories = [] } = useGetCategories()
-	const { data: transactionCounts } = useBudgetTransactionCounts((budgets ?? []).map((budget) => budget.id))
+	const list = budgets ?? []
+	const { data: transactionCounts } = useBudgetTransactionCounts(list.map((budget) => budget.id))
 
 	const handleEdit = (budget: Budget) => {
 		setEditingBudget(budget)
+		setModalOpen(true)
+	}
+
+	const handleCreate = () => {
+		setEditingBudget(null)
 		setModalOpen(true)
 	}
 
@@ -61,78 +60,57 @@ function BudgetListView() {
 		return <BudgetsPageSkeleton />
 	}
 
-	if (error) {
-		return (
-			<div className='flex flex-col items-center justify-center min-h-[400px]'>
-				<AlertTriangle className='h-16 w-16 text-red-500 mb-4' />
-				<h2 className='text-2xl font-bold text-foreground mb-2'>{t('errorLoading')}</h2>
-				<p className='text-muted-foreground text-center max-w-md'>{error}</p>
-				<Button className='mt-4' onClick={() => window.location.reload()}>
-					{t('tryAgain')}
-				</Button>
-			</div>
+	let content: ReactNode
+	if (error && list.length === 0) {
+		content = <ErrorState title={t('errorLoading')} onRetry={() => void refetch()} />
+	} else if (list.length === 0) {
+		content = (
+			<EmptyState
+				icon={PiggyBank}
+				title={t('noBudgets')}
+				description={t('noBudgetsDescription')}
+				action={
+					<Button onClick={handleCreate}>
+						<Plus className='mr-2 h-4 w-4' aria-hidden='true' />
+						{t('createFirstBudget')}
+					</Button>
+				}
+			/>
 		)
-	}
+	} else {
+		content = (
+			<div className='space-y-6'>
+				<BudgetSummaryCard budgets={list} />
 
-	if (!budgets || budgets.length === 0) {
-		return (
-			<div className='flex flex-col items-center justify-center min-h-[400px]'>
-				<div className='p-6 rounded-full bg-gradient-to-br from-blue-500/20 to-purple-500/20 dark:from-blue-500/10 dark:to-purple-500/10 mb-6'>
-					<PiggyBank className='h-16 w-16 text-blue-600 dark:text-blue-400' />
+				<div className='grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'>
+					{list.map((budget) => (
+						<div
+							key={budget.id}
+							id={`budget-card-${budget.id}`}
+							className={cn(
+								'rounded-lg',
+								selectedBudgetId === budget.id && 'ring-2 ring-primary/70 ring-offset-2 ring-offset-background',
+							)}
+						>
+							<BudgetCard
+								budget={budget}
+								category={categories?.find((c) => c.id === budget.category_id)}
+								transactionCount={transactionCounts?.[budget.id]}
+								onDelete={deleteBudget}
+								onEdit={handleEdit}
+							/>
+						</div>
+					))}
 				</div>
-				<h2 className='text-2xl font-bold text-foreground mb-2'>{t('noBudgets')}</h2>
-				<p className='text-muted-foreground text-center max-w-md mb-6'>{t('noBudgetsDescription')}</p>
-				<Button
-					className='bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70'
-					onClick={() => setModalOpen(true)}
-				>
-					<PlusCircle className='h-4 w-4 mr-2' />
-					{t('createFirstBudget')}
-				</Button>
-				<BudgetFormModal open={isModalOpen} setOpen={setModalOpen} initialCategoryId={suggestedCategoryId} />
 			</div>
 		)
 	}
 
 	return (
-		<m.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.5 }}>
-			<div className='mb-8'>
-				<BudgetSummaryCard budgets={budgets} />
-			</div>
-
-			<div className='grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6'>
-				<AnimatePresence mode='popLayout' initial={false}>
-					{budgets.map((budget) => {
-						const category = categories?.find((c) => c.id === budget.category_id)
-						return (
-							<m.div
-								key={budget.id}
-								id={`budget-card-${budget.id}`}
-								initial={{ opacity: 0, y: 15 }}
-								animate={{ opacity: 1, y: 0 }}
-								exit={{ opacity: 0, scale: 0.95 }}
-								transition={{ duration: 0.5, ease: [0.4, 0, 0.2, 1] }}
-								className={
-									selectedBudgetId === budget.id
-										? 'rounded-xl ring-2 ring-primary/70 ring-offset-2 ring-offset-background'
-										: ''
-								}
-							>
-								<BudgetCard
-									budget={budget}
-									category={category}
-									transactionCount={transactionCounts?.[budget.id]}
-									onDelete={deleteBudget}
-									onEdit={handleEdit}
-								/>
-							</m.div>
-						)
-					})}
-				</AnimatePresence>
-			</div>
-
-			{/* Context-controlled Modal for Edit/Create */}
+		<>
+			{content}
+			{/* Context-controlled dialog for create/edit (also opened from the header and ?create=1). */}
 			<BudgetFormModal open={isModalOpen} setOpen={setModalOpen} initialCategoryId={suggestedCategoryId} />
-		</m.div>
+		</>
 	)
 }

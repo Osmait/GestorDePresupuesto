@@ -1,10 +1,11 @@
 'use client'
 
-import { DollarSign, PieChart, TrendingDown, TrendingUp } from 'lucide-react'
+import { DollarSign, Percent, PieChart, TrendingUp } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAppLocale } from '@/lib/i18n/date-locale'
-import { formatCurrency } from '@/lib/utils'
+import { Amount } from '@/components/shared/Amount'
+import { StatCard, type StatTone } from '@/components/shared/StatCard'
+import { StatGrid } from '@/components/shared/StatGrid'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
 
 interface InvestmentMetrics {
 	totalValue: number
@@ -13,65 +14,61 @@ interface InvestmentMetrics {
 	roi: number
 }
 
-export function InvestmentSummaryCards({ metrics }: { metrics: InvestmentMetrics }) {
+interface InvestmentSummaryCardsProps {
+	metrics: InvestmentMetrics
+	loading?: boolean
+}
+
+// Portfolio totals are aggregated without FX conversion; positions are settled in USD by default.
+const PORTFOLIO_CURRENCY = 'USD'
+
+/** Sign-aware tone with a neutral zero (rounded to hundredths, like the displayed value). */
+function toneFor(value: number): StatTone {
+	const rounded = Math.round(value * 100)
+	if (rounded > 0) return 'positive'
+	if (rounded < 0) return 'negative'
+	return 'default'
+}
+
+export function InvestmentSummaryCards({ metrics, loading = false }: InvestmentSummaryCardsProps) {
 	const t = useTranslations('investments.summary')
-	const locale = useAppLocale()
-	// Portfolio totals are aggregated without FX conversion; positions are settled in USD by default.
-	const money = (value: number, signDisplay?: 'exceptZero') => formatCurrency(value, 'USD', { locale, signDisplay })
+	const formatPercent = useFormatPercent()
+
 	return (
-		<div className='grid gap-4 md:grid-cols-2 lg:grid-cols-4'>
-			<Card>
-				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-					<CardTitle className='text-sm font-medium'>{t('totalValue')}</CardTitle>
-					<DollarSign className='h-4 w-4 text-muted-foreground' />
-				</CardHeader>
-				<CardContent>
-					<div className='text-2xl font-bold'>{money(metrics.totalValue)}</div>
-					<p className='text-xs text-muted-foreground'>{t('totalValueHint')}</p>
-				</CardContent>
-			</Card>
-			<Card>
-				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-					<CardTitle className='text-sm font-medium'>{t('totalCost')}</CardTitle>
-					<PieChart className='h-4 w-4 text-muted-foreground' />
-				</CardHeader>
-				<CardContent>
-					<div className='text-2xl font-bold'>{money(metrics.totalCost)}</div>
-					<p className='text-xs text-muted-foreground'>{t('totalCostHint')}</p>
-				</CardContent>
-			</Card>
-			<Card>
-				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-					<CardTitle className='text-sm font-medium'>{t('totalProfit')}</CardTitle>
-					{metrics.totalProfit >= 0 ? (
-						<TrendingUp className='h-4 w-4 text-green-500' />
-					) : (
-						<TrendingDown className='h-4 w-4 text-red-500' />
-					)}
-				</CardHeader>
-				<CardContent>
-					<div className={`text-2xl font-bold ${metrics.totalProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-						{money(metrics.totalProfit, 'exceptZero')}
-					</div>
-					<p className='text-xs text-muted-foreground'>{t('totalProfitHint')}</p>
-				</CardContent>
-			</Card>
-			<Card>
-				<CardHeader className='flex flex-row items-center justify-between space-y-0 pb-2'>
-					<CardTitle className='text-sm font-medium'>{t('roi')}</CardTitle>
-					{metrics.roi >= 0 ? (
-						<TrendingUp className='h-4 w-4 text-green-500' />
-					) : (
-						<TrendingDown className='h-4 w-4 text-red-500' />
-					)}
-				</CardHeader>
-				<CardContent>
-					<div className={`text-2xl font-bold ${metrics.roi >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-						{metrics.roi.toFixed(2)}%
-					</div>
-					<p className='text-xs text-muted-foreground'>{t('roiHint')}</p>
-				</CardContent>
-			</Card>
-		</div>
+		<StatGrid columns={4}>
+			<StatCard
+				label={t('totalValue')}
+				icon={DollarSign}
+				loading={loading}
+				value={<Amount value={metrics.totalValue} currency={PORTFOLIO_CURRENCY} />}
+				hint={t('totalValueHint')}
+			/>
+			<StatCard
+				label={t('totalCost')}
+				icon={PieChart}
+				loading={loading}
+				value={<Amount value={metrics.totalCost} currency={PORTFOLIO_CURRENCY} />}
+				hint={t('totalCostHint')}
+			/>
+			<StatCard
+				label={t('totalProfit')}
+				icon={TrendingUp}
+				loading={loading}
+				value={<Amount value={metrics.totalProfit} currency={PORTFOLIO_CURRENCY} tone='auto' signed icon />}
+				hint={t('totalProfitHint')}
+			/>
+			<StatCard
+				label={t('roi')}
+				icon={Percent}
+				loading={loading}
+				tone={toneFor(metrics.roi)}
+				value={formatPercent(metrics.roi, {
+					signDisplay: 'exceptZero',
+					minimumFractionDigits: 2,
+					maximumFractionDigits: 2,
+				})}
+				hint={t('roiHint')}
+			/>
+		</StatGrid>
 	)
 }

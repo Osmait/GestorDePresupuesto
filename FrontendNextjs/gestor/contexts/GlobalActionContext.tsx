@@ -122,7 +122,7 @@ function CategoryModalWrapper({ isOpen, onClose, onCreated }: ModalWrapperProps)
 }
 
 function TransactionModalWrapper({ isOpen, onClose, onCreated }: ModalWrapperProps) {
-	const { createTransaction, isLoading, error } = useTransactionContext()
+	const { createTransaction } = useTransactionContext()
 
 	return (
 		<TransactionFormModal
@@ -132,8 +132,6 @@ function TransactionModalWrapper({ isOpen, onClose, onCreated }: ModalWrapperPro
 				await createTransaction(...args)
 				onCreated()
 			}}
-			isLoading={isLoading}
-			error={error}
 		/>
 	)
 }

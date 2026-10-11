@@ -1,25 +1,19 @@
 'use client'
 
 import { format, subMonths } from 'date-fns'
-import {
-	AlertCircle,
-	AlertTriangle,
-	DollarSign,
-	Info,
-	Lightbulb,
-	Loader2,
-	PiggyBank,
-	TrendingDown,
-	TrendingUp,
-} from 'lucide-react'
+import { AlertCircle, AlertTriangle, Info, Lightbulb, PiggyBank, TrendingDown, TrendingUp } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
 import { DateRange } from 'react-day-picker'
 import { toast } from 'sonner'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
-import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Amount } from '@/components/shared/Amount'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { FormDialog } from '@/components/shared/FormDialog'
+import { StatCard } from '@/components/shared/StatCard'
+import { Progress } from '@/components/ui/progress'
 import { useAnalyzeSpendingMutation } from '@/hooks/queries/useAIQuery'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
 import { cn } from '@/lib/utils'
 import { CategoryBreakdown, Pattern, Recommendation, SpendingAnalysisResponse, SpendingInsights } from '@/types/ai'
 
@@ -28,8 +22,12 @@ interface SpendingInsightsModalProps {
 	onOpenChange: (open: boolean) => void
 }
 
+// The analysis aggregates the user's amounts without a currency of its own: it
+// is shown in the app's default currency (DOP), like the other cross-account totals.
+
 export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsModalProps) {
 	const t = useTranslations('ai.insights')
+	const tCommon = useTranslations('ai.common')
 	const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
 		const to = new Date()
 		const from = subMonths(to, 3)
@@ -58,235 +56,181 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 		}
 	}
 
-	const handleClose = () => {
-		setInsights(null)
-		onOpenChange(false)
+	const handleOpenChange = (next: boolean) => {
+		if (!next) setInsights(null)
+		onOpenChange(next)
 	}
 
 	return (
-		<Dialog open={open} onOpenChange={handleClose}>
-			<DialogContent className='w-full sm:max-w-3xl max-h-[90vh] overflow-y-auto'>
-				<DialogHeader>
-					<DialogTitle className='flex items-center gap-2'>
-						<Lightbulb className='h-5 w-5 text-primary' />
-						{t('title')}
-					</DialogTitle>
-					<DialogDescription>{t('description')}</DialogDescription>
-				</DialogHeader>
+		<FormDialog
+			open={open}
+			onOpenChange={handleOpenChange}
+			title={t('title')}
+			description={t('description')}
+			size='lg'
+			onSubmit={handleAnalyze}
+			submitLabel={analyzeMutation.isPending ? t('analyzing') : t('analyzeButton')}
+			cancelLabel={tCommon('cancel')}
+			loading={analyzeMutation.isPending}
+			submitDisabled={!dateRange?.from || !dateRange?.to}
+		>
+			<div className='space-y-6'>
+				<fieldset className='min-w-0'>
+					<legend className='mb-2 text-sm font-medium'>{t('dateRange')}</legend>
+					<CalendarDateRangePicker
+						value={dateRange}
+						onChange={(range) => {
+							if (range && 'from' in range) {
+								setDateRange(range)
+							}
+						}}
+					/>
+				</fieldset>
 
-				<div className='space-y-4 sm:space-y-6'>
-					<div className='flex flex-col sm:flex-row sm:items-end gap-3 sm:gap-4'>
-						<div className='flex-1'>
-							<label className='text-sm font-medium mb-2 block'>{t('dateRange')}</label>
-							<CalendarDateRangePicker
-								value={dateRange}
-								onChange={(range) => {
-									if (range && 'from' in range) {
-										setDateRange(range)
-									}
-								}}
-							/>
-						</div>
-						<Button
-							onClick={handleAnalyze}
-							disabled={!dateRange?.from || !dateRange?.to || analyzeMutation.isPending}
-							className='w-full sm:w-auto'
-						>
-							{analyzeMutation.isPending ? (
-								<>
-									<Loader2 className='h-4 w-4 mr-2 animate-spin' />
-									{t('analyzing')}
-								</>
-							) : (
-								<>
-									<Lightbulb className='h-4 w-4 mr-2' />
-									{t('analyzeButton')}
-								</>
-							)}
-						</Button>
+				{insights ? (
+					<div className='space-y-6'>
+						<SummarySection summary={insights.summary} />
+						{insights.patterns.length > 0 && <PatternsSection patterns={insights.patterns} />}
+						{insights.recommendations.length > 0 && (
+							<RecommendationsSection recommendations={insights.recommendations} />
+						)}
 					</div>
-
-					{insights && (
-						<div className='space-y-4 sm:space-y-6'>
-							<SummarySection summary={insights.summary} />
-							{insights.patterns.length > 0 && <PatternsSection patterns={insights.patterns} />}
-							{insights.recommendations.length > 0 && (
-								<RecommendationsSection recommendations={insights.recommendations} />
-							)}
-						</div>
-					)}
-
-					{!insights && !analyzeMutation.isPending && (
-						<div className='text-center py-8 sm:py-12 text-muted-foreground'>
-							<Lightbulb className='h-10 w-10 sm:h-12 sm:w-12 mx-auto mb-4 opacity-50' />
-							<p className='text-sm sm:text-base'>{t('selectDateRange')}</p>
-						</div>
-					)}
-				</div>
-			</DialogContent>
-		</Dialog>
+				) : (
+					!analyzeMutation.isPending && <EmptyState compact icon={Lightbulb} title={t('selectDateRange')} />
+				)}
+			</div>
+		</FormDialog>
 	)
 }
 
 function SummarySection({ summary }: { summary: SpendingInsights['summary'] }) {
 	const t = useTranslations('ai.insights')
-	const formatCurrency = (amount: number) => {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-		}).format(amount)
-	}
+	const formatPercent = useFormatPercent()
 
 	return (
-		<div className='space-y-4'>
-			<h3 className='text-base sm:text-lg font-semibold'>{t('summary')}</h3>
+		<section className='space-y-4'>
+			<h3 className='text-base font-semibold'>{t('summary')}</h3>
 
-			<div className='grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4'>
-				<div className='p-3 sm:p-4 rounded-lg bg-red-50 dark:bg-red-900/20'>
-					<div className='flex items-center gap-2 text-red-600 dark:text-red-400 mb-1'>
-						<TrendingDown className='h-4 w-4' />
-						<span className='text-xs sm:text-sm'>{t('totalExpenses')}</span>
-					</div>
-					<p className='text-xl sm:text-2xl font-bold'>{formatCurrency(summary.total_expenses)}</p>
-				</div>
-
-				<div className='p-3 sm:p-4 rounded-lg bg-green-50 dark:bg-green-900/20'>
-					<div className='flex items-center gap-2 text-green-600 dark:text-green-400 mb-1'>
-						<TrendingUp className='h-4 w-4' />
-						<span className='text-xs sm:text-sm'>{t('totalIncome')}</span>
-					</div>
-					<p className='text-xl sm:text-2xl font-bold'>{formatCurrency(summary.total_income)}</p>
-				</div>
-
-				<div className='p-3 sm:p-4 rounded-lg bg-blue-50 dark:bg-blue-900/20'>
-					<div className='flex items-center gap-2 text-blue-600 dark:text-blue-400 mb-1'>
-						<PiggyBank className='h-4 w-4' />
-						<span className='text-xs sm:text-sm'>{t('savingsRate')}</span>
-					</div>
-					<p className='text-xl sm:text-2xl font-bold'>{summary.savings_rate_percent.toFixed(1)}%</p>
-				</div>
-			</div>
+			<dl className='grid grid-cols-1 gap-3 sm:grid-cols-3'>
+				<StatCard
+					label={t('totalExpenses')}
+					icon={TrendingDown}
+					tone='negative'
+					value={<Amount value={summary.total_expenses} />}
+				/>
+				<StatCard
+					label={t('totalIncome')}
+					icon={TrendingUp}
+					tone='positive'
+					value={<Amount value={summary.total_income} />}
+				/>
+				<StatCard label={t('savingsRate')} icon={PiggyBank} value={formatPercent(summary.savings_rate_percent)} />
+			</dl>
 
 			{summary.top_categories.length > 0 && (
-				<div>
-					<h4 className='text-sm font-medium mb-2'>{t('topCategories')}</h4>
-					<div className='space-y-2'>
+				<div className='space-y-2'>
+					<h4 className='text-sm font-medium'>{t('topCategories')}</h4>
+					<ul className='space-y-3'>
 						{summary.top_categories.map((cat) => (
 							<CategoryBar key={cat.category} category={cat} />
 						))}
-					</div>
+					</ul>
 				</div>
 			)}
 
 			<p className='text-xs text-muted-foreground'>
 				{t('period', { from: summary.period.from, to: summary.period.to, days: summary.period.days })}
 			</p>
-		</div>
+		</section>
 	)
 }
 
 function CategoryBar({ category }: { category: CategoryBreakdown }) {
-	const formatCurrency = (amount: number) => {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-		}).format(amount)
-	}
-
+	const formatPercent = useFormatPercent()
 	return (
-		<div className='flex items-center gap-3'>
-			<div className='w-24 text-sm truncate'>{category.category}</div>
-			<div className='flex-1 h-6 bg-muted rounded-full overflow-hidden'>
-				<div
-					className='h-full bg-primary rounded-full flex items-center justify-end pr-2'
-					style={{ width: `${Math.min(category.percentage, 100)}%` }}
-				>
-					<span className='text-xs text-primary-foreground font-medium'>{category.percentage.toFixed(0)}%</span>
-				</div>
+		<li className='space-y-1'>
+			<div className='flex items-baseline justify-between gap-3 text-sm'>
+				<span className='min-w-0 truncate'>{category.category}</span>
+				<span className='shrink-0 tabular-nums'>
+					<Amount value={category.amount} />
+					<span className='ml-2 text-xs text-muted-foreground'>{formatPercent(category.percentage)}</span>
+				</span>
 			</div>
-			<div className='w-20 text-sm text-right'>{formatCurrency(category.amount)}</div>
-		</div>
+			<Progress value={category.percentage} aria-label={category.category} />
+		</li>
 	)
 }
+
+const SEVERITY_ICON = {
+	alert: { icon: AlertCircle, className: 'text-destructive' },
+	warning: { icon: AlertTriangle, className: 'text-warning' },
+	info: { icon: Info, className: 'text-info' },
+} as const
 
 function PatternsSection({ patterns }: { patterns: Pattern[] }) {
 	const t = useTranslations('ai.insights')
 	return (
-		<div className='space-y-3 sm:space-y-4'>
-			<h3 className='text-base sm:text-lg font-semibold'>{t('patternsDetected')}</h3>
-			<div className='space-y-2 sm:space-y-3'>
-				{patterns.map((pattern) => (
-					<div key={pattern.type} className='flex items-start gap-3 p-3 rounded-lg bg-muted'>
-						{pattern.severity === 'alert' ? (
-							<AlertCircle className='h-4 w-4 sm:h-5 sm:w-5 text-red-500 mt-0.5 shrink-0' />
-						) : pattern.severity === 'warning' ? (
-							<AlertTriangle className='h-4 w-4 sm:h-5 sm:w-5 text-yellow-500 mt-0.5 shrink-0' />
-						) : (
-							<Info className='h-4 w-4 sm:h-5 sm:w-5 text-blue-500 mt-0.5 shrink-0' />
-						)}
-						<div>
-							<p className='font-medium text-sm sm:text-base capitalize'>{pattern.type.replace(/_/g, ' ')}</p>
-							<p className='text-xs sm:text-sm text-muted-foreground'>{pattern.description}</p>
-						</div>
-					</div>
-				))}
-			</div>
-		</div>
+		<section className='space-y-3'>
+			<h3 className='text-base font-semibold'>{t('patternsDetected')}</h3>
+			<ul className='space-y-2'>
+				{patterns.map((pattern) => {
+					const severity = SEVERITY_ICON[pattern.severity] ?? SEVERITY_ICON.info
+					const Icon = severity.icon
+					return (
+						<li key={pattern.type} className='flex items-start gap-3 rounded-lg border p-3'>
+							<Icon className={cn('mt-0.5 h-4 w-4 shrink-0', severity.className)} aria-hidden='true' />
+							<div className='min-w-0'>
+								<p className='text-sm font-medium first-letter:uppercase'>{pattern.type.replace(/_/g, ' ')}</p>
+								<p className='text-sm text-muted-foreground'>{pattern.description}</p>
+							</div>
+						</li>
+					)
+				})}
+			</ul>
+		</section>
 	)
 }
 
+const PRIORITY_CLASS: Record<Recommendation['priority'], string> = {
+	high: 'bg-destructive/10 text-destructive',
+	medium: 'bg-warning/10 text-warning',
+	low: 'bg-muted text-muted-foreground',
+}
+
+const PRIORITY_ORDER: Record<Recommendation['priority'], number> = { high: 0, medium: 1, low: 2 }
+
 function RecommendationsSection({ recommendations }: { recommendations: Recommendation[] }) {
 	const t = useTranslations('ai.insights')
-	const formatCurrency = (amount: number) => {
-		return new Intl.NumberFormat('en-US', {
-			style: 'currency',
-			currency: 'USD',
-		}).format(amount)
-	}
-
-	const getPriorityColor = (priority: string) => {
-		switch (priority) {
-			case 'high':
-				return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400'
-			case 'medium':
-				return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
-			default:
-				return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-		}
-	}
-
-	const sortedRecommendations = [...recommendations].sort((a, b) => {
-		const priorityOrder = { high: 0, medium: 1, low: 2 }
-		return priorityOrder[a.priority] - priorityOrder[b.priority]
-	})
+	const sortedRecommendations = [...recommendations].sort(
+		(a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority],
+	)
 
 	return (
-		<div className='space-y-3 sm:space-y-4'>
-			<h3 className='text-base sm:text-lg font-semibold'>{t('recommendations')}</h3>
-			<div className='space-y-2 sm:space-y-3'>
+		<section className='space-y-3'>
+			<h3 className='text-base font-semibold'>{t('recommendations')}</h3>
+			<ul className='space-y-2'>
 				{sortedRecommendations.map((rec) => (
-					<div key={rec.title} className='p-3 sm:p-4 rounded-lg border border-border'>
-						<div className='flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-4'>
-							<div className='flex-1'>
-								<div className='flex items-center gap-2 mb-1'>
-									<span className='font-medium text-sm sm:text-base'>{rec.title}</span>
-									<span className={cn('text-xs px-2 py-0.5 rounded capitalize', getPriorityColor(rec.priority))}>
-										{rec.priority}
+					<li key={rec.title} className='rounded-lg border p-3 sm:p-4'>
+						<div className='flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between sm:gap-4'>
+							<div className='min-w-0 flex-1'>
+								<div className='mb-1 flex flex-wrap items-center gap-2'>
+									<span className='text-sm font-medium'>{rec.title}</span>
+									<span className={cn('rounded px-2 py-0.5 text-xs font-medium', PRIORITY_CLASS[rec.priority])}>
+										{t(`priority.${rec.priority}`)}
 									</span>
 								</div>
-								<p className='text-xs sm:text-sm text-muted-foreground'>{rec.description}</p>
+								<p className='text-sm text-muted-foreground'>{rec.description}</p>
 							</div>
 							{rec.potential_savings > 0 && (
-								<div className='flex items-center gap-1 sm:flex-col sm:items-end text-green-600 dark:text-green-400'>
-									<DollarSign className='h-4 w-4' />
-									<span className='font-bold text-sm sm:text-base'>{formatCurrency(rec.potential_savings)}</span>
-									<span className='text-xs text-muted-foreground hidden sm:block'>{t('potentialSavings')}</span>
+								<div className='flex items-baseline gap-2 sm:flex-col sm:items-end sm:gap-0'>
+									<Amount value={rec.potential_savings} tone='positive' className='text-sm font-semibold' />
+									<span className='text-xs text-muted-foreground'>{t('potentialSavings')}</span>
 								</div>
 							)}
 						</div>
-					</div>
+					</li>
 				))}
-			</div>
-		</div>
+			</ul>
+		</section>
 	)
 }

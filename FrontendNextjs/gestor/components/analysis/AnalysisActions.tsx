@@ -1,26 +1,27 @@
 'use client'
 
-import { Minus, Wrench, X } from 'lucide-react'
+import { GripHorizontal, Minus, SlidersHorizontal, Wrench, X } from 'lucide-react'
 import { useTranslations } from 'next-intl'
-import type { PointerEvent as ReactPointerEvent } from 'react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode, PointerEvent as ReactPointerEvent } from 'react'
+import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { Amount } from '@/components/shared/Amount'
 import { Button } from '@/components/ui/button'
 import { Drawer, DrawerClose, DrawerContent, DrawerFooter, DrawerHeader, DrawerTitle } from '@/components/ui/drawer'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetDashboardSummary } from '@/hooks/queries/useAnalyticsQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
-import { formatCurrency } from '@/lib/utils'
-import { AnalyticsQueryFilters, CategoryExpense } from '@/types/analytics'
-import { AnalysisFiltersState, useAnalysisContext } from './AnalysisContext'
+import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { BREAKPOINTS, useMediaQuery } from '@/hooks/useMediaQuery'
+import type { AnalyticsQueryFilters, CategoryExpense } from '@/types/analytics'
+import { createDefaultAnalysisFilters, useAnalysisContext } from './AnalysisContext'
 import { AnalysisFiltersForm } from './AnalysisFilters'
-
-const now = new Date()
-const defaultMonth = String(now.getMonth() + 1).padStart(2, '0')
-const defaultYear = String(now.getFullYear())
+import { buildAnalyticsFilters, daysBetween, fromApiDate } from './analysis-query'
 
 const toolDefinitions = [
 	{ id: 'what_if', titleKey: 'toolWhatIfTitle' },
@@ -40,44 +41,20 @@ type FloatingWindowState = {
 	z: number
 }
 
-function formatDate(date: Date) {
-	return date.toISOString().split('T')[0]
-}
+/** Desktop tool window width (px) and the margin kept to the viewport edges. */
+const WINDOW_WIDTH = 380
+const EDGE = 16
+/** Keyboard move step (px); Shift moves 4×. */
+const MOVE_STEP = 16
 
-function buildAnalyticsFiltersFromState(filters: AnalysisFiltersState): AnalyticsQueryFilters {
-	const next: AnalyticsQueryFilters = {}
+type Translate = ReturnType<typeof useTranslations>
 
-	if (filters.filterMode === 'month') {
-		const selectedYear = Number(filters.year || new Date().getFullYear())
-		if (filters.month && filters.month !== 'all') {
-			const selectedMonth = Number(filters.month)
-			const from = new Date(selectedYear, selectedMonth - 1, 1)
-			const to = new Date(selectedYear, selectedMonth, 0)
-			next.date_from = formatDate(from)
-			next.date_to = formatDate(to)
-		} else {
-			const from = new Date(selectedYear, 0, 1)
-			const to = new Date(selectedYear, 11, 31)
-			next.date_from = formatDate(from)
-			next.date_to = formatDate(to)
-		}
-	} else if (filters.dateRange?.from && filters.dateRange?.to) {
-		next.date_from = formatDate(filters.dateRange.from)
-		next.date_to = formatDate(filters.dateRange.to)
+function clampPosition(x: number, y: number) {
+	if (typeof window === 'undefined') return { x, y }
+	return {
+		x: Math.max(EDGE, Math.min(x, window.innerWidth - Math.min(WINDOW_WIDTH, window.innerWidth - 2 * EDGE) - EDGE)),
+		y: Math.max(EDGE, Math.min(y, window.innerHeight - 120)),
 	}
-
-	if (filters.account !== 'all') next.account_id = filters.account
-	if (filters.category !== 'all') next.category_id = filters.category
-	if (filters.type === 'INCOME') next.type = 'income'
-	if (filters.type === 'BILL') next.type = 'bill'
-
-	const minAmount = Number(filters.minAmount)
-	if (filters.minAmount !== '' && !Number.isNaN(minAmount) && minAmount >= 0) next.min_amount = minAmount
-
-	const maxAmount = Number(filters.maxAmount)
-	if (filters.maxAmount !== '' && !Number.isNaN(maxAmount) && maxAmount >= 0) next.max_amount = maxAmount
-
-	return next
 }
 
 function createInitialWindows(): Record<ToolId, FloatingWindowState> {
@@ -89,8 +66,42 @@ function createInitialWindows(): Record<ToolId, FloatingWindowState> {
 	}
 }
 
-function formatDOP(value: number): string {
-	return formatCurrency(value, 'DOP')
+function CategorySelect({
+	id,
+	value,
+	onChange,
+	categories,
+	placeholder,
+}: {
+	id: string
+	value: string
+	onChange: (value: string) => void
+	categories: CategoryExpense[]
+	placeholder: string
+}) {
+	return (
+		<Select value={value} onValueChange={onChange}>
+			<SelectTrigger id={id}>
+				<SelectValue placeholder={placeholder} />
+			</SelectTrigger>
+			<SelectContent className='z-[1000]'>
+				{categories.map((category) => (
+					<SelectItem key={category.id} value={category.id}>
+						{category.label}
+					</SelectItem>
+				))}
+			</SelectContent>
+		</Select>
+	)
+}
+
+function Figure({ label, children }: { label: ReactNode; children: ReactNode }) {
+	return (
+		<div className='rounded-md border p-2'>
+			<dt className='text-xs text-muted-foreground'>{label}</dt>
+			<dd className='font-semibold tabular-nums'>{children}</dd>
+		</div>
+	)
 }
 
 function WhatIfTool({
@@ -102,8 +113,10 @@ function WhatIfTool({
 	categories: CategoryExpense[]
 	totalIncome: number
 	totalExpenses: number
-	t: ReturnType<typeof useTranslations>
+	t: Translate
 }) {
+	const fieldId = useId()
+	const formatPercent = useFormatPercent()
 	const [categoryId, setCategoryId] = useState<string>('')
 	const [reductionPct, setReductionPct] = useState<number>(10)
 
@@ -119,46 +132,41 @@ function WhatIfTool({
 	const projectedSavingsRate = totalIncome > 0 ? (projectedNet / totalIncome) * 100 : 0
 
 	return (
-		<div className='space-y-3 text-sm'>
-			<div>
-				<p className='mb-1 text-xs text-muted-foreground'>{t('toolTargetCategory')}</p>
-				<Select value={categoryId} onValueChange={setCategoryId}>
-					<SelectTrigger className='h-8'>
-						<SelectValue placeholder={t('category')} />
-					</SelectTrigger>
-					<SelectContent className='z-[1000]'>
-						{categories.map((category) => (
-							<SelectItem key={category.id} value={category.id}>
-								{category.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+		<div className='space-y-4 text-sm'>
+			<div className='space-y-2'>
+				<Label htmlFor={`${fieldId}-category`}>{t('toolTargetCategory')}</Label>
+				<CategorySelect
+					id={`${fieldId}-category`}
+					value={categoryId}
+					onChange={setCategoryId}
+					categories={categories}
+					placeholder={t('category')}
+				/>
 			</div>
 
-			<div>
-				<p className='mb-1 text-xs text-muted-foreground'>{t('toolReductionPercent')}</p>
+			<div className='space-y-2'>
+				<div className='flex items-center justify-between'>
+					<Label htmlFor={`${fieldId}-reduction`}>{t('toolReductionPercent')}</Label>
+					<span className='text-xs text-muted-foreground tabular-nums'>{formatPercent(reductionPct)}</span>
+				</div>
 				<Input
+					id={`${fieldId}-reduction`}
 					type='range'
 					min={0}
 					max={100}
 					step={1}
 					value={reductionPct}
+					aria-valuetext={formatPercent(reductionPct)}
 					onChange={(event) => setReductionPct(Number(event.target.value))}
 				/>
-				<p className='mt-1 text-xs text-muted-foreground'>{reductionPct}%</p>
 			</div>
 
-			<div className='grid grid-cols-2 gap-2'>
-				<div className='rounded-md border border-border/50 p-2'>
-					<p className='text-xs text-muted-foreground'>{t('toolPotentialCut')}</p>
-					<p className='font-semibold'>{formatDOP(reductionAmount)}</p>
-				</div>
-				<div className='rounded-md border border-border/50 p-2'>
-					<p className='text-xs text-muted-foreground'>{t('toolProjectedSavingsRate')}</p>
-					<p className='font-semibold'>{projectedSavingsRate.toFixed(1)}%</p>
-				</div>
-			</div>
+			<dl className='grid grid-cols-2 gap-2'>
+				<Figure label={t('toolPotentialCut')}>
+					<Amount value={reductionAmount} currency='DOP' />
+				</Figure>
+				<Figure label={t('toolProjectedSavingsRate')}>{formatPercent(projectedSavingsRate)}</Figure>
+			</dl>
 		</div>
 	)
 }
@@ -174,39 +182,40 @@ function ProjectionTool({
 	plannedBudget: number
 	dateFrom?: string
 	dateTo?: string
-	t: ReturnType<typeof useTranslations>
+	t: Translate
 }) {
+	const formatCurrency = useFormatCurrency()
 	const today = new Date()
-	const from = dateFrom ? new Date(`${dateFrom}T00:00:00`) : new Date(today.getFullYear(), today.getMonth(), 1)
-	const to = dateTo ? new Date(`${dateTo}T00:00:00`) : new Date(today.getFullYear(), today.getMonth() + 1, 0)
+	const from = dateFrom ? fromApiDate(dateFrom) : new Date(today.getFullYear(), today.getMonth(), 1)
+	const to = dateTo ? fromApiDate(dateTo) : new Date(today.getFullYear(), today.getMonth() + 1, 0)
 	const effectiveToday = today > to ? to : today
-	const elapsedDays = Math.max(1, Math.floor((effectiveToday.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)) + 1)
-	const totalDays = Math.max(1, Math.floor((to.getTime() - from.getTime()) / (24 * 60 * 60 * 1000)) + 1)
+	const elapsedDays = daysBetween(from, effectiveToday)
+	const totalDays = daysBetween(from, to)
 	const projectedClose = totalExpenses * (totalDays / elapsedDays)
 	const projectedGap = plannedBudget - projectedClose
 
 	return (
 		<div className='space-y-3 text-sm'>
-			<div className='grid grid-cols-2 gap-2'>
-				<div className='rounded-md border border-border/50 p-2'>
-					<p className='text-xs text-muted-foreground'>{t('toolProjectedClose')}</p>
-					<p className='font-semibold'>{formatDOP(projectedClose)}</p>
-				</div>
-				<div className='rounded-md border border-border/50 p-2'>
-					<p className='text-xs text-muted-foreground'>{t('plannedBudget')}</p>
-					<p className='font-semibold'>{formatDOP(plannedBudget)}</p>
-				</div>
-			</div>
-			<p className={`text-xs ${projectedGap >= 0 ? 'text-emerald-600' : 'text-destructive'}`}>
+			<dl className='grid grid-cols-2 gap-2'>
+				<Figure label={t('toolProjectedClose')}>
+					<Amount value={projectedClose} currency='DOP' />
+				</Figure>
+				<Figure label={t('plannedBudget')}>
+					<Amount value={plannedBudget} currency='DOP' />
+				</Figure>
+			</dl>
+			<p className={projectedGap >= 0 ? 'text-success' : 'text-destructive'}>
 				{projectedGap >= 0
-					? t('toolProjectionOnTrack', { amount: formatDOP(projectedGap) })
-					: t('toolProjectionOver', { amount: formatDOP(Math.abs(projectedGap)) })}
+					? t('toolProjectionOnTrack', { amount: formatCurrency(projectedGap, 'DOP') })
+					: t('toolProjectionOver', { amount: formatCurrency(Math.abs(projectedGap), 'DOP') })}
 			</p>
 		</div>
 	)
 }
 
-function CompareTool({ categories, t }: { categories: CategoryExpense[]; t: ReturnType<typeof useTranslations> }) {
+function CompareTool({ categories, t }: { categories: CategoryExpense[]; t: Translate }) {
+	const fieldId = useId()
+	const formatCurrency = useFormatCurrency()
 	const [first, setFirst] = useState<string>('')
 	const [second, setSecond] = useState<string>('')
 
@@ -220,44 +229,40 @@ function CompareTool({ categories, t }: { categories: CategoryExpense[]; t: Retu
 	const firstValue = Math.max(0, firstCategory?.value || 0)
 	const secondValue = Math.max(0, secondCategory?.value || 0)
 	const diff = firstValue - secondValue
+	const higher = diff >= 0 ? firstCategory : secondCategory
 
 	return (
-		<div className='space-y-3 text-sm'>
-			<div className='grid grid-cols-1 gap-2'>
-				<Select value={first} onValueChange={setFirst}>
-					<SelectTrigger className='h-8'>
-						<SelectValue placeholder={t('toolFirstCategory')} />
-					</SelectTrigger>
-					<SelectContent className='z-[1000]'>
-						{categories.map((category) => (
-							<SelectItem key={category.id} value={category.id}>
-								{category.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
-				<Select value={second} onValueChange={setSecond}>
-					<SelectTrigger className='h-8'>
-						<SelectValue placeholder={t('toolSecondCategory')} />
-					</SelectTrigger>
-					<SelectContent className='z-[1000]'>
-						{categories.map((category) => (
-							<SelectItem key={category.id} value={category.id}>
-								{category.label}
-							</SelectItem>
-						))}
-					</SelectContent>
-				</Select>
+		<div className='space-y-4 text-sm'>
+			<div className='space-y-2'>
+				<Label htmlFor={`${fieldId}-first`}>{t('toolFirstCategory')}</Label>
+				<CategorySelect
+					id={`${fieldId}-first`}
+					value={first}
+					onChange={setFirst}
+					categories={categories}
+					placeholder={t('toolFirstCategory')}
+				/>
 			</div>
-			<div className='rounded-md border border-border/50 p-2'>
+			<div className='space-y-2'>
+				<Label htmlFor={`${fieldId}-second`}>{t('toolSecondCategory')}</Label>
+				<CategorySelect
+					id={`${fieldId}-second`}
+					value={second}
+					onChange={setSecond}
+					categories={categories}
+					placeholder={t('toolSecondCategory')}
+				/>
+			</div>
+			<div className='rounded-md border p-2'>
 				<p className='text-xs text-muted-foreground'>{t('toolDifference')}</p>
-				<p className={`font-semibold ${diff >= 0 ? 'text-amber-600' : 'text-emerald-600'}`}>
-					{formatDOP(Math.abs(diff))}
+				<p className='font-semibold'>
+					<Amount value={Math.abs(diff)} currency='DOP' />
 				</p>
 				<p className='text-xs text-muted-foreground'>
-					{diff >= 0
-						? t('toolDifferenceHigher', { category: firstCategory?.label || '-', amount: formatDOP(Math.abs(diff)) })
-						: t('toolDifferenceHigher', { category: secondCategory?.label || '-', amount: formatDOP(Math.abs(diff)) })}
+					{t('toolDifferenceHigher', {
+						category: higher?.label || '-',
+						amount: formatCurrency(Math.abs(diff), 'DOP'),
+					})}
 				</p>
 			</div>
 		</div>
@@ -275,7 +280,7 @@ function ExportTool({
 	totalIncome: number
 	totalExpenses: number
 	categories: CategoryExpense[]
-	t: ReturnType<typeof useTranslations>
+	t: Translate
 }) {
 	const [status, setStatus] = useState<string>('')
 
@@ -320,10 +325,8 @@ function ExportTool({
 
 	return (
 		<div className='space-y-3 text-sm'>
-			<div className='max-h-36 overflow-auto rounded-md border border-border/50 bg-muted/30 p-2 text-xs'>
-				<pre>{snapshotText}</pre>
-			</div>
-			<div className='flex gap-2'>
+			<pre className='max-h-48 overflow-auto rounded-md border bg-muted/40 p-2 font-mono text-xs'>{snapshotText}</pre>
+			<div className='flex flex-wrap gap-2'>
 				<Button type='button' size='sm' variant='secondary' onClick={handleCopy}>
 					{t('toolCopy')}
 				</Button>
@@ -331,23 +334,140 @@ function ExportTool({
 					{t('toolDownload')}
 				</Button>
 			</div>
-			{status && <p className='text-xs text-muted-foreground'>{status}</p>}
+			<p className='min-h-4 text-xs text-muted-foreground' aria-live='polite'>
+				{status}
+			</p>
+		</div>
+	)
+}
+
+/**
+ * Desktop tool window: a non-modal dialog that floats over the page. Draggable
+ * by its header with the pointer, movable with the arrow keys from the move
+ * button, closable with Escape. Focus moves into it on open.
+ */
+function FloatingToolWindow({
+	title,
+	state,
+	t,
+	onFocus,
+	onClose,
+	onMinimize,
+	onMove,
+	onStartDrag,
+	children,
+}: {
+	title: string
+	state: FloatingWindowState
+	t: Translate
+	onFocus: () => void
+	onClose: () => void
+	onMinimize: () => void
+	onMove: (dx: number, dy: number) => void
+	onStartDrag: (event: ReactPointerEvent<HTMLDivElement>) => void
+	children: ReactNode
+}) {
+	const titleId = useId()
+	const ref = useRef<HTMLDivElement>(null)
+
+	useEffect(() => {
+		ref.current?.focus()
+	}, [])
+
+	const handleKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
+		// Radix popovers (Select) prevent the Escape they consume.
+		if (event.key === 'Escape' && !event.defaultPrevented) {
+			event.stopPropagation()
+			onClose()
+		}
+	}
+
+	const handleMoveKey = (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+		const step = event.shiftKey ? MOVE_STEP * 4 : MOVE_STEP
+		const delta: Record<string, [number, number]> = {
+			ArrowLeft: [-step, 0],
+			ArrowRight: [step, 0],
+			ArrowUp: [0, -step],
+			ArrowDown: [0, step],
+		}
+		const move = delta[event.key]
+		if (!move) return
+		event.preventDefault()
+		onMove(move[0], move[1])
+	}
+
+	return (
+		<div
+			ref={ref}
+			role='dialog'
+			aria-labelledby={titleId}
+			tabIndex={-1}
+			className='fixed flex max-h-[calc(100dvh-2rem)] w-[380px] max-w-[calc(100vw-2rem)] flex-col rounded-lg border bg-popover text-popover-foreground shadow-lg outline-none focus-visible:ring-2 focus-visible:ring-ring'
+			style={{ left: state.x, top: state.y, zIndex: state.z }}
+			onPointerDownCapture={onFocus}
+			onFocusCapture={onFocus}
+			onKeyDown={handleKeyDown}
+		>
+			<div
+				className='flex cursor-move touch-none select-none items-center gap-1 rounded-t-lg border-b bg-muted/60 py-1 pr-1 pl-1'
+				onPointerDown={(event) => {
+					if ((event.target as HTMLElement).closest('button:not([data-drag-handle])')) return
+					onStartDrag(event)
+				}}
+			>
+				<Button
+					type='button'
+					variant='ghost'
+					size='icon'
+					data-drag-handle
+					className='cursor-move text-muted-foreground'
+					aria-label={t('toolMove', { tool: title })}
+					onKeyDown={handleMoveKey}
+				>
+					<GripHorizontal className='h-4 w-4' aria-hidden='true' />
+				</Button>
+				<h2 id={titleId} className='min-w-0 flex-1 truncate text-sm font-semibold'>
+					{title}
+				</h2>
+				<Button
+					type='button'
+					variant='ghost'
+					size='icon'
+					aria-label={t('toolMinimize', { tool: title })}
+					onClick={onMinimize}
+				>
+					<Minus className='h-4 w-4' aria-hidden='true' />
+				</Button>
+				<Button
+					type='button'
+					variant='ghost'
+					size='icon'
+					aria-label={t('toolClose', { tool: title })}
+					onClick={onClose}
+				>
+					<X className='h-4 w-4' aria-hidden='true' />
+				</Button>
+			</div>
+			<div className='min-h-0 flex-1 overflow-y-auto p-4'>{children}</div>
 		</div>
 	)
 }
 
 export function AnalysisActions() {
 	const t = useTranslations('analysis')
+	const isDesktop = useMediaQuery(BREAKPOINTS.md)
 	const [drawerOpen, setDrawerOpen] = useState(false)
+	const toolsTriggerRef = useRef<HTMLButtonElement>(null)
+	const openingToolRef = useRef(false)
 	const dragRef = useRef<{ id: ToolId; startX: number; startY: number; originX: number; originY: number } | null>(null)
+	const zCounterRef = useRef(60)
 	const [windows, setWindows] = useState<Record<ToolId, FloatingWindowState>>(() => createInitialWindows())
-	const [_zCounter, setZCounter] = useState(60)
 	const { filters, setFilters } = useAnalysisContext()
 	const { data: accounts = [] } = useGetAccounts()
 	const { data: categories = [] } = useGetCategories()
 	const { data: budgets = [] } = useGetBudgets()
 
-	const activeFilters = useMemo(() => buildAnalyticsFiltersFromState(filters), [filters])
+	const activeFilters = useMemo(() => buildAnalyticsFilters(filters), [filters])
 	const { data: dashboardSummary } = useGetDashboardSummary(activeFilters)
 
 	const categoryExpenses = dashboardSummary?.category_expenses || []
@@ -355,51 +475,45 @@ export function AnalysisActions() {
 	const totalExpenses = dashboardSummary?.total_expenses || 0
 	const plannedBudget = budgets.reduce((sum, budget) => sum + budget.amount, 0)
 
+	const nextZ = () => {
+		zCounterRef.current += 1
+		return zCounterRef.current
+	}
+
+	const updateWindow = (id: ToolId, patch: Partial<FloatingWindowState>) => {
+		setWindows((current) => ({ ...current, [id]: { ...current[id], ...patch } }))
+	}
+
 	const openTool = (id: ToolId) => {
-		setZCounter((previous) => {
-			const next = previous + 1
-			setWindows((current) => ({
-				...current,
-				[id]: { ...current[id], open: true, minimized: false, z: next },
-			}))
-			return next
-		})
+		openingToolRef.current = true
+		const position = clampPosition(windows[id].x, windows[id].y)
+		updateWindow(id, { open: true, minimized: false, z: nextZ(), ...position })
 	}
 
 	const focusWindow = (id: ToolId) => {
-		setZCounter((previous) => {
-			const next = previous + 1
-			setWindows((current) => ({
-				...current,
-				[id]: { ...current[id], z: next },
-			}))
-			return next
-		})
+		const topZ = Math.max(...Object.values(windows).map((state) => state.z))
+		if (windows[id].z < topZ) updateWindow(id, { z: nextZ() })
 	}
 
 	const closeWindow = (id: ToolId) => {
-		setWindows((current) => ({
-			...current,
-			[id]: { ...current[id], open: false, minimized: false },
-		}))
+		updateWindow(id, { open: false, minimized: false })
+		toolsTriggerRef.current?.focus()
 	}
 
 	const minimizeWindow = (id: ToolId) => {
-		setWindows((current) => ({
-			...current,
-			[id]: { ...current[id], minimized: true },
-		}))
+		updateWindow(id, { minimized: true })
+		toolsTriggerRef.current?.focus()
 	}
 
 	const restoreWindow = (id: ToolId) => {
-		setZCounter((previous) => {
-			const next = previous + 1
-			setWindows((current) => ({
-				...current,
-				[id]: { ...current[id], minimized: false, open: true, z: next },
-			}))
-			return next
-		})
+		updateWindow(id, { minimized: false, open: true, z: nextZ() })
+	}
+
+	const moveWindow = (id: ToolId, dx: number, dy: number) => {
+		setWindows((current) => ({
+			...current,
+			[id]: { ...current[id], ...clampPosition(current[id].x + dx, current[id].y + dy) },
+		}))
 	}
 
 	const startDragging = (event: ReactPointerEvent<HTMLDivElement>, id: ToolId) => {
@@ -412,23 +526,14 @@ export function AnalysisActions() {
 			originX: current.x,
 			originY: current.y,
 		}
-		focusWindow(id)
 	}
 
 	useEffect(() => {
 		const handleMove = (event: PointerEvent) => {
 			if (!dragRef.current) return
 			const { id, startX, startY, originX, originY } = dragRef.current
-			const nextX = originX + (event.clientX - startX)
-			const nextY = originY + (event.clientY - startY)
-			setWindows((current) => ({
-				...current,
-				[id]: {
-					...current[id],
-					x: Math.max(16, Math.min(nextX, window.innerWidth - 420)),
-					y: Math.max(16, Math.min(nextY, window.innerHeight - 120)),
-				},
-			}))
+			const next = clampPosition(originX + (event.clientX - startX), originY + (event.clientY - startY))
+			setWindows((current) => ({ ...current, [id]: { ...current[id], ...next } }))
 		}
 
 		const handleUp = () => {
@@ -481,19 +586,30 @@ export function AnalysisActions() {
 
 	return (
 		<>
-			<div className='flex items-center gap-3'>
-				<Button variant='outline' className='border-border/50' onClick={() => setDrawerOpen(true)}>
+			<div className='flex flex-wrap items-center gap-2'>
+				<Button variant='outline' onClick={() => setDrawerOpen(true)}>
+					<SlidersHorizontal className='mr-2 h-4 w-4' aria-hidden='true' />
 					{t('filter')}
 				</Button>
 
 				<DropdownMenu>
 					<DropdownMenuTrigger asChild>
-						<Button variant='outline' className='border-border/50'>
-							<Wrench className='mr-2 h-4 w-4' />
+						<Button ref={toolsTriggerRef} variant='outline'>
+							<Wrench className='mr-2 h-4 w-4' aria-hidden='true' />
 							{t('tools')}
 						</Button>
 					</DropdownMenuTrigger>
-					<DropdownMenuContent align='end' className='w-56'>
+					<DropdownMenuContent
+						align='end'
+						className='w-56'
+						onCloseAutoFocus={(event) => {
+							// The opened tool window takes focus instead of the trigger.
+							if (openingToolRef.current) {
+								event.preventDefault()
+								openingToolRef.current = false
+							}
+						}}
+					>
 						{toolDefinitions.map((tool) => (
 							<DropdownMenuItem key={tool.id} onSelect={() => openTool(tool.id)}>
 								{t(tool.titleKey)}
@@ -504,8 +620,8 @@ export function AnalysisActions() {
 
 				<Drawer open={drawerOpen} onOpenChange={setDrawerOpen} side='right'>
 					{/* Filter drawer has no description; opt out explicitly (Radix warns otherwise). */}
-					<DrawerContent side='right' className='p-6' aria-describedby={undefined}>
-						<DrawerHeader>
+					<DrawerContent side='right' className='overflow-y-auto p-6' aria-describedby={undefined}>
+						<DrawerHeader className='px-0 text-left'>
 							<DrawerTitle>{t('filterAnalytics')}</DrawerTitle>
 						</DrawerHeader>
 						<AnalysisFiltersForm
@@ -514,30 +630,17 @@ export function AnalysisActions() {
 							accounts={accounts}
 							categories={categories}
 						/>
-						<DrawerFooter>
+						<DrawerFooter className='px-0'>
 							<Button
 								type='button'
 								variant='outline'
-								onClick={() =>
-									setFilters({
-										filterMode: 'month',
-										month: defaultMonth,
-										year: defaultYear,
-										dateRange: { from: undefined, to: undefined },
-										account: 'all',
-										category: 'all',
-										type: 'all',
-										minAmount: '',
-										maxAmount: '',
-										search: '',
-									})
-								}
+								onClick={() => setFilters(createDefaultAnalysisFilters())}
 								className='w-full'
 							>
 								{t('clearFilters')}
 							</Button>
 							<DrawerClose asChild>
-								<Button type='button' variant='ghost' className='w-full'>
+								<Button type='button' className='w-full'>
 									{t('close')}
 								</Button>
 							</DrawerClose>
@@ -548,55 +651,65 @@ export function AnalysisActions() {
 
 			{toolDefinitions.map((tool) => {
 				const windowState = windows[tool.id]
+				const title = t(tool.titleKey)
+
+				if (!isDesktop) {
+					// Mobile: a full-width bottom drawer (modal, Escape and swipe to close).
+					return (
+						<Drawer
+							key={tool.id}
+							open={windowState.open}
+							onOpenChange={(open) => {
+								if (!open) closeWindow(tool.id)
+							}}
+							shouldScaleBackground={false}
+						>
+							<DrawerContent className='max-h-[90dvh]' aria-describedby={undefined}>
+								<DrawerHeader className='flex items-center justify-between gap-2 text-left'>
+									<DrawerTitle>{title}</DrawerTitle>
+									<DrawerClose asChild>
+										<Button type='button' variant='ghost' size='icon' aria-label={t('toolClose', { tool: title })}>
+											<X className='h-4 w-4' aria-hidden='true' />
+										</Button>
+									</DrawerClose>
+								</DrawerHeader>
+								<div className='min-h-0 flex-1 overflow-y-auto px-4 pb-6'>{renderToolContent(tool.id)}</div>
+							</DrawerContent>
+						</Drawer>
+					)
+				}
+
 				if (!windowState.open || windowState.minimized) return null
 
 				return (
-					<div
+					<FloatingToolWindow
 						key={tool.id}
-						className='fixed w-[380px] max-w-[92vw] rounded-lg border border-border/60 bg-background shadow-2xl'
-						style={{ left: windowState.x, top: windowState.y, zIndex: windowState.z }}
-						onMouseDown={() => focusWindow(tool.id)}
+						title={title}
+						state={windowState}
+						t={t}
+						onFocus={() => focusWindow(tool.id)}
+						onClose={() => closeWindow(tool.id)}
+						onMinimize={() => minimizeWindow(tool.id)}
+						onMove={(dx, dy) => moveWindow(tool.id, dx, dy)}
+						onStartDrag={(event) => startDragging(event, tool.id)}
 					>
-						<div
-							className='flex cursor-move items-center justify-between rounded-t-lg border-b border-border/50 bg-muted/70 px-3 py-2'
-							onPointerDown={(event) => startDragging(event, tool.id)}
-						>
-							<div className='flex items-center gap-2'>
-								<span className='h-2.5 w-2.5 rounded-full bg-red-500' />
-								<span className='h-2.5 w-2.5 rounded-full bg-amber-400' />
-								<span className='h-2.5 w-2.5 rounded-full bg-emerald-500' />
-								<p className='text-xs font-semibold text-foreground'>{t(tool.titleKey)}</p>
-							</div>
-							<div className='flex items-center gap-1'>
-								<Button
-									type='button'
-									variant='ghost'
-									size='sm'
-									className='h-6 w-6 p-0'
-									onClick={() => minimizeWindow(tool.id)}
-								>
-									<Minus className='h-3.5 w-3.5' />
-								</Button>
-								<Button
-									type='button'
-									variant='ghost'
-									size='sm'
-									className='h-6 w-6 p-0'
-									onClick={() => closeWindow(tool.id)}
-								>
-									<X className='h-3.5 w-3.5' />
-								</Button>
-							</div>
-						</div>
-						<div className='p-3'>{renderToolContent(tool.id)}</div>
-					</div>
+						{renderToolContent(tool.id)}
+					</FloatingToolWindow>
 				)
 			})}
 
-			{minimizedWindows.length > 0 && (
-				<div className='fixed bottom-4 right-4 z-[120] flex flex-wrap gap-2'>
+			{isDesktop && minimizedWindows.length > 0 && (
+				<div className='fixed right-4 bottom-4 z-[120] flex flex-wrap justify-end gap-2'>
 					{minimizedWindows.map((tool) => (
-						<Button key={tool.id} type='button' size='sm' variant='secondary' onClick={() => restoreWindow(tool.id)}>
+						<Button
+							key={tool.id}
+							type='button'
+							size='sm'
+							variant='secondary'
+							className='shadow-md'
+							aria-label={t('toolRestore', { tool: t(tool.titleKey) })}
+							onClick={() => restoreWindow(tool.id)}
+						>
 							{t(tool.titleKey)}
 						</Button>
 					))}

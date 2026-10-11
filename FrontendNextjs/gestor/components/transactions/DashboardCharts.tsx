@@ -2,17 +2,18 @@
 
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
-import { useTheme } from 'next-themes'
-import { useMemo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Skeleton } from '@/components/ui/skeleton'
 import { CategoryExpense, MonthlySummary } from '@/types/analytics'
 
+// Both charts take their Nivo theme and colors from useChartTheme() (resolvedTheme + CSS tokens).
 const DashboardPieChart = dynamic(() => import('@/components/charts/DashboardPieChart'), {
 	ssr: false,
-	loading: () => <div className='h-full w-full bg-muted/20 animate-pulse rounded' />,
+	loading: () => <Skeleton className='h-full w-full' />,
 })
 const DashboardBarChart = dynamic(() => import('@/components/charts/DashboardBarChart'), {
 	ssr: false,
-	loading: () => <div className='h-full w-full bg-muted/20 animate-pulse rounded' />,
+	loading: () => <Skeleton className='h-full w-full' />,
 })
 
 interface DashboardChartsProps {
@@ -22,7 +23,6 @@ interface DashboardChartsProps {
 }
 
 export function DashboardCharts({ categorysData, monthSummary }: DashboardChartsProps) {
-	const { theme } = useTheme()
 	const t = useTranslations('charts')
 
 	const pieData = categorysData
@@ -37,58 +37,14 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 				.sort((a, b) => b.value - a.value)
 		: []
 
-	// Transform data to use translated keys
+	// Series keys are the translated labels (they show in the legend and tooltip).
 	const barData = monthSummary
-		? monthSummary.map((month) => {
-				return {
-					month: month.month,
-					[t('income')]: month.Ingresos,
-					[t('expenses')]: Math.abs(month.Gastos),
-				}
-			})
+		? monthSummary.map((month) => ({
+				month: month.month,
+				[t('income')]: month.Ingresos,
+				[t('expenses')]: Math.abs(month.Gastos),
+			}))
 		: []
-
-	const nivoTheme = useMemo(
-		() => ({
-			background: 'transparent',
-			textColor: theme === 'dark' ? '#e5e7eb' : '#374151',
-			fontSize: 14,
-			axis: {
-				legend: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#374151' } },
-				ticks: { text: { fill: theme === 'dark' ? '#e5e7eb' : '#374151' } },
-			},
-			legends: {
-				text: {
-					fill: theme === 'dark' ? '#e5e7eb' : '#374151',
-					fontSize: 13,
-					fontWeight: 500,
-				},
-			},
-			tooltip: {
-				container: {
-					background: theme === 'dark' ? '#1f2937' : '#ffffff',
-					color: theme === 'dark' ? '#e5e7eb' : '#374151',
-					fontSize: 14,
-					borderRadius: '8px',
-					border: `1px solid ${theme === 'dark' ? '#374151' : '#d1d5db'}`,
-					boxShadow:
-						theme === 'dark'
-							? '0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -2px rgba(0, 0, 0, 0.1)'
-							: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
-				},
-				basic: {
-					whiteSpace: 'pre',
-					display: 'flex',
-					alignItems: 'center',
-				},
-				table: {},
-				tableCell: {
-					padding: '3px 5px',
-				},
-			},
-		}),
-		[theme],
-	)
 
 	const monthAbbreviations = [
 		t('jan'),
@@ -106,37 +62,41 @@ export function DashboardCharts({ categorysData, monthSummary }: DashboardCharts
 	]
 
 	return (
-		<div className='grid grid-cols-1 md:grid-cols-2 gap-8 mb-10'>
-			<div className='bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center'>
-				<h3 className='font-semibold mb-2 text-lg text-foreground'>{t('expensesByCategory')}</h3>
-				<div className='h-[320px] w-full'>
-					<DashboardPieChart
-						data={pieData}
-						theme={theme}
-						nivoTheme={nivoTheme}
-						t={{
-							noExpenses: t('noExpenses'),
-							expensesHint: t('expensesHint'),
-						}}
-					/>
-				</div>
-			</div>
-			<div className='bg-card rounded-xl border border-border/50 p-4 flex flex-col items-center'>
-				<h3 className='font-semibold mb-2 text-lg text-foreground'>{t('incomeVsExpenses')}</h3>
-				<div className='h-64 w-full'>
-					<DashboardBarChart
-						data={barData}
-						keys={[t('income'), t('expenses')]}
-						theme={theme}
-						nivoTheme={nivoTheme}
-						monthAbbreviations={monthAbbreviations}
-						t={{
-							noTransactions: t('noTransactions'),
-							statsHint: t('statsHint'),
-						}}
-					/>
-				</div>
-			</div>
+		<div className='grid grid-cols-1 gap-4 lg:grid-cols-2'>
+			<Card>
+				<CardHeader className='pb-2'>
+					<CardTitle className='text-base font-semibold'>{t('expensesByCategory')}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<div className='h-[320px] w-full'>
+						<DashboardPieChart
+							data={pieData}
+							t={{
+								noExpenses: t('noExpenses'),
+								expensesHint: t('expensesHint'),
+							}}
+						/>
+					</div>
+				</CardContent>
+			</Card>
+			<Card>
+				<CardHeader className='pb-2'>
+					<CardTitle className='text-base font-semibold'>{t('incomeVsExpenses')}</CardTitle>
+				</CardHeader>
+				<CardContent>
+					<div className='h-[320px] w-full'>
+						<DashboardBarChart
+							data={barData}
+							keys={[t('income'), t('expenses')]}
+							monthAbbreviations={monthAbbreviations}
+							t={{
+								noTransactions: t('noTransactions'),
+								statsHint: t('statsHint'),
+							}}
+						/>
+					</div>
+				</CardContent>
+			</Card>
 		</div>
 	)
 }

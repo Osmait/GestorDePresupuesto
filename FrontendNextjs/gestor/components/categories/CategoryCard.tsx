@@ -1,20 +1,15 @@
 'use client'
 
 import { Edit, MoreHorizontal, Trash2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
+import { toast } from 'sonner'
+import { Amount } from '@/components/shared/Amount'
+import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
-import {
-	Dialog,
-	DialogContent,
-	DialogDescription,
-	DialogFooter,
-	DialogHeader,
-	DialogTitle,
-} from '@/components/ui/dialog'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { CategoryExpense } from '@/types/analytics'
 import { Category } from '@/types/category'
@@ -28,126 +23,109 @@ export interface CategoryCardProps {
 
 export function CategoryCard({ category, stats, onDelete, onEdit }: CategoryCardProps) {
 	const t = useTranslations('categories')
-	const tForms = useTranslations('forms')
-	const router = useRouter()
-	const categoryTransactionsCount = stats?.transaction_count || 0
-	const totalAmountDOP = stats?.value || 0
-	const totals = {
-		dop: stats?.dop_total || 0,
-		usd: stats?.usd_total || 0,
-	}
+	const tCommon = useTranslations('common')
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false)
-	const [isDeleting, setIsDeleting] = useState(false)
+	const transactionCount = stats?.transaction_count || 0
+	const totalAmountDOP = stats?.value || 0
+	const dopTotal = stats?.dop_total || 0
+	const usdTotal = stats?.usd_total || 0
 
 	const handleDelete = async () => {
-		setIsDeleting(true)
 		try {
 			await onDelete()
-			setShowDeleteDialog(false)
 		} catch (error) {
-			console.error('Error deleting category:', error)
-		} finally {
-			setIsDeleting(false)
+			toast.error(t('deleteError'))
+			throw error
 		}
-	}
-
-	const handleCardClick = (e: React.MouseEvent) => {
-		if ((e.target as HTMLElement).closest('[role="menuitem"], button')) {
-			return
-		}
-		router.push(`/app/transactions?category=${category.id}`)
 	}
 
 	return (
-		<Card
-			className='hover:bg-accent/40 dark:hover:bg-accent/40 transition-all duration-300 border-border/50 dark:border-border/20 relative group cursor-pointer'
-			onClick={handleCardClick}
-		>
-			<div className='absolute top-3 right-3 opacity-0 group-hover:opacity-100 transition-opacity z-10'>
-				<DropdownMenu>
-					<DropdownMenuTrigger asChild>
-						<Button variant='ghost' size='sm' className='h-8 w-8 p-0 hover:bg-muted'>
-							<MoreHorizontal className='h-4 w-4' />
-							<span className='sr-only'>{t('openMenu')}</span>
-						</Button>
-					</DropdownMenuTrigger>
-					<DropdownMenuContent align='end'>
-						<DropdownMenuItem className='flex items-center gap-2 cursor-pointer' onClick={onEdit}>
-							<Edit className='h-4 w-4' />
-							{t('edit')}
-						</DropdownMenuItem>
-						<DropdownMenuItem
-							className='flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400'
-							onClick={() => setShowDeleteDialog(true)}
-						>
-							<Trash2 className='h-4 w-4' />
-							{t('delete')}
-						</DropdownMenuItem>
-					</DropdownMenuContent>
-				</DropdownMenu>
-			</div>
-
-			<CardContent className='p-6'>
-				<div className='flex items-center justify-between mb-4'>
-					<div className='flex items-center space-x-4'>
-						<div
-							className='w-12 h-12 rounded-full flex items-center justify-center text-xl font-semibold'
-							style={{ backgroundColor: category.color, color: '#fff' }}
-						>
-							{category.icon}
+		<>
+			{/*
+			 * The name is a real link to the category's transactions, stretched over
+			 * the card (after:absolute after:inset-0). The menu sits above it (z-10)
+			 * and is always visible, so it works on touch and with the keyboard.
+			 */}
+			<Card className='relative transition-colors hover:bg-muted/40 has-[a:focus-visible]:ring-2 has-[a:focus-visible]:ring-ring has-[a:focus-visible]:ring-offset-2 has-[a:focus-visible]:ring-offset-background'>
+				<CardContent className='p-5'>
+					<div className='mb-4 flex items-start justify-between gap-2'>
+						<div className='flex min-w-0 items-center gap-3'>
+							{/* Category color and emoji are user data. */}
+							<div
+								className='flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg'
+								style={{ backgroundColor: category.color }}
+								aria-hidden='true'
+							>
+								{category.icon}
+							</div>
+							<div className='min-w-0'>
+								<Link
+									href={`/app/transactions?category=${category.id}`}
+									className='block truncate text-base font-semibold text-foreground focus-visible:outline-none after:absolute after:inset-0'
+								>
+									{category.name}
+								</Link>
+								<p className='text-sm text-muted-foreground tabular-nums'>
+									{transactionCount} {t('transactionsCount')}
+								</p>
+							</div>
 						</div>
-						<div>
-							<p className='font-semibold text-foreground text-lg'>{category.name}</p>
-							<p className='text-sm text-muted-foreground'>
-								{categoryTransactionsCount} {t('transactionsCount')}
-							</p>
-						</div>
+						<DropdownMenu>
+							<DropdownMenuTrigger asChild>
+								<Button
+									variant='ghost'
+									size='icon'
+									className='relative z-10 shrink-0'
+									aria-label={tCommon('actions.rowMenu', { name: category.name })}
+								>
+									<MoreHorizontal className='h-4 w-4' aria-hidden='true' />
+								</Button>
+							</DropdownMenuTrigger>
+							<DropdownMenuContent align='end'>
+								<DropdownMenuItem className='flex items-center gap-2' onSelect={onEdit}>
+									<Edit className='h-4 w-4' aria-hidden='true' />
+									{t('edit')}
+								</DropdownMenuItem>
+								<DropdownMenuItem
+									className='flex items-center gap-2 text-destructive focus:text-destructive'
+									onSelect={() => setShowDeleteDialog(true)}
+								>
+									<Trash2 className='h-4 w-4' aria-hidden='true' />
+									{t('delete')}
+								</DropdownMenuItem>
+							</DropdownMenuContent>
+						</DropdownMenu>
 					</div>
-					<div className='text-right'>
-						<p className='font-bold text-xl text-foreground'>
-							{new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totalAmountDOP)}
-						</p>
-						<p className='text-xs text-muted-foreground'>Total (DOP)</p>
-						<p className='text-[11px] text-muted-foreground'>
-							DOP: {new Intl.NumberFormat('es-DO', { style: 'currency', currency: 'DOP' }).format(totals.dop)}
-						</p>
-						<p className='text-[11px] text-muted-foreground'>
-							USD: {new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(totals.usd)}
-						</p>
-					</div>
-				</div>
 
-				<div className='flex items-center justify-between pt-3 border-t border-border/50'>
-					<div className='flex items-center gap-2'>
-						<div className='w-3 h-3 rounded-full' style={{ backgroundColor: category.color }}></div>
-						<span className='text-xs text-muted-foreground'>Color</span>
+					<div className='flex items-baseline justify-between gap-2'>
+						<span className='text-sm text-muted-foreground'>{t('totalDop')}</span>
+						<Amount value={totalAmountDOP} currency='DOP' className='text-xl font-semibold tracking-tight' />
 					</div>
-					<Badge variant='outline' className='bg-muted/30 dark:bg-muted/20'>
-						{categoryTransactionsCount > 5
-							? t('active')
-							: categoryTransactionsCount > 0
-								? t('moderate')
-								: t('inactive')}
-					</Badge>
-				</div>
-			</CardContent>
 
-			<Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-				<DialogContent>
-					<DialogHeader>
-						<DialogTitle>{t('deleteTitle')}</DialogTitle>
-						<DialogDescription>{t('deleteDescription', { name: category.name })}</DialogDescription>
-					</DialogHeader>
-					<DialogFooter>
-						<Button variant='outline' onClick={() => setShowDeleteDialog(false)} disabled={isDeleting}>
-							{tForms('cancel')}
-						</Button>
-						<Button variant='destructive' onClick={handleDelete} disabled={isDeleting}>
-							{isDeleting ? t('deleting') : tForms('delete')}
-						</Button>
-					</DialogFooter>
-				</DialogContent>
-			</Dialog>
-		</Card>
+					<div className='mt-4 flex items-center justify-between gap-2 border-t pt-3'>
+						<p className='flex flex-wrap gap-x-3 text-xs text-muted-foreground'>
+							<span>
+								DOP <Amount value={dopTotal} currency='DOP' />
+							</span>
+							<span>
+								USD <Amount value={usdTotal} currency='USD' />
+							</span>
+						</p>
+						<Badge variant='outline' className='shrink-0'>
+							{transactionCount > 5 ? t('active') : transactionCount > 0 ? t('moderate') : t('inactive')}
+						</Badge>
+					</div>
+				</CardContent>
+			</Card>
+
+			<ConfirmDialog
+				open={showDeleteDialog}
+				onOpenChange={setShowDeleteDialog}
+				title={t('deleteTitle', { name: category.name })}
+				description={tCommon('confirm.irreversible')}
+				destructive
+				onConfirm={handleDelete}
+			/>
+		</>
 	)
 }
