@@ -42,10 +42,9 @@ internal/e2e/
 ```bash
 # Setup E2E testing environment
 make e2e-setup
-
-# Start E2E infrastructure
-make e2e-docker-up
 ```
+
+PostgreSQL is started automatically by testcontainers; no compose stack is needed.
 
 ### Run Tests
 
@@ -129,15 +128,6 @@ make e2e-performance
 | `make e2e-performance` | Run performance tests |
 | `make e2e-stress` | Run stress tests (multiple iterations) |
 
-### Docker Environment
-
-| Command | Description |
-|---------|-------------|
-| `make e2e-docker-up` | Start E2E infrastructure |
-| `make e2e-docker-down` | Stop E2E infrastructure |
-| `make e2e-docker-test` | Run tests in Docker |
-| `make e2e-docker-debug` | Start with debug tools |
-
 ### Utilities
 
 | Command | Description |
@@ -148,33 +138,10 @@ make e2e-performance
 
 ## 🐳 Docker Testing
 
-### Local Development
-
-```bash
-# Start E2E environment
-make e2e-docker-up
-
-# Run your development server against E2E database
-export DB_HOST=localhost
-export DB_PORT=5433
-export DB_USER=e2e_user
-export DB_PASSWORD=e2e_password
-export DB_NAME=gestor_e2e_test
-
-go run main.go
-```
-
-### Debug Mode
-
-```bash
-# Start with debugging tools
-make e2e-docker-debug
-
-# Access debug tools:
-# - Adminer (DB): http://localhost:8082
-# - Redis Commander: http://localhost:8083
-# - Application: http://localhost:8081
-```
+The suites start their own PostgreSQL container through testcontainers
+(`postgres:17-alpine`), so only a running Docker daemon is required. For a
+manual database, use the `testdb` service of `docker-compose.yaml`
+(`docker compose up -d testdb`, port 5433).
 
 ## 📊 Coverage and Reporting
 
@@ -190,14 +157,12 @@ open coverage/coverage.html
 
 ### CI Integration
 
-The E2E tests integrate with GitHub Actions:
+The API E2E suite runs in GitHub Actions as the `backend-e2e` job of
+`.github/workflows/backend.yaml` (repository root):
 
 ```yaml
-# .github/workflows/e2e-tests.yml
-- name: Run E2E Tests
-  run: |
-    make e2e-smoke  # On PRs
-    make e2e        # On main branch
+- name: E2E Tests
+  run: make e2e-api
 ```
 
 ## 🧪 Writing E2E Tests
@@ -284,18 +249,6 @@ DB_HOST=auto-generated    # Testcontainer host
 DB_PORT=auto-generated    # Testcontainer port
 ```
 
-### Docker Compose Override
-
-Create `docker-compose.e2e.override.yml` for local customizations:
-
-```yaml
-version: '3.8'
-services:
-  postgres-e2e:
-    ports:
-      - "5434:5432"  # Different port to avoid conflicts
-```
-
 ## 🚨 Troubleshooting
 
 ### Common Issues
@@ -312,8 +265,8 @@ sudo chmod 666 /var/run/docker.sock
 sudo lsof -i :5433
 sudo lsof -i :8081
 
-# Stop conflicting services
-make e2e-docker-down
+# Remove leftover test containers
+make e2e-clean
 ```
 
 #### Test Timeouts
@@ -324,11 +277,11 @@ E2E_TIMEOUT=20m make e2e
 
 #### Database Connection Issues
 ```bash
-# Check database status
-docker-compose -f docker-compose.e2e.yml ps
+# Check the testcontainers PostgreSQL container
+docker ps --filter "label=org.testcontainers=true"
 
-# View logs
-docker-compose -f docker-compose.e2e.yml logs postgres-e2e
+# View its logs
+docker logs <container-id>
 ```
 
 ### Debug Mode
