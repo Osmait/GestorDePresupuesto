@@ -42,6 +42,28 @@ struct AuthViewModelTests {
         #expect(vm.error == nil)
     }
 
+    @Test @MainActor func sessionExpired_returnsToLogin() {
+        let (vm, _, _) = makeSUT()
+        vm.isAuthenticated = true
+        vm.user = .fixture()
+
+        vm.handleSessionExpired()
+
+        #expect(!vm.isAuthenticated)
+        #expect(vm.user == nil)
+        #expect(vm.toastMessage == "Tu sesión expiró. Inicia sesión de nuevo.")
+    }
+
+    @Test @MainActor func sessionExpired_ignoredWhenLoggedOut() {
+        let (vm, _, _) = makeSUT()
+        vm.isAuthenticated = false
+        vm.requiresBiometricUnlock = false
+
+        vm.handleSessionExpired()
+
+        #expect(!vm.showToast, "a wrong password on login must not show 'session expired'")
+    }
+
     @Test @MainActor func register_error_doesNotLogIn() async {
         let (vm, authRepo, _) = makeSUT()
         authRepo.registerError = MockError.forced

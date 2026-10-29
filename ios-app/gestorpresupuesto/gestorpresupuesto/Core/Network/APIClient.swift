@@ -164,6 +164,9 @@ actor APIClient {
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
                 await self.tokenStorage.clearTokens()
+                // The server rejected the refresh token (expired, revoked or
+                // unknown user): the session is over, send the user to login.
+                NotificationCenter.default.post(name: .sessionExpired, object: nil)
                 return nil
             }
 
@@ -185,4 +188,9 @@ actor APIClient {
 
 struct ErrorMessage: Decodable {
     let message: String
+}
+
+extension Notification.Name {
+    /// Posted when the refresh token is rejected; AuthViewModel returns to login.
+    static let sessionExpired = Notification.Name("APIClient.sessionExpired")
 }

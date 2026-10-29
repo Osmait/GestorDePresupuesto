@@ -250,7 +250,6 @@ struct FilterBar: View {
             .padding(.horizontal)
             .padding(.vertical, .sm)
         }
-        .background(Color.app.surface.opacity(0.5))
     }
 }
 
@@ -283,7 +282,7 @@ struct FilterChip: View {
                         .font(.caption2)
                 }
             }
-            .foregroundStyle(isActive ? .white : Color.app.textPrimary)
+            .foregroundStyle(isActive ? Color.app.onAccent : Color.app.textPrimary)
             .padding(.horizontal, .sm)
             .padding(.vertical, .xs)
             .background(
