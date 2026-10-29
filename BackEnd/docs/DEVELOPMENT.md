@@ -35,7 +35,7 @@ make dev-full
 ```
 Este comando inicia todos los servicios:
 - **Backend**: http://localhost:8080
-- **Frontend**: http://localhost:4321
+- **Frontend**: http://localhost:3000
 - **Database**: localhost:5432
 
 ### 🔧 Comandos de Gestión
@@ -120,7 +120,7 @@ make dev-stop
 | Servicio | Puerto | URL |
 |----------|--------|-----|
 | Backend API | 8080 | http://localhost:8080 |
-| Frontend | 4321 | http://localhost:4321 |
+| Frontend | 3000 | http://localhost:3000 |
 | PostgreSQL | 5432 | localhost:5432 |
 | PostgreSQL Test | 5433 | localhost:5433 |
 
@@ -164,7 +164,7 @@ LOG_FORMAT=console
 
 ## Hot Reload con Air
 
-La aplicación usa [Air](https://github.com/cosmtrek/air) para hot reload:
+La aplicación usa [Air](https://github.com/air-verse/air) para hot reload:
 
 - **Archivos monitoreados**: `*.go`, `*.html`, `*.tmpl`
 - **Archivos excluidos**: `*_test.go`

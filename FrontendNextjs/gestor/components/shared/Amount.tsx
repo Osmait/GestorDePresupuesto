@@ -1,7 +1,7 @@
 'use client'
 
-import { useReducedMotion } from 'framer-motion'
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
+import { useReducedMotion } from 'motion/react'
 import { AnimatedCounter } from '@/components/ui/animated-counter'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useAppLocale } from '@/lib/i18n/date-locale'

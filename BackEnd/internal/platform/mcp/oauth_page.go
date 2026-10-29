@@ -11,7 +11,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 	"github.com/rs/zerolog/log"
 
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"

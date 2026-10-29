@@ -77,7 +77,7 @@ export default async function globalSetup(): Promise<() => Promise<void>> {
 
   // ── 1. Start PostgreSQL testcontainer ────────────────────────────────────
   log('🐘 Starting PostgreSQL...')
-  const pgContainer: StartedPostgreSqlContainer = await new PostgreSqlContainer('postgres:15-alpine')
+  const pgContainer: StartedPostgreSqlContainer = await new PostgreSqlContainer('postgres:17-alpine')
     .withDatabase('e2e_testdb')
     .withUsername('e2e_user')
     .withPassword('e2e_pass')

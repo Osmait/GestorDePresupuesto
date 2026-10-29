@@ -2,7 +2,7 @@ const DEFAULT_AFTER_LOGIN = '/app'
 
 /** Only same-origin relative paths are accepted, to avoid open redirects. */
 export function getSafeCallbackUrl(value: string | null | undefined): string {
-	if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) {
+	if (!value?.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) {
 		return DEFAULT_AFTER_LOGIN
 	}
 	if (value.startsWith('/login') || value.startsWith('/register')) return DEFAULT_AFTER_LOGIN

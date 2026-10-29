@@ -279,6 +279,7 @@ func (s *Server) registerRoutes() {
 			s.oauthServer.TokenHandler().ServeHTTP(c.Writer, c.Request)
 			log.Printf("[OAuth] POST /oauth/token responded with status %d", c.Writer.Status())
 		})
+		s.Engine.POST("/oauth/revoke", gin.WrapH(s.oauthServer.RevocationHandler()))
 		s.Engine.POST("/oauth/register", func(c *gin.Context) {
 			log.Printf("[OAuth] POST /oauth/register from %s", c.ClientIP())
 			s.oauthServer.RegistrationHandler().ServeHTTP(c.Writer, c.Request)

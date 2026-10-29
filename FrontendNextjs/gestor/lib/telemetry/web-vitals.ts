@@ -6,7 +6,7 @@ export type WebVitalName = (typeof WEB_VITAL_NAMES)[number]
 
 export const webVitalSchema = z.object({
 	name: z.enum(WEB_VITAL_NAMES),
-	value: z.number().finite().nonnegative().max(600_000),
+	value: z.number().nonnegative().max(600_000),
 	rating: z.enum(['good', 'needs-improvement', 'poor']),
 	route: z.string().max(200),
 	navigationType: z.string().max(32).optional(),

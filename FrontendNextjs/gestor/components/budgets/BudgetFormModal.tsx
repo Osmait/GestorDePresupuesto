@@ -32,13 +32,14 @@ export function BudgetFormModal({ open, setOpen, initialCategoryId, onSaved }: B
 		() =>
 			z.object({
 				category_id: z.string().min(1, t('categoryRequired')),
-				amount: z.coerce.number().min(1, t('amountRequired')),
+				amount: z.coerce.number<number>().min(1, t('amountRequired')),
 			}),
 		[t],
 	)
 	type BudgetFormValues = z.infer<typeof budgetSchema>
+	type BudgetFormInput = z.input<typeof budgetSchema>
 
-	const form = useForm<BudgetFormValues>({
+	const form = useForm<BudgetFormInput, unknown, BudgetFormValues>({
 		resolver: zodResolver(budgetSchema),
 		defaultValues: { category_id: '', amount: 0 },
 		values: editingBudget

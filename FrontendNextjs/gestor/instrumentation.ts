@@ -3,8 +3,8 @@
  *
  * OpenTelemetry is OFF unless OTEL_EXPORTER_OTLP_ENDPOINT (or the
  * traces-specific variable) is set, so default deployments are unchanged.
- * Only the Node.js runtime is instrumented: the edge middleware only decodes
- * the session cookie and is not worth a span.
+ * Only the Node.js runtime is instrumented (the route-guard proxy in proxy.ts
+ * also runs there).
  */
 export async function register() {
 	if (process.env.NEXT_RUNTIME !== 'nodejs') return

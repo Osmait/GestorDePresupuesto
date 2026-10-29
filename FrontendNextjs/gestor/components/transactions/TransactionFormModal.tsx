@@ -33,8 +33,8 @@ function createTransactionSchema(t: (key: string) => string) {
 	return z.object({
 		name: z.string().min(2, t('nameRequired')),
 		description: z.string().optional(),
-		amount: z.coerce.number().min(0.01, t('amountRequired')),
-		type_transaction: z.nativeEnum(TypeTransaction, { errorMap: () => ({ message: t('selectType') }) }),
+		amount: z.coerce.number<number>().min(0.01, t('amountRequired')),
+		type_transaction: z.enum(TypeTransaction, { error: () => t('selectType') }),
 		account_id: z.string().min(1, t('accountRequired')),
 		category_id: z.string().min(1, t('categoryRequired')),
 		budget_id: z.string().optional(),
@@ -43,6 +43,7 @@ function createTransactionSchema(t: (key: string) => string) {
 	})
 }
 type TransactionFormValues = z.infer<ReturnType<typeof createTransactionSchema>>
+type TransactionFormInput = z.input<ReturnType<typeof createTransactionSchema>>
 
 /**
  * Unsent form input is kept in sessionStorage when the session expires mid-edit
@@ -177,7 +178,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 	const [submitError, setSubmitError] = useState<string | null>(null)
 	const draftKey = userId ? transactionDraftKey(userId, editingTransaction?.id) : null
 
-	const form = useForm<TransactionFormValues>({
+	const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
 		resolver: zodResolver(transactionSchema),
 		defaultValues: {
 			name: '',
@@ -750,7 +751,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 											selected={field.value}
 											onSelect={field.onChange}
 											disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-											initialFocus
+											autoFocus
 										/>
 									</PopoverContent>
 								</Popover>

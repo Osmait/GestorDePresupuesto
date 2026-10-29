@@ -107,7 +107,7 @@ dev-full:
 	@echo "$(GREEN)Full development environment started!$(RESET)"
 	@echo "$(YELLOW)Services:$(RESET)"
 	@echo "  - Backend: http://localhost:8080"
-	@echo "  - Frontend: http://localhost:4321"
+	@echo "  - Frontend: http://localhost:3000"
 	@echo "  - Database: localhost:5432"
 
 # Stop development environment
@@ -487,12 +487,6 @@ help:
 	@echo "  e2e-coverage  - Generate E2E coverage report"
 	@echo "  e2e-clean     - Clean E2E test containers"
 	@echo "  e2e-setup     - Setup E2E test environment"
-	@echo ""
-	@echo "$(YELLOW)E2E Docker Commands:$(RESET)"
-	@echo "  e2e-docker-up - Start E2E environment"
-	@echo "  e2e-docker-down - Stop E2E environment"
-	@echo "  e2e-docker-test - Run E2E tests in Docker"
-	@echo "  e2e-docker-debug - Start E2E environment with debug tools"
 
 ## E2E Test Commands
 
@@ -533,32 +527,6 @@ e2e-coverage:
 e2e-clean:
 	@echo "$(BLUE)🧹 Cleaning E2E test containers...$(RESET)"
 	@./scripts/e2e-test.sh clean
-
-# E2E Docker targets
-e2e-docker-up:
-	@echo "$(BLUE)🐳 Starting E2E environment...$(RESET)"
-	@docker-compose -f docker-compose.e2e.yml up -d postgres-e2e redis-e2e
-	@echo "$(YELLOW)⏳ Waiting for services to be ready...$(RESET)"
-	@sleep 10
-	@echo "$(GREEN)E2E environment ready!$(RESET)"
-
-e2e-docker-down:
-	@echo "$(BLUE)🐳 Stopping E2E environment...$(RESET)"
-	@docker-compose -f docker-compose.e2e.yml down -v
-	@echo "$(GREEN)E2E environment stopped$(RESET)"
-
-e2e-docker-test:
-	@echo "$(BLUE)🐳 Running E2E tests in Docker...$(RESET)"
-	@docker-compose -f docker-compose.e2e.yml --profile e2e up --build --abort-on-container-exit e2e-tests
-
-e2e-docker-debug:
-	@echo "$(BLUE)🐳 Starting E2E environment with debugging tools...$(RESET)"
-	@docker-compose -f docker-compose.e2e.yml --profile debug up -d
-	@echo "$(GREEN)E2E debug environment started!$(RESET)"
-	@echo "$(YELLOW)Debug tools available:$(RESET)"
-	@echo "  - Adminer (DB): http://localhost:8082"
-	@echo "  - Redis Commander: http://localhost:8083"
-	@echo "  - Application: http://localhost:8081"
 
 # E2E setup and dependencies
 e2e-setup:

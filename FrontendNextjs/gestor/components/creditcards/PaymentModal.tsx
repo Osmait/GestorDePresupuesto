@@ -37,13 +37,13 @@ function createPaymentSchema(t: Translator, tForms: Translator) {
 		fromAccountId: z.string().min(1, t('errors.selectAccount')),
 		currency: z.string().min(1),
 		amount: z.coerce
-			.number()
+			.number<number>()
 			.positive(t('errors.amountPositive'))
 			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals),
 		exchangeRate: z.string().optional().default(''),
 		includesInterest: z.boolean().default(false),
 		interestAmount: z.coerce
-			.number()
+			.number<number>()
 			.min(0)
 			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals)
 			.default(0),
@@ -52,6 +52,8 @@ function createPaymentSchema(t: Translator, tForms: Translator) {
 }
 
 type PaymentFormValues = z.infer<ReturnType<typeof createPaymentSchema>>
+
+type PaymentFormInput = z.input<ReturnType<typeof createPaymentSchema>>
 
 export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProps) {
 	const t = useTranslations('creditCards.payment')
@@ -65,7 +67,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 	const [accountsError, setAccountsError] = useState(false)
 	const { data: rateData } = useExchangeRateQuery()
 
-	const form = useForm<PaymentFormValues>({
+	const form = useForm<PaymentFormInput, unknown, PaymentFormValues>({
 		resolver: zodResolver(paymentSchema),
 		defaultValues: {
 			fromAccountId: '',

@@ -29,7 +29,7 @@ type Translator = (key: string, values?: Record<string, string | number>) => str
 
 function createCreditCardSchema(t: Translator) {
 	const day = z.coerce
-		.number()
+		.number<number>()
 		.min(1, t('errors.dayMin', { min: 1 }))
 		.max(28, t('errors.dayMax', { max: 28 }))
 	return z.object({
@@ -47,6 +47,8 @@ function createCreditCardSchema(t: Translator) {
 }
 
 type CreditCardFormValues = z.infer<ReturnType<typeof createCreditCardSchema>>
+
+type CreditCardFormInput = z.input<ReturnType<typeof createCreditCardSchema>>
 
 const DEFAULT_BALANCE: CreateBalanceDTO = { currency: 'DOP', credit_limit: 100000, initial_debt: 0 }
 
@@ -91,7 +93,7 @@ export function CreditCardFormModal({ open, onClose, onSubmit, card }: CreditCar
 	const [submitError, setSubmitError] = useState<{ detail: string | null } | null>(null)
 	const [balances, setBalances] = useState<BalanceRow[]>(() => balancesOf(card))
 
-	const form = useForm<CreditCardFormValues>({
+	const form = useForm<CreditCardFormInput, unknown, CreditCardFormValues>({
 		resolver: zodResolver(creditCardSchema),
 		defaultValues: valuesOf(card),
 	})

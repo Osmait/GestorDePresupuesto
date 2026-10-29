@@ -27,14 +27,14 @@ function createPaymentSchema(
 	return z.object({
 		destination_account_id: z.string().min(1, t('errors.destinationAccountRequired')),
 		amount: z.coerce
-			.number({ invalid_type_error: t('invalidPaymentAmountDetailed') })
+			.number<number>({ error: t('invalidPaymentAmountDetailed') })
 			.positive(t('invalidPaymentAmountDetailed'))
 			// loan_payments.amount is DECIMAL(15,2): the API rejects sub-cent amounts.
 			.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals'))
 			.superRefine((value, ctx) => {
 				if (value > pending) {
 					ctx.addIssue({
-						code: z.ZodIssueCode.custom,
+						code: 'custom',
 						message: t('paymentExceedsPendingDetailed', {
 							entered: formatAmount(value),
 							pending: formatAmount(pending),
@@ -48,6 +48,8 @@ function createPaymentSchema(
 }
 
 type LoanPaymentValues = z.infer<ReturnType<typeof createPaymentSchema>>
+
+type LoanPaymentInput = z.input<ReturnType<typeof createPaymentSchema>>
 
 function emptyValues(destinationAccountId = ''): LoanPaymentValues {
 	return {
@@ -84,7 +86,7 @@ export function LoanPaymentDialog({ open, onOpenChange, loan, accounts, onSubmit
 	const [submitError, setSubmitError] = useState<string | null>(null)
 	const defaultAccountId = accounts[0]?.id ?? ''
 
-	const form = useForm<LoanPaymentValues>({
+	const form = useForm<LoanPaymentInput, unknown, LoanPaymentValues>({
 		resolver: zodResolver(schema),
 		defaultValues: emptyValues(defaultAccountId),
 	})

@@ -12,10 +12,11 @@ function redirectToLogin(req: NextRequest) {
 }
 
 /**
- * Route protection only: decodes the session cookie and never refreshes backend
- * tokens (that happens exclusively in the next-auth `jwt` callback).
+ * Route protection only (Next.js proxy, Node.js runtime): decodes the session
+ * cookie and never refreshes backend tokens (that happens exclusively in the
+ * next-auth `jwt` callback).
  */
-export default async function middleware(req: NextRequest) {
+export async function proxy(req: NextRequest) {
 	const token = await readSessionJwt(req.headers)
 	if (!isUsableSession(token)) {
 		return redirectToLogin(req)

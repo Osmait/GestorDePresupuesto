@@ -34,16 +34,18 @@ function createEditPaymentSchema(t: (key: string) => string, tForms: (key: strin
 	// certificate_payments money columns are DECIMAL(15,2): the API rejects sub-cent amounts.
 	const cents = (schema: z.ZodNumber) => schema.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals'))
 	return z.object({
-		gross_interest: cents(z.coerce.number().min(0, t('errors.nonNegative'))),
-		tax_withheld: cents(z.coerce.number().min(0, t('errors.nonNegative'))),
-		net_interest: cents(z.coerce.number().min(0, t('errors.nonNegative'))),
-		applied_rate: z.coerce.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
-		applied_tax_rate: z.coerce.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
-		applied_capital: cents(z.coerce.number().min(0.01, t('errors.positive'))),
+		gross_interest: cents(z.coerce.number<number>().min(0, t('errors.nonNegative'))),
+		tax_withheld: cents(z.coerce.number<number>().min(0, t('errors.nonNegative'))),
+		net_interest: cents(z.coerce.number<number>().min(0, t('errors.nonNegative'))),
+		applied_rate: z.coerce.number<number>().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
+		applied_tax_rate: z.coerce.number<number>().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+		applied_capital: cents(z.coerce.number<number>().min(0.01, t('errors.positive'))),
 	})
 }
 
 type EditPaymentFormData = z.infer<ReturnType<typeof createEditPaymentSchema>>
+
+type EditPaymentFormInput = z.input<ReturnType<typeof createEditPaymentSchema>>
 
 const EDIT_FIELDS = [
 	{ name: 'gross_interest', labelKey: 'grossInterest' },
@@ -73,7 +75,7 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 	const updatePaymentMutation = useUpdateCertificatePaymentMutation()
 	const currency = certificate?.currency || 'DOP'
 
-	const form = useForm<EditPaymentFormData>({
+	const form = useForm<EditPaymentFormInput, unknown, EditPaymentFormData>({
 		resolver: zodResolver(editPaymentSchema),
 	})
 
