@@ -56,33 +56,40 @@ struct MainTabView: View {
             Tab("Inicio", systemImage: "house", value: AppTab.dashboard) {
                 NavigationStack {
                     DashboardView(onOpenMonthlyPlan: { selectedTab = .monthlyPlan })
+                        .readableWidth(ReadableWidth.wide)
                 }
             }
 
             Tab("Movimientos", systemImage: "arrow.up.arrow.down", value: AppTab.transactions) {
                 NavigationStack {
                     TransactionsListView()
+                        .readableWidth()
                 }
             }
 
             Tab("Plan", systemImage: "calendar", value: AppTab.monthlyPlan) {
                 NavigationStack {
                     MonthlyPlanView()
+                        .readableWidth(ReadableWidth.wide)
                 }
             }
 
             Tab("Análisis", systemImage: "chart.bar", value: AppTab.analytics) {
                 NavigationStack {
                     AnalyticsView()
+                        .readableWidth()
                 }
             }
 
             Tab("Más", systemImage: "square.grid.2x2", value: AppTab.more) {
                 NavigationStack {
                     MoreView(authViewModel: authViewModel)
+                        .readableWidth()
                 }
             }
         }
+        // iPad: tabs become a sidebar the user can toggle. iPhone: tab bar.
+        .tabViewStyle(.sidebarAdaptable)
     }
 }
 

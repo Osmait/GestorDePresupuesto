@@ -4,6 +4,7 @@ import SwiftUI
 /// expected income of every month, with the plan totals on top.
 struct MonthlyPlanView: View {
     @StateObject private var viewModel = MonthlyPlanViewModel()
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var editorItem: MonthlyPlanEditorTarget?
     @State private var itemToDelete: MonthlyPlanItem?
     @State private var showDeleteConfirmation = false
@@ -75,32 +76,70 @@ struct MonthlyPlanView: View {
 
     // MARK: - List
 
+    /// iPad (regular width): summary and controls in a side column, the
+    /// ledger next to it. iPhone: one list.
+    @ViewBuilder
     private var planList: some View {
+        if horizontalSizeClass == .regular {
+            HStack(alignment: .top, spacing: .xl) {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: .lg) {
+                        if let summary = viewModel.summary {
+                            MonthlyPlanSummaryCard(summary: summary)
+                        }
+                        groupingPicker
+                        pausedToggle
+                    }
+                    .padding(.vertical, .lg)
+                }
+                .frame(width: 360)
+
+                groupsList(withControls: false)
+            }
+            .padding(.horizontal, .lg)
+        } else {
+            groupsList(withControls: true)
+        }
+    }
+
+    private var groupingPicker: some View {
+        Picker("Agrupar por", selection: $viewModel.grouping) {
+            ForEach(MonthlyPlanViewModel.Grouping.allCases) { grouping in
+                Text(grouping.title).tag(grouping)
+            }
+        }
+        .pickerStyle(.segmented)
+    }
+
+    @ViewBuilder
+    private var pausedToggle: some View {
+        if viewModel.pausedCount > 0 {
+            Toggle("Mostrar pausados (\(viewModel.pausedCount))", isOn: $viewModel.showPaused)
+                .font(.app(.footnote))
+                .foregroundStyle(Color.app.textSecondary)
+                .tint(Color.app.accent)
+        }
+    }
+
+    private func groupsList(withControls: Bool) -> some View {
         List {
-            if let summary = viewModel.summary {
+            if withControls {
+                if let summary = viewModel.summary {
+                    Section {
+                        MonthlyPlanSummaryCard(summary: summary)
+                            .listRowInsets(EdgeInsets())
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
+                }
+
                 Section {
-                    MonthlyPlanSummaryCard(summary: summary)
+                    groupingPicker
                         .listRowInsets(EdgeInsets())
                         .listRowBackground(Color.clear)
                         .listRowSeparator(.hidden)
-                }
-            }
-
-            Section {
-                Picker("Agrupar por", selection: $viewModel.grouping) {
-                    ForEach(MonthlyPlanViewModel.Grouping.allCases) { grouping in
-                        Text(grouping.title).tag(grouping)
-                    }
-                }
-                .pickerStyle(.segmented)
-                .listRowInsets(EdgeInsets())
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-            } footer: {
-                if viewModel.pausedCount > 0 {
-                    Toggle("Mostrar pausados (\(viewModel.pausedCount))", isOn: $viewModel.showPaused)
-                        .font(.app(.footnote))
-                        .tint(Color.app.accent)
+                } footer: {
+                    pausedToggle
                         .padding(.top, .sm)
                 }
             }

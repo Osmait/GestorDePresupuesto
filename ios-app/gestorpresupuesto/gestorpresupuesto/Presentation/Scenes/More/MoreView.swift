@@ -157,6 +157,7 @@ struct MoreView: View {
     ) -> some View {
         NavigationLink {
             destination()
+                .readableWidth()
         } label: {
             Label {
                 Text(title)

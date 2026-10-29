@@ -21,12 +21,11 @@ final class TabWalkthroughUITests: XCTestCase {
 
         logInIfNeeded(app)
 
-        let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 15), "tab bar after login")
+        XCTAssertTrue(tab("Inicio", in: app).waitForExistence(timeout: 15), "tabs after login")
 
         let tabs = ["Inicio", "Movimientos", "Plan", "Análisis", "Más"]
         for tab in tabs {
-            tabBar.buttons[tab].tap()
+            self.tab(tab, in: app).tap()
             XCTAssertTrue(app.navigationBars.firstMatch.waitForExistence(timeout: 10))
             sleep(3) // let the screen load its data
             XCTAssertFalse(app.staticTexts["Error al cargar"].exists, "\(tab) failed to load")
@@ -34,7 +33,7 @@ final class TabWalkthroughUITests: XCTestCase {
         }
 
         // Plan: open the add menu and the new item form.
-        tabBar.buttons["Plan"].tap()
+        tab("Plan", in: app).tap()
         app.navigationBars.buttons["Agregar ítem al plan"].tap()
         app.buttons["Gasto fijo"].tap()
         XCTAssertTrue(app.navigationBars["Nuevo ítem"].waitForExistence(timeout: 5))
@@ -42,7 +41,7 @@ final class TabWalkthroughUITests: XCTestCase {
         app.navigationBars.buttons["Cancelar"].tap()
 
         // Más: open each module the user can see.
-        tabBar.buttons["Más"].tap()
+        tab("Más", in: app).tap()
         for module in ["Cuentas", "Presupuestos", "Categorías", "Recurrentes", "Tarjetas de crédito", "Préstamos", "Certificados", "Inversiones", "Metas de ahorro"] {
             let row = app.buttons[module].firstMatch
             var swipes = 0
@@ -61,6 +60,14 @@ final class TabWalkthroughUITests: XCTestCase {
             app.navigationBars.buttons.element(boundBy: 0).tap()
             app.collectionViews.firstMatch.swipeDown()
         }
+    }
+
+    /// iPhone shows a tab bar; iPad (sidebar-adaptable) shows its own tab
+    /// strip, which is not exposed as a tab bar.
+    @MainActor
+    private func tab(_ name: String, in app: XCUIApplication) -> XCUIElement {
+        let tabBarButton = app.tabBars.buttons[name]
+        return tabBarButton.exists ? tabBarButton : app.buttons[name].firstMatch
     }
 
     @MainActor

@@ -5,6 +5,7 @@ import SwiftUI
 struct DashboardView: View {
     @StateObject private var viewModel = DashboardViewModel()
     @State private var showSearch = false
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     var onOpenMonthlyPlan: () -> Void = {}
 
     var body: some View {
@@ -24,52 +25,9 @@ struct DashboardView: View {
                         Task { await viewModel.refresh() }
                     }
                 } else {
-                    LazyVStack(alignment: .leading, spacing: .lg) {
-                        BalanceHeader(
-                            totalBalance: viewModel.totalBalance,
-                            accountsCount: viewModel.accounts.count
-                        )
-
-                        HStack(spacing: .md) {
-                            StatCard(
-                                title: "Ingresos",
-                                value: viewModel.totalIncome.currencyFormatted,
-                                icon: "arrow.up.right",
-                                colors: Color.app.gradientIncome
-                            )
-                            StatCard(
-                                title: "Gastos",
-                                value: abs(viewModel.totalExpenses).currencyFormatted,
-                                icon: "arrow.down.right",
-                                colors: Color.app.gradientExpense
-                            )
-                        }
-
-                        if let summary = viewModel.monthlyPlanSummary {
-                            Button(action: onOpenMonthlyPlan) {
-                                MonthlyPlanDashboardCard(summary: summary, nextBill: viewModel.nextBill)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        if !viewModel.budgets.isEmpty {
-                            BudgetsSection(budgets: viewModel.budgets)
-                        }
-
-                        if !viewModel.recentTransactions.isEmpty {
-                            RecentTransactionsSection(transactions: viewModel.recentTransactions)
-                        }
-
-                        if viewModel.investmentsTotal + viewModel.certificatesTotal > 0 {
-                            PatrimonySection(
-                                accountsTotal: viewModel.totalBalance,
-                                investmentsTotal: viewModel.investmentsTotal,
-                                certificatesTotal: viewModel.certificatesTotal
-                            )
-                        }
-                    }
-                    .padding(.horizontal, .lg)
-                    .padding(.bottom, .xl)
+                    content
+                        .padding(.horizontal, .lg)
+                        .padding(.bottom, .xl)
                 }
             }
             .refreshable {
@@ -94,6 +52,87 @@ struct DashboardView: View {
             if viewModel.accounts.isEmpty {
                 await viewModel.loadAll()
             }
+        }
+    }
+}
+
+extension DashboardView {
+    /// iPad (regular width): the month on the left, budgets and recent
+    /// activity on the right. iPhone: one column.
+    @ViewBuilder
+    fileprivate var content: some View {
+        if horizontalSizeClass == .regular {
+            HStack(alignment: .top, spacing: .xl) {
+                VStack(alignment: .leading, spacing: .lg) {
+                    monthOverview
+                    patrimony
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
+
+                VStack(alignment: .leading, spacing: .lg) {
+                    activity
+                }
+                .frame(maxWidth: .infinity, alignment: .top)
+                .padding(.top, .xs)
+            }
+        } else {
+            LazyVStack(alignment: .leading, spacing: .lg) {
+                monthOverview
+                activity
+                patrimony
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var monthOverview: some View {
+        BalanceHeader(
+            totalBalance: viewModel.totalBalance,
+            accountsCount: viewModel.accounts.count
+        )
+
+        HStack(spacing: .md) {
+            StatCard(
+                title: "Ingresos",
+                value: viewModel.totalIncome.currencyFormatted,
+                icon: "arrow.up.right",
+                colors: Color.app.gradientIncome
+            )
+            StatCard(
+                title: "Gastos",
+                value: abs(viewModel.totalExpenses).currencyFormatted,
+                icon: "arrow.down.right",
+                colors: Color.app.gradientExpense
+            )
+        }
+
+        if let summary = viewModel.monthlyPlanSummary {
+            Button(action: onOpenMonthlyPlan) {
+                MonthlyPlanDashboardCard(summary: summary, nextBill: viewModel.nextBill)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var activity: some View {
+        if !viewModel.budgets.isEmpty {
+            BudgetsSection(budgets: viewModel.budgets)
+        }
+
+        if !viewModel.recentTransactions.isEmpty {
+            RecentTransactionsSection(transactions: viewModel.recentTransactions)
+        }
+    }
+
+    @ViewBuilder
+    private var patrimony: some View {
+        if viewModel.investmentsTotal + viewModel.certificatesTotal > 0 {
+            PatrimonySection(
+                accountsTotal: viewModel.totalBalance,
+                investmentsTotal: viewModel.investmentsTotal,
+                certificatesTotal: viewModel.certificatesTotal
+            )
         }
     }
 }
