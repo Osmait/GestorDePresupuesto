@@ -29,6 +29,9 @@ const (
 
 	CertificateInterestName        Key = "tx.certificate_interest.name"        // %s: bank
 	CertificateInterestDescription Key = "tx.certificate_interest.description" // %s start, %s end
+
+	BalanceAdjustmentName        Key = "tx.balance_adjustment.name"
+	BalanceAdjustmentDescription Key = "tx.balance_adjustment.description"
 )
 
 // CategoryKey returns the message key of the name of the system category
@@ -63,12 +66,16 @@ var messages = map[Key]map[Locale]string{
 	CertificateInterestName:        {ES: "%s - Pago de intereses", EN: "%s - Interest payment"},
 	CertificateInterestDescription: {ES: "Pago de intereses del certificado del %s al %s", EN: "Certificate interest payment for period %s to %s"},
 
+	BalanceAdjustmentName:        {ES: "Ajuste de saldo", EN: "Balance adjustment"},
+	BalanceAdjustmentDescription: {ES: "Cuadre con el saldo del banco", EN: "Reconciled with the bank balance"},
+
 	// System category names, keyed by domain/category.System.Key.
-	CategoryKey("card_payment"):      {ES: "Pago de tarjeta", EN: "Card payment"},
-	CategoryKey("loans_granted"):     {ES: "Préstamos otorgados", EN: "Loans granted"},
-	CategoryKey("loan_collections"):  {ES: "Cobro de préstamos", EN: "Loan collections"},
-	CategoryKey("loan_interest"):     {ES: "Intereses cobrados", EN: "Loan interest income"},
-	CategoryKey("loan_cancellation"): {ES: "Cancelación de préstamo", EN: "Loan cancellation"},
-	CategoryKey("broker_funding"):    {ES: "Fondeo del bróker", EN: "Broker funding"},
-	CategoryKey("investment_fees"):   {ES: "Comisiones de inversión", EN: "Investment fees"},
+	CategoryKey("card_payment"):       {ES: "Pago de tarjeta", EN: "Card payment"},
+	CategoryKey("loans_granted"):      {ES: "Préstamos otorgados", EN: "Loans granted"},
+	CategoryKey("loan_collections"):   {ES: "Cobro de préstamos", EN: "Loan collections"},
+	CategoryKey("loan_interest"):      {ES: "Intereses cobrados", EN: "Loan interest income"},
+	CategoryKey("loan_cancellation"):  {ES: "Cancelación de préstamo", EN: "Loan cancellation"},
+	CategoryKey("broker_funding"):     {ES: "Fondeo del bróker", EN: "Broker funding"},
+	CategoryKey("investment_fees"):    {ES: "Comisiones de inversión", EN: "Investment fees"},
+	CategoryKey("balance_adjustment"): {ES: "Ajuste de saldo", EN: "Balance adjustment"},
 }

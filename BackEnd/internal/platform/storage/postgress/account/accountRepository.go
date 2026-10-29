@@ -62,8 +62,8 @@ func (repo *AccountRepository) Delete(ctx context.Context, id string, userId str
 
 // The balance reads below use account_balances (migration 000052): per
 // (user, account, currency) the net total of the account's transactions
-// (income, loan_collection and loan_cancellation_refund add, every other type
-// subtracts; a NULL currency counts as DOP). Triggers on transactions keep it
+// (income, loan_collection, loan_cancellation_refund and adjustment_in add,
+// every other type subtracts; a NULL currency counts as DOP). Triggers on transactions keep it
 // current inside the writing transaction. The total is striped over up to 32
 // rows (one per writing connection slot, so concurrent writers do not queue on
 // a single row) and summed on read: an index range scan of a few rows instead

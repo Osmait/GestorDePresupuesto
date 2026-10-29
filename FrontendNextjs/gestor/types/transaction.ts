@@ -5,6 +5,9 @@ export enum TypeTransaction {
 	LOAN_COLLECTION = 'loan_collection',
 	INVESTMENT_PURCHASE = 'investment_purchase',
 	INVESTMENT_FUNDING = 'investment_funding',
+	/** Balance adjustment from a reconciliation (neutral in reports). */
+	ADJUSTMENT_IN = 'adjustment_in',
+	ADJUSTMENT_OUT = 'adjustment_out',
 }
 
 export interface Transaction {

@@ -10,6 +10,7 @@ import (
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/account"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
+	"github.com/osmait/gestorDePresupuesto/internal/services/systemcategory"
 
 	"github.com/segmentio/ksuid"
 )
@@ -17,13 +18,22 @@ import (
 // AccountService handles business logic related to account management.
 type AccountService struct {
 	accountRepository accountRepo.AccountRepositoryInterface
+
+	// Set by WithReconciliation (reconcile.go).
+	reconciliations accountRepo.ReconciliationRepositoryInterface
+	adjustments     AdjustmentWriter
+	categories      systemcategory.Store
 }
 
 // NewAccountService creates a new instance of AccountService.
-func NewAccountService(accountRepository accountRepo.AccountRepositoryInterface) *AccountService {
-	return &AccountService{
+func NewAccountService(accountRepository accountRepo.AccountRepositoryInterface, opts ...Option) *AccountService {
+	s := &AccountService{
 		accountRepository: accountRepository,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 // CreateAccount creates a new account for a user.
@@ -51,11 +61,18 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.Acc
 	if err != nil {
 		return nil, err
 	}
+	reconciledAt, err := s.lastReconciledAt(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
 	accountResponses := make([]*dto.AccountResponse, 0)
 
 	for _, account := range accounts {
 		balance := balances[account.Id]
 		accountResponse := dto.NewAccountResponse(account, balance.Add(account.InitialBalance))
+		if at, ok := reconciledAt[account.Id]; ok {
+			accountResponse.LastReconciledAt = &at
+		}
 		accountResponses = append(accountResponses, accountResponse)
 	}
 
@@ -119,6 +136,14 @@ func (s *AccountService) FindById(ctx context.Context, id, userId string) (*dto.
 	if err != nil {
 		return nil, err
 	}
+	reconciledAt, err := s.lastReconciledAt(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
 
-	return dto.NewAccountResponse(acc, balance.Add(acc.InitialBalance)), nil
+	response := dto.NewAccountResponse(acc, balance.Add(acc.InitialBalance))
+	if at, ok := reconciledAt[id]; ok {
+		response.LastReconciledAt = &at
+	}
+	return response, nil
 }

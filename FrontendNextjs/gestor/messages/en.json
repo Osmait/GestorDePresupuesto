@@ -328,8 +328,31 @@
       "typeBank": "Bank account",
       "typeCreditCard": "Credit card",
       "currency": "Currency",
-      "createdAt": "Created on"
-    }
+      "createdAt": "Created on",
+      "lastReconciled": "Last reconciled",
+      "reconciliations": "Reconciliation history",
+      "noReconciliations": "You have not reconciled this account yet",
+      "reconcileNoAdjustment": "No adjustment"
+    },
+    "reconcile": "Reconcile balance",
+    "reconcileTitle": "Reconcile {name}",
+    "reconcileDescription": "Enter the balance your bank shows right now. If it differs from the app, an adjustment is recorded for the difference (it counts as neither income nor expense).",
+    "reconcileAppBalance": "Balance in the app",
+    "reconcileBankBalance": "Balance at the bank",
+    "reconcileBankBalanceHint": "May be negative if the account is overdrawn.",
+    "reconcileBalanceRequired": "Enter the balance the bank shows",
+    "reconcileNotes": "Note (optional)",
+    "reconcileNotesPlaceholder": "E.g. balance from the bank app",
+    "reconcileDifference": "Adjustment",
+    "reconcileMatches": "Matches: no adjustment needed",
+    "reconcileSubmit": "Reconcile",
+    "reconcileSuccessAdjusted": "Account reconciled with an adjustment of {amount}",
+    "reconcileSuccessMatched": "Account reconciled: the balance already matched",
+    "reconcileError": "Could not reconcile the account",
+    "reconciledAgo": "Reconciled {ago}",
+    "reconciledToday": "Reconciled today",
+    "neverReconciled": "Never reconciled",
+    "reconcileStale": "Not reconciled for more than {days} days"
   },
   "transactions": {
     "noDescription": "No description",
@@ -405,6 +428,8 @@
       "investment_purchase": "Investment purchase",
       "investment_funding": "Investment funding",
       "loan_cancellation_refund": "Loan cancellation refund",
+      "adjustment_in": "Balance adjustment (in)",
+      "adjustment_out": "Balance adjustment (out)",
       "unknown": "Other"
     },
     "sectionsLabel": "Transaction sections"

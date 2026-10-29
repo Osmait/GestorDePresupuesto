@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
-import { getSignedAmount, isInflowTransaction } from '@/lib/transaction-utils'
+import { getSignedAmount, isAdjustmentTransaction, isInflowTransaction } from '@/lib/transaction-utils'
 import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { TransactionActionsContext } from './TransactionContext'
@@ -41,7 +41,8 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 	const [deleteDialogMounted, setDeleteDialogMounted] = useState(false)
 
 	const isIncome = isInflowTransaction(transaction.type_transation)
-	const canEdit = Boolean(onEdit || (setEditingTransaction && setModalOpen))
+	const canEdit =
+		!isAdjustmentTransaction(transaction.type_transation) && Boolean(onEdit || (setEditingTransaction && setModalOpen))
 
 	const getCategoryIcon = (icon?: string) => {
 		if (!icon) return '🏷️'

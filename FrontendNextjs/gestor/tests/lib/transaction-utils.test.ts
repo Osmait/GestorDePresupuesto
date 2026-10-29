@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { getSignedAmount, getTransactionTypeKey, isInflowTransaction } from '@/lib/transaction-utils'
+import {
+	getSignedAmount,
+	getTransactionTypeKey,
+	isAdjustmentTransaction,
+	isInflowTransaction,
+} from '@/lib/transaction-utils'
 import { TypeTransaction } from '@/types/transaction'
 
 describe('transaction-utils', () => {
@@ -21,5 +26,21 @@ describe('transaction-utils', () => {
 		expect(getTransactionTypeKey('bill')).toBe('types.bill')
 		expect(getTransactionTypeKey('income')).toBe('types.income')
 		expect(getTransactionTypeKey('something-new')).toBe('types.unknown')
+	})
+
+	it('signs balance adjustments by direction and maps them to their own keys', () => {
+		expect(isInflowTransaction(TypeTransaction.ADJUSTMENT_IN)).toBe(true)
+		expect(isInflowTransaction(TypeTransaction.ADJUSTMENT_OUT)).toBe(false)
+		expect(getSignedAmount({ amount: 50.5, type_transation: TypeTransaction.ADJUSTMENT_IN })).toBe(50.5)
+		expect(getSignedAmount({ amount: 50.5, type_transation: TypeTransaction.ADJUSTMENT_OUT })).toBe(-50.5)
+		expect(getTransactionTypeKey('adjustment_in')).toBe('types.adjustment_in')
+		expect(getTransactionTypeKey('adjustment_out')).toBe('types.adjustment_out')
+	})
+
+	it('flags only the adjustment types as adjustments', () => {
+		expect(isAdjustmentTransaction(TypeTransaction.ADJUSTMENT_IN)).toBe(true)
+		expect(isAdjustmentTransaction(TypeTransaction.ADJUSTMENT_OUT)).toBe(true)
+		expect(isAdjustmentTransaction(TypeTransaction.BILL)).toBe(false)
+		expect(isAdjustmentTransaction(undefined)).toBe(false)
 	})
 })

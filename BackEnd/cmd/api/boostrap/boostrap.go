@@ -356,6 +356,7 @@ func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 // repositories holds all repository interfaces
 type repositories struct {
 	accountRepository      accountRepo.AccountRepositoryInterface
+	reconciliationRepo     accountRepo.ReconciliationRepositoryInterface
 	transactionRepository  transactionRepo.TransactionRepositoryInterface
 	userRepository         userRepo.UserRepositoryInterface
 	budgetRepository       budgetRepo.BudgetRepoInterface
@@ -377,6 +378,7 @@ type repositories struct {
 func initializeRepositories(db *sql.DB) *repositories {
 	return &repositories{
 		accountRepository:      accountRepo.NewAccountRepository(db),
+		reconciliationRepo:     accountRepo.NewReconciliationRepository(db),
 		transactionRepository:  transactionRepo.NewTransactionRepository(db),
 		userRepository:         userRepo.NewUserRepository(db),
 		budgetRepository:       budgetRepo.NewBudgetRepository(db),
@@ -481,7 +483,7 @@ func initializeServices(repos *repositories, cfg *config.Config) (*services, err
 	}
 
 	return &services{
-		accountService:      account.NewAccountService(repos.accountRepository),
+		accountService:      account.NewAccountService(repos.accountRepository, account.WithReconciliation(repos.reconciliationRepo, transactionService, repos.categoryRepository)),
 		transactionService:  transactionService,
 		userService:         userService,
 		authService:         authService,

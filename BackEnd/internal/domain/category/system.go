@@ -50,12 +50,16 @@ var (
 	SystemLoanCancellation = System{Key: "loan_cancellation", Icon: "🔙", Color: "#ef4444", KnownNames: []string{"Cancelacion de prestamo", "Cancelación de préstamo", "Loan cancellation"}, idPrefix: "syscat_", hashKey: true}
 	SystemBrokerFunding    = System{Key: "broker_funding", Icon: "🏦", Color: "#2563eb", KnownNames: []string{"Fondeo broker", "Fondeo del bróker", "Broker funding"}, idPrefix: "syscat_", hashKey: true}
 	SystemInvestmentFees   = System{Key: "investment_fees", Icon: "💳", Color: "#f97316", KnownNames: []string{"Comisiones de inversion", "Comisiones de inversión", "Investment fees"}, idPrefix: "syscat_", hashKey: true}
+
+	// SystemBalanceAdjustment groups the adjustments written when the user
+	// reconciles an account with the balance the bank shows.
+	SystemBalanceAdjustment = System{Key: "balance_adjustment", Icon: "⚖️", Color: "#8b5cf6", KnownNames: []string{"Ajuste de saldo", "Balance adjustment"}, idPrefix: "syscat_", hashKey: true}
 )
 
 // Systems lists every system category.
 func Systems() []System {
 	return []System{
 		SystemCardPayment, SystemLoansGranted, SystemLoanCollections, SystemLoanInterest,
-		SystemLoanCancellation, SystemBrokerFunding, SystemInvestmentFees,
+		SystemLoanCancellation, SystemBrokerFunding, SystemInvestmentFees, SystemBalanceAdjustment,
 	}
 }
