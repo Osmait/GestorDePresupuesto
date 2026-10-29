@@ -24,6 +24,7 @@ struct CreditCard: Codable, Identifiable, Equatable {
         case updatedAt = "updated_at"
     }
 
+
     var totalDebt: Double {
         balances.reduce(0) { $0 + $1.currentBalance }
     }
@@ -150,5 +151,23 @@ struct CreateCardPaymentRequest: Codable {
         case exchangeRate = "exchange_rate"
         case includesInterest = "includes_interest"
         case interestAmount = "interest_amount"
+    }
+}
+
+extension CreditCard {
+    // `balances` comes back as `null` for a card without balance rows.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        name = try container.decode(String.self, forKey: .name)
+        bank = try container.decode(String.self, forKey: .bank)
+        lastFourDigits = try container.decode(String.self, forKey: .lastFourDigits)
+        cutDay = try container.decode(Int.self, forKey: .cutDay)
+        dueDay = try container.decode(Int.self, forKey: .dueDay)
+        balances = try container.decodeIfPresent([CardBalance].self, forKey: .balances) ?? []
+        nextCutDate = try container.decodeIfPresent(String.self, forKey: .nextCutDate)
+        nextDueDate = try container.decodeIfPresent(String.self, forKey: .nextDueDate)
+        createdAt = try container.decode(String.self, forKey: .createdAt)
+        updatedAt = try container.decode(String.self, forKey: .updatedAt)
     }
 }

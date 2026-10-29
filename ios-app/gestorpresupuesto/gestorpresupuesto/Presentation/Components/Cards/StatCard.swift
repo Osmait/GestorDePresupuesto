@@ -1,5 +1,8 @@
 import SwiftUI
 
+/// One KPI in a flat card, like the web `StatCard`: muted label and icon on
+/// top, the value below. `colors.first` only tints the value (pass
+/// `Color.app.gradientSuccess` for a positive figure, etc.).
 struct StatCard: View {
     let title: String
     let value: String
@@ -12,36 +15,42 @@ struct StatCard: View {
         case up, down, neutral
     }
 
+    private var valueColor: Color {
+        colors.first ?? Color.app.textPrimary
+    }
+
     var body: some View {
-        GradientCard(colors: colors, cornerRadius: .xl, padding: .lg) {
-            HStack(spacing: .md) {
-                IconCircle(icon: icon, colors: colors)
-
-                VStack(alignment: .leading, spacing: .xs) {
+        SurfaceCard(cornerRadius: .lg, padding: .lg) {
+            VStack(alignment: .leading, spacing: .sm) {
+                HStack(alignment: .top) {
                     Text(title)
-                        .font(.app(.caption))
-                        .foregroundStyle(.white.opacity(0.8))
-
-                    Text(value)
-                        .font(.app(.title2))
-                        .fontWeight(.bold)
-                        .foregroundStyle(.white)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.5)
-
-                    if let trend = trend, let trendValue = trendValue {
-                        HStack(spacing: .xs) {
-                            Image(systemName: trend == .up ? "arrow.up.right" : trend == .down ? "arrow.down.right" : "minus")
-                                .font(.caption2)
-                            Text(trendValue)
-                                .font(.caption2)
-                        }
-                        .foregroundStyle(trend == .up ? .white : trend == .down ? .white.opacity(0.7) : .white.opacity(0.6))
-                    }
+                        .font(.app(.footnote))
+                        .fontWeight(.medium)
+                        .foregroundStyle(Color.app.textSecondary)
+                    Spacer(minLength: .sm)
+                    Image(systemName: icon)
+                        .font(.footnote)
+                        .foregroundStyle(Color.app.textSecondary)
+                        .accessibilityHidden(true)
                 }
 
-                Spacer()
+                Text(value)
+                    .font(.app(.title3))
+                    .monospacedDigit()
+                    .foregroundStyle(valueColor)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+
+                if let trend = trend, let trendValue = trendValue {
+                    HStack(spacing: .xs) {
+                        Image(systemName: trend == .up ? "arrow.up.right" : trend == .down ? "arrow.down.right" : "minus")
+                        Text(trendValue)
+                    }
+                    .font(.app(.caption))
+                    .foregroundStyle(trend == .up ? Color.app.success : trend == .down ? Color.app.error : Color.app.textSecondary)
+                }
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(title): \(value)")
@@ -56,12 +65,12 @@ struct IconCircle: View {
     var body: some View {
         ZStack {
             Circle()
-                .fill(.white.opacity(0.2))
+                .fill(Color.app.surfaceSecondary)
                 .frame(width: size, height: size)
 
             Image(systemName: icon)
-                .font(.system(size: size * 0.45, weight: .semibold))
-                .foregroundStyle(.white)
+                .font(.system(size: size * 0.42, weight: .medium))
+                .foregroundStyle(colors.first ?? Color.app.textPrimary)
         }
     }
 }

@@ -23,18 +23,16 @@ class RecurringTransactionsViewModel: BaseViewModel {
         }
     }
 
-    func createRecurringTransaction(request: CreateRecurringTransactionRequest) async throws -> RecurringTransaction {
-        let recurring = try await recurringRepository.create(request)
+    func createRecurringTransaction(request: CreateRecurringTransactionRequest) async throws {
+        try await recurringRepository.create(request)
         showSuccess("Transacción recurrente creada")
         await loadRecurringTransactions()
-        return recurring
     }
 
-    func updateRecurringTransaction(_ id: String, request: UpdateRecurringTransactionRequest) async throws -> RecurringTransaction {
-        let recurring = try await recurringRepository.update(id, request: request)
+    func updateRecurringTransaction(_ id: String, request: UpdateRecurringTransactionRequest) async throws {
+        try await recurringRepository.update(id, request: request)
         showSuccess("Transacción recurrente actualizada")
         await loadRecurringTransactions()
-        return recurring
     }
 
     func deleteRecurringTransaction(_ id: String) async {

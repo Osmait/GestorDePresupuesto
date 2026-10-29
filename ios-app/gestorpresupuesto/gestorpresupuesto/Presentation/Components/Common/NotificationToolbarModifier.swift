@@ -17,7 +17,7 @@ struct NotificationToolbarModifier: ViewModifier {
                             if notificationManager.unreadCount > 0 {
                                 Text(notificationManager.unreadCount > 9 ? "9+" : "\(notificationManager.unreadCount)")
                                     .font(.system(size: 8, weight: .bold))
-                                    .foregroundStyle(.white)
+                                    .foregroundStyle(Color.app.onStatus)
                                     .padding(.horizontal, 3)
                                     .frame(minWidth: 14, minHeight: 14)
                                     .background(Color.app.error, in: Capsule())

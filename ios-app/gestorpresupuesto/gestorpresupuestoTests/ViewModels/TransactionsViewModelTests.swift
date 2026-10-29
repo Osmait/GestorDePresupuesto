@@ -177,7 +177,7 @@ struct TransactionsViewModelTests {
     @Test func filterType_apiValues() {
         #expect(FilterType.all.apiValue == nil)
         #expect(FilterType.income.apiValue == "income")
-        #expect(FilterType.expense.apiValue == "expense")
+        #expect(FilterType.expense.apiValue == "bill")
     }
 
     // MARK: - Delete

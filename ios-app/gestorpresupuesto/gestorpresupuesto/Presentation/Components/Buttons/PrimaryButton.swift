@@ -23,7 +23,7 @@ struct PrimaryButton: View {
             HStack(spacing: .sm) {
                 if isLoading {
                     ProgressView()
-                        .progressViewStyle(CircularProgressViewStyle(tint: .white))
+                        .progressViewStyle(CircularProgressViewStyle(tint: Color.app.onAccent))
                 } else {
                     if let icon = icon {
                         Image(systemName: icon)
@@ -34,15 +34,9 @@ struct PrimaryButton: View {
             }
             .frame(maxWidth: .infinity)
             .padding(Spacing.lg)
-            .background(
-                LinearGradient(
-                    colors: Color.app.gradientPrimary,
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
+            .background(Color.app.accent)
             .cornerRadius(Radius.lg)
-            .foregroundStyle(.white)
+            .foregroundStyle(Color.app.onAccent)
         }
         .disabled(isLoading)
         .buttonStyle(ScaleButtonStyle())
@@ -128,19 +122,14 @@ struct FAB: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                LinearGradient(
-                    colors: Color.app.gradientPrimary,
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .frame(width: 56, height: 56)
-                .clipShape(Circle())
-                .shadow(color: Color.app.accent.opacity(0.4), radius: 8, x: 0, y: 4)
+                Circle()
+                    .fill(Color.app.accent)
+                    .frame(width: 56, height: 56)
 
                 Image(systemName: icon)
                     .font(.title2)
                     .fontWeight(.semibold)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.app.onAccent)
             }
         }
         .buttonStyle(ScaleButtonStyle())

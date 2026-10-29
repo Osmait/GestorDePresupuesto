@@ -6,7 +6,7 @@ struct ReconciliationView: View {
     @State private var selectedAccountId = ""
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
             ZStack {
                 Color.app.background.ignoresSafeArea()
 

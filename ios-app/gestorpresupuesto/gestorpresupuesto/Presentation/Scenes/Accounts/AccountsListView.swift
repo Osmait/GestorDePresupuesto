@@ -11,7 +11,7 @@ struct AccountsListView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
             ZStack {
                 Color.app.background.ignoresSafeArea()
 
@@ -283,7 +283,7 @@ struct AddAccountView: View {
         )
 
         do {
-            _ = try await viewModel.createAccount(request: request)
+            try await viewModel.createAccount(request: request)
             isPresented = false
         } catch {
             shakeTrigger = false

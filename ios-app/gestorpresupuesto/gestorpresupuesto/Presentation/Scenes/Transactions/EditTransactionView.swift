@@ -19,7 +19,7 @@ struct EditTransactionView: View {
         _name = State(initialValue: transaction.name)
         _description = State(initialValue: transaction.description ?? "")
         _amount = State(initialValue: String(format: "%.2f", transaction.amount))
-        _typeTransaction = State(initialValue: transaction.typeTransaction)
+        _typeTransaction = State(initialValue: transaction.typeTransaction == "expense" ? "bill" : transaction.typeTransaction)
         _selectedCategoryId = State(initialValue: transaction.categoryId)
         _selectedAccountId = State(initialValue: transaction.accountId)
     }
@@ -60,7 +60,7 @@ struct EditTransactionView: View {
                         DropdownPicker(
                             title: "Tipo",
                             selection: $typeTransaction,
-                            options: ["income", "expense", "bill"],
+                            options: ["income", "bill"],
                             labelForOption: { type in
                                 TransactionType(rawValue: type)?.displayName ?? type
                             },

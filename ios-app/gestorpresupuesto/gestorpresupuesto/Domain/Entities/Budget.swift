@@ -70,6 +70,15 @@ struct BudgetResponse: Codable, Identifiable {
     var displayName: String {
         categoryName ?? "Presupuesto"
     }
+
+    /// The backend does not send `category_name`; the repository fills it in
+    /// from the categories, like the web does.
+    func withCategoryName(_ name: String?) -> BudgetResponse {
+        BudgetResponse(
+            id: id, categoryId: categoryId, userId: userId, amount: amount,
+            currentAmount: currentAmount, categoryName: categoryName ?? name, createdAt: createdAt
+        )
+    }
 }
 
 struct CreateBudgetRequest: Codable {

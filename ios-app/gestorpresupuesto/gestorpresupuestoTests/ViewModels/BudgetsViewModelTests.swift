@@ -31,11 +31,12 @@ struct BudgetsViewModelTests {
         mock.getAllResult = .success([.fixture()])
         let vm = BudgetsViewModel(budgetRepository: mock)
 
-        let budget = try await vm.createBudget(request: CreateBudgetRequest(
+        try await vm.createBudget(request: CreateBudgetRequest(
             categoryId: "cat-1", amount: 5000
         ))
 
-        #expect(budget.amount == 5000)
+        // The backend returns no body; the list is reloaded instead.
+        #expect(vm.budgets.first?.amount == 5000)
     }
 
     @Test @MainActor func updateBudget_success() async throws {
@@ -44,7 +45,7 @@ struct BudgetsViewModelTests {
         mock.getAllResult = .success([.fixture()])
         let vm = BudgetsViewModel(budgetRepository: mock)
 
-        _ = try await vm.updateBudget("bud-1", request: UpdateBudgetRequest(
+        try await vm.updateBudget("bud-1", request: UpdateBudgetRequest(
             categoryId: "cat-1", amount: 8000
         ))
 

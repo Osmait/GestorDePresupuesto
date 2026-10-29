@@ -196,7 +196,7 @@ enum FilterType: String, CaseIterable {
         switch self {
         case .all: return nil
         case .income: return "income"
-        case .expense: return "expense"
+        case .expense: return "bill"
         }
     }
 }

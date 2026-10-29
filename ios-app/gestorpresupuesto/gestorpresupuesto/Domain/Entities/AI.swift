@@ -353,6 +353,11 @@ struct AISavingsGoal: Codable, Identifiable {
     }
 }
 
+struct AISavingsGoalsListResponse: Codable {
+    let success: Bool
+    let data: [AISavingsGoal]?
+}
+
 struct AISavingsGoalResponse: Codable {
     let success: Bool
     let data: AISavingsGoal

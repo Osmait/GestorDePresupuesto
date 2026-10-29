@@ -13,7 +13,8 @@ enum MockError: Error, LocalizedError {
 final class MockAuthRepository: AuthRepository {
     var loginResult: Result<User, Error> = .success(.fixture())
     var loginCallCount = 0
-    var registerResult: Result<User, Error> = .success(.fixture())
+    var registerError: Error?
+    var registerCallCount = 0
     var logoutError: Error?
     var logoutCallCount = 0
     var getProfileResult: Result<User, Error> = .success(.fixture())
@@ -23,8 +24,9 @@ final class MockAuthRepository: AuthRepository {
         return try loginResult.get()
     }
 
-    func register(name: String, lastName: String, email: String, password: String) async throws -> User {
-        return try registerResult.get()
+    func register(name: String, lastName: String, email: String, password: String) async throws {
+        registerCallCount += 1
+        if let error = registerError { throw error }
     }
 
     func logout() async throws {
@@ -58,13 +60,13 @@ final class MockAccountRepository: AccountRepository {
         return try getByIdResult.get()
     }
 
-    func create(_ request: CreateAccountRequest) async throws -> Account {
+    func create(_ request: CreateAccountRequest) async throws {
         createCallCount += 1
-        return try createResult.get()
+        _ = try createResult.get()
     }
 
-    func update(_ id: String, request: UpdateAccountRequest) async throws -> Account {
-        return try updateResult.get()
+    func update(_ id: String, request: UpdateAccountRequest) async throws {
+        _ = try updateResult.get()
     }
 
     func delete(_ id: String) async throws {
@@ -128,12 +130,12 @@ final class MockCategoryRepository: CategoryRepository {
         return try getAllResult.get()
     }
 
-    func create(_ request: CreateCategoryRequest) async throws -> gestorpresupuesto.Category {
-        return try createResult.get()
+    func create(_ request: CreateCategoryRequest) async throws {
+        _ = try createResult.get()
     }
 
-    func update(_ id: String, request: UpdateCategoryRequest) async throws -> gestorpresupuesto.Category {
-        return try updateResult.get()
+    func update(_ id: String, request: UpdateCategoryRequest) async throws {
+        _ = try updateResult.get()
     }
 
     func delete(_ id: String) async throws {
@@ -157,12 +159,57 @@ final class MockBudgetRepository: BudgetRepository {
         return try getAllResult.get()
     }
 
-    func create(_ request: CreateBudgetRequest) async throws -> Budget {
-        return try createResult.get()
+    func create(_ request: CreateBudgetRequest) async throws {
+        _ = try createResult.get()
     }
 
-    func update(_ id: String, request: UpdateBudgetRequest) async throws -> Budget {
-        return try updateResult.get()
+    func update(_ id: String, request: UpdateBudgetRequest) async throws {
+        _ = try updateResult.get()
+    }
+
+    func delete(_ id: String) async throws {
+        deleteCallCount += 1
+        if let error = deleteError { throw error }
+    }
+}
+
+// MARK: - MockMonthlyPlanRepository
+
+final class MockMonthlyPlanRepository: MonthlyPlanRepository {
+    var getAllResult: Result<[MonthlyPlanItem], Error> = .success([])
+    var getAllCallCount = 0
+    var getSummaryResult: Result<MonthlyPlanSummary, Error> = .success(.fixture())
+    var createError: Error?
+    var lastCreateRequest: MonthlyPlanItemRequest?
+    var updateError: Error?
+    var lastUpdate: (id: String, request: MonthlyPlanItemRequest)?
+    var setActiveError: Error?
+    var lastSetActive: (id: String, isActive: Bool)?
+    var deleteError: Error?
+    var deleteCallCount = 0
+
+    func getAll() async throws -> [MonthlyPlanItem] {
+        getAllCallCount += 1
+        return try getAllResult.get()
+    }
+
+    func getSummary() async throws -> MonthlyPlanSummary {
+        try getSummaryResult.get()
+    }
+
+    func create(_ request: MonthlyPlanItemRequest) async throws {
+        lastCreateRequest = request
+        if let error = createError { throw error }
+    }
+
+    func update(_ id: String, request: MonthlyPlanItemRequest) async throws {
+        lastUpdate = (id, request)
+        if let error = updateError { throw error }
+    }
+
+    func setActive(_ id: String, isActive: Bool) async throws {
+        lastSetActive = (id, isActive)
+        if let error = setActiveError { throw error }
     }
 
     func delete(_ id: String) async throws {
@@ -208,12 +255,12 @@ final class MockRecurringTransactionRepository: RecurringTransactionRepository {
         return try getAllResult.get()
     }
 
-    func create(_ request: CreateRecurringTransactionRequest) async throws -> RecurringTransaction {
-        return try createResult.get()
+    func create(_ request: CreateRecurringTransactionRequest) async throws {
+        _ = try createResult.get()
     }
 
-    func update(_ id: String, request: UpdateRecurringTransactionRequest) async throws -> RecurringTransaction {
-        return try updateResult.get()
+    func update(_ id: String, request: UpdateRecurringTransactionRequest) async throws {
+        _ = try updateResult.get()
     }
 
     func delete(_ id: String) async throws {
@@ -385,12 +432,12 @@ final class MockCertificateRepository: CertificateRepository {
         return try getByIdResult.get()
     }
 
-    func create(_ request: CreateCertificateRequest) async throws -> Certificate {
-        return try createResult.get()
+    func create(_ request: CreateCertificateRequest) async throws {
+        _ = try createResult.get()
     }
 
-    func update(_ id: String, request: UpdateCertificateRequest) async throws -> Certificate {
-        return try updateResult.get()
+    func update(_ id: String, request: UpdateCertificateRequest) async throws {
+        _ = try updateResult.get()
     }
 
     func delete(_ id: String) async throws {
@@ -430,8 +477,8 @@ final class MockInvestmentRepository: InvestmentRepository {
         return try getByIdResult.get()
     }
 
-    func create(_ request: CreateInvestmentRequest) async throws -> Investment {
-        return try createResult.get()
+    func create(_ request: CreateInvestmentRequest) async throws {
+        _ = try createResult.get()
     }
 
     func update(_ id: String, request: UpdateInvestmentRequest) async throws -> Investment {

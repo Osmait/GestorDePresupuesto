@@ -200,7 +200,7 @@ struct EditCategoryView: View {
         )
 
         do {
-            _ = try await viewModel.updateCategory(category.id, request: request)
+            try await viewModel.updateCategory(category.id, request: request)
             dismiss()
         } catch {
             shakeTrigger = false

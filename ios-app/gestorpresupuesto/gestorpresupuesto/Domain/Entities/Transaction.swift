@@ -155,7 +155,8 @@ struct TransactionFilter: Codable {
         if let type = type { items.append(URLQueryItem(name: "type", value: type)) }
         if let categoryId = categoryId { items.append(URLQueryItem(name: "category_id", value: categoryId)) }
         if let categories = categories, !categories.isEmpty {
-            categories.forEach { items.append(URLQueryItem(name: "categories", value: $0)) }
+            // The backend reads one comma-separated value.
+            items.append(URLQueryItem(name: "categories", value: categories.joined(separator: ",")))
         }
         if let accountId = accountId { items.append(URLQueryItem(name: "account_id", value: accountId)) }
         if let budgetId = budgetId { items.append(URLQueryItem(name: "budget_id", value: budgetId)) }

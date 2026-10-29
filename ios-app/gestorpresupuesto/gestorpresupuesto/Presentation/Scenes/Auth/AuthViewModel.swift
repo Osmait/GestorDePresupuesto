@@ -71,7 +71,7 @@ class AuthViewModel: BaseViewModel {
         error = nil
 
         do {
-            _ = try await authRepository.register(name: name, lastName: lastName, email: email, password: password)
+            try await authRepository.register(name: name, lastName: lastName, email: email, password: password)
             await login(email: email, password: password)
         } catch {
             showError(error.localizedDescription)

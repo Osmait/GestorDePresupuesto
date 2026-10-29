@@ -23,18 +23,16 @@ class AccountsViewModel: BaseViewModel {
         }
     }
 
-    func createAccount(request: CreateAccountRequest) async throws -> Account {
-        let account = try await accountRepository.create(request)
+    func createAccount(request: CreateAccountRequest) async throws {
+        try await accountRepository.create(request)
         showSuccess("Cuenta creada")
         await loadAccounts()
-        return account
     }
 
-    func updateAccount(_ id: String, request: UpdateAccountRequest) async throws -> Account {
-        let account = try await accountRepository.update(id, request: request)
+    func updateAccount(_ id: String, request: UpdateAccountRequest) async throws {
+        try await accountRepository.update(id, request: request)
         showSuccess("Cuenta actualizada")
         await loadAccounts()
-        return account
     }
 
     func deleteAccount(_ id: String) async {

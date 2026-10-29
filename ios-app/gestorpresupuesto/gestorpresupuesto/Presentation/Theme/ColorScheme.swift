@@ -5,78 +5,84 @@ extension Color {
 }
 
 struct AppColors {
+    // Values mirror FrontendNextjs/gestor/styles/globals.css ("Quiet Ledger",
+    // see DESIGN.md): neutral ink, hue only for meaning. Gradients stay as API
+    // but are flat (both stops equal) so legacy call sites render solid.
+
     // MARK: - Light Mode
     struct Light {
-        static let background = Color(hex: "FFFFFF")
-        static let surface = Color(hex: "F8F9FA")
-        static let surfaceSecondary = Color(hex: "F1F3F5")
+        static let background = Color(hex: "F4F4F5")
+        static let surface = Color(hex: "FFFFFF")
+        static let surfaceSecondary = Color(hex: "F4F4F5")
 
-        static let primary = Color(hex: "1A1A2E")
-        static let primaryLight = Color(hex: "2D2D44")
+        static let primary = Color(hex: "18181B")
+        static let primaryLight = Color(hex: "3F3F46")
 
-        static let accent = Color(hex: "3B82F6")
-        static let accentLight = Color(hex: "60A5FA")
-        static let accentDark = Color(hex: "2563EB")
+        static let accent = Color(hex: "18181B")
+        static let accentLight = Color(hex: "3F3F46")
+        static let accentDark = Color(hex: "09090B")
+        static let onAccent = Color(hex: "FAFAFA")
 
-        static let textPrimary = Color(hex: "1A1A2E")
-        static let textSecondary = Color(hex: "6B7280")
-        static let textTertiary = Color(hex: "9CA3AF")
+        static let textPrimary = Color(hex: "09090B")
+        static let textSecondary = Color(hex: "71717A")
+        static let textTertiary = Color(hex: "8E8E96")
 
-        static let border = Color(hex: "E5E7EB")
-        static let borderLight = Color(hex: "F3F4F6")
+        static let border = Color(hex: "E4E4E7")
+        static let borderLight = Color(hex: "F4F4F5")
 
-        static let success = Color(hex: "22C55E")
-        static let successLight = Color(hex: "86EFAC")
-        static let warning = Color(hex: "F59E0B")
-        static let warningLight = Color(hex: "FCD34D")
-        static let error = Color(hex: "EF4444")
-        static let errorLight = Color(hex: "FCA5A5")
-        static let info = Color(hex: "3B82F6")
-        static let infoLight = Color(hex: "93C5FD")
+        static let success = Color(hex: "157F3C")
+        static let successLight = Color(hex: "DCFCE7")
+        static let warning = Color(hex: "B3530A")
+        static let warningLight = Color(hex: "FFEDD5")
+        static let error = Color(hex: "C71E1E")
+        static let errorLight = Color(hex: "FEE2E2")
+        static let info = Color(hex: "0369A0")
+        static let infoLight = Color(hex: "E0F2FE")
 
-        static let gradientPrimary = [Color(hex: "3B82F6"), Color(hex: "8B5CF6")]
-        static let gradientSuccess = [Color(hex: "22C55E"), Color(hex: "10B981")]
-        static let gradientWarning = [Color(hex: "F59E0B"), Color(hex: "F97316")]
-        static let gradientError = [Color(hex: "EF4444"), Color(hex: "F87171")]
-        static let gradientIncome = [Color(hex: "22C55E"), Color(hex: "14B8A6")]
-        static let gradientExpense = [Color(hex: "EF4444"), Color(hex: "F97316")]
+        static let gradientPrimary = [accent, accent]
+        static let gradientSuccess = [success, success]
+        static let gradientWarning = [warning, warning]
+        static let gradientError = [error, error]
+        static let gradientIncome = [success, success]
+        static let gradientExpense = [error, error]
     }
 
-    // MARK: - Dark Mode (Soft Dark)
+    // MARK: - Dark Mode
     struct Dark {
-        static let background = Color(hex: "131316")
-        static let surface = Color(hex: "1C1C21")
-        static let surfaceSecondary = Color(hex: "252529")
+        static let background = Color(hex: "131416")
+        static let surface = Color(hex: "1A1B1E")
+        static let surfaceSecondary = Color(hex: "27292F")
 
-        static let primary = Color(hex: "FFFFFF")
-        static let primaryLight = Color(hex: "E5E5E5")
+        static let primary = Color(hex: "F9FAFB")
+        static let primaryLight = Color(hex: "E4E4E7")
 
-        static let accent = Color(hex: "60A5FA")
-        static let accentLight = Color(hex: "93C5FD")
-        static let accentDark = Color(hex: "3B82F6")
+        static let accent = Color(hex: "F9FAFB")
+        static let accentLight = Color(hex: "D4D4D8")
+        static let accentDark = Color(hex: "FFFFFF")
+        static let onAccent = Color(hex: "1A1B1E")
 
         static let textPrimary = Color(hex: "F9FAFB")
-        static let textSecondary = Color(hex: "9CA3AF")
-        static let textTertiary = Color(hex: "6B7280")
+        static let textSecondary = Color(hex: "858B99")
+        static let textTertiary = Color(hex: "6B7080")
 
-        static let border = Color(hex: "2D2D32")
-        static let borderLight = Color(hex: "3D3D42")
+        static let border = Color(hex: "27292F")
+        static let borderLight = Color(hex: "323540")
 
-        static let success = Color(hex: "22C55E")
-        static let successLight = Color(hex: "16A34A")
-        static let warning = Color(hex: "F59E0B")
-        static let warningLight = Color(hex: "D97706")
-        static let error = Color(hex: "EF4444")
-        static let errorLight = Color(hex: "DC2626")
-        static let info = Color(hex: "3B82F6")
-        static let infoLight = Color(hex: "2563EB")
+        static let success = Color(hex: "24C25E")
+        static let successLight = Color(hex: "14532D")
+        static let warning = Color(hex: "DB7706")
+        static let warningLight = Color(hex: "431407")
+        static let error = Color(hex: "F87171")
+        static let errorLight = Color(hex: "450A0A")
+        static let info = Color(hex: "0EA5E9")
+        static let infoLight = Color(hex: "082F49")
 
-        static let gradientPrimary = [Color(hex: "60A5FA"), Color(hex: "A78BFA")]
-        static let gradientSuccess = [Color(hex: "22C55E"), Color(hex: "10B981")]
-        static let gradientWarning = [Color(hex: "F59E0B"), Color(hex: "F97316")]
-        static let gradientError = [Color(hex: "EF4444"), Color(hex: "F87171")]
-        static let gradientIncome = [Color(hex: "22C55E"), Color(hex: "14B8A6")]
-        static let gradientExpense = [Color(hex: "EF4444"), Color(hex: "F97316")]
+        static let gradientPrimary = [accent, accent]
+        static let gradientSuccess = [success, success]
+        static let gradientWarning = [warning, warning]
+        static let gradientError = [error, error]
+        static let gradientIncome = [success, success]
+        static let gradientExpense = [error, error]
     }
 
     // MARK: - Dynamic Colors
@@ -86,6 +92,10 @@ struct AppColors {
 
     var primary: Color { Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(Dark.primary) : UIColor(Light.primary) }) }
     var accent: Color { Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(Dark.accent) : UIColor(Light.accent) }) }
+    var onAccent: Color { Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(Dark.onAccent) : UIColor(Light.onAccent) }) }
+    /// Text/icons on a success/error/warning/info fill. Same values as the web
+    /// `--*-foreground` tokens (light text in light mode, dark text in dark).
+    var onStatus: Color { onAccent }
     var accentLight: Color { Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(Dark.accentLight) : UIColor(Light.accentLight) }) }
 
     var textPrimary: Color { Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(Dark.textPrimary) : UIColor(Light.textPrimary) }) }

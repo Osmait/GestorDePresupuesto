@@ -15,6 +15,8 @@ class DashboardViewModel: BaseViewModel {
     @Published var savingsRate: Double = 0
     @Published var investmentsTotal: Double = 0
     @Published var certificatesTotal: Double = 0
+    @Published var monthlyPlanSummary: MonthlyPlanSummary?
+    @Published var nextBill: MonthlyPlanItem?
 
     var patrimonyTotal: Double {
         totalBalance + investmentsTotal + certificatesTotal
@@ -24,18 +26,21 @@ class DashboardViewModel: BaseViewModel {
     private let transactionRepository: TransactionRepository
     private let budgetRepository: BudgetRepository
     private let analyticsRepository: AnalyticsRepository
+    private let monthlyPlanRepository: MonthlyPlanRepository?
 
     init(
         accountRepository: AccountRepository? = nil,
         transactionRepository: TransactionRepository? = nil,
         budgetRepository: BudgetRepository? = nil,
-        analyticsRepository: AnalyticsRepository? = nil
+        analyticsRepository: AnalyticsRepository? = nil,
+        monthlyPlanRepository: MonthlyPlanRepository? = nil
     ) {
         let container = DependencyContainer.shared
         self.accountRepository = accountRepository ?? container.resolve(AccountRepository.self)
         self.transactionRepository = transactionRepository ?? container.resolve(TransactionRepository.self)
         self.budgetRepository = budgetRepository ?? container.resolve(BudgetRepository.self)
         self.analyticsRepository = analyticsRepository ?? container.resolve(AnalyticsRepository.self)
+        self.monthlyPlanRepository = monthlyPlanRepository ?? container.resolveOptional(MonthlyPlanRepository.self)
     }
 
     func loadAll() async {
@@ -47,9 +52,11 @@ class DashboardViewModel: BaseViewModel {
         async let summaryTask = loadDashboardSummary()
         async let transactionsTask = transactionRepository.getAll(filter: TransactionFilter(limit: 10))
         async let budgetsTask = budgetRepository.getAll()
+        async let planTask: Void = loadMonthlyPlan()
 
         do {
             await summaryTask
+            await planTask
             let transactionsResponse = try await transactionsTask
             recentTransactions = transactionsResponse.data
             budgets = try await budgetsTask
@@ -77,6 +84,17 @@ class DashboardViewModel: BaseViewModel {
             // Fallback to individual calls
             await loadFallback()
         }
+    }
+
+    /// The plan card is optional: a failure here leaves it hidden instead of
+    /// failing the whole dashboard.
+    private func loadMonthlyPlan() async {
+        guard let monthlyPlanRepository else { return }
+        async let summaryTask = monthlyPlanRepository.getSummary()
+        async let itemsTask = monthlyPlanRepository.getAll()
+        guard let summary = try? await summaryTask, let items = try? await itemsTask else { return }
+        monthlyPlanSummary = summary.totalIncome > 0 || summary.totalExpenses > 0 ? summary : nil
+        nextBill = items.nextBill(from: Date())
     }
 
     private func loadFallback() async {

@@ -12,12 +12,12 @@ struct ErrorBanner: View {
         HStack(spacing: .sm) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.app.onStatus)
 
             Text(message)
                 .font(.app(.subheadline))
                 .fontWeight(.medium)
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.app.onStatus)
                 .lineLimit(2)
 
             Spacer()
@@ -27,17 +27,13 @@ struct ErrorBanner: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.caption)
-                    .foregroundStyle(.white.opacity(0.8))
+                    .foregroundStyle(Color.app.onStatus.opacity(0.8))
             }
             .accessibilityLabel("Cerrar error")
         }
         .padding(Spacing.md)
         .background(
-            LinearGradient(
-                colors: [Color.app.error, Color.app.error.opacity(0.85)],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
+            Color.app.error
         )
         .cornerRadius(Radius.md)
         .shadow(color: Color.app.error.opacity(0.3), radius: 8, x: 0, y: 4)

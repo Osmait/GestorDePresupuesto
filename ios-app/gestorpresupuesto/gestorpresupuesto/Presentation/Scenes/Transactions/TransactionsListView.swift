@@ -9,7 +9,7 @@ struct TransactionsListView: View {
     @State private var transactionToDelete: Transaction?
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
             ZStack {
                 Color.app.background.ignoresSafeArea()
 
@@ -45,6 +45,7 @@ struct TransactionsListView: View {
                             // Summary header
                             summaryHeader
                                 .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 0, leading: 16, bottom: 8, trailing: 16))
                                 .listRowSeparator(.hidden)
 
@@ -52,6 +53,7 @@ struct TransactionsListView: View {
                             ForEach(viewModel.transactions) { transaction in
                                 TransactionRow(transaction: transaction)
                                     .listRowBackground(Color.clear)
+                                    .listRowSeparator(.hidden)
                                     .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                         Button(role: .destructive) {
@@ -70,6 +72,7 @@ struct TransactionsListView: View {
                                     Spacer()
                                 }
                                 .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                                 .task { await viewModel.loadTransactions() }
                             }
                         }
@@ -78,7 +81,7 @@ struct TransactionsListView: View {
                     }
                 }
             }
-            .navigationTitle("Transacciones")
+            .navigationTitle("Movimientos")
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
@@ -140,18 +143,18 @@ struct TransactionsListView: View {
     private var summaryHeader: some View {
         VStack(spacing: Spacing.md.rawValue) {
             // Income & Expenses cards
-            HStack(spacing: Spacing.sm.rawValue) {
-                summaryCard(
+            HStack(spacing: Spacing.md.rawValue) {
+                StatCard(
                     title: "Ingresos",
-                    amount: viewModel.totalIncome,
-                    icon: "arrow.up.circle.fill",
-                    color: .app.success
+                    value: viewModel.totalIncome.currencyFormatted,
+                    icon: "arrow.up.right",
+                    colors: Color.app.gradientIncome
                 )
-                summaryCard(
+                StatCard(
                     title: "Gastos",
-                    amount: viewModel.totalExpenses,
-                    icon: "arrow.down.circle.fill",
-                    color: .app.error
+                    value: abs(viewModel.totalExpenses).currencyFormatted,
+                    icon: "arrow.down.right",
+                    colors: Color.app.gradientExpense
                 )
             }
 
@@ -159,12 +162,11 @@ struct TransactionsListView: View {
             HStack {
                 Text("Balance neto")
                     .font(.app(.caption))
-                    .foregroundStyle(Color.app.textTertiary)
+                    .foregroundStyle(Color.app.textSecondary)
                 Spacer()
-                Text((viewModel.netAmount >= 0 ? "+" : "") + viewModel.netAmount.currencyFormatted)
+                AmountText(value: viewModel.netAmount, tone: .auto, signed: true)
                     .font(.app(.subheadline))
-                    .fontWeight(.bold)
-                    .foregroundStyle(viewModel.netAmount >= 0 ? Color.app.success : Color.app.error)
+                    .fontWeight(.semibold)
             }
             .padding(.horizontal, Spacing.md.rawValue)
             .padding(.vertical, Spacing.sm.rawValue)
@@ -172,38 +174,12 @@ struct TransactionsListView: View {
                 RoundedRectangle(cornerRadius: Radius.md.rawValue)
                     .fill(Color.app.surface)
             )
+            .overlay(
+                RoundedRectangle(cornerRadius: Radius.md.rawValue)
+                    .strokeBorder(Color.app.border, lineWidth: 1)
+            )
         }
         .padding(.top, Spacing.sm.rawValue)
-    }
-
-    private func summaryCard(title: String, amount: Double, icon: String, color: Color) -> some View {
-        VStack(alignment: .leading, spacing: Spacing.sm.rawValue) {
-            HStack(spacing: Spacing.xs.rawValue) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                    .foregroundStyle(color)
-                Text(title)
-                    .font(.app(.caption))
-                    .foregroundStyle(Color.app.textSecondary)
-            }
-
-            Text(amount.currencyFormatted)
-                .font(.app(.headline))
-                .fontWeight(.bold)
-                .foregroundStyle(Color.app.textPrimary)
-                .minimumScaleFactor(0.7)
-                .lineLimit(1)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Spacing.md.rawValue)
-        .background(
-            RoundedRectangle(cornerRadius: Radius.lg.rawValue)
-                .fill(color.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: Radius.lg.rawValue)
-                .stroke(color.opacity(0.15), lineWidth: 1)
-        )
     }
 }
 

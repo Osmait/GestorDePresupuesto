@@ -22,7 +22,7 @@ final class FeatureFlagManager: ObservableObject {
         isLoading = true
         do {
             let response: FeaturesResponse = try await apiClient.request(Endpoints.features())
-            flags = FeatureFlags(flags: response.map)
+            flags = FeatureFlags(flags: response.map ?? [:])
             await CacheManager.shared.set("feature_flags", value: flags, ttl: 600)
         } catch {
             if let cached: FeatureFlags = await CacheManager.shared.get("feature_flags") {

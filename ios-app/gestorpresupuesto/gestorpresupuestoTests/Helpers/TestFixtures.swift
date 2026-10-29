@@ -428,3 +428,49 @@ extension ExchangeRateResponse {
         ExchangeRateResponse(usdToDop: 58.5, lastUpdated: "2026-01-01")
     }
 }
+
+// MARK: - MonthlyPlan Fixtures
+
+extension MonthlyPlanItem {
+    static func fixture(
+        id: String = "plan-1",
+        userId: String = "user-1",
+        name: String = "Alquiler",
+        description: String = "",
+        amount: Double = 32000,
+        amountDop: Double? = nil,
+        currency: String = "DOP",
+        type: MonthlyPlanItem.ItemType = .bill,
+        categoryId: String? = "cat-1",
+        accountId: String? = nil,
+        dayOfMonth: Int? = 30,
+        isActive: Bool = true,
+        createdAt: Date = Date()
+    ) -> MonthlyPlanItem {
+        MonthlyPlanItem(
+            id: id, userId: userId, name: name, description: description,
+            amount: amount, amountDop: amountDop ?? amount, currency: currency,
+            type: type, categoryId: categoryId, accountId: accountId,
+            dayOfMonth: dayOfMonth, isActive: isActive, createdAt: createdAt
+        )
+    }
+}
+
+extension MonthlyPlanSummary {
+    static func fixture(
+        totalIncome: Double = 96000,
+        totalExpenses: Double = 74650,
+        available: Double = 21350,
+        committedPercentage: Double = 77.8,
+        usdToDopRate: Double = 63.1,
+        incomeCount: Int = 2,
+        expensesCount: Int = 9
+    ) -> MonthlyPlanSummary {
+        MonthlyPlanSummary(
+            totalIncome: totalIncome, totalExpenses: totalExpenses,
+            available: available, committedPercentage: committedPercentage,
+            usdToDopRate: usdToDopRate, incomeCount: incomeCount,
+            expensesCount: expensesCount
+        )
+    }
+}

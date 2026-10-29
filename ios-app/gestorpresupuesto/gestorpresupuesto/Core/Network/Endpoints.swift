@@ -200,6 +200,31 @@ struct Endpoints {
         Endpoint(path: "/analytics/monthly-summary", method: .GET)
     }
 
+    // MARK: - Monthly Plan
+    static func monthlyPlan() -> Endpoint {
+        Endpoint(path: "/monthly-plan", method: .GET)
+    }
+
+    static func monthlyPlanSummary() -> Endpoint {
+        Endpoint(path: "/monthly-plan/summary", method: .GET)
+    }
+
+    static func createMonthlyPlanItem(body: Data) -> Endpoint {
+        Endpoint(path: "/monthly-plan", method: .POST, body: body)
+    }
+
+    static func updateMonthlyPlanItem(id: String, body: Data) -> Endpoint {
+        Endpoint(path: "/monthly-plan/\(encode(id))", method: .PUT, body: body)
+    }
+
+    static func setMonthlyPlanItemActive(id: String, body: Data) -> Endpoint {
+        Endpoint(path: "/monthly-plan/\(encode(id))/active", method: .PATCH, body: body)
+    }
+
+    static func deleteMonthlyPlanItem(id: String) -> Endpoint {
+        Endpoint(path: "/monthly-plan/\(encode(id))", method: .DELETE)
+    }
+
     // MARK: - Recurring Transactions
     static func recurringTransactions() -> Endpoint {
         Endpoint(path: "/recurring-transactions", method: .GET)

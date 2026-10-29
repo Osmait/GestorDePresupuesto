@@ -247,7 +247,7 @@ struct ScannedImageThumbnail: View {
             } label: {
                 Image(systemName: "xmark.circle.fill")
                     .font(.system(size: 20))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.app.onStatus)
                     .background(Circle().fill(Color.app.error))
             }
             .offset(x: 6, y: -6)
@@ -326,7 +326,7 @@ struct ExtractedTransactionsSection: View {
                 if !savedIds.isEmpty {
                     Text("\(savedIds.count)/\(transactions.count)")
                         .font(.caption)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.app.onStatus)
                         .padding(.horizontal, .sm)
                         .padding(.vertical, 2)
                         .background(Color.app.success)
@@ -335,7 +335,7 @@ struct ExtractedTransactionsSection: View {
 
                 Text("\(transactions.count)")
                     .font(.caption)
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.app.onAccent)
                     .padding(.horizontal, .sm)
                     .padding(.vertical, 2)
                     .background(Color.app.accent)
@@ -439,7 +439,7 @@ struct ExtractedTransactionCard: View {
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, .sm)
                         .background(selectedCategoryId.isEmpty ? Color.app.textTertiary : Color.app.accent)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(Color.app.onAccent)
                         .cornerRadius(.md)
                     }
                     .disabled(selectedCategoryId.isEmpty || isSaving)

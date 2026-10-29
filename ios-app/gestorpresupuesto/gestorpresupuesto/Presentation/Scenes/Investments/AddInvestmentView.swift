@@ -98,7 +98,7 @@ struct AddInvestmentView: View {
         )
 
         do {
-            _ = try await viewModel.createInvestment(request: request)
+            try await viewModel.createInvestment(request: request)
             dismiss()
         } catch {
             shakeTrigger = false

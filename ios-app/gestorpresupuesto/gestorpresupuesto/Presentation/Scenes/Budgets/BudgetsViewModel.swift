@@ -23,18 +23,16 @@ class BudgetsViewModel: BaseViewModel {
         }
     }
 
-    func createBudget(request: CreateBudgetRequest) async throws -> Budget {
-        let budget = try await budgetRepository.create(request)
+    func createBudget(request: CreateBudgetRequest) async throws {
+        try await budgetRepository.create(request)
         showSuccess("Presupuesto creado")
         await loadBudgets()
-        return budget
     }
 
-    func updateBudget(_ id: String, request: UpdateBudgetRequest) async throws -> Budget {
-        let budget = try await budgetRepository.update(id, request: request)
+    func updateBudget(_ id: String, request: UpdateBudgetRequest) async throws {
+        try await budgetRepository.update(id, request: request)
         showSuccess("Presupuesto actualizado")
         await loadBudgets()
-        return budget
     }
 
     func deleteBudget(_ id: String) async {

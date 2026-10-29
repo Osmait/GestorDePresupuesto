@@ -43,13 +43,17 @@ struct EditAccountView: View {
                             text: $bank
                         )
 
-                        FormField(
-                            title: "Balance Inicial",
-                            icon: "dollarsign.circle",
-                            placeholder: "0.00",
-                            text: $initialBalance,
-                            keyboardType: .decimalPad
-                        )
+                        // The backend only updates name and bank (dto/account
+                        // AccountUpdateRequest), so the balance is shown, not edited.
+                        HStack {
+                            Text("Balance inicial")
+                                .font(.app(.subheadline))
+                                .foregroundStyle(Color.app.textSecondary)
+                            Spacer()
+                            AmountText(value: account.accountInfo.initialBalance)
+                                .font(.app(.subheadline))
+                        }
+                        .padding(.horizontal, .xs)
                     }
                     .padding(Spacing.lg.rawValue)
                 }
@@ -74,7 +78,7 @@ struct EditAccountView: View {
         guard let balance = Double(initialBalance) else { return }
         let request = UpdateAccountRequest(name: name, bank: bank, initialBalance: balance)
         do {
-            _ = try await viewModel.updateAccount(account.accountInfo.id, request: request)
+            try await viewModel.updateAccount(account.accountInfo.id, request: request)
             dismiss()
         } catch {
             viewModel.showError(error.localizedDescription)

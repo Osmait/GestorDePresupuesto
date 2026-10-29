@@ -72,7 +72,7 @@ struct EditBudgetView: View {
         guard let amountValue = Double(amount) else { return }
         let request = UpdateBudgetRequest(categoryId: selectedCategoryId, amount: amountValue)
         do {
-            _ = try await viewModel.updateBudget(budget.id, request: request)
+            try await viewModel.updateBudget(budget.id, request: request)
             dismiss()
         } catch {
             viewModel.showError(error.localizedDescription)

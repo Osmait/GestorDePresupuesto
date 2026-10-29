@@ -23,19 +23,17 @@ struct GlassCard<Content: View>: View {
             .padding(padding)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius.rawValue)
-                    .fill(.ultraThinMaterial)
+                    .fill(Color.app.surface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius.rawValue)
-                    .stroke(
-                        hasBorder ? Color.primary.opacity(0.1) : Color.clear,
-                        lineWidth: 0.5
-                    )
+                    .strokeBorder(hasBorder ? Color.app.border : Color.clear, lineWidth: 1)
             )
-            .cardShadow()
     }
 }
 
+/// Kept for API compatibility: renders as a flat card. `colors` no longer
+/// paint the background (no gradient tiles, see DESIGN.md).
 struct GradientCard<Content: View>: View {
     let colors: [Color]
     let content: Content
@@ -59,15 +57,12 @@ struct GradientCard<Content: View>: View {
             .padding(padding)
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius.rawValue)
-                    .fill(
-                        LinearGradient(
-                            colors: colors,
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
+                    .fill(Color.app.surface)
             )
-            .cardShadow(elevation: .lg)
+            .overlay(
+                RoundedRectangle(cornerRadius: cornerRadius.rawValue)
+                    .strokeBorder(Color.app.border, lineWidth: 1)
+            )
     }
 }
 
@@ -93,9 +88,8 @@ struct SurfaceCard<Content: View>: View {
             .cornerRadius(cornerRadius)
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius.rawValue)
-                    .stroke(Color.app.border, lineWidth: 0.5)
+                    .strokeBorder(Color.app.border, lineWidth: 1)
             )
-            .cardShadow()
     }
 }
 
@@ -111,7 +105,7 @@ struct SurfaceCard<Content: View>: View {
 
             GradientCard(colors: Color.app.gradientPrimary) {
                 Text("Gradient Card")
-                    .foregroundStyle(.white)
+                    .foregroundStyle(Color.app.textPrimary)
             }
 
             SurfaceCard {

@@ -166,7 +166,8 @@ class DocumentScannerViewModel: BaseViewModel {
             name: extracted.name,
             description: extracted.description,
             amount: extracted.amount,
-            typeTransaction: extracted.typeTransaction ?? "expense",
+            // The backend only accepts "bill" for expenses.
+            typeTransaction: extracted.typeTransaction.map { $0 == "expense" ? "bill" : $0 } ?? "bill",
             accountId: accountId,
             categoryId: categoryId,
             budgetId: nil,

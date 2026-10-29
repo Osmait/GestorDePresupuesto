@@ -70,7 +70,8 @@ struct TransactionEntityTests {
         filter.categories = ["cat-1", "cat-2"]
         let items = filter.toQueryItems()
         let categoryItems = items.filter { $0.name == "categories" }
-        #expect(categoryItems.count == 2)
+        // The backend reads a single comma-separated value.
+        #expect(categoryItems.map(\.value) == ["cat-1,cat-2"])
     }
 
     @Test func toQueryItems_amountFilters() {

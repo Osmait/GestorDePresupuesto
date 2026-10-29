@@ -8,7 +8,7 @@ struct InvestmentsListView: View {
     @State private var investmentToDelete: Investment?
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
             ZStack {
                 Color.app.background.ignoresSafeArea()
 

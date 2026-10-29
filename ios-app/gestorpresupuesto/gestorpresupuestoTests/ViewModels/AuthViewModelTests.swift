@@ -29,6 +29,29 @@ struct AuthViewModelTests {
         #expect(!vm.isLoading)
     }
 
+    @Test @MainActor func register_success_logsIn() async {
+        let (vm, authRepo, _) = makeSUT()
+        authRepo.loginResult = .success(.fixture(name: "Nuevo"))
+        authRepo.getProfileResult = .success(.fixture(name: "Nuevo"))
+
+        await vm.register(name: "Nuevo", lastName: "Usuario", email: "n@test.com", password: "password")
+
+        #expect(authRepo.registerCallCount == 1)
+        #expect(authRepo.loginCallCount == 1)
+        #expect(vm.user?.name == "Nuevo")
+        #expect(vm.error == nil)
+    }
+
+    @Test @MainActor func register_error_doesNotLogIn() async {
+        let (vm, authRepo, _) = makeSUT()
+        authRepo.registerError = MockError.forced
+
+        await vm.register(name: "Nuevo", lastName: "Usuario", email: "n@test.com", password: "password")
+
+        #expect(authRepo.loginCallCount == 0)
+        #expect(vm.error != nil)
+    }
+
     @Test @MainActor func login_error_showsError() async {
         let (vm, authRepo, _) = makeSUT()
         authRepo.loginResult = .failure(MockError.forced)

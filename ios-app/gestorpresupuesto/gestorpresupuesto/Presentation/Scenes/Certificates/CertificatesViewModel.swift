@@ -47,11 +47,10 @@ class CertificatesViewModel: BaseViewModel {
         }
     }
 
-    func createCertificate(request: CreateCertificateRequest) async throws -> Certificate {
-        let cert = try await certificateRepository.create(request)
+    func createCertificate(request: CreateCertificateRequest) async throws {
+        try await certificateRepository.create(request)
         showSuccess("Certificado creado")
         await loadCertificates()
-        return cert
     }
 
     func deleteCertificate(_ id: String) async {

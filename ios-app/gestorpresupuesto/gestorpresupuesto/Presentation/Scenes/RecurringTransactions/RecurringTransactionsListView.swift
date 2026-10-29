@@ -7,7 +7,7 @@ struct RecurringTransactionsListView: View {
     @State private var transactionToDelete: RecurringTransaction?
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
         ZStack {
             Color.app.background.ignoresSafeArea()
 
@@ -345,7 +345,7 @@ struct AddRecurringTransactionView: View {
         )
 
         do {
-            _ = try await viewModel.createRecurringTransaction(request: request)
+            try await viewModel.createRecurringTransaction(request: request)
             isPresented = false
         } catch {
             shakeTrigger = false

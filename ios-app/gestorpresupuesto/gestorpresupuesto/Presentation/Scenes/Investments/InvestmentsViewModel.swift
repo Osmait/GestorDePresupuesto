@@ -51,11 +51,10 @@ class InvestmentsViewModel: BaseViewModel {
         }
     }
 
-    func createInvestment(request: CreateInvestmentRequest) async throws -> Investment {
-        let investment = try await investmentRepository.create(request)
+    func createInvestment(request: CreateInvestmentRequest) async throws {
+        try await investmentRepository.create(request)
         showSuccess("Inversión creada")
         await loadInvestments()
-        return investment
     }
 
     func deleteInvestment(_ id: String) async {

@@ -16,17 +16,17 @@ enum AppFont {
 
     var font: Font {
         switch self {
-        case .largeTitle: return .system(size: 34, weight: .bold, design: .rounded)
-        case .title: return .system(size: 28, weight: .bold, design: .rounded)
-        case .title2: return .system(size: 22, weight: .semibold, design: .rounded)
-        case .title3: return .system(size: 20, weight: .semibold, design: .rounded)
-        case .headline: return .system(size: 17, weight: .semibold, design: .rounded)
-        case .body: return .system(size: 17, weight: .regular, design: .rounded)
-        case .callout: return .system(size: 16, weight: .regular, design: .rounded)
-        case .subheadline: return .system(size: 15, weight: .regular, design: .rounded)
-        case .footnote: return .system(size: 13, weight: .regular, design: .rounded)
-        case .caption: return .system(size: 12, weight: .regular, design: .rounded)
-        case .caption2: return .system(size: 11, weight: .regular, design: .rounded)
+        case .largeTitle: return .system(size: 34, weight: .bold)
+        case .title: return .system(size: 28, weight: .bold)
+        case .title2: return .system(size: 22, weight: .semibold)
+        case .title3: return .system(size: 20, weight: .semibold)
+        case .headline: return .system(size: 17, weight: .semibold)
+        case .body: return .system(size: 17, weight: .regular)
+        case .callout: return .system(size: 16, weight: .regular)
+        case .subheadline: return .system(size: 15, weight: .regular)
+        case .footnote: return .system(size: 13, weight: .regular)
+        case .caption: return .system(size: 12, weight: .regular)
+        case .caption2: return .system(size: 11, weight: .regular)
         }
     }
 
