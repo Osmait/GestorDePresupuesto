@@ -20,7 +20,7 @@
     "code-quality": "npm run type-check && npm run lint && npm run format:check"
   },
   "dependencies": {
-    "@hookform/resolvers": "^5.9.1",
+    "@hookform/resolvers": "^6.0.0",
     "@microsoft/fetch-event-source": "^2.0.1",
     "@nivo/bar": "^0.99.0",
     "@nivo/core": "^0.99.0",
