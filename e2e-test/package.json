@@ -16,7 +16,7 @@
   "devDependencies": {
     "@playwright/test": "^1.64.0",
     "@testcontainers/postgresql": "^12.2.0",
-    "@types/node": "^24.19.2",
+    "@types/node": "^26.6.5",
     "testcontainers": "^12.2.0",
     "typescript": "^5.9.3"
   }
