@@ -1,11 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAccountRepository } from '@/lib/repositoryConfig'
+import type { ReconcileAccountInput } from '@/types/account'
 import { invalidateFinancialData } from './invalidateFinancialData'
 
 export const ACCOUNT_KEYS = {
 	all: ['accounts'] as const,
 	lists: () => [...ACCOUNT_KEYS.all, 'list'] as const,
 	detail: (id: string) => [...ACCOUNT_KEYS.all, 'detail', id] as const,
+	reconciliations: (id: string) => [...ACCOUNT_KEYS.all, 'reconciliations', id] as const,
 }
 
 // Read Hook
@@ -70,6 +72,32 @@ export function useDeleteAccountMutation() {
 			return repo.delete(id)
 		},
 		// Lists, details, dashboard totals and transactions (delete cascades) depend on accounts.
+		onSuccess: () => invalidateFinancialData(queryClient),
+	})
+}
+
+export function useGetAccountReconciliations(id: string) {
+	return useQuery({
+		queryKey: ACCOUNT_KEYS.reconciliations(id),
+		queryFn: async () => {
+			const repo = await getAccountRepository()
+			return repo.findReconciliations(id)
+		},
+		enabled: !!id,
+	})
+}
+
+// Reconcile Mutation: may write an adjustment transaction, so balances,
+// transaction lists and dashboard totals all change.
+export function useReconcileAccountMutation() {
+	const queryClient = useQueryClient()
+
+	return useMutation({
+		mutationFn: async (data: { id: string } & ReconcileAccountInput) => {
+			const { id, ...input } = data
+			const repo = await getAccountRepository()
+			return repo.reconcile(id, input)
+		},
 		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }

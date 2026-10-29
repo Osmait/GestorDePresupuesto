@@ -1,7 +1,7 @@
 import { screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { vi } from 'vitest'
-import { AccountCard } from '@/components/accounts/AccountCard'
+import { AccountCard, isReconcileStale } from '@/components/accounts/AccountCard'
 import { renderWithIntl } from '@/tests/utils/intl'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn() } }))
@@ -82,5 +82,50 @@ describe('AccountCard', () => {
 
 		expect(onDelete).toHaveBeenCalledTimes(1)
 		await waitFor(() => expect(dialog).not.toBeInTheDocument())
+	})
+
+	it('offers "Reconcile balance" for bank accounts', async () => {
+		const user = userEvent.setup()
+		const onReconcile = vi.fn()
+		renderWithIntl(<AccountCard account={mockAccount} onAccountReconcile={onReconcile} />)
+
+		await user.click(screen.getByRole('button', { name: 'Actions for Main Checking' }))
+		await user.click(await screen.findByRole('menuitem', { name: 'Reconcile balance' }))
+
+		expect(onReconcile).toHaveBeenCalledWith(mockAccount)
+	})
+
+	it('does not offer reconciliation for credit cards', () => {
+		renderWithIntl(<AccountCard account={{ ...mockAccount, type: 'credit_card' }} onAccountReconcile={vi.fn()} />)
+		expect(screen.queryByRole('button', { name: 'Actions for Main Checking' })).not.toBeInTheDocument()
+		expect(screen.queryByText('Never reconciled')).not.toBeInTheDocument()
+	})
+
+	it('flags an account that was never reconciled', () => {
+		renderWithIntl(<AccountCard account={mockAccount} />)
+		expect(screen.getByText('Never reconciled')).toHaveClass('text-warning')
+	})
+
+	it('says "today" for a reconciliation less than a day old', () => {
+		const anHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString()
+		renderWithIntl(<AccountCard account={{ ...mockAccount, last_reconciled_at: anHourAgo }} />)
+		expect(screen.getByText('Reconciled today')).not.toHaveClass('text-warning')
+	})
+
+	it('shows how long ago a recent reconciliation was, without the warning', () => {
+		const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
+		renderWithIntl(<AccountCard account={{ ...mockAccount, last_reconciled_at: twoDaysAgo }} />)
+		const status = screen.getByText('Reconciled 2 days ago')
+		expect(status).not.toHaveClass('text-warning')
+	})
+})
+
+describe('isReconcileStale', () => {
+	const now = new Date('2026-10-29T12:00:00Z')
+	it('is stale when never reconciled or older than 30 days', () => {
+		expect(isReconcileStale(undefined, now)).toBe(true)
+		expect(isReconcileStale('2026-09-28T11:00:00Z', now)).toBe(true)
+		expect(isReconcileStale('2026-10-20T12:00:00Z', now)).toBe(false)
+		expect(isReconcileStale('not a date', now)).toBe(true)
 	})
 })

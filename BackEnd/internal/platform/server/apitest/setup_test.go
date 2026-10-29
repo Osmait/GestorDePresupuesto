@@ -149,7 +149,6 @@ func buildRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 		transactionRepository,
 		cfg,
 	)
-	accountService := accountSvc.NewAccountService(accountRepository)
 	transactionService := transactionSvc.NewTransactionService(
 		transactionRepository,
 		budgetRepository,
@@ -158,6 +157,8 @@ func buildRouter(db *sql.DB, cfg *config.Config) *gin.Engine {
 		nil,
 		nil,
 	)
+	accountService := accountSvc.NewAccountService(accountRepository,
+		accountSvc.WithReconciliation(accountRepo.NewReconciliationRepository(db), transactionService, categoryRepository))
 	investmentService := investmentSvc.NewInvestmentService(
 		investmentRepo.NewInvestmentRepository(db),
 		nil,

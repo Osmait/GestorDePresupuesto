@@ -328,8 +328,31 @@
       "typeBank": "Cuenta bancaria",
       "typeCreditCard": "Tarjeta de crédito",
       "currency": "Moneda",
-      "createdAt": "Creada el"
-    }
+      "createdAt": "Creada el",
+      "lastReconciled": "Última vez cuadrada",
+      "reconciliations": "Historial de cuadres",
+      "noReconciliations": "Aún no has cuadrado esta cuenta",
+      "reconcileNoAdjustment": "Sin ajuste"
+    },
+    "reconcile": "Cuadrar saldo",
+    "reconcileTitle": "Cuadrar {name}",
+    "reconcileDescription": "Escribe el saldo que muestra tu banco ahora mismo. Si no coincide con el de la app, se registra un ajuste por la diferencia (no cuenta como ingreso ni como gasto).",
+    "reconcileAppBalance": "Saldo en la app",
+    "reconcileBankBalance": "Saldo en el banco",
+    "reconcileBankBalanceHint": "Puede ser negativo si la cuenta está en sobregiro.",
+    "reconcileBalanceRequired": "Escribe el saldo que muestra el banco",
+    "reconcileNotes": "Nota (opcional)",
+    "reconcileNotesPlaceholder": "Ej: saldo de la app del banco",
+    "reconcileDifference": "Ajuste",
+    "reconcileMatches": "Coincide: no hace falta ajuste",
+    "reconcileSubmit": "Cuadrar",
+    "reconcileSuccessAdjusted": "Cuenta cuadrada con un ajuste de {amount}",
+    "reconcileSuccessMatched": "Cuenta cuadrada: el saldo ya coincidía",
+    "reconcileError": "No se pudo cuadrar la cuenta",
+    "reconciledAgo": "Cuadrada {ago}",
+    "reconciledToday": "Cuadrada hoy",
+    "neverReconciled": "Nunca cuadrada",
+    "reconcileStale": "Hace más de {days} días que no se cuadra"
   },
   "transactions": {
     "noDescription": "Sin descripción",
@@ -405,6 +428,8 @@
       "investment_purchase": "Compra de inversión",
       "investment_funding": "Fondeo de inversión",
       "loan_cancellation_refund": "Reembolso por cancelación de préstamo",
+      "adjustment_in": "Ajuste de saldo (entrada)",
+      "adjustment_out": "Ajuste de saldo (salida)",
       "unknown": "Otro"
     },
     "sectionsLabel": "Secciones de transacciones"

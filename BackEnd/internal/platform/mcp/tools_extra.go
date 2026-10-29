@@ -13,6 +13,7 @@ import (
 	creditcardDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/creditcard"
 	loanDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
+	accountService "github.com/osmait/gestorDePresupuesto/internal/services/account"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 )
 
@@ -44,6 +45,23 @@ func (s *MCPServer) registerExtraTools() {
 			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
 		),
 		s.handleDeleteAccount,
+	)
+	s.server.AddTool(
+		mcp.NewTool("reconcile_account",
+			mcp.WithDescription("Reconcile a bank account with the balance its bank shows right now. If the app balance differs, one balance adjustment transaction (neutral in income/expense reports) moves the account to the bank balance. Not for credit cards."),
+			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
+			mcp.WithNumber("bank_balance", mcp.Required(), mcp.Description("Balance the bank shows now (may be negative if overdrawn)")),
+			mcp.WithString("currency", mcp.Description("DOP or USD (default: the account's currency)")),
+			mcp.WithString("notes", mcp.Description("Optional note, e.g. where the balance comes from")),
+		),
+		s.handleReconcileAccount,
+	)
+	s.server.AddTool(
+		mcp.NewTool("list_account_reconciliations",
+			mcp.WithDescription("List the latest reconciliations of an account (newest first)"),
+			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
+		),
+		s.handleListAccountReconciliations,
 	)
 
 	// --- Categories ---
@@ -606,6 +624,54 @@ func (s *MCPServer) handleResetCreditCardBalance(ctx context.Context, req mcp.Ca
 
 	return s.runRW(ctx, userID, func(txCtx context.Context) (interface{}, error) {
 		return s.services.CreditCard.ResetCardBalance(txCtx, cardID, userID, resetReq)
+	})
+}
+
+func (s *MCPServer) handleReconcileAccount(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID, fail := authUserID(ctx)
+	if fail != nil {
+		return fail, nil
+	}
+	id, err := req.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+	if _, ok := req.GetArguments()["bank_balance"]; !ok {
+		return mcp.NewToolResultError("bank_balance is required"), nil
+	}
+	bankBalance, argErr := amountArg(req, "bank_balance", money.StorageScale)
+	if argErr != nil {
+		return mcp.NewToolResultError(argErr.Error()), nil
+	}
+	in := &accountDTO.ReconcileRequest{
+		BankBalance: &bankBalance,
+		Currency:    req.GetString("currency", ""),
+		Notes:       req.GetString("notes", ""),
+	}
+	if err := in.Validate(); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	return s.runRW(ctx, userID, func(txCtx context.Context) (interface{}, error) {
+		return s.services.Account.Reconcile(txCtx, id, userID, accountService.ReconcileInput{
+			BankBalance: bankBalance,
+			Currency:    in.Currency,
+			Notes:       in.Notes,
+		})
+	})
+}
+
+func (s *MCPServer) handleListAccountReconciliations(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID, fail := authUserID(ctx)
+	if fail != nil {
+		return fail, nil
+	}
+	id, err := req.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+	return s.runRO(ctx, userID, func(txCtx context.Context) (interface{}, error) {
+		return s.services.Account.Reconciliations(txCtx, id, userID)
 	})
 }
 

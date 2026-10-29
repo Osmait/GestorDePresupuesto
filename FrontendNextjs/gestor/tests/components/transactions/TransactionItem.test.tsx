@@ -180,4 +180,25 @@ describe('TransactionItem', () => {
 		expect(dialog).toHaveTextContent('deleteDescription(Netflix Subscription)')
 		expect(dialog).not.toHaveTextContent('Monthly payment')
 	})
+
+	it('offers edit for a regular transaction but not for a balance adjustment', async () => {
+		const user = userEvent.setup()
+		const onEdit = vi.fn()
+		const { unmount } = render(
+			<TransactionItem transaction={mockTransaction} onEdit={onEdit} onTransactionDeleted={vi.fn()} />,
+		)
+		await user.click(screen.getByRole('button', { name: 'actions.rowMenu(Netflix Subscription)' }))
+		expect(await screen.findByRole('menuitem', { name: 'edit' })).toBeInTheDocument()
+		unmount()
+
+		const adjustment = {
+			...mockTransaction,
+			name: 'Balance adjustment',
+			type_transation: TypeTransaction.ADJUSTMENT_OUT,
+		}
+		render(<TransactionItem transaction={adjustment} onEdit={onEdit} onTransactionDeleted={vi.fn()} />)
+		await user.click(screen.getByRole('button', { name: 'actions.rowMenu(Balance adjustment)' }))
+		expect(await screen.findByRole('menuitem', { name: 'delete' })).toBeInTheDocument()
+		expect(screen.queryByRole('menuitem', { name: 'edit' })).not.toBeInTheDocument()
+	})
 })

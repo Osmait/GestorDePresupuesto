@@ -1,5 +1,5 @@
 import { BaseRepository } from '@/lib/base-repository'
-import { Account } from '@/types/account'
+import { Account, AccountReconciliation, ReconcileAccountInput, ReconcileAccountResult } from '@/types/account'
 
 export class AccountRepository extends BaseRepository {
 	async findAll(): Promise<Account[]> {
@@ -10,6 +10,7 @@ export class AccountRepository extends BaseRepository {
 			const accounts = (data || []).map((item: any) => ({
 				...item.account_info,
 				current_balance: item.current_balance,
+				last_reconciled_at: item.last_reconciled_at,
 			}))
 			return accounts
 		} catch (error) {
@@ -51,10 +52,22 @@ export class AccountRepository extends BaseRepository {
 			return {
 				...data.account_info,
 				current_balance: data.current_balance,
+				last_reconciled_at: data.last_reconciled_at,
 			}
 		} catch (error) {
 			console.error('Error fetching account by id:', error)
 			return null
 		}
+	}
+
+	async reconcile(id: string, input: ReconcileAccountInput): Promise<ReconcileAccountResult> {
+		const result = await this.post<ReconcileAccountResult>(`/account/${id}/reconcile`, input)
+		if (!result) throw new Error('Empty reconcile response')
+		return result
+	}
+
+	async findReconciliations(id: string): Promise<AccountReconciliation[]> {
+		const data = await this.get<AccountReconciliation[]>(`/account/${id}/reconciliations`)
+		return Array.isArray(data) ? data : []
 	}
 }

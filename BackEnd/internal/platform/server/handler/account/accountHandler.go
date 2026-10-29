@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	accountDomain "github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/account"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/account"
@@ -155,5 +156,70 @@ func FindAccount(accountService *account.AccountService) gin.HandlerFunc {
 			return
 		}
 		ctx.JSON(http.StatusOK, account)
+	}
+}
+
+// ReconcileAccount godoc
+//
+//	@Summary		Reconcile an account with the bank balance
+//	@Description	Compare the account balance with the balance the bank shows now. When they differ an adjustment transaction (adjustment_in/adjustment_out, neutral in reports) moves the account to the bank balance. Every call is recorded.
+//	@Tags			Accounts
+//	@Accept			json
+//	@Produce		json
+//	@Security		JWT
+//	@Param			id		path		string					true	"Account ID"
+//	@Param			body	body		dto.ReconcileRequest	true	"Balance shown by the bank"
+//	@Success		201		{object}	account.ReconcileResult
+//	@Failure		400		{object}	map[string]string	"Invalid input or credit card account"
+//	@Failure		401		{object}	map[string]string	"Unauthorized - Invalid JWT token"
+//	@Failure		404		{object}	map[string]string	"Account not found"
+//	@Router			/account/{id}/reconcile [post]
+func ReconcileAccount(accountService *account.AccountService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		var req dto.ReconcileRequest
+		if err := ctx.ShouldBindJSON(&req); err != nil {
+			_ = ctx.Error(apperrors.NewValidationError("INVALID_JSON", "Invalid request body"))
+			return
+		}
+		if err := req.Validate(); err != nil {
+			_ = ctx.Error(apperrors.NewValidationError("VALIDATION_FAILED", err.Error()))
+			return
+		}
+		result, err := accountService.Reconcile(ctx.Request.Context(), ctx.Param("id"), userId, account.ReconcileInput{
+			BankBalance: *req.BankBalance,
+			Currency:    req.Currency,
+			Notes:       req.Notes,
+		})
+		if err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+		ctx.JSON(http.StatusCreated, result)
+	}
+}
+
+// ListReconciliations godoc
+//
+//	@Summary		List account reconciliations
+//	@Description	The latest reconciliations of the account, newest first
+//	@Tags			Accounts
+//	@Produce		json
+//	@Security		JWT
+//	@Param			id	path		string	true	"Account ID"
+//	@Success		200	{array}		accountDomain.Reconciliation
+//	@Failure		401	{object}	map[string]string	"Unauthorized - Invalid JWT token"
+//	@Failure		404	{object}	map[string]string	"Account not found"
+//	@Router			/account/{id}/reconciliations [get]
+func ListReconciliations(accountService *account.AccountService) gin.HandlerFunc {
+	return func(ctx *gin.Context) {
+		userId := ctx.GetString("X-User-Id")
+		var list []*accountDomain.Reconciliation
+		list, err := accountService.Reconciliations(ctx.Request.Context(), ctx.Param("id"), userId)
+		if err != nil {
+			_ = ctx.Error(err)
+			return
+		}
+		ctx.JSON(http.StatusOK, list)
 	}
 }

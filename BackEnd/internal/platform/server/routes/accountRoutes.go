@@ -12,4 +12,6 @@ func AccountRotes(s *gin.Engine, acountService *account.AccountService) {
 	s.DELETE("/account/:id", handler.DeleteAccount(acountService))
 	s.GET("/account/:id", handler.FindAccount(acountService))
 	s.PUT("/account/:id", handler.UpdateAccount(acountService))
+	s.POST("/account/:id/reconcile", handler.ReconcileAccount(acountService))
+	s.GET("/account/:id/reconciliations", handler.ListReconciliations(acountService))
 }
