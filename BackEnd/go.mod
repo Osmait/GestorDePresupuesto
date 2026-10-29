@@ -16,9 +16,9 @@ require (
 	github.com/golang-migrate/migrate/v4 v4.20.1
 	github.com/google/uuid v1.6.0
 	github.com/joho/godotenv v1.5.1
-	github.com/klauspost/compress v1.20.1
+	github.com/klauspost/compress v1.20.3
 	github.com/lib/pq v1.12.3
-	github.com/mark3labs/mcp-go v1.2.1
+	github.com/mark3labs/mcp-go v1.4.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
 	github.com/plexusone/omniskill v0.12.0
 	github.com/prometheus/client_golang v1.25.0
@@ -26,7 +26,7 @@ require (
 	github.com/rs/cors/wrapper/gin v0.0.0-20261008204034-5d834403882d
 	github.com/rs/zerolog v1.35.1
 	github.com/segmentio/ksuid v1.0.4
-	github.com/shopspring/decimal v1.5.0
+	github.com/shopspring/decimal v1.6.0
 	github.com/stretchr/testify v1.12.1
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.1
@@ -47,7 +47,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.47.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/sync v0.24.0
-	google.golang.org/genai v1.73.0
+	google.golang.org/genai v1.76.0
 )
 
 require (
