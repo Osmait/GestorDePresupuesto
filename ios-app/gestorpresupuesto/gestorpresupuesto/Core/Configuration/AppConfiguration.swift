@@ -35,7 +35,8 @@ struct AppConfiguration {
             case .staging:
                 self.baseURL = "https://staging-api.sbfinance.app"
             case .production:
-                self.baseURL = "https://api.sbfinance.app"
+                // Railway service "GestorPresupuesto" (project gestor-de-presupuesto-backend).
+                self.baseURL = "https://gestorpresupuesto-production.up.railway.app"
             }
         }
 
