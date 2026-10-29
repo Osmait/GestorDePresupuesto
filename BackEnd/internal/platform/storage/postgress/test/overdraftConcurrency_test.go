@@ -112,9 +112,7 @@ func TestCreditCardPayment_ConcurrentOverdraftExactlyOneSucceeds(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, payments, 1, "the rejected payment leaves no row")
 
-	balance, err := cards.FindBalanceById(ctx, fx.balanceID, fx.userID)
-	require.NoError(t, err)
-	moneytest.Equal(t, -940, balance.CurrentBalance)
+	moneytest.Equal(t, -940, cardDebtBalance(t, db, fx))
 }
 
 // TestLoanDisbursement_ConcurrentOverdraftExactlyOneSucceeds does the same for

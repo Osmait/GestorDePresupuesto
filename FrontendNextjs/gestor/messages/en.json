@@ -274,7 +274,9 @@
     "activeItems": "active",
     "exchangeRate": "Exchange rate (1 US$)",
     "distribution": "Distribution",
-    "sectionsLabel": "Dashboard sections"
+    "sectionsLabel": "Dashboard sections",
+    "cardDebt": "Credit card debt",
+    "creditCardsSection": "Credit cards"
   },
   "accounts": {
     "title": "Accounts",
@@ -430,6 +432,8 @@
       "loan_cancellation_refund": "Loan cancellation refund",
       "adjustment_in": "Balance adjustment (in)",
       "adjustment_out": "Balance adjustment (out)",
+      "card_payment": "Card payment",
+      "card_payment_received": "Payment received",
       "unknown": "Other"
     },
     "sectionsLabel": "Transaction sections"
@@ -1447,7 +1451,24 @@
       "noDebt": "No debt",
       "cutDay": "Cut Day",
       "dueDay": "Due Day",
-      "utilizationLabel": "{currency} credit used"
+      "utilizationLabel": "{currency} credit used",
+      "reconcile": "Reconcile with statement",
+      "reconcileTitle": "Reconcile {name}",
+      "reconcileDescription": "Enter the debt your statement or bank app shows. If it differs from the app, an adjustment is recorded for the difference (it does not count as an expense).",
+      "reconcileCurrency": "Currency",
+      "reconcileAppDebt": "Debt in the app",
+      "reconcileBankDebt": "Debt at the bank",
+      "reconcileBankDebtHint": "Enter 0 if you owe nothing.",
+      "reconcileDebtRequired": "Enter the debt the bank shows",
+      "reconcileDifference": "Adjustment",
+      "reconcileNotes": "Note (optional)",
+      "reconcileMatches": "Matches: no adjustment needed",
+      "reconcileSubmit": "Reconcile",
+      "reconcileSuccess": "Card reconciled: you owe {amount}",
+      "reconcileError": "Could not reconcile the card",
+      "owes": "You owe {amount}",
+      "inFavor": "In credit {amount}",
+      "limitUsed": "{percent} of the {limit} limit"
     },
     "form": {
       "addTitle": "Add Credit Card",

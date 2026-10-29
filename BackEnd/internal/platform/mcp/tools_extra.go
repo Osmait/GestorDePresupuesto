@@ -48,9 +48,9 @@ func (s *MCPServer) registerExtraTools() {
 	)
 	s.server.AddTool(
 		mcp.NewTool("reconcile_account",
-			mcp.WithDescription("Reconcile a bank account with the balance its bank shows right now. If the app balance differs, one balance adjustment transaction (neutral in income/expense reports) moves the account to the bank balance. Not for credit cards."),
-			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
-			mcp.WithNumber("bank_balance", mcp.Required(), mcp.Description("Balance the bank shows now (may be negative if overdrawn)")),
+			mcp.WithDescription("Reconcile an account with the balance its bank shows right now. If the app balance differs, one balance adjustment transaction (neutral in income/expense reports) moves the account to the bank balance. For a credit card pass the statement debt as a negative balance (owes 1000 -> -1000)."),
+			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID (bank account or credit card)")),
+			mcp.WithNumber("bank_balance", mcp.Required(), mcp.Description("Balance the bank shows now (negative if overdrawn, or a card's debt as a negative number)")),
 			mcp.WithString("currency", mcp.Description("DOP or USD (default: the account's currency)")),
 			mcp.WithString("notes", mcp.Description("Optional note, e.g. where the balance comes from")),
 		),

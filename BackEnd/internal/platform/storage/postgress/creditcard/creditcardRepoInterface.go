@@ -17,15 +17,15 @@ type CreditCardRepositoryInterface interface {
 	FindAllCards(ctx context.Context, userId string) ([]*creditcard.CreditCard, error)
 	UpdateCard(ctx context.Context, card *creditcard.CreditCard, userId string) error
 	DeleteCard(ctx context.Context, accountId string, userId string) error
+	// DeleteBookkeeping deletes the card account's adjustments and payments
+	// received (not its charges); see DeleteCreditCard.
+	DeleteBookkeeping(ctx context.Context, cardId string, userId string) error
 
 	SaveBalance(ctx context.Context, balance *creditcard.CardBalance) error
 	FindBalanceById(ctx context.Context, id string, userId string) (*creditcard.CardBalance, error)
 	FindBalancesByCard(ctx context.Context, cardId string, userId string) ([]*creditcard.CardBalance, error)
 	FindBalanceByCardAndCurrency(ctx context.Context, cardId string, userId string, currency string) (*creditcard.CardBalance, error)
 	UpdateCreditLimit(ctx context.Context, id string, userId string, creditLimit money.Amount) (*creditcard.CardBalance, error)
-	AdjustBalance(ctx context.Context, id string, userId string, delta money.Amount) (money.Amount, error)
-	ResetBalance(ctx context.Context, id string, userId string) (money.Amount, error)
-	UpdateBalanceByAmount(ctx context.Context, cardId string, userId string, currency string, amount money.Amount) error
 	DeleteBalance(ctx context.Context, id string, userId string) error
 
 	SaveBalanceReset(ctx context.Context, reset *creditcard.CardBalanceReset) error
@@ -41,4 +41,7 @@ type CreditCardRepositoryInterface interface {
 	// EnsurePaymentCategory returns the id of the user's dedicated card payment
 	// category, creating it on first use.
 	EnsurePaymentCategory(ctx context.Context, userId string) (string, error)
+	// EnsureAdjustmentCategory returns the id of the user's "Ajuste de saldo"
+	// system category, creating it on first use.
+	EnsureAdjustmentCategory(ctx context.Context, userId string) (string, error)
 }

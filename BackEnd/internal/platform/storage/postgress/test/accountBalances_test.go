@@ -51,11 +51,12 @@ import (
 // ---------------------------------------------------------------------------
 // Reference implementation: the ledger SUM queries the repositories used
 // before account_balances (migration 000052), plus adjustment_in (migration
-// 000058). The oracle the trigger-maintained balances must always agree with.
+// 000058) and card_payment_received (migration 000059). The oracle the
+// trigger-maintained balances must always agree with.
 // ---------------------------------------------------------------------------
 
 const legacySignedAmount = `CASE
-    WHEN type_transation IN ('income','loan_collection','loan_cancellation_refund','adjustment_in')
+    WHEN type_transation IN ('income','loan_collection','loan_cancellation_refund','adjustment_in','card_payment_received')
     THEN amount
     ELSE -amount
 END`
@@ -192,7 +193,7 @@ func requireRepositoryReadsMatchLegacy(t *testing.T, db *sql.DB, userID string, 
 var allTransactionTypes = []string{
 	"bill", "income", "loan_disbursement", "loan_collection", "investment_purchase",
 	"investment_funding", "card_payment", "loan_cancellation_refund",
-	"adjustment_in", "adjustment_out",
+	"adjustment_in", "adjustment_out", "card_payment_received",
 }
 
 type ledgerUser struct {

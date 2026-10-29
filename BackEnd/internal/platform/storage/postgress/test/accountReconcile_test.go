@@ -11,12 +11,14 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	categoryDomain "github.com/osmait/gestorDePresupuesto/internal/domain/category"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/creditcard"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/cache"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
 	analyticsRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/analytics"
 	budgetRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/budget"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
+	creditcardRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/creditcard"
 	notificationRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/notification"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
@@ -191,15 +193,32 @@ func TestAccountReconcile(t *testing.T) {
 		assert.Empty(t, history[0].TransactionId)
 	})
 
-	t.Run("credit cards are rejected", func(t *testing.T) {
+	t.Run("a credit card is reconciled to the debt of its statement", func(t *testing.T) {
 		f := newReconcileFixture(t, money.Zero)
 		card := account.NewCreditCardAccount(newID(), "Visa", "Bank")
 		card.UserId = f.userId
 		require.NoError(t, accountRepo.NewAccountRepository(f.db).Save(ctx, card))
+		cards := creditcardRepo.NewCreditCardRepository(f.db)
+		require.NoError(t, cards.SaveCard(ctx, creditcard.NewCreditCard(card.Id, "Bank", "4242", 10, 20)))
+		require.NoError(t, cards.SaveBalance(ctx, creditcard.NewCardBalance(newID(), card.Id, "DOP", money.FromInt(10_000))))
 
-		_, err := f.service.Reconcile(ctx, card.Id, f.userId, accountService.ReconcileInput{BankBalance: money.FromInt(-100)})
-		assert.ErrorIs(t, err, accountService.ErrReconcileCreditCard)
-		assert.ErrorIs(t, err, errorhttp.ErrBadRequest)
+		charge := utils.GetNewRandomTransaction()
+		charge.Id, charge.TypeTransation, charge.Amount = newID(), "bill", money.FromInt(300)
+		charge.AccountId, charge.CategoryId, charge.UserId, charge.Currency, charge.CreatedAt = card.Id, f.categoryId, f.userId, "DOP", time.Now()
+		require.NoError(t, f.txRepo.Save(ctx, charge))
+
+		// The statement says the card owes 1,250.
+		result, err := f.service.Reconcile(ctx, card.Id, f.userId, accountService.ReconcileInput{BankBalance: money.FromInt(-1250)})
+		require.NoError(t, err)
+		assert.True(t, result.Difference.Equal(money.FromInt(-950)), "difference %s", result.Difference)
+
+		acc, err := f.service.FindById(ctx, card.Id, f.userId)
+		require.NoError(t, err)
+		assert.True(t, acc.CurrentBalance.Equal(money.FromInt(-1250)), "card balance %s", acc.CurrentBalance)
+
+		// A currency the card does not have cannot be adjusted.
+		_, err = f.service.Reconcile(ctx, card.Id, f.userId, accountService.ReconcileInput{BankBalance: money.FromInt(-10), Currency: "USD"})
+		assert.Error(t, err)
 	})
 
 	t.Run("another user's account is not found", func(t *testing.T) {

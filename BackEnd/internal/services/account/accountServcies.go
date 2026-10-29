@@ -67,10 +67,17 @@ func (s *AccountService) FindAll(ctx context.Context, userId string) ([]*dto.Acc
 	}
 	accountResponses := make([]*dto.AccountResponse, 0)
 
-	for _, account := range accounts {
-		balance := balances[account.Id]
-		accountResponse := dto.NewAccountResponse(account, balance.Add(account.InitialBalance))
-		if at, ok := reconciledAt[account.Id]; ok {
+	for _, acc := range accounts {
+		balance := balances[acc.Id]
+		if acc.Type == account.AccountTypeCreditCard {
+			// A card may carry several currencies; its balance here is the
+			// one in its primary currency (the credit card endpoints list all).
+			if balance, err = s.accountRepository.BalanceByCurrency(ctx, acc.Id, userId, cardCurrency(acc)); err != nil {
+				return nil, err
+			}
+		}
+		accountResponse := dto.NewAccountResponse(acc, balance.Add(acc.InitialBalance))
+		if at, ok := reconciledAt[acc.Id]; ok {
 			accountResponse.LastReconciledAt = &at
 		}
 		accountResponses = append(accountResponses, accountResponse)
@@ -132,7 +139,12 @@ func (s *AccountService) FindById(ctx context.Context, id, userId string) (*dto.
 		return nil, err
 	}
 
-	balance, err := s.accountRepository.Balance(ctx, id, userId)
+	var balance money.Amount
+	if acc.Type == account.AccountTypeCreditCard {
+		balance, err = s.accountRepository.BalanceByCurrency(ctx, id, userId, cardCurrency(acc))
+	} else {
+		balance, err = s.accountRepository.Balance(ctx, id, userId)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -146,4 +158,9 @@ func (s *AccountService) FindById(ctx context.Context, id, userId string) (*dto.
 		response.LastReconciledAt = &at
 	}
 	return response, nil
+}
+
+// cardCurrency is the primary currency of a credit card account.
+func cardCurrency(acc *account.Account) string {
+	return normalizeCurrency(acc.Currency)
 }

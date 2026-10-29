@@ -3,6 +3,8 @@ import {
 	getSignedAmount,
 	getTransactionTypeKey,
 	isAdjustmentTransaction,
+	isDeletableTransaction,
+	isEditableTransaction,
 	isInflowTransaction,
 } from '@/lib/transaction-utils'
 import { TypeTransaction } from '@/types/transaction'
@@ -42,5 +44,18 @@ describe('transaction-utils', () => {
 		expect(isAdjustmentTransaction(TypeTransaction.ADJUSTMENT_OUT)).toBe(true)
 		expect(isAdjustmentTransaction(TypeTransaction.BILL)).toBe(false)
 		expect(isAdjustmentTransaction(undefined)).toBe(false)
+	})
+
+	it('treats a card payment received as an inflow on the card, neither editable nor deletable alone', () => {
+		expect(isInflowTransaction(TypeTransaction.CARD_PAYMENT_RECEIVED)).toBe(true)
+		expect(isInflowTransaction(TypeTransaction.CARD_PAYMENT)).toBe(false)
+		expect(getTransactionTypeKey('card_payment_received')).toBe('types.card_payment_received')
+		expect(getTransactionTypeKey('card_payment')).toBe('types.card_payment')
+		expect(isEditableTransaction(TypeTransaction.CARD_PAYMENT_RECEIVED)).toBe(false)
+		expect(isDeletableTransaction(TypeTransaction.CARD_PAYMENT_RECEIVED)).toBe(false)
+		expect(isEditableTransaction(TypeTransaction.ADJUSTMENT_IN)).toBe(false)
+		expect(isDeletableTransaction(TypeTransaction.ADJUSTMENT_IN)).toBe(true)
+		expect(isEditableTransaction(TypeTransaction.BILL)).toBe(true)
+		expect(isDeletableTransaction(TypeTransaction.BILL)).toBe(true)
 	})
 })

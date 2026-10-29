@@ -57,6 +57,8 @@ type DashboardSummaryResponse struct {
 	AccountsTotal     money.Amount                  `json:"accounts_total"`
 	InvestmentsTotal  money.Amount                  `json:"investments_total"`
 	CertificatesTotal money.Amount                  `json:"certificates_total"`
+	CreditCardDebt    money.Amount                  `json:"credit_card_debt"`
+	CreditCardsCount  int                           `json:"credit_cards_count"`
 	AccountsCount     int                           `json:"accounts_count"`
 	InvestmentsCount  int                           `json:"investments_count"`
 	CertificatesCount int                           `json:"certificates_count"`
@@ -80,6 +82,8 @@ func NewDashboardSummaryResponse(summary *analytics.DashboardSummary) DashboardS
 		AccountsTotal:     summary.AccountsTotal,
 		InvestmentsTotal:  summary.InvestmentsTotal,
 		CertificatesTotal: summary.CertificatesTotal,
+		CreditCardDebt:    summary.CreditCardDebt,
+		CreditCardsCount:  summary.CreditCardsCount,
 		AccountsCount:     summary.AccountsCount,
 		InvestmentsCount:  summary.InvestmentsCount,
 		CertificatesCount: summary.CertificatesCount,

@@ -8,6 +8,7 @@ import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModa
 import { CreditCardItem } from '@/components/creditcards/CreditCardItem'
 import { CreditCardPaymentHistory } from '@/components/creditcards/CreditCardPaymentHistory'
 import { PaymentModal } from '@/components/creditcards/PaymentModal'
+import { ReconcileCardModal } from '@/components/creditcards/ReconcileCardModal'
 import { Amount } from '@/components/shared/Amount'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -78,6 +79,7 @@ function CreditCardsContent() {
 	const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null)
 	const [cardToDelete, setCardToDelete] = useState<CreditCard | null>(null)
 	const [cardToReset, setCardToReset] = useState<CreditCard | null>(null)
+	const [cardToReconcile, setCardToReconcile] = useState<CreditCard | null>(null)
 	const t = useTranslations('creditCards')
 	const formatCurrency = useFormatCurrency()
 	const formatPercent = useFormatPercent()
@@ -312,6 +314,7 @@ function CreditCardsContent() {
 							onPay={handlePay}
 							onViewPayments={handleViewPayments}
 							onReset={setCardToReset}
+							onReconcile={setCardToReconcile}
 						/>
 					))}
 				</div>
@@ -325,6 +328,12 @@ function CreditCardsContent() {
 			/>
 
 			<PaymentModal open={paymentOpen} onClose={handlePaymentClose} onSubmit={handlePayment} card={selectedCard} />
+
+			<ReconcileCardModal
+				open={Boolean(cardToReconcile)}
+				setOpen={(open) => !open && setCardToReconcile(null)}
+				card={cardToReconcile}
+			/>
 
 			<CreditCardPaymentHistory open={historyOpen} onClose={handleHistoryClose} card={selectedCard} />
 

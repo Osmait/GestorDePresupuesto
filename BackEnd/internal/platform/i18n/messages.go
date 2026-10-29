@@ -11,6 +11,10 @@ const (
 	CardInterestDesc       Key = "tx.card_interest.description" // %s: card name
 	CardNameWithBank       Key = "card.name_with_bank"          // %s: bank
 	CardNameFallback       Key = "card.name_fallback"
+	CardPaymentReceived    Key = "tx.card_payment_received.name"
+	CardPaymentReceivedDsc Key = "tx.card_payment_received.description" // %s: paying account
+	CardInitialDebtDesc    Key = "tx.card_initial_debt.description"
+	CardResetDescription   Key = "tx.card_reset.description"
 
 	BrokerFundingName        Key = "tx.broker_funding.name"
 	BrokerFundingDescription Key = "tx.broker_funding.description"
@@ -47,6 +51,10 @@ var messages = map[Key]map[Locale]string{
 	CardInterestDesc:       {ES: "Intereses pagados a %s", EN: "Interest paid to %s"},
 	CardNameWithBank:       {ES: "tarjeta %s", EN: "%s card"},
 	CardNameFallback:       {ES: "tarjeta de crédito", EN: "credit card"},
+	CardPaymentReceived:    {ES: "Pago recibido", EN: "Payment received"},
+	CardPaymentReceivedDsc: {ES: "Pago desde %s", EN: "Payment from %s"},
+	CardInitialDebtDesc:    {ES: "Deuda inicial de la tarjeta", EN: "Initial card debt"},
+	CardResetDescription:   {ES: "Saldo de la tarjeta reiniciado", EN: "Card balance reset"},
 
 	BrokerFundingName:        {ES: "Transferencia al bróker", EN: "Transfer to broker"},
 	BrokerFundingDescription: {ES: "Fondeo de la cartera de inversión", EN: "Investment wallet funding"},

@@ -45,7 +45,7 @@ export const CLIENT_NAMESPACES = {
 		'settingsModal',
 		'transactions',
 	],
-	dashboard: ['charts', 'dateFilter', 'datePicker'],
+	dashboard: ['charts', 'creditCards', 'dateFilter', 'datePicker'],
 	accounts: ['analysis'],
 	analysis: ['analysis', 'datePicker'],
 	certificates: ['certificates'],

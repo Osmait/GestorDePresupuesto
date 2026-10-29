@@ -407,7 +407,11 @@ export default async function DashboardPage({
 								icon: <CreditCard className='h-4 w-4' />,
 								content: (
 									<DashboardAccountsTab
-										labels={{ noAccounts: tAccounts('emptyTitle'), addAccount: tAccounts('addAccount') }}
+										labels={{
+											noAccounts: tAccounts('emptyTitle'),
+											addAccount: tAccounts('addAccount'),
+											creditCards: t('creditCardsSection'),
+										}}
 									/>
 								),
 							},
@@ -448,6 +452,8 @@ export default async function DashboardPage({
 										investmentsTotal={investmentsTotalDOP}
 										investmentsTotalUSD={investmentsTotalUSD}
 										certificatesTotal={certificatesTotal}
+										creditCardDebt={dashboardSummary?.credit_card_debt ?? 0}
+										creditCardsCount={dashboardSummary?.credit_cards_count ?? 0}
 										accountsCount={accountsCount}
 										investmentsCount={investmentsCount}
 										certificatesCount={certificatesCount}
@@ -457,6 +463,7 @@ export default async function DashboardPage({
 											accounts: t('accountsBalance'),
 											investments: t('investmentsValue'),
 											certificates: t('certificatesValue'),
+											cardDebt: t('cardDebt'),
 											total: t('totalPatrimony'),
 											activeItems: t('activeItems'),
 											exchangeRate: t('exchangeRate'),

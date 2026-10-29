@@ -103,10 +103,15 @@ func (s *CreditCardService) CreateCreditCard(ctx context.Context, req *dto.Creat
 	for _, balanceReq := range req.Balances {
 		balanceUuid, _ := ksuid.NewRandom()
 		balance := creditcard.NewCardBalance(balanceUuid.String(), accountId, balanceReq.Currency, balanceReq.CreditLimit)
-		balance.CurrentBalance = balanceReq.InitialDebt.Neg()
 		if err := s.cardRepo.SaveBalance(ctx, balance); err != nil {
 			log.Error().Err(err).Str("account_id", accountId).Str("currency", balanceReq.Currency).Msg("Failed to save card balance")
 			return nil, err
+		}
+		// The debt the card already had is the first entry of its ledger.
+		if balanceReq.InitialDebt.IsPositive() {
+			if err := s.writeAdjustment(ctx, accountId, userId, balanceReq.Currency, balanceReq.InitialDebt.Neg(), i18n.T(ctx, i18n.CardInitialDebtDesc)); err != nil {
+				return nil, err
+			}
 		}
 	}
 
@@ -206,6 +211,17 @@ func (s *CreditCardService) UpdateCreditCard(ctx context.Context, accountId stri
 }
 
 func (s *CreditCardService) DeleteCreditCard(ctx context.Context, accountId string, userId string) error {
+	if _, err := s.cardRepo.FindCardById(ctx, accountId, userId); err != nil {
+		if isNotFound(err) {
+			return ErrCardNotFound
+		}
+		return err
+	}
+	// The card's bookkeeping (initial debt, payments received, resets) goes
+	// with it; the paying accounts keep their card_payment transactions.
+	if err := s.cardRepo.DeleteBookkeeping(ctx, accountId, userId); err != nil {
+		return err
+	}
 	if err := s.cardRepo.DeleteCard(ctx, accountId, userId); err != nil {
 		if isNotFound(err) {
 			return ErrCardNotFound
@@ -276,14 +292,25 @@ func (s *CreditCardService) ResetCardBalance(ctx context.Context, cardId string,
 		return nil, ErrBalanceNotFound
 	}
 
-	// Read the previous real balance (stored balance + card transactions) and
-	// zero it in one atomic statement, so a payment committed in between can
-	// neither be lost nor recorded twice.
-	previousBalance, err := s.cardRepo.ResetBalance(ctx, balance.Id, userId)
-	if err != nil {
+	// Lock the card account (like a transfer source) so two resets of the same
+	// card are serialised: the second one sees the first one's adjustment. A
+	// charge or payment committed concurrently is not covered by the read below
+	// and stays in the balance; it is neither lost nor counted twice.
+	if _, err := s.accountRepo.FindByIdAndUserIdForUpdate(ctx, cardId, userId); err != nil {
 		if isNotFound(err) {
-			return nil, ErrBalanceNotFound
+			return nil, ErrCardNotFound
 		}
+		return nil, err
+	}
+	previousBalance, err := s.accountRepo.BalanceByCurrency(ctx, cardId, userId, balance.Currency)
+	if err != nil {
+		return nil, err
+	}
+	description := strings.TrimSpace(req.Notes)
+	if description == "" {
+		description = i18n.T(ctx, i18n.CardResetDescription)
+	}
+	if err := s.writeAdjustment(ctx, cardId, userId, balance.Currency, previousBalance.Neg(), description); err != nil {
 		return nil, err
 	}
 
@@ -398,18 +425,6 @@ func (s *CreditCardService) CreatePayment(ctx context.Context, cardId string, us
 		return nil, err
 	}
 
-	// Atomic increment (UPDATE ... SET current_balance = current_balance + $1)
-	// instead of read-modify-write: concurrent payments cannot overwrite each
-	// other. Every write of this method runs in the request transaction, so on
-	// any later error the caller fails the request and everything rolls back;
-	// there are no hand-written compensating writes.
-	if _, err := s.cardRepo.AdjustBalance(ctx, balance.Id, userId, req.Amount); err != nil {
-		if isNotFound(err) {
-			return nil, ErrBalanceNotFound
-		}
-		return nil, err
-	}
-
 	cardName := i18n.T(ctx, i18n.CardNameFallback)
 	if card != nil && strings.TrimSpace(card.Bank) != "" {
 		cardName = i18n.T(ctx, i18n.CardNameWithBank, card.Bank)
@@ -426,7 +441,18 @@ func (s *CreditCardService) CreatePayment(ctx context.Context, cardId string, us
 	if err != nil {
 		return nil, err
 	}
-	if _, err := s.transactionRepo.CreateTransactionWithID(ctx, i18n.T(ctx, i18n.CardPaymentName), transactionDesc, sourceAmount, "card_payment", req.FromAccountId, userId, paymentCategoryID, "", fromCurrency, time.Now()); err != nil {
+	// Two sides of one transfer: money leaves the paying account and the debt
+	// on the card goes down (in the card currency). Every write runs in the
+	// request transaction, so on any later error everything rolls back.
+	now := time.Now()
+	if _, err := s.transactionRepo.CreateTransactionWithID(ctx, i18n.T(ctx, i18n.CardPaymentName), transactionDesc, sourceAmount, "card_payment", req.FromAccountId, userId, paymentCategoryID, "", fromCurrency, now); err != nil {
+		return nil, err
+	}
+	receivedDesc := i18n.T(ctx, i18n.CardPaymentReceivedDsc, fromAccount.Name)
+	if req.Notes != "" {
+		receivedDesc += " - " + req.Notes
+	}
+	if _, err := s.transactionRepo.CreateTransactionWithID(ctx, i18n.T(ctx, i18n.CardPaymentReceived), receivedDesc, req.Amount, creditcard.PaymentReceivedType, cardId, userId, paymentCategoryID, "", balance.Currency, now); err != nil {
 		return nil, err
 	}
 
@@ -438,6 +464,22 @@ func (s *CreditCardService) CreatePayment(ctx context.Context, cardId string, us
 
 	log.Info().Str("card_id", cardId).Str("user_id", userId).Stringer("amount", req.Amount).Msg("Card payment created")
 	return dto.NewPaymentResponse(payment), nil
+}
+
+// writeAdjustment moves the card's balance in currency by delta with one
+// balance adjustment (neutral in reports); nothing when delta is zero.
+func (s *CreditCardService) writeAdjustment(ctx context.Context, cardId, userId, currency string, delta money.Amount, description string) error {
+	adjustmentType, ok := account.AdjustmentType(delta)
+	if !ok {
+		return nil
+	}
+	categoryId, err := s.cardRepo.EnsureAdjustmentCategory(ctx, userId)
+	if err != nil {
+		return err
+	}
+	_, err = s.transactionRepo.CreateTransactionWithID(ctx, i18n.T(ctx, i18n.BalanceAdjustmentName), description, delta.Abs(),
+		adjustmentType, cardId, userId, categoryId, "", currency, time.Now())
+	return err
 }
 
 func convertPaymentAmount(cardAmount money.Amount, cardCurrency string, sourceCurrency string, rate money.Amount) (money.Amount, error) {
@@ -532,11 +574,11 @@ func (s *CreditCardService) GetSummary(ctx context.Context, userId string) (*dto
 func (s *CreditCardService) buildCardResponse(ctx context.Context, card *creditcard.CreditCard, acc *account.Account, balances []*creditcard.CardBalance, userId string) *dto.CreditCardResponse {
 	var balanceResponses []*dto.BalanceResponse
 	for _, b := range balances {
-		transactionsBalance, _ := s.accountRepo.BalanceByCurrency(ctx, card.AccountId, userId, b.Currency)
-		realBalance := b.CurrentBalance.Add(transactionsBalance)
+		// The card's balance in this currency is the ledger of its account.
+		ledgerBalance, _ := s.accountRepo.BalanceByCurrency(ctx, card.AccountId, userId, b.Currency)
 
 		balanceCopy := *b
-		balanceCopy.CurrentBalance = realBalance
+		balanceCopy.CurrentBalance = ledgerBalance
 		balanceResponses = append(balanceResponses, dto.NewBalanceResponse(&balanceCopy))
 	}
 

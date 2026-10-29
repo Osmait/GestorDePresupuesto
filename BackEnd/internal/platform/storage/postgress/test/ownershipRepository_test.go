@@ -299,17 +299,6 @@ func TestRepositories_CrossUserAccess(t *testing.T) {
 			_, err := r.creditCard.UpdateCreditLimit(ctx, owner.cardBalanceID, a, money.FromInt(1))
 			return err
 		}, ownership.ErrNotFound},
-		{"credit card: adjust balance", func() error {
-			_, err := r.creditCard.AdjustBalance(ctx, owner.cardBalanceID, a, money.FromInt(999))
-			return err
-		}, ownership.ErrNotFound},
-		{"credit card: reset balance", func() error {
-			_, err := r.creditCard.ResetBalance(ctx, owner.cardBalanceID, a)
-			return err
-		}, ownership.ErrNotFound},
-		{"credit card: update balance by amount", func() error {
-			return r.creditCard.UpdateBalanceByAmount(ctx, owner.cardID, a, "DOP", money.FromInt(999))
-		}, ownership.ErrNotFound},
 		{"credit card: delete balance", func() error { return r.creditCard.DeleteBalance(ctx, owner.cardBalanceID, a) }, ownership.ErrNotFound},
 		{"credit card: find payment", func() error {
 			_, err := r.creditCard.FindPaymentById(ctx, owner.cardPaymentID, a)

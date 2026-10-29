@@ -72,8 +72,13 @@ func TestCreditCardPayment_FromUUIDAccount(t *testing.T) {
 	cards := creditcardRepo.NewCreditCardRepository(db)
 	require.NoError(t, cards.SaveCard(ctx, creditcard.NewCreditCard(cardAccount.Id, "BHD", "4242", 10, 20)))
 	balance := creditcard.NewCardBalance(newID(), cardAccount.Id, "DOP", money.FromInt(50_000))
-	balance.CurrentBalance = money.FromInt(-1000)
 	require.NoError(t, cards.SaveBalance(ctx, balance))
+	debtCat := category.NewCategory(newID(), "Ajuste", "i", "#fff")
+	debtCat.UserId = user.Id
+	require.NoError(t, categoryRepo.NewCategoryRepository(db).Save(ctx, debtCat))
+	debt := transaction.NewTransaction(newID(), "Ajuste de saldo", "", account.AdjustmentOut, cardAccount.Id, debtCat.Id, money.FromInt(1000))
+	debt.UserId, debt.Currency, debt.CreatedAt = user.Id, "DOP", time.Now()
+	require.NoError(t, transactionRepo.NewTransactionRepository(db).Save(ctx, debt))
 
 	service := creditcardService.NewCreditCardService(cards, accounts, &repoTransactions{repo: transactionRepo.NewTransactionRepository(db)})
 	pay := func(ctx context.Context) {
@@ -98,9 +103,9 @@ func TestCreditCardPayment_FromUUIDAccount(t *testing.T) {
 		assert.Equal(t, cardAccount.Id, p.CardId)
 	}
 
-	updated, err := cards.FindBalanceById(ctx, balance.Id, user.Id)
+	cardBalance, err := accounts.BalanceByCurrency(ctx, cardAccount.Id, user.Id, "DOP")
 	require.NoError(t, err)
-	moneytest.Equal(t, -800, updated.CurrentBalance)
+	moneytest.Equal(t, -800, cardBalance)
 
 	rows, err := db.QueryContext(ctx, `SELECT transaction_name, transaction_description, category_id FROM transactions WHERE account_id = $1 ORDER BY transaction_name`, bank.Id)
 	require.NoError(t, err)
@@ -123,7 +128,7 @@ func TestCreditCardPayment_FromUUIDAccount(t *testing.T) {
 	// language of the first payment.
 	var count int
 	var name string
-	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*), MIN(name) FROM categorys WHERE user_id = $1`, user.Id).Scan(&count, &name))
+	require.NoError(t, db.QueryRowContext(ctx, `SELECT COUNT(*), MIN(name) FROM categorys WHERE user_id = $1 AND id <> $2`, user.Id, debtCat.Id).Scan(&count, &name))
 	assert.Equal(t, 1, count)
 	assert.Equal(t, "Pago de tarjeta", name)
 }

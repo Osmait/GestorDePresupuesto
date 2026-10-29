@@ -12,6 +12,7 @@ export const FINANCIAL_QUERY_ROOTS = [
 	['categories'], // CATEGORY_KEYS.all
 	['analytics'], // ANALYTICS_KEYS.all (dashboard summary, category expenses)
 	['search'], // SEARCH_KEYS.all
+	['credit-cards'], // CREDIT_CARD_KEYS.all (a card's balance is the ledger of its account)
 ] as const
 
 /**
