@@ -89,21 +89,23 @@ vi.mock('@/components/ai/AIExtractionModal', () => ({
 	AIExtractionModal: () => <div data-testid='ai-extraction-modal'>AI Modal</div>,
 }))
 
-function createWrapper() {
+function renderActions() {
 	const queryClient = new QueryClient({
 		defaultOptions: {
 			queries: { retry: false },
 			mutations: { retry: false },
 		},
 	})
-	return function Wrapper({ children }: { children: React.ReactNode }) {
-		return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-	}
+	return render(
+		<QueryClientProvider client={queryClient}>
+			<TransactionActions />
+		</QueryClientProvider>,
+	)
 }
 
 describe('TransactionActions', () => {
 	it('renders action buttons', () => {
-		render(<TransactionActions />, { wrapper: createWrapper() })
+		renderActions()
 
 		expect(screen.getByText('addTransaction')).toBeInTheDocument()
 		expect(screen.getByText('filters')).toBeInTheDocument()
@@ -111,7 +113,7 @@ describe('TransactionActions', () => {
 
 	it('opens filter drawer on click', async () => {
 		const user = userEvent.setup()
-		render(<TransactionActions />, { wrapper: createWrapper() })
+		renderActions()
 
 		await user.click(screen.getByText('filters'))
 
@@ -121,7 +123,7 @@ describe('TransactionActions', () => {
 	it('debounces the search box: one filter update after the user stops typing', async () => {
 		setFilters.mockClear()
 		const user = userEvent.setup()
-		render(<TransactionActions />, { wrapper: createWrapper() })
+		renderActions()
 		await user.click(screen.getByText('filters'))
 		const input = await screen.findByPlaceholderText('searchPlaceholder')
 
