@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"errors"
 
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/likepattern"
+
 	"github.com/osmait/gestorDePresupuesto/internal/domain/budget"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
@@ -130,7 +132,7 @@ func (b *BudgetRepository) FindByCategory(ctx context.Context, categoryID string
 }
 
 func (b *BudgetRepository) Search(ctx context.Context, userId string, query string) ([]*budget.Budget, error) {
-	searchTerm := "%" + query + "%"
+	searchTerm := likepattern.Contains(query)
 	// Join with categories to search by category name since budgets don't have own names
 	querySQL := `
 		SELECT b.id, b.category_id, b.user_id, b.amount, b.created_at, c.name

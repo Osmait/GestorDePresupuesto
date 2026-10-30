@@ -107,7 +107,7 @@ SERVER_HOST=localhost
 SERVER_PORT=8080
 
 JWT_SECRET=development-secret-key
-JWT_EXPIRATION=24h
+JWT_EXPIRATION=15m
 
 ENV=development
 LOG_LEVEL=debug

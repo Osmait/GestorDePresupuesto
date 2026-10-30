@@ -76,7 +76,7 @@ The application uses a comprehensive configuration system that supports:
 | Variable | Default | Description |
 |----------|---------|-------------|
 | `JWT_SECRET` | Generated | JWT secret key (minimum 32 characters) |
-| `JWT_EXPIRATION` | `24h` | JWT token expiration |
+| `JWT_EXPIRATION` | `15m` | Access token lifetime (not revocable; clients use the refresh token) |
 | `JWT_REFRESH_EXPIRATION` | `168h` | JWT refresh token expiration (7 days) |
 | `JWT_ISSUER` | `gestor-de-presupuesto` | JWT issuer |
 | `JWT_ALGORITHM` | `HS256` | JWT algorithm |

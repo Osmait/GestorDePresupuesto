@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/likepattern"
+
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
@@ -517,7 +519,7 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	// Search filter (name and description)
 	if filter.Search != "" {
 		whereConditions = append(whereConditions, fmt.Sprintf("(transaction_name ILIKE $%d OR transaction_description ILIKE $%d)", argIndex, argIndex+1))
-		searchTerm := "%" + filter.Search + "%"
+		searchTerm := likepattern.Contains(filter.Search)
 		args = append(args, searchTerm, searchTerm)
 		argIndex += 2
 	}

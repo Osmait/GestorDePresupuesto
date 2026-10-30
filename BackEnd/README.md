@@ -243,7 +243,7 @@ CORS_ALLOW_CREDENTIALS=false
 
 # JWT
 JWT_SECRET=your-secret-key       # >= 32 chars, required outside development/test
-JWT_EXPIRATION=24h               # access token lifetime (also used by legacy /login)
+JWT_EXPIRATION=15m               # access token lifetime (also used by legacy /login)
 JWT_REFRESH_EXPIRATION=168h
 JWT_ISSUER=gestor-de-presupuesto
 JWT_AUDIENCE=gestor-de-presupuesto-api
