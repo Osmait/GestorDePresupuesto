@@ -10,12 +10,22 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// UserQuotaConfig limits one user's requests to a path prefix.
+// UserQuotaConfig limits one user's requests to the paths starting with any
+// of Prefixes.
 type UserQuotaConfig struct {
-	Prefix      string
+	Prefixes    []string
 	PerMinute   int
 	PerDay      int
 	MaxInFlight int
+}
+
+func hasAnyPrefix(path string, prefixes []string) bool {
+	for _, p := range prefixes {
+		if strings.HasPrefix(path, p) {
+			return true
+		}
+	}
+	return false
 }
 
 type userQuotaState struct {
@@ -24,7 +34,7 @@ type userQuotaState struct {
 	inFlight int
 }
 
-// UserQuota limits, per authenticated user, the requests to cfg.Prefix: per
+// UserQuota limits, per authenticated user, the requests to cfg.Prefixes: per
 // minute, per day and at the same time. The global limiter runs before
 // authentication and can only count per IP; this one counts per user, which
 // is what bounds the cost of the AI endpoints (each call goes to the paid
@@ -38,7 +48,7 @@ func UserQuota(cfg UserQuotaConfig) gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		userID := c.GetString("X-User-Id")
-		if userID == "" || !strings.HasPrefix(c.Request.URL.Path, cfg.Prefix) {
+		if userID == "" || !hasAnyPrefix(c.Request.URL.Path, cfg.Prefixes) {
 			c.Next()
 			return
 		}

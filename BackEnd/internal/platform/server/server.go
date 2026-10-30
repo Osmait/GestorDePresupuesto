@@ -355,7 +355,7 @@ func (s *Server) registerRoutes() {
 	// Each SSE stream holds a goroutine and a socket for as long as it is
 	// open: a handful of tabs per user, not unbounded.
 	s.Engine.GET("/notifications", middleware.UserQuota(middleware.UserQuotaConfig{
-		Prefix:      "/notifications",
+		Prefixes:    []string{"/notifications"},
 		MaxInFlight: maxSSEStreamsPerUser,
 	}), notificationH.Subscribe)
 
@@ -372,12 +372,21 @@ func (s *Server) registerRoutes() {
 	// one deadlocks once concurrent requests exhaust the pool. The connection
 	// is acquired with a bounded wait (DB_TX_ACQUIRE_TIMEOUT) and the request
 	// fails fast with 503 when the pool stays exhausted.
-	// Per-user AI limits, before RLS so a rejected call takes no connection.
+	// Per-user limits on the AI endpoints that call the provider (the savings
+	// goals CRUD and reading/applying a reconciliation do not), before RLS so
+	// a rejected call takes no connection.
 	s.Engine.Use(middleware.UserQuota(middleware.UserQuotaConfig{
-		Prefix:      "/ai/",
+		Prefixes:    []string{"/ai/extract/", "/ai/reconcile/preview", "/ai/analyze/", "/ai/goals/savings-plan"},
 		PerMinute:   s.config.AI.RequestsPerMinute,
 		PerDay:      s.config.AI.RequestsPerDay,
 		MaxInFlight: s.config.AI.MaxInFlight,
+	}))
+	// Category suggestions are asked while typing: their own, looser budget.
+	s.Engine.Use(middleware.UserQuota(middleware.UserQuotaConfig{
+		Prefixes:    []string{"/ai/suggest-category", "/ai/suggest-categories/"},
+		PerMinute:   60,
+		PerDay:      1000,
+		MaxInFlight: 3,
 	}))
 	s.Engine.Use(middleware.RLSMiddlewareWithTimeout(s.db, s.config.Database.TxAcquireTimeout))
 

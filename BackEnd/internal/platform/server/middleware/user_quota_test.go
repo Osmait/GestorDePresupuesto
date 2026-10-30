@@ -38,7 +38,7 @@ func quotaCall(r *gin.Engine, path, user string) int {
 
 func TestUserQuota_PerMinuteAndPerUser(t *testing.T) {
 	t.Parallel()
-	r := quotaEngine(UserQuotaConfig{Prefix: "/ai/", PerMinute: 2}, nil, nil)
+	r := quotaEngine(UserQuotaConfig{Prefixes: []string{"/ai/extract"}, PerMinute: 2}, nil, nil)
 	assert.Equal(t, http.StatusOK, quotaCall(r, "/ai/extract", "u1"))
 	assert.Equal(t, http.StatusOK, quotaCall(r, "/ai/extract", "u1"))
 	assert.Equal(t, http.StatusTooManyRequests, quotaCall(r, "/ai/extract", "u1"))
@@ -49,7 +49,7 @@ func TestUserQuota_PerMinuteAndPerUser(t *testing.T) {
 func TestUserQuota_MaxInFlight(t *testing.T) {
 	t.Parallel()
 	entered, hold := make(chan struct{}), make(chan struct{})
-	r := quotaEngine(UserQuotaConfig{Prefix: "/ai/", MaxInFlight: 1}, entered, hold)
+	r := quotaEngine(UserQuotaConfig{Prefixes: []string{"/ai/extract"}, MaxInFlight: 1}, entered, hold)
 
 	var wg sync.WaitGroup
 	wg.Add(1)
