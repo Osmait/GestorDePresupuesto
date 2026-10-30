@@ -58,4 +58,20 @@ describe('transaction-utils', () => {
 		expect(isEditableTransaction(TypeTransaction.BILL)).toBe(true)
 		expect(isDeletableTransaction(TypeTransaction.BILL)).toBe(true)
 	})
+
+	it('leaves card payments, loans and broker movements to their own screens', () => {
+		for (const type of [
+			TypeTransaction.CARD_PAYMENT,
+			TypeTransaction.LOAN_DISBURSEMENT,
+			TypeTransaction.LOAN_COLLECTION,
+			TypeTransaction.INVESTMENT_FUNDING,
+			TypeTransaction.INVESTMENT_PURCHASE,
+			'loan_cancellation_refund',
+		]) {
+			expect(isEditableTransaction(type)).toBe(false)
+			expect(isDeletableTransaction(type)).toBe(false)
+		}
+		expect(isEditableTransaction(TypeTransaction.INCOME)).toBe(true)
+		expect(isEditableTransaction(undefined)).toBe(false)
+	})
 })

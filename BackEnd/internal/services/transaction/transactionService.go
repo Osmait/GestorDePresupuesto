@@ -32,7 +32,7 @@ const (
 
 // ErrManagedTransaction rejects editing or deleting a transaction the app
 // manages itself (see transaction.IsEditable / IsDeletable).
-var ErrManagedTransaction = fmt.Errorf("%w: this transaction is managed by the app (balance adjustment or card payment); reconcile the account or delete the adjustment instead", errorhttp.ErrBadRequest)
+var ErrManagedTransaction = fmt.Errorf("%w: this transaction is managed by the app (card payment, loan, broker funding or balance adjustment); use its own screen, reconcile the account or delete the adjustment instead", errorhttp.ErrBadRequest)
 
 // The method parameters named `transaction` shadow the domain package.
 func isEditable(t string) bool  { return transaction.IsEditable(t) }

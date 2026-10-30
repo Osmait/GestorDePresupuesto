@@ -167,6 +167,17 @@ func TestMCPTools(t *testing.T) {
 		var found page
 		f.mustCall(t, "list_transactions", map[string]any{"search": "colmado"}, &found)
 		assert.Len(t, found.Data, 2)
+
+		// Wildcards in the search text are literal: "50%" is not "50 then anything".
+		for _, name := range []string{"Oferta 50% off", "500 pesos"} {
+			f.mustCall(t, "create_transaction", map[string]any{
+				"name": name, "amount": 1, "type": "bill", "account_id": f.bankId, "category_id": f.foodCat,
+			}, nil)
+		}
+		var literal page
+		f.mustCall(t, "list_transactions", map[string]any{"search": "50%"}, &literal)
+		require.Len(t, literal.Data, 1)
+		assert.Equal(t, "Oferta 50% off", literal.Data[0].Name)
 	})
 
 	t.Run("managed transactions cannot be edited, nor a payment received deleted", func(t *testing.T) {
@@ -197,6 +208,14 @@ func TestMCPTools(t *testing.T) {
 		var receivedId string
 		require.NoError(t, f.db.QueryRow(`SELECT id FROM transactions WHERE account_id = $1 AND type_transation = 'card_payment_received'`, card.Id).Scan(&receivedId))
 		text, isErr = f.call(t, "delete_transaction", map[string]any{"id": receivedId})
+		assert.True(t, isErr)
+		assert.Contains(t, text, "managed by the app")
+
+		// Nor the paying side: deleting it would give the money back while the
+		// card stays paid (and bypass the overdraft check).
+		var paidId string
+		require.NoError(t, f.db.QueryRow(`SELECT id FROM transactions WHERE account_id = $1 AND type_transation = 'card_payment'`, f.bankId).Scan(&paidId))
+		text, isErr = f.call(t, "delete_transaction", map[string]any{"id": paidId})
 		assert.True(t, isErr)
 		assert.Contains(t, text, "managed by the app")
 
