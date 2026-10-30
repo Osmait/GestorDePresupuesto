@@ -56,13 +56,38 @@ type LoanDetailsResponse struct {
 	Payments     []LoanPaymentResponse     `json:"payments"`
 }
 
+// LoanSummaryResponse totals the user's loans. The amounts are in DOP (USD
+// loans converted at UsdToDopRate); ByCurrency has the same totals in each
+// loan's own currency, unconverted.
+//
+//   - TotalPrincipal: principal lent, cancelled loans excluded (their pending
+//     principal was refunded to the source account).
+//   - TotalPending: what active loans still owe (principal + interest).
+//     Defaulted loans are written off: their pending amount is reported apart
+//     in DefaultedPending and never added to TotalPending (nor to net worth).
+//   - TotalCollected / TotalInterestEarned: every payment received, whatever
+//     the loan's status now.
 type LoanSummaryResponse struct {
+	TotalPrincipal      money.Amount                  `json:"total_principal"`
+	TotalPending        money.Amount                  `json:"total_pending"`
+	TotalCollected      money.Amount                  `json:"total_collected"`
+	TotalInterestEarned money.Amount                  `json:"total_interest_earned"`
+	OverdueLoans        int                           `json:"overdue_loans"`
+	ActiveLoans         int                           `json:"active_loans"`
+	DefaultedPending    money.Amount                  `json:"defaulted_pending"`
+	DefaultedLoans      int                           `json:"defaulted_loans"`
+	UsdToDopRate        money.Amount                  `json:"usd_to_dop_rate"`
+	ByCurrency          map[string]*LoanCurrencyTotal `json:"by_currency"`
+}
+
+// LoanCurrencyTotal is the summary of the loans in one currency, in that
+// currency.
+type LoanCurrencyTotal struct {
 	TotalPrincipal      money.Amount `json:"total_principal"`
 	TotalPending        money.Amount `json:"total_pending"`
 	TotalCollected      money.Amount `json:"total_collected"`
 	TotalInterestEarned money.Amount `json:"total_interest_earned"`
-	OverdueLoans        int          `json:"overdue_loans"`
-	ActiveLoans         int          `json:"active_loans"`
+	DefaultedPending    money.Amount `json:"defaulted_pending"`
 }
 
 func NewLoanResponse(entity *loan.Loan) LoanResponse {
