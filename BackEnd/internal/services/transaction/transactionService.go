@@ -10,6 +10,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
@@ -28,6 +29,14 @@ const (
 	INVESTMENT_FUNDING       = "investment_funding"
 	LOAN_CANCELLATION_REFUND = "loan_cancellation_refund"
 )
+
+// ErrManagedTransaction rejects editing or deleting a transaction the app
+// manages itself (see transaction.IsEditable / IsDeletable).
+var ErrManagedTransaction = fmt.Errorf("%w: this transaction is managed by the app (balance adjustment or card payment); reconcile the account or delete the adjustment instead", errorhttp.ErrBadRequest)
+
+// The method parameters named `transaction` shadow the domain package.
+func isEditable(t string) bool  { return transaction.IsEditable(t) }
+func isDeletable(t string) bool { return transaction.IsDeletable(t) }
 
 type AICacheInvalidator interface {
 	InvalidateUserAnalysis(userID string)
@@ -408,8 +417,17 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 	return transactionResponseList
 }
 
-// UpdateTransaction modifies an existing transaction.
+// UpdateTransaction modifies an existing transaction. Transactions the app
+// manages (balance adjustments, card payments received) cannot be edited, nor
+// can a transaction be turned into one.
 func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, transaction *transaction.Transaction) error {
+	current, err := s.transactionRepository.TypeOf(ctx, id, transaction.UserId)
+	if err != nil {
+		return err
+	}
+	if !isEditable(current) || !isEditable(transaction.TypeTransation) {
+		return ErrManagedTransaction
+	}
 	transaction.Amount = transaction.Amount.Abs()
 
 	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, transaction.UserId, transaction.AccountId, transaction.Currency)
@@ -436,9 +454,17 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 	return nil
 }
 
-// DeleteTransaction removes a transaction by its ID and User ID.
+// DeleteTransaction removes a transaction by its ID and User ID. A card
+// payment received cannot be deleted on its own (see transaction.IsDeletable).
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {
-	err := s.transactionRepository.Delete(ctx, id, userId)
+	current, err := s.transactionRepository.TypeOf(ctx, id, userId)
+	if err != nil {
+		return err
+	}
+	if !isDeletable(current) {
+		return ErrManagedTransaction
+	}
+	err = s.transactionRepository.Delete(ctx, id, userId)
 	if err == nil {
 		s.invalidateLists(ctx, userId)
 

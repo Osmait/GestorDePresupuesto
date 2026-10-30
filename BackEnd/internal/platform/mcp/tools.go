@@ -15,25 +15,35 @@ import (
 
 // registerTools registers all MCP tools on the server.
 func (s *MCPServer) registerTools() {
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("list_accounts",
 			mcp.WithDescription("List all financial accounts for the authenticated user"),
 		),
 		s.handleListAccounts,
 	)
 
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("list_categories",
 			mcp.WithDescription("List all transaction categories for the authenticated user"),
 		),
 		s.handleListCategories,
 	)
 
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("list_transactions",
-			mcp.WithDescription("List transactions for the authenticated user. Supports filtering by date range, account, category and type."),
+			mcp.WithDescription("List transactions for the authenticated user, newest first. Supports filtering by date range, account, category, type and text, and paging (the result says whether there is a next page)."),
 			mcp.WithNumber("limit",
-				mcp.Description("Maximum number of transactions to return (default 20, max 100)"),
+				mcp.Description("Transactions per page (default 20, max 100)"),
+			),
+			mcp.WithNumber("page",
+				mcp.Description("Page number, starting at 1 (default 1)"),
+			),
+			mcp.WithString("search",
+				mcp.Description("Filter: text in the name or description"),
+			),
+			mcp.WithString("sort_order",
+				mcp.Description("Order by date: desc (newest first, default) or asc"),
+				mcp.Enum("desc", "asc"),
 			),
 			mcp.WithString("date_from",
 				mcp.Description("Filter: start date in YYYY-MM-DD or YYYY/MM/DD format"),
@@ -55,9 +65,9 @@ func (s *MCPServer) registerTools() {
 		s.handleListTransactions,
 	)
 
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("update_transaction",
-			mcp.WithDescription("Replace an existing transaction's core fields. Before calling, use list_transactions to fetch the current values and pass the full set of fields — any omitted required field will be rejected."),
+			mcp.WithDescription("Replace an existing transaction's core fields. Before calling, use list_transactions to fetch the current values and pass the full set of fields — any omitted required field will be rejected. Balance adjustments and card payments received are managed by the app and cannot be edited."),
 			mcp.WithString("id", mcp.Required(), mcp.Description("ID of the transaction to update")),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Transaction name")),
 			mcp.WithNumber("amount", mcp.Required(), mcp.Description("Amount (positive number)")),
@@ -65,21 +75,21 @@ func (s *MCPServer) registerTools() {
 			mcp.WithString("account_id", mcp.Required(), mcp.Description("Account ID")),
 			mcp.WithString("category_id", mcp.Required(), mcp.Description("Category ID")),
 			mcp.WithString("description", mcp.Description("Optional description")),
-			mcp.WithString("currency", mcp.Description("Currency code (e.g. USD, DOP). Defaults to USD")),
-			mcp.WithString("date", mcp.Description("Transaction date in RFC3339 (optional, preserves original if omitted — but if you need to preserve it, pass it explicitly)")),
+			mcp.WithString("currency", mcp.Description("Currency code (DOP or USD). Defaults to the account's currency")),
+			mcp.WithString("date", mcp.Description("Transaction date, YYYY-MM-DD or RFC3339. Pass the current date to keep it (list_transactions shows it)")),
 		),
 		s.handleUpdateTransaction,
 	)
 
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("delete_transaction",
-			mcp.WithDescription("Delete a transaction owned by the authenticated user"),
+			mcp.WithDescription("Delete a transaction owned by the authenticated user. Deleting a balance adjustment undoes it; a card payment received cannot be deleted on its own."),
 			mcp.WithString("id", mcp.Required(), mcp.Description("ID of the transaction to delete")),
 		),
 		s.handleDeleteTransaction,
 	)
 
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("create_transaction",
 			mcp.WithDescription("Create a new income or expense transaction"),
 			mcp.WithString("name",
@@ -107,23 +117,23 @@ func (s *MCPServer) registerTools() {
 				mcp.Description("Optional description for the transaction"),
 			),
 			mcp.WithString("currency",
-				mcp.Description("Currency code (e.g. USD, DOP). Defaults to USD"),
+				mcp.Description("Currency code (DOP or USD). Defaults to the account's currency"),
 			),
 			mcp.WithString("date",
-				mcp.Description("Transaction date in RFC3339 format (defaults to now)"),
+				mcp.Description("Transaction date, YYYY-MM-DD or RFC3339 (defaults to now)"),
 			),
 		),
 		s.handleCreateTransaction,
 	)
 
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("get_balance",
 			mcp.WithDescription("Get current balance for all accounts of the authenticated user"),
 		),
 		s.handleGetBalance,
 	)
 
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("analyze_spending",
 			mcp.WithDescription("Get a breakdown of expenses by category for the authenticated user"),
 		),
@@ -216,6 +226,10 @@ func (s *MCPServer) handleListTransactions(ctx context.Context, req mcp.CallTool
 	if limit <= 0 || limit > 100 {
 		limit = 20
 	}
+	page := int(req.GetFloat("page", 1))
+	if page < 1 {
+		page = 1
+	}
 
 	txCtx, commit, rollback, err := s.withRLSTx(ctx, userID)
 	if err != nil {
@@ -226,8 +240,11 @@ func (s *MCPServer) handleListTransactions(ctx context.Context, req mcp.CallTool
 
 	filter := dto.NewTransactionFilter()
 	filter.Limit = limit
-	filter.Page = 1
-	filter.Offset = 0
+	filter.Page = page
+	filter.Offset = (page - 1) * limit
+	filter.Search = req.GetString("search", "")
+	filter.SortBy = "created_at"
+	filter.SortOrder = req.GetString("sort_order", "desc")
 	filter.DateFrom = req.GetString("date_from", "")
 	filter.DateTo = req.GetString("date_to", "")
 	filter.AccountId = req.GetString("account_id", "")
@@ -301,13 +318,16 @@ func (s *MCPServer) handleCreateTransaction(ctx context.Context, req mcp.CallToo
 	}
 
 	description := req.GetString("description", "")
-	currency := req.GetString("currency", "USD")
+	// Empty: the account's currency (a DOP account rejects USD).
+	currency := req.GetString("currency", "")
 
 	createdAt := time.Now()
 	if dateStr := req.GetString("date", ""); dateStr != "" {
-		if parsed, parseErr := time.Parse(time.RFC3339, dateStr); parseErr == nil {
-			createdAt = parsed
+		parsed, parseErr := parseTransactionDate(dateStr)
+		if parseErr != nil {
+			return mcp.NewToolResultError(parseErr.Error()), nil
 		}
+		createdAt = parsed
 	}
 
 	txCtx, _, rollback, dbErr := s.withRLSTx(ctx, userID)
@@ -380,6 +400,21 @@ func parseMCPDate(s string) (time.Time, error) {
 	return time.Time{}, fmt.Errorf("unable to parse date: %s", s)
 }
 
+// parseTransactionDate parses the date of a transaction: RFC3339 as given, or a
+// calendar day (YYYY-MM-DD, YYYY/MM/DD) at 12:00 UTC, which is the same day in
+// UTC and in Santo Domingo (UTC-4), so it lands on that day on every screen.
+func parseTransactionDate(s string) (time.Time, error) {
+	if t, err := time.Parse(time.RFC3339, s); err == nil {
+		return t, nil
+	}
+	for _, layout := range []string{"2006-01-02", "2006/01/02"} {
+		if t, err := time.Parse(layout, s); err == nil {
+			return t.Add(12 * time.Hour), nil
+		}
+	}
+	return time.Time{}, fmt.Errorf("invalid date %q: use YYYY-MM-DD or RFC3339", s)
+}
+
 // handleUpdateTransaction updates an existing transaction owned by the authenticated user.
 func (s *MCPServer) handleUpdateTransaction(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
 	userID := mcpcontext.UserIDFromContext(ctx)
@@ -430,9 +465,9 @@ func (s *MCPServer) handleUpdateTransaction(ctx context.Context, req mcp.CallToo
 	updated.UserId = userID
 	updated.Currency = req.GetString("currency", "")
 	if dateStr := req.GetString("date", ""); dateStr != "" {
-		parsed, perr := time.Parse(time.RFC3339, dateStr)
+		parsed, perr := parseTransactionDate(dateStr)
 		if perr != nil {
-			return mcp.NewToolResultError("invalid date: expected RFC3339 format"), nil
+			return mcp.NewToolResultError(perr.Error()), nil
 		}
 		updated.CreatedAt = parsed
 	}

@@ -283,6 +283,16 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 	return budgets, nil
 }
 
+func (repo *TransactionRepository) TypeOf(ctx context.Context, id string, userId string) (string, error) {
+	var t string
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx,
+		"SELECT type_transation FROM transactions WHERE id = $1 AND user_id = $2", id, userId).Scan(&t)
+	if err != nil {
+		return "", ownership.NotFoundIfNoRows(err)
+	}
+	return t, nil
+}
+
 func (repo *TransactionRepository) Delete(ctx context.Context, id string, userId string) error {
 	result, err := txhelper.FromContext(ctx, repo.db).ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND user_id = $2", id, userId)
 	if err != nil {

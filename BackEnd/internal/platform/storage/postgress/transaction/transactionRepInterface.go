@@ -21,6 +21,9 @@ type TransactionRepositoryInterface interface {
 	FindAllOfAllAccounts(ctx context.Context, id string) ([]*transaction.Transaction, error)
 	BalanceByAccountAndCurrency(ctx context.Context, accountId string, userId string, currency string) (money.Amount, error)
 	Delete(ctx context.Context, id string, userId string) error
+	// TypeOf returns the type of transaction id owned by userId
+	// (ownership.ErrNotFound otherwise).
+	TypeOf(ctx context.Context, id string, userId string) (string, error)
 	Update(ctx context.Context, id string, transaction *transaction.Transaction) error
 	FindAllOfAllAccountsWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)
 	FindAllWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)
