@@ -3,6 +3,7 @@ import type { NextAuthConfig, User } from 'next-auth'
 import Credentials from 'next-auth/providers/credentials'
 import { z } from 'zod'
 import { getJwtExpiryMs } from '@/lib/auth/jwt-utils'
+import { revokeBackendSession } from '@/lib/auth/logout'
 import { ensureFreshToken } from '@/lib/auth/token-refresh'
 import { getBackendUrl } from '@/lib/backend-url'
 import { clientIpHeaders } from '@/lib/server/client-ip'
@@ -146,6 +147,13 @@ export const authConfig = {
 			session.user.role = token.role ?? 'USER'
 			if (token.error) session.error = token.error
 			return session
+		},
+	},
+	events: {
+		// Clearing the cookie alone leaves the backend refresh token valid for
+		// its full lifetime; revoke it server-side (best effort, never throws).
+		async signOut(message) {
+			if ('token' in message) await revokeBackendSession(message.token)
 		},
 	},
 	pages: {
