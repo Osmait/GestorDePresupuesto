@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCreditCardRepository } from '@/lib/repositoryConfig'
-import { CreateCreditCardDTO, CreatePaymentDTO } from '@/types/creditcard'
+import { CreateCreditCardDTO, CreatePaymentDTO, UpdateCreditCardInput } from '@/types/creditcard'
 import { invalidateFinancialData } from './invalidateFinancialData'
 import { ACCOUNT_KEYS } from './useAccountsQuery'
 
@@ -69,17 +69,28 @@ export function useCreateCreditCardMutation() {
 	})
 }
 
+/**
+ * Saves the edit form: the card fields, then each changed credit limit through its balance
+ * endpoint (PUT /credit-cards/:id ignores balances).
+ */
 export function useUpdateCreditCardMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
-		mutationFn: async ({ id, data }: { id: string; data: CreateCreditCardDTO }) => {
+		mutationFn: async ({ id, data }: { id: string; data: UpdateCreditCardInput }) => {
 			const repo = await getCreditCardRepository()
-			return repo.update(id, data)
+			const card = await repo.update(id, data.card)
+			for (const { balanceId, credit_limit } of data.creditLimits) {
+				await repo.updateBalance(id, balanceId, { credit_limit })
+			}
+			return card
 		},
-		onSuccess: () => {
+		// Also after a partial failure (card saved, a limit rejected): show what was saved.
+		onSettled: (_data, _error, variables) => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.summary() })
+			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.detail(variables.id) })
 		},
 	})
 }

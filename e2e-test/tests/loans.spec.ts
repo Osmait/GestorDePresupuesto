@@ -20,8 +20,8 @@ test.describe('Loans @prod-write', () => {
 		await expect(modal).toBeVisible()
 
 		await modal.locator('input').first().fill(borrowerName)
-		await modal.locator('input[type="number"]').first().fill('3000') // must fit the source account balance (overdrafts are blocked)
-		await modal.locator('input[type="number"]').nth(1).fill('5')
+		await modal.locator('input[inputmode="decimal"]').first().fill('3000') // must fit the source account balance (overdrafts are blocked)
+		await modal.locator('input[inputmode="decimal"]').nth(1).fill('5')
 
 		// Source account (Radix select)
 		await modal.getByRole('combobox').first().click()
@@ -68,8 +68,8 @@ test.describe('Loans @prod-write', () => {
 		await expect(modal).toBeVisible()
 
 		await modal.locator('input').first().fill(borrowerName)
-		await modal.locator('input[type="number"]').first().fill('5000')
-		await modal.locator('input[type="number"]').nth(1).fill('10')
+		await modal.locator('input[inputmode="decimal"]').first().fill('5000')
+		await modal.locator('input[inputmode="decimal"]').nth(1).fill('10')
 		await modal.getByRole('combobox').first().click()
 		await page.getByRole('option', { name: accountName, exact: true }).click()
 
@@ -88,7 +88,7 @@ test.describe('Loans @prod-write', () => {
 
 		await paymentDialog.getByRole('combobox').first().click()
 		await page.getByRole('option', { name: accountName, exact: true }).click()
-		await paymentDialog.locator('input[type="number"]').fill('500')
+		await paymentDialog.locator('input[inputmode="decimal"]').fill('500')
 		await paymentDialog.locator('input[type="date"]').fill(new Date().toISOString().slice(0, 10))
 
 		await paymentDialog.getByRole('button', { name: /Confirm payment|Confirmar pago/i }).click()

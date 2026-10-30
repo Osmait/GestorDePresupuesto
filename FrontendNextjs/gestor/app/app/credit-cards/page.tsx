@@ -33,7 +33,7 @@ import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
-import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard } from '@/types/creditcard'
+import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard, UpdateCreditCardInput } from '@/types/creditcard'
 
 /** Header + KPI + card skeletons, shared by the feature-flag and the cards loading states. */
 function CreditCardsSkeleton() {
@@ -100,7 +100,7 @@ function CreditCardsContent() {
 		toast.success(t('toasts.created'))
 	}
 
-	const handleUpdateCard = async (data: CreateCreditCardDTO) => {
+	const handleUpdateCard = async (data: UpdateCreditCardInput) => {
 		if (!selectedCard) return
 		await updateMutation.mutateAsync({ id: selectedCard.id, data })
 		toast.success(t('toasts.updated'))
@@ -323,7 +323,8 @@ function CreditCardsContent() {
 			<CreditCardFormModal
 				open={formOpen}
 				onClose={handleFormClose}
-				onSubmit={selectedCard ? handleUpdateCard : handleCreateCard}
+				onSubmit={handleCreateCard}
+				onUpdate={handleUpdateCard}
 				card={selectedCard}
 			/>
 

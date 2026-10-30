@@ -75,7 +75,8 @@ async function openCreateDialog(user: ReturnType<typeof userEvent.setup>) {
 	const dialog = await screen.findByRole('dialog')
 	const [borrower] = Array.from(dialog.querySelectorAll('input'))
 	await user.type(borrower, 'Ana')
-	const [principal] = Array.from(dialog.querySelectorAll<HTMLInputElement>('input[type="number"]'))
+	// The first amount field (money fields are text inputs with a decimal keyboard).
+	const [principal] = Array.from(dialog.querySelectorAll<HTMLInputElement>('input[inputmode="decimal"]'))
 	return { dialog, principal }
 }
 
@@ -142,7 +143,7 @@ describe('LoansPage create dialog', () => {
 		const { dialog, principal } = await openCreateDialog(user)
 		// Set the whole value at once (typing would go through intermediate values).
 		fireEvent.change(principal, { target: { value: '10.005' } })
-		// Submit the form directly: the browser's own step="0.01" check is not under test here.
+		// Submit the form directly (as a keyboard Enter would).
 		const form = dialog.querySelector('form')
 		if (!form) throw new Error('create form not found')
 		fireEvent.submit(form)

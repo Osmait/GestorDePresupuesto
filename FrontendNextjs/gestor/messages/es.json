@@ -1024,6 +1024,10 @@
     "delete": "Eliminar",
     "deleting": "Eliminando...",
     "maxTwoDecimals": "Usa como máximo 2 decimales",
+    "maxDecimals": "Usa como máximo {count} decimales",
+    "amountMissing": "Ingresa un monto",
+    "invalidAmount": "Ingresa un monto válido, p. ej. 1,500.50",
+    "invalidNumber": "Ingresa un número válido, p. ej. 12.5",
     "insufficientFunds": "La cuenta de origen no tiene fondos suficientes para esta operación.",
     "insufficientFundsAvailable": "La cuenta de origen no tiene fondos suficientes: solo hay {amount} disponibles.",
     "availableBalance": "Disponible: {amount}"
@@ -1486,6 +1490,8 @@
       "removeCurrency": "Quitar moneda",
       "creditLimit": "Límite de crédito",
       "initialDebt": "Deuda inicial",
+      "currentDebt": "Deuda actual",
+      "debtReadOnlyHint": "Para cambiar la deuda, usa \"Cuadrar\" en la tarjeta.",
       "create": "Crear",
       "update": "Actualizar",
       "errors": {
@@ -1495,7 +1501,7 @@
         "dayMin": "Mínimo {min}",
         "dayMax": "Máximo {max}",
         "saveFailed": "No se pudo guardar la tarjeta. Inténtalo de nuevo.",
-        "limitRequired": "Ingresa un límite de crédito de 0 o más para cada moneda."
+        "limitRequired": "Ingresa un límite de crédito mayor que 0 para cada moneda."
       }
     },
     "payment": {

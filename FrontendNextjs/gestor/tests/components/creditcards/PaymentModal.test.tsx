@@ -133,12 +133,13 @@ describe('PaymentModal', () => {
 		})
 	})
 
-	it('amount field has correct type and step', () => {
+	it('amount field is a text field with a decimal keyboard', () => {
 		renderModal()
 
-		const amountInput = screen.getByRole('spinbutton', { name: 'Amount to Pay' })
-		expect(amountInput).toHaveAttribute('type', 'number')
-		expect(amountInput).toHaveAttribute('step', '0.01')
+		const amountInput = screen.getByRole('textbox', { name: 'Amount to Pay' })
+		// Not type="number": it would parse "1500,50" with the browser locale.
+		expect(amountInput).toHaveAttribute('type', 'text')
+		expect(amountInput).toHaveAttribute('inputmode', 'decimal')
 	})
 
 	it('submit button is disabled without account selected', () => {
@@ -157,7 +158,7 @@ describe('PaymentModal', () => {
 			expect(mockFindAll).toHaveBeenCalled()
 		})
 
-		const amountInput = screen.getByRole('spinbutton', { name: 'Amount to Pay' })
+		const amountInput = screen.getByRole('textbox', { name: 'Amount to Pay' })
 		await user.clear(amountInput)
 		await user.type(amountInput, '20000')
 
@@ -204,7 +205,7 @@ describe('PaymentModal', () => {
 		// The amount is pre-filled from card balance (15000)
 		// We need to select an account first - since Radix Select is complex to interact with,
 		// let's check the submit button is present and test what we can
-		const amountInput = screen.getByRole('spinbutton', { name: 'Amount to Pay' })
+		const amountInput = screen.getByRole('textbox', { name: 'Amount to Pay' })
 		await user.clear(amountInput)
 		await user.type(amountInput, '5000')
 
@@ -291,7 +292,7 @@ describe('PaymentModal', () => {
 		const user = userEvent.setup()
 		renderModal()
 
-		const amountInput = screen.getByRole('spinbutton', { name: 'Amount to Pay' })
+		const amountInput = screen.getByRole('textbox', { name: 'Amount to Pay' })
 		await user.clear(amountInput)
 		await user.type(amountInput, '0.001')
 		await submitPaymentFromSavings(user)

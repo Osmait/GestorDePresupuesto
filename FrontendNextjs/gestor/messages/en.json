@@ -1024,6 +1024,10 @@
     "delete": "Delete",
     "deleting": "Deleting...",
     "maxTwoDecimals": "Use at most 2 decimal places",
+    "maxDecimals": "Use at most {count} decimal places",
+    "amountMissing": "Enter an amount",
+    "invalidAmount": "Enter a valid amount, e.g. 1,500.50",
+    "invalidNumber": "Enter a valid number, e.g. 12.5",
     "insufficientFunds": "The source account doesn't have enough funds for this operation.",
     "insufficientFundsAvailable": "The source account doesn't have enough funds: only {amount} available.",
     "availableBalance": "Available: {amount}"
@@ -1486,6 +1490,8 @@
       "removeCurrency": "Remove currency",
       "creditLimit": "Credit Limit",
       "initialDebt": "Initial Debt",
+      "currentDebt": "Current debt",
+      "debtReadOnlyHint": "To change the debt, use \"Reconcile\" on the card.",
       "create": "Create",
       "update": "Update",
       "errors": {
@@ -1495,7 +1501,7 @@
         "dayMin": "Min {min}",
         "dayMax": "Max {max}",
         "saveFailed": "The card could not be saved. Please try again.",
-        "limitRequired": "Enter a credit limit of 0 or more for each currency."
+        "limitRequired": "Enter a credit limit greater than 0 for each currency."
       }
     },
     "payment": {

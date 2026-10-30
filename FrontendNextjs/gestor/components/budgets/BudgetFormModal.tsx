@@ -7,10 +7,11 @@ import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { useBudgetContext } from '@/components/budgets/BudgetContext'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { moneyMessages, moneySchema } from '@/lib/money-input'
 
 interface BudgetFormModalProps {
 	open: boolean
@@ -32,7 +33,9 @@ export function BudgetFormModal({ open, setOpen, initialCategoryId, onSaved }: B
 		() =>
 			z.object({
 				category_id: z.string().min(1, t('categoryRequired')),
-				amount: z.coerce.number<number>().min(1, t('amountRequired')),
+				amount: moneySchema(moneyMessages(t, { required: t('amountRequired') })).pipe(
+					z.number().min(1, t('amountRequired')),
+				),
 			}),
 		[t],
 	)
@@ -122,7 +125,7 @@ export function BudgetFormModal({ open, setOpen, initialCategoryId, onSaved }: B
 							<FormItem>
 								<FormLabel>{t('amount')}</FormLabel>
 								<FormControl>
-									<Input type='number' inputMode='decimal' {...field} min={1} step={0.01} />
+									<MoneyInput {...field} />
 								</FormControl>
 								<FormDescription>{tBudgets('spentHint')}</FormDescription>
 								<FormMessage />

@@ -181,15 +181,15 @@ describe('InvestmentFormModal', () => {
 		const symbolInput = screen.getByPlaceholderText('e.g. AAPL, BTC-USD')
 		await user.type(symbolInput, 'EXPENSIVE')
 
-		const quantityInput = screen.getByRole('spinbutton', { name: 'Quantity' })
+		const quantityInput = screen.getByRole('textbox', { name: 'Quantity' })
 		await user.clear(quantityInput)
 		await user.type(quantityInput, '1000')
 
-		const purchaseInput = screen.getByRole('spinbutton', { name: 'Purchase price' })
+		const purchaseInput = screen.getByRole('textbox', { name: 'Purchase price' })
 		await user.clear(purchaseInput)
 		await user.type(purchaseInput, '100')
 
-		const currentInput = screen.getByRole('spinbutton', { name: 'Current price' })
+		const currentInput = screen.getByRole('textbox', { name: 'Current price' })
 		await user.clear(currentInput)
 		await user.type(currentInput, '100')
 
@@ -213,15 +213,15 @@ describe('InvestmentFormModal', () => {
 		const symbolInput = screen.getByPlaceholderText('e.g. AAPL, BTC-USD')
 		await user.type(symbolInput, 'AAPL')
 
-		const quantityInput = screen.getByRole('spinbutton', { name: 'Quantity' })
+		const quantityInput = screen.getByRole('textbox', { name: 'Quantity' })
 		await user.clear(quantityInput)
 		await user.type(quantityInput, '5')
 
-		const purchaseInput = screen.getByRole('spinbutton', { name: 'Purchase price' })
+		const purchaseInput = screen.getByRole('textbox', { name: 'Purchase price' })
 		await user.clear(purchaseInput)
 		await user.type(purchaseInput, '150')
 
-		const currentInput = screen.getByRole('spinbutton', { name: 'Current price' })
+		const currentInput = screen.getByRole('textbox', { name: 'Current price' })
 		await user.clear(currentInput)
 		await user.type(currentInput, '180')
 

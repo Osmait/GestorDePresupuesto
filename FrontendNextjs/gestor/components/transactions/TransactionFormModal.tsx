@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 import { DEFAULT_CATEGORY_COLOR } from '@/components/shared/ColorSwatchPicker'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -23,17 +24,20 @@ import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/use
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { onSessionExpired } from '@/lib/client-session'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { moneyInputToNumber, moneyMessages, moneySchema } from '@/lib/money-input'
 import { getCreditCardRepository } from '@/lib/repositoryConfig'
 import { cn } from '@/lib/utils'
 import { AICategorySuggestion } from '@/types/ai'
 import { TypeTransaction } from '@/types/transaction'
 import { useTransactionContext } from './TransactionContext'
 
-function createTransactionSchema(t: (key: string) => string) {
+function createTransactionSchema(t: (key: string, values?: Record<string, string | number>) => string) {
 	return z.object({
 		name: z.string().min(2, t('nameRequired')),
 		description: z.string().optional(),
-		amount: z.coerce.number<number>().min(0.01, t('amountRequired')),
+		amount: moneySchema(moneyMessages(t, { required: t('amountRequired') })).pipe(
+			z.number().min(0.01, t('amountRequired')),
+		),
 		type_transaction: z.enum(TypeTransaction, { error: () => t('selectType') }),
 		account_id: z.string().min(1, t('accountRequired')),
 		category_id: z.string().min(1, t('categoryRequired')),
@@ -54,7 +58,7 @@ export function transactionDraftKey(userId: string, transactionId?: string | nul
 	return `gestor:draft:transaction-form:${userId}:${transactionId || 'new'}`
 }
 
-export function saveTransactionDraft(key: string, values: Partial<TransactionFormValues>): boolean {
+export function saveTransactionDraft(key: string, values: Partial<TransactionFormInput>): boolean {
 	try {
 		const createdAt = values.created_at instanceof Date ? values.created_at.toISOString() : undefined
 		window.sessionStorage.setItem(key, JSON.stringify({ ...values, created_at: createdAt }))
@@ -64,15 +68,15 @@ export function saveTransactionDraft(key: string, values: Partial<TransactionFor
 	}
 }
 
-export function loadTransactionDraft(key: string): Partial<TransactionFormValues> | null {
+export function loadTransactionDraft(key: string): Partial<TransactionFormInput> | null {
 	try {
 		const raw = window.sessionStorage.getItem(key)
 		if (!raw) return null
-		const parsed = JSON.parse(raw) as Partial<Record<keyof TransactionFormValues, unknown>>
+		const parsed = JSON.parse(raw) as Partial<Record<keyof TransactionFormInput, unknown>>
 		if (!parsed || typeof parsed !== 'object') return null
 		const createdAt = typeof parsed.created_at === 'string' ? new Date(parsed.created_at) : undefined
 		return {
-			...(parsed as Partial<TransactionFormValues>),
+			...(parsed as Partial<TransactionFormInput>),
 			created_at: createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt : new Date(),
 		}
 	} catch {
@@ -196,7 +200,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 	const selectedAccountId = form.watch('account_id')
 	const typedName = form.watch('name')
 	const typedDescription = form.watch('description')
-	const typedAmount = form.watch('amount')
+	const typedAmount = moneyInputToNumber(form.watch('amount'))
 	const typedType = form.watch('type_transaction')
 	const selectedCategoryId = form.watch('category_id')
 	const isCategorySuggestionsEnabled = isEnabled('ai_category_suggestions')
@@ -329,14 +333,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 			return
 		}
 
-		if (
-			!typedName ||
-			typedName.trim().length < 3 ||
-			!selectedAccountId ||
-			!typedAmount ||
-			typedAmount <= 0 ||
-			selectedCategoryId
-		) {
+		if (!typedName || typedName.trim().length < 3 || !selectedAccountId || !(typedAmount > 0) || selectedCategoryId) {
 			lastSuggestionInputRef.current = ''
 			setCategorySuggestion(null)
 			return
@@ -345,7 +342,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 		const timeout = setTimeout(async () => {
 			const normalizedName = typedName.trim().toLowerCase()
 			const normalizedDescription = (typedDescription || '').trim().toLowerCase()
-			const numericAmount = Number(typedAmount)
+			const numericAmount = typedAmount
 			if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
 				lastSuggestionInputRef.current = ''
 				setCategorySuggestion(null)
@@ -569,7 +566,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 								<FormItem>
 									<FormLabel>{t('amount')}</FormLabel>
 									<FormControl>
-										<Input type='number' inputMode='decimal' {...field} min={0.01} step={0.01} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>

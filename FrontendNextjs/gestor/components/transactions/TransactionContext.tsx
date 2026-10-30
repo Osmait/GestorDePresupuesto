@@ -9,6 +9,7 @@ import {
 	useGetTransactions,
 	useUpdateTransactionMutation,
 } from '@/hooks/queries/useTransactionsQuery'
+import { moneyInputToNumber } from '@/lib/money-input'
 import { TransactionFilters, TransactionSummary } from '@/types/transaction'
 
 const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
@@ -114,8 +115,11 @@ function buildApiFilters(filters: TransactionFiltersState): TransactionFilters {
 	if (filters.account !== 'all') apiFilters.account_id = filters.account
 	if (filters.category !== 'all') apiFilters.category_id = filters.category
 	if (filters.budget !== 'all') apiFilters.budget_id = filters.budget
-	if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
-	if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
+	// Amount filters are typed text ("1,500" or "1500,50"); an unparseable one is ignored.
+	const minAmount = moneyInputToNumber(filters.minAmount)
+	const maxAmount = moneyInputToNumber(filters.maxAmount)
+	if (Number.isFinite(minAmount)) apiFilters.amount_min = minAmount
+	if (Number.isFinite(maxAmount)) apiFilters.amount_max = maxAmount
 	if (filters.search) apiFilters.search = filters.search
 
 	return apiFilters
