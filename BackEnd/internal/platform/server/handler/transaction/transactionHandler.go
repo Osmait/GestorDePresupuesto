@@ -75,7 +75,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			Stringer("amount", transactionRequest.Amount).
 			Msg("Creating transaction")
 
-		err := transactionservice.CreateTransaction(
+		_, err := transactionservice.CreateUserTransaction(
 			ctx.Request.Context(),
 			transactionRequest.Name,
 			transactionRequest.Description,

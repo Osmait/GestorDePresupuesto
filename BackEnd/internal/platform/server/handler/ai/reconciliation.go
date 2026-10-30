@@ -268,7 +268,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 			}
 
 			amount := tx.Amount
-			createdID, createErr := h.transactionService.CreateTransactionWithID(
+			createdID, createErr := h.transactionService.CreateUserTransaction(
 				c.Request.Context(),
 				tx.Name,
 				tx.Description,

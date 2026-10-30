@@ -250,3 +250,21 @@ func TestFindAllTransactionofAllAccount(t *testing.T) {
 	assert.NoError(t, err, "CreateAccount should not return an error")
 	mockRepo.AssertExpectations(t)
 }
+
+// REST, MCP and the AI import create through CreateUserTransaction, which only
+// takes the user's own types: a card_payment_received written directly would
+// lower a card's debt with no money leaving any account.
+func TestTransactionService_CreateUserTransactionRejectsManagedTypes(t *testing.T) {
+	t.Parallel()
+	for _, typ := range []string{"card_payment_received", "card_payment", "adjustment_in", "adjustment_out", "loan_collection", "loan_cancellation_refund", "investment_funding"} {
+		t.Run(typ, func(t *testing.T) {
+			t.Parallel()
+			mockRepo := &MockTransaction{}
+			s := NewTransactionService(mockRepo, &MockBudgetRepository{}, nil, &MockCache{}, &MockAICache{}, nil)
+
+			_, err := s.CreateUserTransaction(context.Background(), "x", "", money.FromInt(5000), typ, "acc", "user", "cat", "", "DOP", time.Now())
+			assert.ErrorIs(t, err, ErrNotUserType)
+			mockRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+		})
+	}
+}

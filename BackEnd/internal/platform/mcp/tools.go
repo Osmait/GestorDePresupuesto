@@ -336,7 +336,7 @@ func (s *MCPServer) handleCreateTransaction(ctx context.Context, req mcp.CallToo
 	}
 	defer rollback() // rollback is a no-op after a successful commit
 
-	if createErr := s.services.Transaction.CreateTransaction(
+	if _, createErr := s.services.Transaction.CreateUserTransaction(
 		txCtx,
 		name,
 		description,
