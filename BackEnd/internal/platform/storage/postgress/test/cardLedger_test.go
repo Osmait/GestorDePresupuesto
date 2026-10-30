@@ -79,6 +79,14 @@ func newCardLedgerFixture(t *testing.T) *cardLedgerFixture {
 	}
 }
 
+// aroundNow is a dashboard range that contains time.Now() whatever the time
+// of day (the default range ends today in Santo Domingo, which at night is
+// already yesterday in UTC).
+func aroundNow() analyticsService.DashboardFilters {
+	now := time.Now().UTC()
+	return analyticsService.DashboardFilters{DateFrom: now.AddDate(0, 0, -1), DateTo: now.AddDate(0, 0, 1)}
+}
+
 func (f *cardLedgerFixture) charge(t *testing.T, cardId, currency string, amount int64) {
 	t.Helper()
 	txn := utils.GetNewRandomTransaction()
@@ -131,7 +139,7 @@ func TestCardLedger(t *testing.T) {
 		}
 
 		// The dashboard owes 6,200 DOP + 50 USD * 60 and keeps bank accounts apart.
-		summary, err := f.analytics.GetDashboardSummary(ctx, f.userId, analyticsService.DashboardFilters{})
+		summary, err := f.analytics.GetDashboardSummary(ctx, f.userId, aroundNow())
 		require.NoError(t, err)
 		moneytest.Equal(t, 9_200, summary.CreditCardDebt)
 		assert.Equal(t, 1, summary.CreditCardsCount)
@@ -149,7 +157,7 @@ func TestCardLedger(t *testing.T) {
 		}, f.userId)
 		require.NoError(t, err)
 		f.charge(t, card.Id, "DOP", 3_000)
-		before, err := f.analytics.GetDashboardSummary(ctx, f.userId, analyticsService.DashboardFilters{})
+		before, err := f.analytics.GetDashboardSummary(ctx, f.userId, aroundNow())
 		require.NoError(t, err)
 
 		_, err = f.cards.CreatePayment(ctx, card.Id, f.userId, &creditcardDto.CreatePaymentRequest{
@@ -167,7 +175,7 @@ func TestCardLedger(t *testing.T) {
 			card.Id, creditcard.PaymentReceivedType).Scan(&received))
 		assert.Equal(t, 1, received)
 
-		after, err := f.analytics.GetDashboardSummary(ctx, f.userId, analyticsService.DashboardFilters{})
+		after, err := f.analytics.GetDashboardSummary(ctx, f.userId, aroundNow())
 		require.NoError(t, err)
 		moneytest.Equal(t, before.TotalExpenses, after.TotalExpenses)
 		moneytest.Equal(t, before.TotalIncome, after.TotalIncome)
