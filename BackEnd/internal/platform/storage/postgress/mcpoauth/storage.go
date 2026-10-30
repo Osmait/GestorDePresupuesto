@@ -364,6 +364,27 @@ func (s *Storage) GetToken(accessToken string) (*oauth2.TokenInfo, error) {
 	return t, nil
 }
 
+// UserIDForAccessToken returns the id of the user an access token was issued
+// to, if the token is unexpired and the user still exists. The id is the one
+// stored when the token was issued, never re-derived from the (mutable) email.
+func (s *Storage) UserIDForAccessToken(accessToken string) (string, error) {
+	ctx, cancel := s.ctx()
+	defer cancel()
+
+	var userID sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT t.user_id
+		FROM mcp_oauth_tokens t
+		JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
+		WHERE t.access_token_hash = $1 AND t.expires_at > $2`, HashSecret(accessToken), s.now()).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !userID.Valid) {
+		return "", oauth2.ErrTokenNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("select oauth token user: %w", err)
+	}
+	return userID.String, nil
+}
+
 // GetTokenByRefresh consumes a refresh token: the row is deleted in the same
 // statement that reads it, so concurrent refreshes with the same token yield
 // one new token pair at most (refresh token rotation). omniskill deletes the old
