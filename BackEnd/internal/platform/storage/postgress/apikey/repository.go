@@ -41,10 +41,14 @@ func (r *APIKeyRepository) Save(ctx context.Context, key *apikey.APIKey) error {
 	return err
 }
 
+// FindByKeyHash returns the key with that hash, only if its user still exists:
+// a deleted user's keys stop working (like their OAuth tokens).
 func (r *APIKeyRepository) FindByKeyHash(ctx context.Context, keyHash string) (*apikey.APIKey, error) {
 	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx,
-		`SELECT id, user_id, name, key_hash, key_prefix, last_used_at, expires_at, created_at, is_active
-		 FROM user_api_keys WHERE key_hash = $1`,
+		`SELECT k.id, k.user_id, k.name, k.key_hash, k.key_prefix, k.last_used_at, k.expires_at, k.created_at, k.is_active
+		 FROM user_api_keys k
+		 JOIN users u ON u.id = k.user_id AND u.deleted_at IS NULL
+		 WHERE k.key_hash = $1`,
 		keyHash,
 	)
 	return scanAPIKey(row)
