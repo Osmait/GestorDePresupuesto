@@ -158,13 +158,15 @@ func (f *fakeAuthSvc) IssueTokensForUser(_ context.Context, userId, _, _ string)
 type virtualAuthenticator struct {
 	key    *ecdsa.PrivateKey
 	credID []byte
+	// flags of the authenticator data: user present + user verified.
+	flags byte
 }
 
 func newVirtualAuthenticator(t *testing.T) *virtualAuthenticator {
 	t.Helper()
 	key, err := ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
 	require.NoError(t, err)
-	return &virtualAuthenticator{key: key, credID: []byte("credential-id-0001")}
+	return &virtualAuthenticator{key: key, credID: []byte("credential-id-0001"), flags: 0x01 | 0x04}
 }
 
 func (v *virtualAuthenticator) cosePublicKey(t *testing.T) []byte {
@@ -191,7 +193,7 @@ func (v *virtualAuthenticator) enroll(t *testing.T, repo *fakePasskeyRepo, store
 	cred := webauthn.Credential{
 		ID:        v.credID,
 		PublicKey: v.cosePublicKey(t),
-		Flags:     webauthn.CredentialFlags{UserPresent: true},
+		Flags:     webauthn.CredentialFlags{UserPresent: true, UserVerified: true},
 		Authenticator: webauthn.Authenticator{
 			SignCount: storedCount,
 		},
@@ -221,7 +223,7 @@ func (v *virtualAuthenticator) assertion(t *testing.T, challenge string, counter
 	rpIDHash := sha256.Sum256([]byte(testRPID))
 	authData := make([]byte, 0, 37)
 	authData = append(authData, rpIDHash[:]...)
-	authData = append(authData, 0x01) // UP
+	authData = append(authData, v.flags) // UP (+ UV unless a test clears it)
 	ctr := make([]byte, 4)
 	binary.BigEndian.PutUint32(ctr, counter)
 	authData = append(authData, ctr...)
@@ -415,4 +417,34 @@ func TestManagementAndHelpers(t *testing.T) {
 	cred := toWebAuthnCredential(legacy)
 	assert.Equal(t, uint32(4), cred.Authenticator.SignCount)
 	assert.Len(t, cred.Transport, 1)
+}
+
+// A passkey login needs user verification (PIN, biometrics): an authenticator
+// that only proves presence (a bare security key touch) is rejected.
+func TestFinishLogin_RequiresUserVerification(t *testing.T) {
+	repo := newFakePasskeyRepo()
+	auth := &fakeAuthSvc{}
+	svc := newTestService(t, repo, auth)
+	va := newVirtualAuthenticator(t)
+	va.enroll(t, repo, 1)
+	va.flags = 0x01 // user present only
+
+	begin, err := svc.BeginLogin(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "required", string(begin.Options.Response.UserVerification))
+
+	tokens, _, err := svc.FinishLogin(context.Background(), begin.SessionID,
+		va.assertion(t, begin.Options.Response.Challenge.String(), 2), "ua", "ip")
+	assert.Error(t, err)
+	assert.Nil(t, tokens)
+	assert.Empty(t, auth.issued)
+}
+
+func TestBeginRegistration_RequiresUserVerification(t *testing.T) {
+	repo := newFakePasskeyRepo()
+	svc := newTestService(t, repo, &fakeAuthSvc{})
+	begin, err := svc.BeginRegistration(context.Background(), testUserID)
+	require.NoError(t, err)
+	require.NotNil(t, begin.Options.Response.AuthenticatorSelection.UserVerification)
+	assert.Equal(t, "required", string(begin.Options.Response.AuthenticatorSelection.UserVerification))
 }

@@ -201,7 +201,14 @@ func (s *PasskeyService) BeginRegistration(ctx context.Context, userId string) (
 		return nil, err
 	}
 
-	creation, sessionData, err := s.webAuthn.BeginRegistration(adapter)
+	// A passkey must be unlocked (PIN, biometrics) to count as a login on its
+	// own: a bare security key without user verification would make the
+	// possession of the device enough. Login requires the UV flag too.
+	creation, sessionData, err := s.webAuthn.BeginRegistration(adapter,
+		webauthn.WithAuthenticatorSelection(protocol.AuthenticatorSelection{
+			ResidentKey:      protocol.ResidentKeyRequirementPreferred,
+			UserVerification: protocol.VerificationRequired,
+		}))
 	if err != nil {
 		return nil, fmt.Errorf("begin registration: %w", err)
 	}
@@ -277,7 +284,7 @@ type BeginLoginResult struct {
 }
 
 func (s *PasskeyService) BeginLogin(ctx context.Context) (*BeginLoginResult, error) {
-	assertion, sessionData, err := s.webAuthn.BeginDiscoverableLogin()
+	assertion, sessionData, err := s.webAuthn.BeginDiscoverableLogin(webauthn.WithUserVerification(protocol.VerificationRequired))
 	if err != nil {
 		return nil, fmt.Errorf("begin login: %w", err)
 	}
