@@ -29,6 +29,11 @@ var (
 	// ErrCreditCardPayoutAccount is returned when a credit card account is used
 	// as the account that funds a certificate / receives its interest.
 	ErrCreditCardPayoutAccount = fmt.Errorf("%w: a credit card account cannot be used as the funding/payout account of a certificate", errorhttp.ErrBadRequest)
+	// ErrUnsupportedCurrency is returned for a certificate currency other than DOP or USD.
+	ErrUnsupportedCurrency = fmt.Errorf("%w: currency must be DOP or USD", errorhttp.ErrBadRequest)
+	// errPayoutRateUnavailable is a payout that needs a conversion while the
+	// exchange rate is unavailable: it is retried on the next read.
+	errPayoutRateUnavailable = errors.New("exchange rate unavailable to convert the interest into the payout account currency")
 )
 
 func isNotFound(err error) bool {
@@ -49,6 +54,7 @@ type CertificateService struct {
 	transactionService TransactionCreator
 	accountRepository  AccountFinder
 	loc                *time.Location
+	usdToDopRateFn     func(context.Context) (money.Amount, error)
 }
 
 // NewCertificateService builds the service. accountRepository validates the
@@ -63,6 +69,16 @@ func WithLocation(loc *time.Location) Option {
 		if loc != nil {
 			s.loc = loc
 		}
+	}
+}
+
+// WithUsdToDopRate sets the USD->DOP rate source. It converts the interest of
+// a certificate paid into an account of the other currency (no fallback: a
+// payout is never converted at a guessed rate) and the DOP totals of the
+// summary (money.FallbackUsdToDopRate when unavailable, like the dashboard).
+func WithUsdToDopRate(fn func(context.Context) (money.Amount, error)) Option {
+	return func(s *CertificateService) {
+		s.usdToDopRateFn = fn
 	}
 }
 
@@ -159,8 +175,9 @@ func (s *CertificateService) CreateCertificate(ctx context.Context, req *dto.Cre
 	cert.ReinvestInterest = req.ReinvestInterest
 	cert.PayoutAccountId = req.PayoutAccountId
 	cert.MaturityDate = req.GetMaturityDate()
-	if req.Currency != "" {
-		cert.Currency = req.Currency
+	cert.Currency = money.NormalizeCurrency(req.Currency, money.CurrencyDOP)
+	if !money.IsSupportedCurrency(cert.Currency) {
+		return ErrUnsupportedCurrency
 	}
 
 	log.Info().
@@ -183,7 +200,8 @@ func (s *CertificateService) CreateCertificate(ctx context.Context, req *dto.Cre
 }
 
 func (s *CertificateService) FindAll(ctx context.Context, userId string) ([]*dto.CertificateResponse, error) {
-	if err := s.ProcessPendingPayments(ctx, userId); err != nil {
+	payoutErrors, err := s.processPendingPayments(ctx, userId)
+	if err != nil {
 		return nil, err
 	}
 
@@ -210,6 +228,7 @@ func (s *CertificateService) FindAll(ctx context.Context, userId string) ([]*dto
 		}
 
 		response := dto.NewCertificateResponse(cert, effectiveCapital, nextPaymentDate, projected)
+		response.PayoutError = payoutErrors[cert.Id]
 		responses = append(responses, response)
 	}
 
@@ -217,7 +236,8 @@ func (s *CertificateService) FindAll(ctx context.Context, userId string) ([]*dto
 }
 
 func (s *CertificateService) FindById(ctx context.Context, id string, userId string) (*dto.CertificateWithHistoryResponse, error) {
-	if err := s.ProcessPendingPayments(ctx, userId); err != nil {
+	payoutErrors, err := s.processPendingPayments(ctx, userId)
+	if err != nil {
 		return nil, err
 	}
 
@@ -245,6 +265,7 @@ func (s *CertificateService) FindById(ctx context.Context, id string, userId str
 	}
 
 	certResponse := dto.NewCertificateResponse(cert, effectiveCapital, nextPaymentDate, projected)
+	certResponse.PayoutError = payoutErrors[cert.Id]
 
 	paymentResponses := make([]dto.PaymentResponse, 0, len(payments))
 	var totalGross, totalTax, totalNet money.Amount
@@ -455,14 +476,99 @@ func (s *CertificateService) Simulate(ctx context.Context, id string, req *dto.S
 	}, nil
 }
 
+// ProcessPendingPayments records the interest payments due up to now on the
+// user's active certificates (see processPendingPayments).
 func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId string) error {
+	_, err := s.processPendingPayments(ctx, userId)
+	return err
+}
+
+// payout is where a certificate's interest is credited: an income
+// transaction on accountID, in accountCurrency. rate is the USD->DOP rate
+// when the certificate's currency differs from the account's.
+type payout struct {
+	accountID       string
+	accountCurrency string
+	certCurrency    string
+	rate            money.Amount
+}
+
+// amount converts net interest to the account currency, rounded half-even to
+// cents.
+func (p payout) amount(net money.Amount) money.Amount {
+	converted, _ := money.Convert(net, p.certCurrency, p.accountCurrency, p.rate)
+	return converted.RoundCents()
+}
+
+// resolvePayout returns where cert pays its interest, or nil when it does not
+// pay it out (it capitalizes it, or has no payout account). The interest is
+// converted when the account is in the other currency (a USD certificate
+// paying into a DOP account): the transaction service only accepts the
+// account's currency, and the rate must be available (it is never guessed).
+func (s *CertificateService) resolvePayout(ctx context.Context, cert *certificate.Certificate) (*payout, error) {
+	if !cert.PaysOutInterest() || s.transactionService == nil {
+		return nil, nil
+	}
+	p := &payout{accountID: *cert.PayoutAccountId, certCurrency: cert.CurrencyCode(), accountCurrency: cert.CurrencyCode()}
+	if s.accountRepository == nil {
+		return p, nil
+	}
+	acc, err := s.accountRepository.FindByIdAndUserId(ctx, p.accountID, cert.UserId)
+	if err != nil {
+		if isNotFound(err) {
+			return nil, ErrPayoutAccountNotFound
+		}
+		return nil, err
+	}
+	if acc.Type == account.AccountTypeCreditCard {
+		return nil, ErrCreditCardPayoutAccount
+	}
+	p.accountCurrency = money.NormalizeCurrency(acc.Currency, money.CurrencyDOP)
+	if !money.IsSupportedCurrency(p.accountCurrency) || !money.IsSupportedCurrency(p.certCurrency) {
+		return nil, ErrUnsupportedCurrency
+	}
+	if p.accountCurrency != p.certCurrency {
+		rate, err := s.payoutRate(ctx)
+		if err != nil {
+			return nil, err
+		}
+		p.rate = rate
+	}
+	return p, nil
+}
+
+// payoutRate is the live USD->DOP rate, with no fallback.
+func (s *CertificateService) payoutRate(ctx context.Context) (money.Amount, error) {
+	if s.usdToDopRateFn == nil {
+		return money.Zero, errPayoutRateUnavailable
+	}
+	rate, err := s.usdToDopRateFn(ctx)
+	if err != nil || !rate.IsPositive() {
+		return money.Zero, errPayoutRateUnavailable
+	}
+	return rate, nil
+}
+
+// processPendingPayments records the interest payments due up to now on the
+// user's active certificates and marks the ones past maturity as matured.
+// The interest of a certificate that pays it out is credited to its payout
+// account (converted to the account's currency when needed).
+//
+// A certificate whose payout cannot be made (payout account gone, rate needed
+// but unavailable) gets no new payments until it can: the problem is logged
+// and returned per certificate id (shown as payout_error) instead of being
+// swallowed, and the payments are recorded on a later read. A failure to
+// write the payment or its transaction is returned, so the request fails and
+// its transaction rolls back (no payment without its income, nor the reverse).
+func (s *CertificateService) processPendingPayments(ctx context.Context, userId string) (map[string]string, error) {
 	certificates, err := s.repository.FindActiveByUser(ctx, userId)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	now := time.Now()
 	calculator := &PaymentCalculator{}
+	payoutErrors := make(map[string]string)
 
 	for _, cert := range certificates {
 		if cert.Status != certificate.StatusActive {
@@ -481,6 +587,10 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 			startDate = cert.CreatedAt
 		}
 
+		// The payout is resolved lazily, once, when a payment is due.
+		var target *payout
+		resolved := false
+
 		for {
 			nextPaymentDate := s.calculateNextPaymentDate(startDate, cert.CutDay)
 
@@ -491,6 +601,17 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 			if s.afterMaturity(nextPaymentDate, cert.MaturityDate) {
 				_ = s.repository.UpdateStatus(ctx, cert.Id, userId, certificate.StatusMatured)
 				break
+			}
+
+			if !resolved {
+				resolved = true
+				target, err = s.resolvePayout(ctx, cert)
+				if err != nil {
+					log.Error().Err(err).Str("certificate_id", cert.Id).Str("user_id", userId).
+						Msg("certificate interest payout failed; payments left pending")
+					payoutErrors[cert.Id] = err.Error()
+					break
+				}
 			}
 
 			effectiveCapital := s.getEffectiveCapitalForPayment(cert, lastPayment)
@@ -517,13 +638,13 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 			payment.PayoutAccountId = cert.PayoutAccountId
 
 			if err := s.repository.SavePayment(ctx, payment); err != nil {
-				break
+				return nil, fmt.Errorf("saving payment of certificate %s: %w", cert.Id, err)
 			}
 
-			if cert.InterestType == certificate.InterestTypeSimple && cert.PayoutAccountId != nil && s.transactionService != nil {
-				transactionName := i18n.T(ctx, i18n.CertificateInterestName, cert.Bank)
-				transactionDesc := i18n.T(ctx, i18n.CertificateInterestDescription, periodStart.Format("2006-01-02"), periodEnd.Format("2006-01-02"))
-				_ = s.transactionService.CreateTransaction(ctx, transactionName, transactionDesc, result.NetInterest, "income", *cert.PayoutAccountId, userId, "", "", cert.Currency, nextPaymentDate)
+			if target != nil {
+				if err := s.creditInterest(ctx, cert, target, result.NetInterest, periodStart, periodEnd, nextPaymentDate, userId); err != nil {
+					return nil, fmt.Errorf("crediting interest of certificate %s: %w", cert.Id, err)
+				}
 			}
 
 			lastPayment = payment
@@ -531,13 +652,30 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 		}
 	}
 
-	return nil
+	return payoutErrors, nil
 }
 
-// GetEffectiveCapital returns the capital interest is computed on. ctx must
-// be the caller's context: inside an HTTP request it carries the RLS
-// transaction, and querying with a detached context would need a second
-// pooled connection while the request holds one (pool deadlock under load).
+// creditInterest records the net interest of one payment as income on the
+// payout account, in the account's currency.
+func (s *CertificateService) creditInterest(ctx context.Context, cert *certificate.Certificate, target *payout, net money.Amount, periodStart, periodEnd, paidAt time.Time, userId string) error {
+	if !net.IsPositive() {
+		return nil
+	}
+	start, end := periodStart.Format("2006-01-02"), periodEnd.Format("2006-01-02")
+	name := i18n.T(ctx, i18n.CertificateInterestName, cert.Bank)
+	description := i18n.T(ctx, i18n.CertificateInterestDescription, start, end)
+	if target.accountCurrency != target.certCurrency {
+		description = i18n.T(ctx, i18n.CertificateInterestFXDesc, start, end, net.StringFixed(2), target.certCurrency, target.accountCurrency, target.rate.StringFixed(4))
+	}
+	return s.transactionService.CreateTransaction(ctx, name, description, target.amount(net), "income", target.accountID, userId, "", "", target.accountCurrency, paidAt)
+}
+
+// GetEffectiveCapital returns the capital interest is computed on (the
+// certificate's current value, see certificate.CurrentValue) and the last
+// payment of a compound certificate. ctx must be the caller's context: inside
+// an HTTP request it carries the RLS transaction, and querying with a
+// detached context would need a second pooled connection while the request
+// holds one (pool deadlock under load).
 func (s *CertificateService) GetEffectiveCapital(ctx context.Context, cert *certificate.Certificate) (money.Amount, *certificate.CertificatePayment) {
 	if cert.InterestType == certificate.InterestTypeSimple {
 		return cert.BaseCapital, nil
@@ -548,27 +686,11 @@ func (s *CertificateService) GetEffectiveCapital(ctx context.Context, cert *cert
 		return cert.BaseCapital, nil
 	}
 
-	if cert.ReinvestInterest {
-		return lastPayment.AppliedCapital.Add(lastPayment.NetInterest), lastPayment
-	}
-
-	return cert.BaseCapital, lastPayment
+	return cert.CurrentValue(lastPayment), lastPayment
 }
 
 func (s *CertificateService) getEffectiveCapitalForPayment(cert *certificate.Certificate, lastPayment *certificate.CertificatePayment) money.Amount {
-	if cert.InterestType == certificate.InterestTypeSimple {
-		return cert.BaseCapital
-	}
-
-	if lastPayment == nil {
-		return cert.BaseCapital
-	}
-
-	if cert.ReinvestInterest {
-		return lastPayment.AppliedCapital.Add(lastPayment.NetInterest)
-	}
-
-	return cert.BaseCapital
+	return cert.CurrentValue(lastPayment)
 }
 
 func (s *CertificateService) CalculateNextPaymentDate(cert *certificate.Certificate, lastPayment *certificate.CertificatePayment) *time.Time {
@@ -616,6 +738,24 @@ func (s *CertificateService) GetProjectedPayment(cert *certificate.Certificate, 
 	}
 }
 
+// summaryRate is the USD->DOP rate of the summary totals, falling back to
+// money.FallbackUsdToDopRate like the dashboard.
+func (s *CertificateService) summaryRate(ctx context.Context) money.Amount {
+	if s.usdToDopRateFn != nil {
+		if rate, err := s.usdToDopRateFn(ctx); err == nil && rate.IsPositive() {
+			return rate
+		}
+	}
+	return money.FallbackUsdToDopRate
+}
+
+// GetSummary totals the user's certificates in DOP (USD converted at the
+// USD->DOP rate). TotalCapital and PortfolioValue cover only active
+// certificates: a matured or cancelled one returned its capital to the user.
+// PortfolioValue is what the active ones are worth now (capital plus the
+// interest they capitalized, see certificate.CurrentValue): interest paid out
+// is already in the payout account. The interest totals are every payment
+// ever made (what the certificates earned).
 func (s *CertificateService) GetSummary(ctx context.Context, userId string) (*dto.CertificateSummaryResponse, error) {
 	certificates, err := s.repository.FindAll(ctx, userId)
 	if err != nil {
@@ -627,28 +767,42 @@ func (s *CertificateService) GetSummary(ctx context.Context, userId string) (*dt
 		return nil, err
 	}
 
-	var totalCapital, totalGross, totalTax, totalNet money.Amount
+	rate := s.summaryRate(ctx)
+	toDOP := func(amount money.Amount, currency string) money.Amount {
+		dop, _ := money.ToDOP(amount, currency, rate)
+		return dop
+	}
+
+	var totalCapital, totalGross, totalTax, totalNet, portfolio money.Amount
 	activeCount := 0
+	currencyOf := make(map[string]string, len(certificates))
+	latest := certificate.LatestPayments(payments)
 
 	for _, cert := range certificates {
-		if cert.Status == certificate.StatusActive {
-			totalCapital = totalCapital.Add(cert.BaseCapital)
+		currencyOf[cert.Id] = cert.CurrencyCode()
+		if cert.IsActive() {
+			totalCapital = totalCapital.Add(toDOP(cert.BaseCapital, cert.CurrencyCode()))
+			portfolio = portfolio.Add(toDOP(cert.CurrentValue(latest[cert.Id]), cert.CurrencyCode()))
 			activeCount++
 		}
 	}
 
 	for _, p := range payments {
-		totalGross = totalGross.Add(p.GrossInterest)
-		totalTax = totalTax.Add(p.TaxWithheld)
-		totalNet = totalNet.Add(p.NetInterest)
+		currency, ok := currencyOf[p.CertificateId]
+		if !ok {
+			currency = money.CurrencyDOP
+		}
+		totalGross = totalGross.Add(toDOP(p.GrossInterest, currency))
+		totalTax = totalTax.Add(toDOP(p.TaxWithheld, currency))
+		totalNet = totalNet.Add(toDOP(p.NetInterest, currency))
 	}
 
 	return &dto.CertificateSummaryResponse{
-		TotalCapital:       totalCapital,
-		TotalGrossInterest: totalGross,
-		TotalTaxWithheld:   totalTax,
-		TotalNetInterest:   totalNet,
-		PortfolioValue:     totalCapital.Add(totalNet),
+		TotalCapital:       totalCapital.RoundCents(),
+		TotalGrossInterest: totalGross.RoundCents(),
+		TotalTaxWithheld:   totalTax.RoundCents(),
+		TotalNetInterest:   totalNet.RoundCents(),
+		PortfolioValue:     portfolio.RoundCents(),
 		ActiveCertificates: activeCount,
 	}, nil
 }

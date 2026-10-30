@@ -25,6 +25,10 @@ type CertificateResponse struct {
 	EffectiveCapital    money.Amount                  `json:"effective_capital"`
 	NextPaymentDate     *time.Time                    `json:"next_payment_date"`
 	ProjectedPayment    *ProjectedPaymentResponse     `json:"projected_payment"`
+	// PayoutError explains why the interest due could not be credited to the
+	// payout account (the payments stay pending until it can); empty when
+	// there is no problem.
+	PayoutError string `json:"payout_error,omitempty"`
 }
 
 type ProjectedPaymentResponse struct {
