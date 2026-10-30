@@ -25,7 +25,7 @@ func (h *Handler) ReconciliationPreview(c *gin.Context) {
 
 	var req dto.ReconciliationPreviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body"))
 		return
 	}
 
@@ -133,7 +133,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 
 	var req dto.ReconciliationApplyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body"))
 		return
 	}
 
@@ -147,7 +147,9 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 		return
 	}
 
-	sessionAccountID, err := h.getReconciliationSessionAccountID(c.Request.Context(), userID, sessionID)
+	// Locked until the request transaction ends: a concurrent apply of the
+	// same session waits and then sees the actions this one stored.
+	sessionAccountID, err := h.lockReconciliationSession(c.Request.Context(), userID, sessionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("RECONCILIATION_NOT_FOUND", "Reconciliation session not found"))
@@ -162,6 +164,12 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 		if item.Extracted != nil {
 			itemsByExtractedID[item.Extracted.Id] = item
 		}
+	}
+
+	applied, err := h.appliedReconciliationItems(c.Request.Context(), userID, sessionID)
+	if err != nil {
+		_ = c.Error(apperrors.NewInternalError("Failed to load reconciliation items", err))
+		return
 	}
 
 	summary := dto.ReconciliationSummary{SessionID: sessionID, Linked: len(data.ExactMatches)}
@@ -186,7 +194,16 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 		logger.Msg("reconciliation action failed")
 	}
 
+	seen := make(map[string]bool, len(req.Actions))
 	for _, action := range req.Actions {
+		// Each extracted transaction is acted on once: a replayed request, a
+		// double click or a repeated id must not create it twice.
+		if seen[action.ExtractedTransactionID] || applied[action.ExtractedTransactionID] {
+			summary.Skipped++
+			continue
+		}
+		seen[action.ExtractedTransactionID] = true
+
 		item, ok := itemsByExtractedID[action.ExtractedTransactionID]
 		if !ok || item.Extracted == nil {
 			addFailure(action.ExtractedTransactionID, action.Action, "ITEM_NOT_FOUND", "Extracted transaction was not found in session", nil)
@@ -456,7 +473,9 @@ func (h *Handler) loadReconciliationSession(ctx context.Context, userID string, 
 	return data, rows.Err()
 }
 
-func (h *Handler) getReconciliationSessionAccountID(ctx context.Context, userID string, sessionID string) (string, error) {
+// lockReconciliationSession returns the session's account and locks the
+// session row until the request transaction ends.
+func (h *Handler) lockReconciliationSession(ctx context.Context, userID string, sessionID string) (string, error) {
 	if h.db == nil {
 		return "", fmt.Errorf("database connection not available")
 	}
@@ -464,7 +483,7 @@ func (h *Handler) getReconciliationSessionAccountID(ctx context.Context, userID 
 	var accountID string
 	err := h.q(ctx).QueryRowContext(
 		ctx,
-		`SELECT account_id FROM reconciliation_sessions WHERE id = $1 AND user_id = $2`,
+		`SELECT account_id FROM reconciliation_sessions WHERE id = $1 AND user_id = $2 FOR UPDATE`,
 		sessionID,
 		userID,
 	).Scan(&accountID)
@@ -516,6 +535,31 @@ func classifyReconciliationCreateError(err error) (string, string) {
 
 // updateReconciliationItemAction records the action taken on an item of a
 // session owned by userID; items of other users' sessions are never touched.
+// appliedReconciliationItems returns the extracted transaction ids of the
+// session that already have an action (created, linked or ignored).
+func (h *Handler) appliedReconciliationItems(ctx context.Context, userID string, sessionID string) (map[string]bool, error) {
+	if h.db == nil {
+		return nil, fmt.Errorf("database connection not available")
+	}
+	rows, err := h.q(ctx).QueryContext(ctx,
+		`SELECT i.extracted_transaction_id FROM reconciliation_items i
+		 JOIN reconciliation_sessions s ON s.id = i.session_id AND s.user_id = $2
+		 WHERE i.session_id = $1 AND i.action <> 'pending'`, sessionID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	applied := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		applied[id] = true
+	}
+	return applied, rows.Err()
+}
+
 func (h *Handler) updateReconciliationItemAction(ctx context.Context, userID string, sessionID string, extractedTransactionID string, action string, linkedID string, createdID string) error {
 	if h.db == nil {
 		return fmt.Errorf("database connection not available")
