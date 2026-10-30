@@ -2,7 +2,7 @@
 import type { JWT } from 'next-auth/jwt'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { authConfig } from '@/lib/auth/config'
-import { getRefreshBufferMs, REFRESH_BUFFER_MS, resetRefreshStore } from '@/lib/auth/token-refresh'
+import { getRefreshBufferMs, REFRESH_BUFFER_MS, ROTATION_GRACE_MS, resetRefreshStore } from '@/lib/auth/token-refresh'
 
 // The incoming request as seen through next/headers; null = outside a request scope.
 let incomingHeaders: Headers | null = null
@@ -142,6 +142,63 @@ describe('next-auth jwt callback token refresh', () => {
 
 		expect(fetchMock).toHaveBeenCalledTimes(1)
 		expect(late.refreshToken).toBe(first.refreshToken)
+	})
+
+	describe('rotation grace store', () => {
+		afterEach(() => {
+			vi.useRealTimers()
+		})
+
+		it('keeps a rotation for 30 seconds only', async () => {
+			vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+			expect(ROTATION_GRACE_MS).toBe(30 * 1000)
+			fetchMock.mockImplementation(async () =>
+				jsonResponse({ access_token: makeJwt(900), refresh_token: 'refresh-new', expires_in: 900 }),
+			)
+
+			await jwtCallback(expiringToken())
+			await vi.advanceTimersByTimeAsync(ROTATION_GRACE_MS - 1000)
+			await jwtCallback(expiringToken())
+			expect(fetchMock).toHaveBeenCalledTimes(1)
+
+			await vi.advanceTimersByTimeAsync(1000)
+			await jwtCallback(expiringToken())
+			expect(fetchMock).toHaveBeenCalledTimes(2)
+		})
+
+		it("never hands one user's rotated pair to another user's session", async () => {
+			fetchMock.mockResolvedValueOnce(
+				jsonResponse({ access_token: makeJwt(900), refresh_token: 'refresh-new', expires_in: 900 }),
+			)
+
+			const owner = await jwtCallback(expiringToken())
+			const other = await jwtCallback({ ...expiringToken(), id: 'u2' })
+
+			expect(owner.refreshToken).toBe('refresh-new')
+			expect(other.error).toBe('RefreshTokenError')
+			expect(other.accessToken).toBe('')
+			expect(other.refreshToken).toBe('')
+			// The rotated token is not replayed to the backend either (reuse detection would revoke u1).
+			expect(fetchMock).toHaveBeenCalledTimes(1)
+		})
+
+		it('does not share an in-flight rotation with another user', async () => {
+			let release: (value: Response) => void = () => {}
+			fetchMock.mockImplementation(
+				() =>
+					new Promise<Response>((resolve) => {
+						release = resolve
+					}),
+			)
+
+			const owner = jwtCallback(expiringToken())
+			const other = await jwtCallback({ ...expiringToken(), id: 'u2' })
+			release(jsonResponse({ access_token: makeJwt(900), refresh_token: 'refresh-new', expires_in: 900 }))
+
+			expect(other.error).toBe('RefreshTokenError')
+			expect((await owner).refreshToken).toBe('refresh-new')
+			expect(fetchMock).toHaveBeenCalledTimes(1)
+		})
 	})
 
 	it('flags the session with RefreshTokenError when the refresh fails', async () => {
