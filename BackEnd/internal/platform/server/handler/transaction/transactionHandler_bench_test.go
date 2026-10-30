@@ -36,10 +36,10 @@ func (f *fakeTxRepo) ResolveAndValidateCurrencyForAccount(_ context.Context, _, 
 func (f *fakeTxRepo) FindAll(context.Context, string, string, string, string) ([]*domain.Transaction, error) {
 	return f.page, nil
 }
-func (f *fakeTxRepo) FindCurrentBudget(context.Context, string, string, money.Amount) (money.Amount, error) {
+func (f *fakeTxRepo) FindCurrentCategorySpent(context.Context, string, string, money.Amount) (money.Amount, error) {
 	return money.Zero, nil
 }
-func (f *fakeTxRepo) FindCurrentBudgets(context.Context, string, money.Amount) (map[string]money.Amount, error) {
+func (f *fakeTxRepo) FindCurrentSpentByCategory(context.Context, string, money.Amount) (map[string]money.Amount, error) {
 	return nil, nil
 }
 func (f *fakeTxRepo) FindAllOfAllAccounts(context.Context, string) ([]*domain.Transaction, error) {

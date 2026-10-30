@@ -49,12 +49,12 @@ func (m *MockTransaction) BalanceByAccountAndCurrency(ctx context.Context, accou
 	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string, userId string, usdToDop money.Amount) (money.Amount, error) {
-	args := m.Called(ctx, budgetId, userId, usdToDop)
+func (m *MockTransaction) FindCurrentCategorySpent(ctx context.Context, categoryId string, userId string, usdToDop money.Amount) (money.Amount, error) {
+	args := m.Called(ctx, categoryId, userId, usdToDop)
 	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
+func (m *MockTransaction) FindCurrentSpentByCategory(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
 	args := m.Called(ctx, userId, usdToDop)
 	return args.Get(0).(map[string]money.Amount), args.Error(1)
 }
@@ -178,7 +178,7 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 
 	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
 	mockRepo.On("ResolveAndValidateCurrencyForAccount", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("DOP", nil)
-	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(money.FromInt(1000), nil)
+	mockRepo.On("FindCurrentCategorySpent", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(money.FromInt(1000), nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
