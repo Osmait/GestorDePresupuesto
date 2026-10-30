@@ -14,6 +14,7 @@ import (
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	cardStorage "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/creditcard"
+	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/osmait/gestorDePresupuesto/internal/services/funds"
 )
 
@@ -398,5 +399,18 @@ func TestCreatePayment_RejectsSubCentAmount(t *testing.T) {
 	}
 	if cardRepo.lastSavedPayment != nil {
 		t.Fatalf("payment must not be saved")
+	}
+}
+
+// A tiny exchange rate must not round the paying account's debit to zero
+// while the card debt still goes down.
+func TestConvertPaymentAmount_RejectsZeroDebit(t *testing.T) {
+	_, err := convertPaymentAmount(money.FromInt(100), "DOP", "USD", money.FromInt(1_000_000))
+	if !errors.Is(err, errorhttp.ErrBadRequest) {
+		t.Fatalf("expected a bad request for a debit that rounds to 0, got %v", err)
+	}
+	got, err := convertPaymentAmount(money.FromInt(100), "USD", "DOP", money.FromInt(60))
+	if err != nil || !got.Equal(money.FromInt(6000)) {
+		t.Fatalf("expected 6000 DOP, got %v %v", got, err)
 	}
 }

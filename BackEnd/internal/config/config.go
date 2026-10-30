@@ -282,6 +282,10 @@ type AIConfig struct {
 	MaxFileSize    int64         `json:"max_file_size"`
 	MaxFiles       int           `json:"max_files"`
 	EnableMetrics  bool          `json:"enable_metrics"`
+	// Per-user limits on /ai/* (each call goes to the paid provider).
+	RequestsPerMinute int `json:"requests_per_minute"`
+	RequestsPerDay    int `json:"requests_per_day"`
+	MaxInFlight       int `json:"max_in_flight"`
 }
 
 // MCPConfig holds Model Context Protocol server configuration
@@ -378,8 +382,10 @@ func LoadConfig() (*Config, error) {
 		},
 
 		JWT: JWTConfig{
-			Secret:            getJWTSecret(),
-			Expiration:        getDuration(getEnvString("JWT_EXPIRATION", "24h")),
+			Secret: getJWTSecret(),
+			// Access tokens cannot be revoked (logout only revokes refresh
+			// tokens), so they are short-lived; clients refresh them.
+			Expiration:        getDuration(getEnvString("JWT_EXPIRATION", "15m")),
 			RefreshExpiration: getDuration(getEnvString("JWT_REFRESH_EXPIRATION", "168h")), // 7 days
 			Issuer:            getEnvString("JWT_ISSUER", "gestor-de-presupuesto"),
 			Audience:          getEnvString("JWT_AUDIENCE", "gestor-de-presupuesto-api"),
@@ -535,6 +541,10 @@ func LoadConfig() (*Config, error) {
 			MaxFileSize:    int64(getEnvInt("AI_MAX_FILE_SIZE_MB", 10)) * 1024 * 1024,
 			MaxFiles:       getEnvInt("AI_MAX_FILES", 5),
 			EnableMetrics:  getEnvBool("AI_ENABLE_METRICS", true),
+
+			RequestsPerMinute: getEnvInt("AI_REQUESTS_PER_MINUTE", 10),
+			RequestsPerDay:    getEnvInt("AI_REQUESTS_PER_DAY", 200),
+			MaxInFlight:       getEnvInt("AI_MAX_IN_FLIGHT", 2),
 		},
 
 		MCP: MCPConfig{
@@ -904,6 +914,13 @@ func (c *Config) validateEnvironmentSpecific() error {
 			}
 		}
 
+		// Not fatal (a wrong value would take production down), but loud:
+		// these modes may send credentials and data unencrypted.
+		switch c.Database.SSLMode {
+		case "", "disable", "allow", "prefer":
+			fmt.Fprintf(os.Stderr, "WARNING: DB_SSL_MODE=%q in production; use require or verify-full\n", c.Database.SSLMode)
+		}
+
 		// if !c.Security.EnableTLS {
 		// 	return fmt.Errorf("TLS must be enabled in production")
 		// }
@@ -972,9 +989,18 @@ func NewConfigSQLite(dbName string) *Config {
 // columns. JSON/text held in a []byte must be passed as a string (see
 // passkeyRepository.jsonText); money.Amount, time.Time, numbers, strings and
 // pq.Array values are unaffected (sent as text either way).
+//
+// User and password are URL-escaped: a password with @, :, / or % would
+// otherwise break (or redirect) the connection string.
 func (c *Config) GetPostgresUrl() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&binary_parameters=yes",
-		c.Database.User, c.Database.Password, c.Database.Host, c.Database.Port, c.Database.Name, c.Database.SSLMode)
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(c.Database.User, c.Database.Password),
+		Host:     net.JoinHostPort(c.Database.Host, strconv.FormatUint(uint64(c.Database.Port), 10)),
+		Path:     "/" + c.Database.Name,
+		RawQuery: "sslmode=" + url.QueryEscape(c.Database.SSLMode) + "&binary_parameters=yes",
+	}
+	return u.String()
 }
 
 // GetSQLiteUrl returns the SQLite connection string

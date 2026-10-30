@@ -34,7 +34,7 @@ func (h *Handler) ExtractTransactions(c *gin.Context) {
 
 	var req dto.ExtractRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body"))
 		return
 	}
 

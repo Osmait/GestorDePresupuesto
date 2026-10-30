@@ -205,6 +205,22 @@ func (p *OAuthProvider) ProtectedResourceMetadataHandler(resourcePath string) ht
 	return p.server.ProtectedResourceMetadataHandler(resourcePath)
 }
 
+// tokenUserStorage is implemented by the persistent storage (mcpoauth).
+type tokenUserStorage interface {
+	UserIDForAccessToken(accessToken string) (string, error)
+}
+
+// TokenUserID returns the user an access token was issued to, as stored with
+// the token. Storages that cannot tell (the in-memory one) fail, so the MCP
+// endpoints reject the token instead of trusting its subject.
+func (p *OAuthProvider) TokenUserID(_ context.Context, accessToken string) (string, error) {
+	s, ok := p.storage.(tokenUserStorage)
+	if !ok {
+		return "", errors.New("oauth: token storage cannot resolve users")
+	}
+	return s.UserIDForAccessToken(accessToken)
+}
+
 // TokenVerifier resolves an access token for MCPAuthMiddleware.
 func (p *OAuthProvider) TokenVerifier() func(token string) (*oauth2.TokenInfo, error) {
 	return p.server.TokenVerifier()

@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/likepattern"
+
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
@@ -168,7 +170,7 @@ func (repo *AccountRepository) FindByIdAndUserIdForUpdate(ctx context.Context, i
 }
 
 func (repo *AccountRepository) Search(ctx context.Context, userId string, query string) ([]*account.Account, error) {
-	searchTerm := "%" + query + "%"
+	searchTerm := likepattern.Contains(query)
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, "SELECT id, name_account, bank, balance, user_id, account_type, currency, created_at FROM account WHERE user_id = $1 AND (name_account ILIKE $2 OR bank ILIKE $2)", userId, searchTerm)
 	if err != nil {
 		return nil, err

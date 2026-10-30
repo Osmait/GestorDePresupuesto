@@ -1,30 +1,33 @@
 package transaction
 
-// Transaction types the app writes on its own and the user must not edit
-// directly: balance adjustments (reconcile, card initial debt and resets) and
-// the card side of a card payment. The form and the API only know income/bill,
-// so editing one would turn it into an expense or income and break the balance
-// it keeps.
+// Only plain incomes and expenses are the user's own records: every other
+// type is written by the app as part of a larger operation (card payment,
+// loan, broker funding, balance adjustment) and is paired with other rows
+// (card_payments, loan payments, the funding ledger, the other side of a
+// transfer). Creating, editing or deleting one through the generic
+// transaction endpoints would desync those records and could bypass the
+// overdraft check.
 const (
-	typeAdjustmentIn        = "adjustment_in"
-	typeAdjustmentOut       = "adjustment_out"
-	typeCardPaymentReceived = "card_payment_received"
+	typeIncome        = "income"
+	typeBill          = "bill"
+	typeAdjustmentIn  = "adjustment_in"
+	typeAdjustmentOut = "adjustment_out"
 )
 
-// IsEditable reports whether a transaction of type t can be edited (or another
-// transaction turned into type t).
+// IsUserType reports whether a transaction of type t can be created or edited
+// directly (and whether another transaction can be turned into type t).
+func IsUserType(t string) bool {
+	return t == typeIncome || t == typeBill
+}
+
+// IsEditable reports whether a transaction of type t can be edited directly.
 func IsEditable(t string) bool {
-	switch t {
-	case typeAdjustmentIn, typeAdjustmentOut, typeCardPaymentReceived:
-		return false
-	default:
-		return true
-	}
+	return IsUserType(t)
 }
 
 // IsDeletable reports whether a transaction of type t can be deleted on its
-// own. Deleting an adjustment undoes it; a card payment received is one side of
-// a payment (the paying account keeps its card_payment), so it cannot.
+// own: the user's incomes and expenses, and balance adjustments (deleting one
+// undoes it; it has no paired rows).
 func IsDeletable(t string) bool {
-	return t != typeCardPaymentReceived
+	return IsUserType(t) || t == typeAdjustmentIn || t == typeAdjustmentOut
 }

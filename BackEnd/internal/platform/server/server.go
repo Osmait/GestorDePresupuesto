@@ -135,6 +135,11 @@ func New(ctx context.Context,
 	oauthSrv *mcpPkg.OAuthProvider,
 	opts ...Option,
 ) (context.Context, *Server) {
+	// Debug mode logs every route and request detail; never in production,
+	// whatever GIN_MODE says.
+	if cfg.IsProduction() {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	srv := Server{
 		Engine:              gin.New(),
 		httpAddr:            fmt.Sprintf("%s:%d", host, port),
@@ -175,6 +180,12 @@ func New(ctx context.Context,
 	srv.registerRoutes()
 	return serverContext(ctx), &srv
 }
+
+// defaultMaxBody caps every JSON request body except the AI uploads.
+const defaultMaxBody = 1 << 20
+
+// maxSSEStreamsPerUser caps one user's open notification streams.
+const maxSSEStreamsPerUser = 5
 
 func (s *Server) registerRoutes() {
 	// Client IP resolution: only trust the frontend server's X-Client-IP
@@ -245,6 +256,12 @@ func (s *Server) registerRoutes() {
 	// Error handling middleware (must be first)
 	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
 
+	// Cap and fully read request bodies before anything takes a database
+	// connection (see BodyLimit). AI uploads carry up to MaxFiles base64
+	// files of MaxFileSize each.
+	aiBody := int64(s.config.AI.MaxFiles)*s.config.AI.MaxFileSize*4/3 + defaultMaxBody
+	s.Engine.Use(middleware.BodyLimit(defaultMaxBody, map[string]int64{"/ai/": aiBody}))
+
 	// Locale for backend-generated names (Accept-Language: es|en, default es).
 	s.Engine.Use(i18n.Middleware())
 
@@ -253,8 +270,11 @@ func (s *Server) registerRoutes() {
 	s.rateLimiter = middleware.NewRateLimitService(s.config)
 	s.Engine.Use(s.rateLimiter.Middleware())
 
-	// Swagger documentation route (before authentication)
-	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Swagger documentation route (before authentication). In production it
+	// maps the whole API for anyone, so it is opt-in (ENABLE_SWAGGER_DOCS).
+	if !s.config.IsProduction() || s.config.FeatureFlags.EnableSwaggerDocs {
+		s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 
 	// Health routes (before authentication). /health/detailed only returns
 	// internals to callers presenting METRICS_TOKEN.
@@ -262,7 +282,6 @@ func (s *Server) registerRoutes() {
 
 	// Prometheus scrape endpoint on the public port: only with a bearer token.
 	s.registerMetricsRoute()
-	routes.QuoteRoutes(s.Engine, s.quoteService)
 	routes.ExchangeRoutes(s.Engine, s.exchangeService)
 
 	// OAuth 2.1 endpoints — public, must be registered BEFORE any auth
@@ -297,15 +316,8 @@ func (s *Server) registerRoutes() {
 		}
 		mcpGroup := s.Engine.Group("/mcp")
 		if s.oauthServer != nil {
-			// Resolve OAuth subject (email) to internal user ID
-			userResolver := func(ctx context.Context, email string) (string, error) {
-				u, err := s.servicesUser.FindByEmail(ctx, email)
-				if err != nil {
-					return "", err
-				}
-				return u.Id, nil
-			}
-			mcpGroup.Use(mcpPkg.MCPAuthMiddleware(s.apiKeyService, s.oauthServer.TokenVerifier(), baseURL, userResolver))
+			// The user is the one stored with the token, not its email subject.
+			mcpGroup.Use(mcpPkg.MCPAuthMiddleware(s.apiKeyService, s.oauthServer.TokenVerifier(), baseURL, s.oauthServer.TokenUserID))
 		} else {
 			mcpGroup.Use(mcpPkg.APIKeyAuthMiddleware(s.apiKeyService))
 		}
@@ -328,6 +340,10 @@ func (s *Server) registerRoutes() {
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
 
+	// Quotes call third-party APIs on every lookup: logged-in users only
+	// (the investments screen), and before RLS since they need no database.
+	routes.QuoteRoutes(s.Engine, s.quoteService)
+
 	// SSE subscribe endpoint is registered HERE — after AuthMiddleware but BEFORE
 	// RLSMiddleware. Rationale: the SSE handler is a long-lived connection that
 	// never completes (it streams events until the client disconnects). If it were
@@ -336,7 +352,12 @@ func (s *Server) registerRoutes() {
 	// connection pool under concurrent users. The subscribe handler does not query
 	// the database itself, so it does not need an RLS transaction.
 	notificationH := notificationHandler.NewNotificationHandler(s.notificationService)
-	s.Engine.GET("/notifications", notificationH.Subscribe)
+	// Each SSE stream holds a goroutine and a socket for as long as it is
+	// open: a handful of tabs per user, not unbounded.
+	s.Engine.GET("/notifications", middleware.UserQuota(middleware.UserQuotaConfig{
+		Prefixes:    []string{"/notifications"},
+		MaxInFlight: maxSSEStreamsPerUser,
+	}), notificationH.Subscribe)
 
 	// The on-demand recurring processor runs every occurrence in its own
 	// scheduler transaction, so it must not also hold a request transaction
@@ -351,6 +372,22 @@ func (s *Server) registerRoutes() {
 	// one deadlocks once concurrent requests exhaust the pool. The connection
 	// is acquired with a bounded wait (DB_TX_ACQUIRE_TIMEOUT) and the request
 	// fails fast with 503 when the pool stays exhausted.
+	// Per-user limits on the AI endpoints that call the provider (the savings
+	// goals CRUD and reading/applying a reconciliation do not), before RLS so
+	// a rejected call takes no connection.
+	s.Engine.Use(middleware.UserQuota(middleware.UserQuotaConfig{
+		Prefixes:    []string{"/ai/extract/", "/ai/reconcile/preview", "/ai/analyze/", "/ai/goals/savings-plan"},
+		PerMinute:   s.config.AI.RequestsPerMinute,
+		PerDay:      s.config.AI.RequestsPerDay,
+		MaxInFlight: s.config.AI.MaxInFlight,
+	}))
+	// Category suggestions are asked while typing: their own, looser budget.
+	s.Engine.Use(middleware.UserQuota(middleware.UserQuotaConfig{
+		Prefixes:    []string{"/ai/suggest-category", "/ai/suggest-categories/"},
+		PerMinute:   60,
+		PerDay:      1000,
+		MaxInFlight: 3,
+	}))
 	s.Engine.Use(middleware.RLSMiddlewareWithTimeout(s.db, s.config.Database.TxAcquireTimeout))
 
 	// Notification management endpoints — these DO query the DB and need RLS.

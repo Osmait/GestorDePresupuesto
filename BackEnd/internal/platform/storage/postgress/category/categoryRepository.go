@@ -4,6 +4,8 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/likepattern"
+
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
@@ -88,7 +90,7 @@ func (c *CategoryRespository) Update(ctx context.Context, category *category.Cat
 }
 
 func (c *CategoryRespository) Search(ctx context.Context, userId string, query string) ([]*category.Category, error) {
-	searchTerm := "%" + query + "%"
+	searchTerm := likepattern.Contains(query)
 	rows, err := txhelper.FromContext(ctx, c.db).QueryContext(ctx, "SELECT id, name, icon, color, user_id, created_at FROM categorys WHERE user_id = $1 AND name ILIKE $2", userId, searchTerm)
 	if err != nil {
 		return nil, err

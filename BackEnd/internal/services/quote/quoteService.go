@@ -3,8 +3,11 @@ package quote
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
 	"time"
 
@@ -58,11 +61,22 @@ func (s *QuoteService) GetQuote(symbol string) (money.Amount, string, string, er
 	return s.GetQuoteContext(context.Background(), symbol)
 }
 
+// validSymbol is a stock/ETF ticker (AAPL, BRK.B) or a crypto pair (BTC-USD).
+var validSymbol = regexp.MustCompile(`^[A-Z0-9][A-Z0-9.\-]{0,14}$`)
+
+// ErrInvalidSymbol is returned for a symbol that is not a ticker.
+var ErrInvalidSymbol = errors.New("invalid symbol")
+
 // GetQuoteContext fetches a quote; ctx cancels the upstream calls and parents
 // their client spans.
 func (s *QuoteService) GetQuoteContext(ctx context.Context, symbol string) (money.Amount, string, string, error) {
 	// Clean symbol
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	// The symbol goes into the upstream URLs: only ticker characters, so it
+	// cannot add query parameters or path segments.
+	if !validSymbol.MatchString(symbol) {
+		return money.Zero, "", "", ErrInvalidSymbol
+	}
 
 	// Try Nasdaq first (Stocks)
 	price, currency, name, err := s.fetchNasdaq(ctx, symbol, "stocks")
@@ -93,7 +107,7 @@ func (s *QuoteService) GetQuoteContext(ctx context.Context, symbol string) (mone
 
 func (s *QuoteService) fetchNasdaq(ctx context.Context, symbol, assetClass string) (money.Amount, string, string, error) {
 	client := s.httpClient()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.nasdaq.com/api/quote/"+symbol+"/info?assetclass="+assetClass, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.nasdaq.com/api/quote/"+url.PathEscape(symbol)+"/info?assetclass="+url.QueryEscape(assetClass), nil)
 	if err != nil {
 		return money.Zero, "", "", err
 	}
@@ -143,7 +157,7 @@ func (s *QuoteService) fetchNasdaq(ctx context.Context, symbol, assetClass strin
 
 func (s *QuoteService) fetchBinance(ctx context.Context, symbol string) (money.Amount, string, string, error) {
 	client := s.httpClient()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.binance.com/api/v3/ticker/price?symbol="+symbol, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.binance.com/api/v3/ticker/price?symbol="+url.QueryEscape(symbol), nil)
 	if err != nil {
 		return money.Zero, "", "", err
 	}

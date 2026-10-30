@@ -157,3 +157,52 @@ func md5Prefix(t *testing.T, db *sql.DB, s string) string {
 	}
 	return v
 }
+
+// rlsExempt are user_id tables read and written outside a user's request
+// context, so RLS would lock the app out of them.
+var rlsExempt = map[string]string{
+	"refresh_tokens":      "used by /auth/refresh and logout before any user context",
+	"mcp_oauth_tokens":    "OAuth storage resolves tokens without a user context",
+	"webauthn_sessions":   "passkey login ceremonies start before the user is known",
+	"financial_audit_log": "written only by the audit triggers; no API reads it",
+	"cryptos":             "legacy table with no API (only deleted with demo users)",
+}
+
+// Every other table with a user_id column has row level security enabled and
+// forced (monthly_plan_items was missing it until migration 000061).
+func TestMigrations_UserTablesHaveForcedRLS(t *testing.T) {
+	dbURL := freshDatabase(t)
+	if err := RunMigrationsFromFS(migrationsdb.Migrations, migrationsdb.MigrationsDir, dbURL); err != nil {
+		t.Fatalf("apply migrations: %v", err)
+	}
+	db, err := sql.Open("postgres", dbURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = db.Close() }()
+
+	rows, err := db.Query(`SELECT c.relname FROM pg_class c
+		JOIN pg_namespace n ON n.oid = c.relnamespace AND n.nspname = 'public'
+		WHERE c.relkind = 'r'
+		  AND EXISTS (SELECT 1 FROM information_schema.columns col
+		              WHERE col.table_schema = 'public' AND col.table_name = c.relname AND col.column_name = 'user_id')
+		  AND NOT (c.relrowsecurity AND c.relforcerowsecurity)
+		ORDER BY 1`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = rows.Close() }()
+	var missing []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			t.Fatal(err)
+		}
+		if _, ok := rlsExempt[name]; !ok {
+			missing = append(missing, name)
+		}
+	}
+	if len(missing) > 0 {
+		t.Errorf("user tables without forced RLS: %v", missing)
+	}
+}

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 )
 
 type TransactionRequest struct {
@@ -35,8 +36,10 @@ func (t *TransactionRequest) Validate() error {
 	if !t.Amount.IsPositive() {
 		return errors.New("amount must be greater than 0")
 	}
-	if t.TypeTransation != "income" && t.TypeTransation != "bill" && t.TypeTransation != "card_payment" && t.TypeTransation != "loan_disbursement" && t.TypeTransation != "loan_collection" && t.TypeTransation != "investment_purchase" && t.TypeTransation != "investment_funding" {
-		return errors.New("type_transation must be 'income', 'bill', 'card_payment', 'loan_disbursement', 'loan_collection', 'investment_purchase' or 'investment_funding'")
+	// Card payments, loans and broker funding have their own endpoints, which
+	// write the paired records and check the funds (see transaction.IsUserType).
+	if !transaction.IsUserType(t.TypeTransation) {
+		return errors.New("type_transation must be 'income' or 'bill'")
 	}
 	return nil
 }

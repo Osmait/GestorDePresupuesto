@@ -1,10 +1,12 @@
 package mcp
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/mark3labs/mcp-go/server"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
 )
 
 // toolKind is what a tool does to the user's data, published as MCP tool
@@ -84,5 +86,19 @@ func (s *MCPServer) addTool(tool mcp.Tool, handler server.ToolHandlerFunc) {
 	tool.Annotations.DestructiveHint = &destructive
 	tool.Annotations.IdempotentHint = &idempotent
 	tool.Annotations.OpenWorldHint = &openWorld
+	if !readOnly {
+		handler = requireWriteGrant(handler)
+	}
 	s.server.AddTool(tool, handler)
+}
+
+// requireWriteGrant rejects a tool that changes data when the connection was
+// granted read-only access (OAuth scope mcp:read).
+func requireWriteGrant(next server.ToolHandlerFunc) server.ToolHandlerFunc {
+	return func(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+		if mcpcontext.IsReadOnly(ctx) {
+			return mcp.NewToolResultError("this connection has read-only access (scope " + ScopeRead + ")"), nil
+		}
+		return next(ctx, req)
+	}
 }

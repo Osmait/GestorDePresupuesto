@@ -492,14 +492,20 @@ func convertPaymentAmount(cardAmount money.Amount, cardCurrency string, sourceCu
 
 	// The converted amount is a derived monetary value: rounded half-even to
 	// cents, the scale of the card/transaction columns it is stored in.
-	if cardCurrency == "USD" && sourceCurrency == "DOP" {
-		return cardAmount.Mul(rate).RoundCents(), nil
+	var converted money.Amount
+	switch {
+	case cardCurrency == "USD" && sourceCurrency == "DOP":
+		converted = cardAmount.Mul(rate).RoundCents()
+	case cardCurrency == "DOP" && sourceCurrency == "USD":
+		converted = cardAmount.Div(rate).RoundCents()
+	default:
+		return money.Zero, fmt.Errorf("%w: unsupported currency conversion from %s to %s", errorhttp.ErrBadRequest, sourceCurrency, cardCurrency)
 	}
-	if cardCurrency == "DOP" && sourceCurrency == "USD" {
-		return cardAmount.Div(rate).RoundCents(), nil
+	// A rate that rounds the debit to nothing would pay the card for free.
+	if !converted.IsPositive() {
+		return money.Zero, fmt.Errorf("%w: the exchange rate converts the payment to %s 0.00", errorhttp.ErrBadRequest, sourceCurrency)
 	}
-
-	return money.Zero, fmt.Errorf("%w: unsupported currency conversion from %s to %s", errorhttp.ErrBadRequest, sourceCurrency, cardCurrency)
+	return converted, nil
 }
 
 func (s *CreditCardService) FindPaymentsByCard(ctx context.Context, cardId string, userId string) ([]*dto.PaymentResponse, error) {

@@ -147,11 +147,14 @@ type ReconciliationApplyResponse struct {
 }
 
 type ReconciliationSummary struct {
-	SessionID   string                     `json:"session_id"`
-	Linked      int                        `json:"linked"`
-	Created     int                        `json:"created"`
-	Ignored     int                        `json:"ignored"`
-	Failed      int                        `json:"failed"`
+	SessionID string `json:"session_id"`
+	Linked    int    `json:"linked"`
+	Created   int    `json:"created"`
+	Ignored   int    `json:"ignored"`
+	Failed    int    `json:"failed"`
+	// Skipped counts actions on items that already had one (a repeated or
+	// concurrent apply) and repeated ids in the same request.
+	Skipped     int                        `json:"skipped"`
 	FailedItems []ReconciliationFailedItem `json:"failed_items,omitempty"`
 }
 

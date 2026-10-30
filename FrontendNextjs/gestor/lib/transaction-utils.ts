@@ -23,22 +23,24 @@ export function isAdjustmentTransaction(type: string | null | undefined): boolea
 	return !!type && ADJUSTMENT_TYPES.has(type)
 }
 
+const USER_TYPES = new Set<string>([TypeTransaction.INCOME, TypeTransaction.BILL])
+
 /**
- * Whether the transaction form may edit it. Not for adjustments and card
- * payments received: the form only knows income/bill and would turn one into
- * an expense.
+ * Whether the transaction form may edit it: only plain incomes and expenses.
+ * Every other type is written by the app as part of a card payment, loan,
+ * broker funding or reconciliation, and the backend rejects editing it.
  */
 export function isEditableTransaction(type: string | null | undefined): boolean {
-	return !isAdjustmentTransaction(type) && type !== TypeTransaction.CARD_PAYMENT_RECEIVED
+	return !!type && USER_TYPES.has(type)
 }
 
 /**
- * Whether it can be deleted on its own. Deleting an adjustment undoes it; a
- * card payment received is one side of a payment (the paying account keeps
- * its card_payment), so it is not deletable alone.
+ * Whether it can be deleted on its own: incomes, expenses and balance
+ * adjustments (deleting one undoes it). Card payments, loan and broker
+ * movements are paired with other records and are managed from their screens.
  */
 export function isDeletableTransaction(type: string | null | undefined): boolean {
-	return type !== TypeTransaction.CARD_PAYMENT_RECEIVED
+	return isEditableTransaction(type) || isAdjustmentTransaction(type)
 }
 
 /** Amount with the sign it has on the account balance (expenses negative). */
