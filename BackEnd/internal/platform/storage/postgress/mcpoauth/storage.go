@@ -287,8 +287,11 @@ func (s *Storage) MarkAuthorizationCodeUsed(code string) error {
 // ---------------------------------------------------------------------------
 
 // CreateToken stores an access token (and its refresh token) by hash. The
-// subject (email) is resolved to the user id so that deleting the user
-// revokes the token. Fully expired tokens are purged opportunistically.
+// subject is resolved to the user id so that deleting the user revokes the
+// token: on the code exchange it is the email the user just logged in with,
+// on a refresh it is the user id of the consumed token (see GetTokenByRefresh),
+// so a refreshed token never follows the email to another account. Fully
+// expired tokens are purged opportunistically.
 func (s *Storage) CreateToken(token *oauth2.TokenInfo) error {
 	if token == nil || token.AccessToken == "" {
 		return errors.New("empty access token")
@@ -326,7 +329,8 @@ func (s *Storage) CreateToken(token *oauth2.TokenInfo) error {
 		(access_token_hash, refresh_token_hash, client_id, user_id, subject, scope,
 		 token_type, expires_at, refresh_expires_at, purge_after, created_at)
 		VALUES ($1, $2, $3,
-			(SELECT id FROM users WHERE email = $4 AND deleted_at IS NULL LIMIT 1),
+			(SELECT id FROM users WHERE deleted_at IS NULL
+				AND CASE WHEN strpos($4, '@') > 0 THEN email = $4 ELSE id = $4 END LIMIT 1),
 			$4, $5, $6, $7, $8, $9, $10)`,
 		HashSecret(token.AccessToken), refreshHash, token.ClientID, token.Subject, token.Scope,
 		tokenType, token.ExpiresAt, refreshExpires, purgeAfter, createdAt)
@@ -389,7 +393,8 @@ func (s *Storage) UserIDForAccessToken(accessToken string) (string, error) {
 // statement that reads it, so concurrent refreshes with the same token yield
 // one new token pair at most (refresh token rotation). omniskill deletes the old
 // access token right after this call anyway; AccessToken is left empty
-// because only its hash is known.
+// because only its hash is known. Subject is the stored user id, not the email,
+// because omniskill copies it into the new token (see CreateToken).
 func (s *Storage) GetTokenByRefresh(refreshToken string) (*oauth2.TokenInfo, error) {
 	ctx, cancel := s.ctx()
 	defer cancel()
@@ -402,7 +407,7 @@ func (s *Storage) GetTokenByRefresh(refreshToken string) (*oauth2.TokenInfo, err
 			RETURNING client_id, user_id, subject, scope, token_type, expires_at,
 				refresh_expires_at, created_at
 		)
-		SELECT c.client_id, c.subject, c.scope, c.token_type, c.expires_at,
+		SELECT c.client_id, COALESCE(c.user_id, c.subject), c.scope, c.token_type, c.expires_at,
 			c.refresh_expires_at, c.created_at,
 			EXISTS (SELECT 1 FROM users u WHERE u.id = c.user_id AND u.deleted_at IS NULL)
 		FROM consumed c`, HashSecret(refreshToken)).
