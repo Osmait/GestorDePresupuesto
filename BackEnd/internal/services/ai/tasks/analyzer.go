@@ -11,6 +11,7 @@ import (
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 )
 
@@ -100,7 +101,11 @@ func (a *SpendingAnalyzer) ParseResponse(rawJSON string) (interface{}, error) {
 	return insights, nil
 }
 
-func PrepareAnalyzerInput(transactions []*transaction.Transaction, dateFrom, dateTo time.Time) *AnalyzerInput {
+// PrepareAnalyzerInput builds the analyzer prompt input. dateFrom and dateTo
+// are the first and the last calendar day of the range; transaction dates are
+// shown as their calendar day in loc (the app time zone).
+func PrepareAnalyzerInput(transactions []*transaction.Transaction, dateFrom, dateTo time.Time, loc *time.Location) *AnalyzerInput {
+	loc = apptime.OrDefault(loc)
 	totalExpenses := money.Zero
 	totalIncome := money.Zero
 	categoryTotals := make(map[string]money.Amount)
@@ -119,7 +124,7 @@ func PrepareAnalyzerInput(transactions []*transaction.Transaction, dateFrom, dat
 		}
 
 		txnInputs = append(txnInputs, TransactionInput{
-			Date:        txn.CreatedAt.Format("2006-01-02"),
+			Date:        txn.CreatedAt.In(loc).Format("2006-01-02"),
 			Type:        txn.TypeTransation,
 			Category:    category,
 			Description: txn.Name,

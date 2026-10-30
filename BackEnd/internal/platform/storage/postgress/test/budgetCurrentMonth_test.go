@@ -14,9 +14,10 @@ import (
 )
 
 // The budget "spent this month" queries use a range predicate on created_at
-// instead of date_trunc('month', created_at) = date_trunc('month',
-// CURRENT_DATE). Both must select exactly the same rows in every session time
-// zone, including instants a microsecond around the local month boundaries.
+// for the current month of the app time zone (app_timezone(), migration
+// 000062). It must select exactly the rows whose local month is the current
+// local month, whatever the session time zone, including instants a
+// microsecond around the month boundaries of several zones.
 func TestFindCurrentBudgets_RangePredicateMatchesDateTrunc(t *testing.T) {
 	db := rollupRLSDB(t)
 	ctx := context.Background()
@@ -76,7 +77,7 @@ func TestFindCurrentBudgets_RangePredicateMatchesDateTrunc(t *testing.T) {
 			var want money.Amount
 			require.NoError(t, tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0)
 				FROM transactions WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill'
-				AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)`, userID, rate).Scan(&want))
+				AND date_trunc('month', created_at AT TIME ZONE app_timezone()) = date_trunc('month', now() AT TIME ZONE app_timezone())`, userID, rate).Scan(&want))
 			require.True(t, want.IsPositive(), zone)
 
 			got, err := repo.FindCurrentBudgets(ctx, userID, rate)

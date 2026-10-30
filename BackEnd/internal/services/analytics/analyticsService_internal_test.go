@@ -53,9 +53,9 @@ func TestResolveUsdToDop_FallsBackTo60(t *testing.T) {
 	moneytest.Equal(t, "58.75", ok.resolveUsdToDop(ctx))
 }
 
-// date_from/date_to are inclusive calendar days: the dashboard aggregates
-// [date_from 00:00 UTC, date_to + 1 day 00:00 UTC), the UTC days the
-// transaction list filters on.
+// date_from/date_to are inclusive calendar days of the app time zone: the
+// dashboard aggregates [date_from 00:00 local, date_to + 1 day 00:00 local),
+// the local days the transaction list filters on.
 func TestDashboardDateRange(t *testing.T) {
 	t.Parallel()
 
@@ -64,6 +64,7 @@ func TestDashboardDateRange(t *testing.T) {
 		t.Skipf("tzdata unavailable: %v", err)
 	}
 	utc := func(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, time.UTC) }
+	local := func(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, santoDomingo) }
 	now := time.Date(2025, time.March, 10, 23, 30, 0, 0, santoDomingo) // 2025-03-11 03:30 UTC
 
 	tests := []struct {
@@ -71,26 +72,27 @@ func TestDashboardDateRange(t *testing.T) {
 		dateFrom, dateTo time.Time
 		wantFrom, wantTo time.Time
 	}{
-		{"last day is included whole", utc(2025, 1, 1), utc(2025, 1, 31), utc(2025, 1, 1), utc(2025, 2, 1)},
-		{"single day", utc(2025, 1, 31), utc(2025, 1, 31), utc(2025, 1, 31), utc(2025, 2, 1)},
-		{"reversed range is swapped", utc(2025, 1, 31), utc(2025, 1, 1), utc(2025, 1, 1), utc(2025, 2, 1)},
-		{"end of year", utc(2024, 12, 1), utc(2024, 12, 31), utc(2024, 12, 1), utc(2025, 1, 1)},
-		{"leap day", utc(2024, 2, 1), utc(2024, 2, 29), utc(2024, 2, 1), utc(2024, 3, 1)},
-		{"bounds keep their own calendar day", time.Date(2025, 1, 1, 23, 0, 0, 0, santoDomingo), time.Date(2025, 1, 31, 23, 59, 59, 0, santoDomingo), utc(2025, 1, 1), utc(2025, 2, 1)},
-		{"no bounds: current Santo Domingo year to date, today included", time.Time{}, time.Time{}, utc(2025, 1, 1), utc(2025, 3, 11)},
-		{"one bound only: default range", utc(2024, 6, 1), time.Time{}, utc(2025, 1, 1), utc(2025, 3, 11)},
+		{"last day is included whole", utc(2025, 1, 1), utc(2025, 1, 31), local(2025, 1, 1), local(2025, 2, 1)},
+		{"single day", utc(2025, 1, 31), utc(2025, 1, 31), local(2025, 1, 31), local(2025, 2, 1)},
+		{"reversed range is swapped", utc(2025, 1, 31), utc(2025, 1, 1), local(2025, 1, 1), local(2025, 2, 1)},
+		{"end of year", utc(2024, 12, 1), utc(2024, 12, 31), local(2024, 12, 1), local(2025, 1, 1)},
+		{"leap day", utc(2024, 2, 1), utc(2024, 2, 29), local(2024, 2, 1), local(2024, 3, 1)},
+		{"bounds keep their own calendar day", time.Date(2025, 1, 1, 23, 0, 0, 0, santoDomingo), time.Date(2025, 1, 31, 23, 59, 59, 0, santoDomingo), local(2025, 1, 1), local(2025, 2, 1)},
+		{"no bounds: current local year to date, today included", time.Time{}, time.Time{}, local(2025, 1, 1), local(2025, 3, 11)},
+		{"one bound only: default range", utc(2024, 6, 1), time.Time{}, local(2025, 1, 1), local(2025, 3, 11)},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
-			from, to := dashboardDateRange(tt.dateFrom, tt.dateTo, now)
+			from, to := dashboardDateRange(tt.dateFrom, tt.dateTo, now, santoDomingo)
 			assert.True(t, from.Equal(tt.wantFrom), "from: want %s got %s", tt.wantFrom, from)
 			assert.True(t, to.Equal(tt.wantTo), "to: want %s got %s", tt.wantTo, to)
 		})
 	}
 }
 
-// A date_to parsed as the handler does (00:00 UTC) covers the whole day.
+// A date_to parsed as the handler does (00:00 UTC of the calendar day) covers
+// the whole local day, up to 23:59 in Santo Domingo (03:59 UTC the next day).
 func TestDashboardDateRange_LastDayInstants(t *testing.T) {
 	t.Parallel()
 
@@ -98,24 +100,23 @@ func TestDashboardDateRange_LastDayInstants(t *testing.T) {
 	if err != nil {
 		t.Skipf("tzdata unavailable: %v", err)
 	}
-	dateFrom, err := time.Parse("2006-01-02", "2025-01-01")
+	dateFrom, err := time.Parse("2006-01-02", "2026-10-01")
 	require.NoError(t, err)
-	dateTo, err := time.Parse("2006-01-02", "2025-01-31")
+	dateTo, err := time.Parse("2006-01-02", "2026-10-31")
 	require.NoError(t, err)
-	from, to := dashboardDateRange(dateFrom, dateTo, time.Now())
+	from, to := dashboardDateRange(dateFrom, dateTo, time.Now(), santoDomingo)
 
 	tests := []struct {
 		name    string
 		at      time.Time
 		include bool
 	}{
-		{"first instant", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC), true},
-		{"before the first day", time.Date(2024, 12, 31, 23, 59, 59, 999999000, time.UTC), false},
-		{"18:00 Santo Domingo on the last day", time.Date(2025, 1, 31, 18, 0, 0, 0, santoDomingo), true},
-		{"noon UTC on the last day", time.Date(2025, 1, 31, 12, 0, 0, 0, time.UTC), true},
-		{"last microsecond of the last day", time.Date(2025, 1, 31, 23, 59, 59, 999999000, time.UTC), true},
-		{"00:00 UTC the day after", time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC), false},
-		{"00:00 Santo Domingo the day after", time.Date(2025, 2, 1, 0, 0, 0, 0, santoDomingo), false},
+		{"00:00 local on the first day", time.Date(2026, 10, 1, 0, 0, 0, 0, santoDomingo), true},
+		{"23:30 local the day before (Oct 1 in UTC)", time.Date(2026, 9, 30, 23, 30, 0, 0, santoDomingo), false},
+		{"00:00 UTC on the first day (Sep 30 local)", time.Date(2026, 10, 1, 0, 0, 0, 0, time.UTC), false},
+		{"21:30 local on the last day (Nov 1 in UTC)", time.Date(2026, 10, 31, 21, 30, 0, 0, santoDomingo), true},
+		{"last microsecond of the last local day", time.Date(2026, 10, 31, 23, 59, 59, 999999000, santoDomingo), true},
+		{"00:00 local the day after", time.Date(2026, 11, 1, 0, 0, 0, 0, santoDomingo), false},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

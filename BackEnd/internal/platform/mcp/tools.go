@@ -9,6 +9,7 @@ import (
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	transactionDomain "github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
 )
@@ -46,10 +47,10 @@ func (s *MCPServer) registerTools() {
 				mcp.Enum("desc", "asc"),
 			),
 			mcp.WithString("date_from",
-				mcp.Description("Filter: start date in YYYY-MM-DD or YYYY/MM/DD format"),
+				mcp.Description("Filter: first day (YYYY-MM-DD or YYYY/MM/DD, a calendar day in the app time zone, America/Santo_Domingo) or an exact RFC3339 instant"),
 			),
 			mcp.WithString("date_to",
-				mcp.Description("Filter: end date in YYYY-MM-DD or YYYY/MM/DD format"),
+				mcp.Description("Filter: last day, included whole (YYYY-MM-DD or YYYY/MM/DD, a calendar day in the app time zone, America/Santo_Domingo) or an exact RFC3339 instant"),
 			),
 			mcp.WithString("account_id",
 				mcp.Description("Filter by account ID"),
@@ -253,21 +254,23 @@ func (s *MCPServer) handleListTransactions(ctx context.Context, req mcp.CallTool
 		filter.Type = typeFilter
 	}
 
-	// Parse date strings into CalculatedDateFrom/To (the repository relies on these).
-	// When empty, leave as zero so no date filter is applied.
+	// Parse date strings into the half-open range [CalculatedDateFrom,
+	// CalculatedDateTo) the repository relies on: local calendar days of the
+	// app time zone, like the REST filter. When empty, leave as zero so no date
+	// filter is applied.
 	if filter.DateFrom != "" {
-		parsed, perr := parseMCPDate(filter.DateFrom)
+		parsed, perr := parseRangeFrom(filter.DateFrom, s.loc)
 		if perr != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("invalid date_from: %s", perr)), nil
 		}
 		filter.CalculatedDateFrom = parsed
 	}
 	if filter.DateTo != "" {
-		parsed, perr := parseMCPDate(filter.DateTo)
+		parsed, perr := parseRangeTo(filter.DateTo, s.loc)
 		if perr != nil {
 			return mcp.NewToolResultError(fmt.Sprintf("invalid date_to: %s", perr)), nil
 		}
-		filter.CalculatedDateTo = parsed.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+		filter.CalculatedDateTo = parsed
 	}
 	if calcErr := filter.Validate(); calcErr != nil {
 		return mcp.NewToolResultError(fmt.Sprintf("invalid filter: %s", calcErr)), nil
@@ -389,30 +392,23 @@ func (s *MCPServer) handleGetBalance(ctx context.Context, req mcp.CallToolReques
 	return mcp.NewToolResultText(string(data)), nil
 }
 
-// parseMCPDate parses a date string accepting several common formats.
-func parseMCPDate(s string) (time.Time, error) {
-	layouts := []string{"2006-01-02", "2006/01/02", time.RFC3339}
-	for _, l := range layouts {
-		if t, err := time.Parse(l, s); err == nil {
-			return t, nil
-		}
-	}
-	return time.Time{}, fmt.Errorf("unable to parse date: %s", s)
+// parseRangeFrom / parseRangeTo parse the bounds of a date filter: a calendar
+// day (YYYY-MM-DD, YYYY/MM/DD) is a local day of the app time zone, from
+// 00:00 local to 00:00 local of the next day (exclusive end); RFC3339 keeps
+// its exact instant (see apptime.ParseRangeFrom / ParseRangeTo).
+func parseRangeFrom(s string, loc *time.Location) (time.Time, error) {
+	return apptime.ParseRangeFrom(s, loc)
+}
+
+func parseRangeTo(s string, loc *time.Location) (time.Time, error) {
+	return apptime.ParseRangeTo(s, loc)
 }
 
 // parseTransactionDate parses the date of a transaction: RFC3339 as given, or a
 // calendar day (YYYY-MM-DD, YYYY/MM/DD) at 12:00 UTC, which is the same day in
 // UTC and in Santo Domingo (UTC-4), so it lands on that day on every screen.
 func parseTransactionDate(s string) (time.Time, error) {
-	if t, err := time.Parse(time.RFC3339, s); err == nil {
-		return t, nil
-	}
-	for _, layout := range []string{"2006-01-02", "2006/01/02"} {
-		if t, err := time.Parse(layout, s); err == nil {
-			return t.Add(12 * time.Hour), nil
-		}
-	}
-	return time.Time{}, fmt.Errorf("invalid date %q: use YYYY-MM-DD or RFC3339", s)
+	return apptime.ParseRecordDate(s)
 }
 
 // handleUpdateTransaction updates an existing transaction owned by the authenticated user.

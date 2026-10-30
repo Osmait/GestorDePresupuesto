@@ -20,12 +20,32 @@ import (
 
 type TransactionRepository struct {
 	db *sql.DB
+	// now is the clock of the "current month" queries (time.Now by default).
+	now func() time.Time
 }
 
-func NewTransactionRepository(db *sql.DB) *TransactionRepository {
-	return &TransactionRepository{
-		db: db,
+// Option configures a TransactionRepository.
+type Option func(*TransactionRepository)
+
+// WithClock sets the clock that decides the current month of the budget
+// queries (tests pin it to a month boundary).
+func WithClock(now func() time.Time) Option {
+	return func(repo *TransactionRepository) {
+		if now != nil {
+			repo.now = now
+		}
 	}
+}
+
+func NewTransactionRepository(db *sql.DB, opts ...Option) *TransactionRepository {
+	repo := &TransactionRepository{
+		db:  db,
+		now: time.Now,
+	}
+	for _, opt := range opts {
+		opt(repo)
+	}
+	return repo
 }
 
 func (repo *TransactionRepository) Save(ctx context.Context, transaction *transaction.Transaction) error {
@@ -202,21 +222,25 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	return transactions, nil
 }
 
-// currentMonthPredicate selects the transactions of the current calendar
-// month in the session time zone. It is the sargable form of
-// date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE): both
-// bounds are computed once per statement (date_trunc on timestamptz and the
-// one-month step use the session time zone, exactly like the old filter), so
-// the (user_id, created_at) / (budget_id, created_at) indexes can range-scan
+// currentMonthPredicate selects the transactions of the calendar month of
+// the instant $n (the repository clock, see currentMonthAt) in the app time
+// zone (app_timezone(), migration 000062), whatever the session TimeZone:
+// [00:00 local of the 1st, 00:00 local of the next 1st). Both bounds are
+// computed once per statement (they only depend on a parameter), so the
+// (user_id, created_at) / (budget_id, created_at) indexes can range-scan
 // instead of evaluating date_trunc on every row of the user/budget.
-const currentMonthPredicate = "created_at >= date_trunc('month', CURRENT_DATE) AND created_at < date_trunc('month', CURRENT_DATE) + interval '1 month'"
+func currentMonthPredicate(n int) string {
+	month := fmt.Sprintf("date_trunc('month', $%d::timestamptz AT TIME ZONE app_timezone())", n)
+	return "created_at >= (" + month + " AT TIME ZONE app_timezone())" +
+		" AND created_at < ((" + month + " + interval '1 month') AT TIME ZONE app_timezone())"
+}
 
 func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string, userId string, usdToDop money.Amount) (money.Amount, error) {
 	if !usdToDop.IsPositive() {
 		usdToDop = money.FromInt(60)
 	}
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
-		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND user_id = $3 AND type_transation = 'bill' AND "+currentMonthPredicate, budgetID, usdToDop, userId)
+		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND user_id = $3 AND type_transation = 'bill' AND "+currentMonthPredicate(4), budgetID, usdToDop, userId, repo.now())
 	if err != nil {
 		return money.Zero, err
 	}
@@ -259,9 +283,9 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 	}
 	query := `SELECT budget_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions
 		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill'
-		AND ` + currentMonthPredicate + `
+		AND ` + currentMonthPredicate(3) + `
 		GROUP BY budget_id`
-	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, usdToDop)
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, usdToDop, repo.now())
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +529,8 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	}
 
 	if !filter.CalculatedDateTo.IsZero() {
-		whereConditions = append(whereConditions, fmt.Sprintf("created_at <= $%d", argIndex))
+		// exclusive upper bound (see TransactionFilter.CalculatedDateTo)
+		whereConditions = append(whereConditions, fmt.Sprintf("created_at < $%d", argIndex))
 		args = append(args, filter.CalculatedDateTo)
 		argIndex++
 	}
@@ -606,13 +631,15 @@ func (repo *TransactionRepository) scanTransactions(rows *sql.Rows) ([]*transact
 	return transactions, nil
 }
 
-func (repo *TransactionRepository) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateTo time.Time) ([]*transaction.Transaction, error) {
+// FindByUserAndDateRange returns the user's transactions in the half-open
+// range of instants [dateFrom, dateToExclusive).
+func (repo *TransactionRepository) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateToExclusive time.Time) ([]*transaction.Transaction, error) {
 	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at
 		FROM transactions
-		WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
+		WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
 		ORDER BY created_at DESC`
 
-	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, dateFrom, dateTo)
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, dateFrom, dateToExclusive)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query transactions: %w", err)
 	}

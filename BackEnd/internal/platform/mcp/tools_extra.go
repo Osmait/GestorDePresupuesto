@@ -8,6 +8,7 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	accountDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/account"
 	categoryDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/category"
 	creditcardDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/creditcard"
@@ -99,8 +100,8 @@ func (s *MCPServer) registerExtraTools() {
 		mcp.NewTool("balance_by_period",
 			mcp.WithDescription("Return income, expenses and net for a period (current month by default)"),
 			mcp.WithString("period", mcp.Description("Preset period"), mcp.Enum("this_week", "this_month", "last_month", "this_year", "custom")),
-			mcp.WithString("date_from", mcp.Description("Custom start date YYYY-MM-DD (required when period=custom)")),
-			mcp.WithString("date_to", mcp.Description("Custom end date YYYY-MM-DD (required when period=custom)")),
+			mcp.WithString("date_from", mcp.Description("Custom first day YYYY-MM-DD, a calendar day in the app time zone America/Santo_Domingo (required when period=custom)")),
+			mcp.WithString("date_to", mcp.Description("Custom last day YYYY-MM-DD, included whole (required when period=custom)")),
 		),
 		s.handleBalanceByPeriod,
 	)
@@ -393,43 +394,32 @@ func (s *MCPServer) handleDeleteCategory(ctx context.Context, req mcp.CallToolRe
 
 // =============== ANALYTICS BY PERIOD ===============
 
-func resolvePeriodRange(period, dateFrom, dateTo string) (time.Time, time.Time, error) {
-	now := time.Now()
+// resolvePeriodRange returns the first and the last calendar day (both
+// inclusive, at 00:00 in loc) of a period, as analytics.DashboardFilters
+// takes them. Periods are calendar periods of the app time zone at now; a
+// custom range takes calendar days (YYYY-MM-DD).
+func resolvePeriodRange(period, dateFrom, dateTo string, now time.Time, loc *time.Location) (time.Time, time.Time, error) {
+	loc = apptime.OrDefault(loc)
 	switch period {
-	case "", "this_month":
-		from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		to := from.AddDate(0, 1, 0).Add(-time.Nanosecond)
-		return from, to, nil
-	case "last_month":
-		prev := now.AddDate(0, -1, 0)
-		from := time.Date(prev.Year(), prev.Month(), 1, 0, 0, 0, 0, now.Location())
-		to := from.AddDate(0, 1, 0).Add(-time.Nanosecond)
-		return from, to, nil
-	case "this_week":
-		weekday := int(now.Weekday())
-		if weekday == 0 {
-			weekday = 7
+	case "", "this_month", "last_month", "this_week", "this_year":
+		if period == "" {
+			period = "this_month"
 		}
-		from := now.AddDate(0, 0, -(weekday - 1)).Truncate(24 * time.Hour)
-		to := from.AddDate(0, 0, 6).Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-		return from, to, nil
-	case "this_year":
-		from := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
-		to := time.Date(now.Year()+1, 1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
-		return from, to, nil
+		r, _ := apptime.Period(period, now, loc)
+		return r.From, r.LastDay(loc), nil
 	case "custom":
 		if dateFrom == "" || dateTo == "" {
 			return time.Time{}, time.Time{}, fmt.Errorf("date_from and date_to are required when period=custom")
 		}
-		from, err := parseMCPDate(dateFrom)
+		fy, fm, fd, err := apptime.ParseCalendarDate(dateFrom)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("invalid date_from: %w", err)
 		}
-		to, err := parseMCPDate(dateTo)
+		ty, tm, td, err := apptime.ParseCalendarDate(dateTo)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("invalid date_to: %w", err)
 		}
-		return from, to.Add(23*time.Hour + 59*time.Minute + 59*time.Second), nil
+		return apptime.Date(fy, fm, fd, loc), apptime.Date(ty, tm, td, loc), nil
 	default:
 		return time.Time{}, time.Time{}, fmt.Errorf("invalid period: %s", period)
 	}
@@ -441,7 +431,7 @@ func (s *MCPServer) handleBalanceByPeriod(ctx context.Context, req mcp.CallToolR
 		return fail, nil
 	}
 	period := req.GetString("period", "this_month")
-	from, to, perr := resolvePeriodRange(period, req.GetString("date_from", ""), req.GetString("date_to", ""))
+	from, to, perr := resolvePeriodRange(period, req.GetString("date_from", ""), req.GetString("date_to", ""), time.Now(), s.loc)
 	if perr != nil {
 		return mcp.NewToolResultError(perr.Error()), nil
 	}
@@ -472,8 +462,9 @@ func (s *MCPServer) handleFinancialSummary(ctx context.Context, req mcp.CallTool
 		return fail, nil
 	}
 
-	currFrom, currTo, _ := resolvePeriodRange("this_month", "", "")
-	prevFrom, prevTo, _ := resolvePeriodRange("last_month", "", "")
+	now := time.Now()
+	currFrom, currTo, _ := resolvePeriodRange("this_month", "", "", now, s.loc)
+	prevFrom, prevTo, _ := resolvePeriodRange("last_month", "", "", now, s.loc)
 
 	return s.runRO(ctx, userID, func(txCtx context.Context) (interface{}, error) {
 		curr, err := s.services.Analytics.GetDashboardSummary(txCtx, userID, analytics.DashboardFilters{DateFrom: currFrom, DateTo: currTo})

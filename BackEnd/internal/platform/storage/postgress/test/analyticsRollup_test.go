@@ -26,7 +26,9 @@ import (
 
 // ── The analytics queries as they were before the monthly rollup (000054) ──
 // They aggregate the ledger directly and are the reference the rollup-based
-// repository must reproduce exactly. Ranges are half-open: [$3, $4).
+// repository must reproduce exactly. Ranges are half-open: [$3, $4). Months
+// are calendar months of the app time zone (Santo Domingo, migration 000062),
+// whatever the session time zone; referenceIn swaps the zone.
 
 const legacyCategoryExpensesSQL = `
 	SELECT c.id, c.name,
@@ -42,8 +44,8 @@ const legacyCategoryExpensesSQL = `
 
 const legacyMonthlySummarySQL = `
 	SELECT
-		EXTRACT(YEAR FROM created_at)::int as year,
-		EXTRACT(MONTH FROM created_at)::int as month,
+		EXTRACT(YEAR FROM created_at AT TIME ZONE 'America/Santo_Domingo')::int as year,
+		EXTRACT(MONTH FROM created_at AT TIME ZONE 'America/Santo_Domingo')::int as month,
 		COALESCE(SUM(CASE
 			WHEN type_transation = 'income' AND currency = 'USD' THEN amount * $2
 			WHEN type_transation = 'income' THEN amount
@@ -80,8 +82,8 @@ const legacyCategoryExpensesInRangeSQL = `
 
 const legacyMonthlySummaryInRangeSQL = `
 	SELECT
-		EXTRACT(YEAR FROM created_at)::int as year,
-		EXTRACT(MONTH FROM created_at)::int as month,
+		EXTRACT(YEAR FROM created_at AT TIME ZONE 'America/Santo_Domingo')::int as year,
+		EXTRACT(MONTH FROM created_at AT TIME ZONE 'America/Santo_Domingo')::int as month,
 		COALESCE(SUM(CASE
 			WHEN type_transation = 'income' AND currency = 'USD' THEN amount * $2
 			WHEN type_transation = 'income' THEN amount
@@ -123,6 +125,11 @@ const legacyTotalsInRangeSQL = `
 		AND ($8::numeric IS NULL OR amount >= $8)
 		AND ($9::numeric IS NULL OR amount <= $9)
 		AND created_at >= $3 AND created_at < $4`
+
+// referenceIn returns a reference query bucketing months in zone instead.
+func referenceIn(query, zone string) string {
+	return strings.ReplaceAll(query, "'America/Santo_Domingo'", "'"+zone+"'")
+}
 
 func legacyCategoryExpenses(ctx context.Context, q txhelper.Querier, query string, args ...any) ([]*analytics.CategoryExpenseRepository, error) {
 	rows, err := q.QueryContext(ctx, query, args...)
@@ -236,9 +243,10 @@ func (g rollupGen) instant() time.Time {
 	base := time.Date(2023, time.January, 1, 0, 0, 0, 0, time.UTC)
 	switch g.rng.IntN(3) {
 	case 0:
-		// on/around a UTC month boundary, and around Santo Domingo's (04:00 UTC)
+		// on/around a UTC month boundary, and around Santo Domingo's (04:00 UTC),
+		// e.g. 23:30 local on the last day of a month (03:30 UTC the next month)
 		m := base.AddDate(0, g.rng.IntN(48), 0)
-		deltas := []time.Duration{0, time.Microsecond, -time.Microsecond, time.Second, -time.Second, 4 * time.Hour, 4*time.Hour - time.Microsecond}
+		deltas := []time.Duration{0, time.Microsecond, -time.Microsecond, time.Second, -time.Second, 4 * time.Hour, 4*time.Hour - time.Microsecond, 4*time.Hour + time.Microsecond, 3*time.Hour + 30*time.Minute}
 		return m.Add(deltas[g.rng.IntN(len(deltas))])
 	default:
 		span := time.Date(2027, time.January, 1, 0, 0, 0, 0, time.UTC).Sub(base)
@@ -369,9 +377,10 @@ func (g rollupGen) randomRange() (time.Time, time.Time) {
 	switch g.rng.IntN(5) {
 	case 0: // inside one month
 		to = from.Add(time.Duration(g.rng.Int64N(int64(20 * 24 * time.Hour))))
-	case 1: // whole UTC months exactly, as dashboardDateRange builds them
-		f := from.UTC()
-		from = time.Date(f.Year(), f.Month(), 1, 0, 0, 0, 0, time.UTC)
+	case 1: // whole local months exactly, as dashboardDateRange builds them
+		loc, _ := time.LoadLocation("America/Santo_Domingo")
+		f := from.In(loc)
+		from = time.Date(f.Year(), f.Month(), 1, 0, 0, 0, 0, loc)
 		to = from.AddDate(0, 1+g.rng.IntN(14), 0)
 	case 2: // Santo Domingo calendar dates, as currentYearRangeInSantoDomingo builds them
 		loc, _ := time.LoadLocation("America/Santo_Domingo")
@@ -435,7 +444,7 @@ func requireRollupMatchesLedger(t *testing.T, ctx context.Context, db *sql.DB) {
 		var diff, negative int
 		if err := tx.QueryRowContext(ctx, `
 			WITH expect AS (
-				SELECT user_id, (date_trunc('month', created_at AT TIME ZONE 'UTC'))::date AS month, category_id,
+				SELECT user_id, (date_trunc('month', created_at AT TIME ZONE app_timezone()))::date AS month, category_id,
 					type_transation, COALESCE(currency, '') AS currency, SUM(amount) AS s, COUNT(*) AS c
 				FROM transactions GROUP BY 1, 2, 3, 4, 5),
 			got AS (
@@ -667,11 +676,11 @@ func TestAnalyticsRollup_RandomizedEquivalence(t *testing.T) {
 		require.Zero(t, n)
 	})
 
-	t.Run("non-UTC session falls back to the ledger", func(t *testing.T) {
+	t.Run("the session time zone does not change the months", func(t *testing.T) {
 		u := users[0]
 		fresh := analyticsRepo.NewAnalyticsRepository(db) // the time-zone check is cached per repository
 		require.NoError(t, inRLSTx(ctx, db, u.id, false, func(ctx context.Context, tx *sql.Tx) error {
-			if _, err := tx.ExecContext(ctx, `SET LOCAL TimeZone = 'America/Santo_Domingo'`); err != nil {
+			if _, err := tx.ExecContext(ctx, `SET LOCAL TimeZone = 'Asia/Kolkata'`); err != nil {
 				return err
 			}
 			before, err := rollupReads(ctx, tx)
@@ -681,21 +690,46 @@ func TestAnalyticsRollup_RandomizedEquivalence(t *testing.T) {
 			require.NoError(t, err)
 			got, err := fresh.GetMonthlySummary(ctx, u.id, rate)
 			require.NoError(t, err)
-			requireSameMonthly(t, want, got, "Santo Domingo session")
-			wantC, err := legacyCategoryExpenses(ctx, tx, legacyCategoryExpensesSQL, u.id, rate)
-			require.NoError(t, err)
-			gotC, err := fresh.GetCategoryExpenses(ctx, u.id, rate)
-			require.NoError(t, err)
-			requireSameCategoryExpenses(t, wantC, gotC, "Santo Domingo session")
+			requireSameMonthly(t, want, got, "Kolkata session")
 			from, to := time.Date(2024, 1, 1, 4, 0, 0, 0, time.UTC), time.Date(2025, 6, 1, 4, 0, 0, 0, time.UTC)
 			wantR, err := legacyMonthlySummary(ctx, tx, legacyMonthlySummaryInRangeSQL, u.id, rate, from, to, "", "", "", nil, nil)
 			require.NoError(t, err)
 			gotR, err := fresh.GetMonthlySummaryInRange(ctx, u.id, rate, from, to, "", "", "", nil, nil)
 			require.NoError(t, err)
-			requireSameMonthly(t, wantR, gotR, "Santo Domingo session range")
+			requireSameMonthly(t, wantR, gotR, "Kolkata session range")
 			after, err := rollupReads(ctx, tx)
 			require.NoError(t, err)
-			require.Equal(t, before, after, "the rollup must not be read when months are not bucketed in UTC")
+			require.Greater(t, after, before, "the rollup is used whatever the session time zone")
+			return nil
+		}))
+	})
+
+	t.Run("a location other than app_timezone() falls back to the ledger", func(t *testing.T) {
+		u := users[0]
+		utcRepo := analyticsRepo.NewAnalyticsRepository(db, analyticsRepo.WithLocation(time.UTC))
+		require.NoError(t, inRLSTx(ctx, db, u.id, false, func(ctx context.Context, tx *sql.Tx) error {
+			before, err := rollupReads(ctx, tx)
+			require.NoError(t, err)
+			rate := rates[1]
+			want, err := legacyMonthlySummary(ctx, tx, referenceIn(legacyMonthlySummarySQL, "UTC"), u.id, rate)
+			require.NoError(t, err)
+			got, err := utcRepo.GetMonthlySummary(ctx, u.id, rate)
+			require.NoError(t, err)
+			requireSameMonthly(t, want, got, "UTC location")
+			wantC, err := legacyCategoryExpenses(ctx, tx, legacyCategoryExpensesSQL, u.id, rate)
+			require.NoError(t, err)
+			gotC, err := utcRepo.GetCategoryExpenses(ctx, u.id, rate)
+			require.NoError(t, err)
+			requireSameCategoryExpenses(t, wantC, gotC, "UTC location")
+			from, to := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 6, 1, 0, 0, 0, 0, time.UTC)
+			wantR, err := legacyMonthlySummary(ctx, tx, referenceIn(legacyMonthlySummaryInRangeSQL, "UTC"), u.id, rate, from, to, "", "", "", nil, nil)
+			require.NoError(t, err)
+			gotR, err := utcRepo.GetMonthlySummaryInRange(ctx, u.id, rate, from, to, "", "", "", nil, nil)
+			require.NoError(t, err)
+			requireSameMonthly(t, wantR, gotR, "UTC location range")
+			after, err := rollupReads(ctx, tx)
+			require.NoError(t, err)
+			require.Equal(t, before, after, "the rollup must not be read when its months are not the repository's")
 			return nil
 		}))
 	})

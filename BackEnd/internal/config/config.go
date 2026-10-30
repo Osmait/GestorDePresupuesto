@@ -42,8 +42,10 @@ type ServerConfig struct {
 	WriteTimeout    time.Duration `json:"write_timeout"`
 	IdleTimeout     time.Duration `json:"idle_timeout"`
 	MaxHeaderBytes  int           `json:"max_header_bytes"`
-	// Timezone is the IANA zone used for calendar-day logic such as
-	// recurring transaction scheduling (APP_TIMEZONE).
+	// Timezone is the IANA app time zone (APP_TIMEZONE): calendar days and
+	// months (transaction filters, budgets, analytics, "today", recurring
+	// scheduling) are cut in it. It must match the database's app_timezone()
+	// (migration 000062); a mismatch is logged at startup.
 	Timezone string `json:"timezone"`
 	// ReadHeaderTimeout bounds how long the server waits for request headers
 	// (slowloris protection).

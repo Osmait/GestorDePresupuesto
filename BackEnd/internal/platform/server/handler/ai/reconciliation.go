@@ -12,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
@@ -239,7 +240,9 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 			summary.Linked++
 		case "create":
 			tx := item.Extracted
-			createdAt := tx.CreatedAt
+			// a date-only statement line (midnight UTC, also in sessions
+			// saved before extraction normalized it) keeps its calendar day
+			createdAt := apptime.NormalizeMidnightUTC(tx.CreatedAt)
 			if createdAt.IsZero() {
 				createdAt = time.Now()
 			}

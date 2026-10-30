@@ -3,6 +3,7 @@ package ai
 import (
 	"context"
 	"database/sql"
+	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
@@ -20,6 +21,11 @@ type Handler struct {
 	db                    *sql.DB
 	aiCache               *aiService.AICacheService
 	flags                 *middleware.FeatureFlags
+}
+
+// location is the app time zone (from the transaction service).
+func (h *Handler) location() *time.Location {
+	return h.transactionService.Location()
 }
 
 func NewHandler(

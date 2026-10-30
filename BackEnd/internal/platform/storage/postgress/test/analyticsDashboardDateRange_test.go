@@ -48,12 +48,12 @@ func seedAnalyticsUser(t *testing.T, db *sql.DB, txs []analyticsFixtureTx) (stri
 	return userID, accountID
 }
 
-// GET /analytics/dashboard-summary treats date_to as an inclusive calendar
-// day: [date_from 00:00 UTC, date_to + 1 day 00:00 UTC), the UTC days the
-// transaction list filters on. Before the fix date_to was 00:00 UTC and
-// "created_at <= date_to" dropped the rest of the last day. Ranges served from
-// the monthly rollup (whole months) and from the ledger (account filter,
-// partial months) agree.
+// GET /analytics/dashboard-summary treats date_from/date_to as inclusive
+// calendar days of the app time zone (Santo Domingo, UTC-4): [date_from 00:00
+// local, date_to + 1 day 00:00 local), the local days the transaction list
+// filters on. An instant late in the local evening (already the next day in
+// UTC) stays on its local day. Ranges served from the monthly rollup (whole
+// local months) and from the ledger (account filter, partial months) agree.
 func TestDashboardSummary_DateToIncludesTheWholeLastDay(t *testing.T) {
 	t.Parallel()
 
@@ -63,14 +63,14 @@ func TestDashboardSummary_DateToIncludesTheWholeLastDay(t *testing.T) {
 
 	// Bill amounts are powers of two, so a total names the rows it contains.
 	userID, accountID := seedAnalyticsUser(t, db, []analyticsFixtureTx{
-		{1, "bill", "DOP", time.Date(2024, 12, 31, 23, 59, 59, 999999000, time.UTC)},
-		{2, "bill", "DOP", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC)},
-		{4, "bill", "DOP", time.Date(2025, 1, 31, 18, 0, 0, 0, santoDomingo)}, // 22:00 UTC
-		{8, "bill", "DOP", time.Date(2025, 1, 31, 23, 59, 59, 999999000, time.UTC)},
-		{16, "bill", "DOP", time.Date(2025, 2, 1, 0, 0, 0, 0, santoDomingo)}, // 04:00 UTC
-		{32, "bill", "DOP", time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC)},
-		{64, "bill", "DOP", time.Date(2025, 2, 28, 12, 0, 0, 0, time.UTC)},
-		{128, "bill", "DOP", time.Date(2025, 3, 1, 0, 0, 0, 0, time.UTC)},
+		{1, "bill", "DOP", time.Date(2024, 12, 31, 23, 59, 59, 999999000, santoDomingo)}, // Jan 1 03:59 UTC
+		{2, "bill", "DOP", time.Date(2025, 1, 1, 0, 0, 0, 0, santoDomingo)},
+		{4, "bill", "DOP", time.Date(2025, 1, 31, 18, 0, 0, 0, santoDomingo)},           // 22:00 UTC
+		{8, "bill", "DOP", time.Date(2025, 1, 31, 23, 59, 59, 999999000, santoDomingo)}, // Feb 1 03:59 UTC
+		{16, "bill", "DOP", time.Date(2025, 2, 1, 0, 0, 0, 0, santoDomingo)},            // 04:00 UTC
+		{32, "bill", "DOP", time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC)},                // Jan 31 20:00 local
+		{64, "bill", "DOP", time.Date(2025, 2, 28, 12, 0, 0, 0, santoDomingo)},
+		{128, "bill", "DOP", time.Date(2025, 3, 1, 0, 0, 0, 0, santoDomingo)},
 		{1000, "income", "DOP", time.Date(2025, 1, 31, 18, 0, 0, 0, santoDomingo)},
 	})
 
@@ -90,14 +90,14 @@ func TestDashboardSummary_DateToIncludesTheWholeLastDay(t *testing.T) {
 		wantIncome   int64
 		wantMonthly  map[string]int64 // month -> expenses
 	}{
-		{"single last day (ledger)", "date_from=2025-01-31&date_to=2025-01-31", 4 + 8, 1000, map[string]int64{"2025-01": 12}},
-		{"whole month (rollup)", "date_from=2025-01-01&date_to=2025-01-31", 2 + 4 + 8, 1000, map[string]int64{"2025-01": 14}},
-		{"whole month with account filter (ledger)", "date_from=2025-01-01&date_to=2025-01-31&account_id=" + accountID, 2 + 4 + 8, 1000, map[string]int64{"2025-01": 14}},
-		{"two whole months (rollup)", "date_from=2025-01-01&date_to=2025-02-28", 2 + 4 + 8 + 16 + 32 + 64, 1000, map[string]int64{"2025-01": 14, "2025-02": 112}},
-		{"partial month then whole month", "date_from=2025-01-15&date_to=2025-02-28", 4 + 8 + 16 + 32 + 64, 1000, map[string]int64{"2025-01": 12, "2025-02": 112}},
-		{"reversed range", "date_from=2025-01-31&date_to=2025-01-01", 2 + 4 + 8, 1000, map[string]int64{"2025-01": 14}},
-		{"day after the last day", "date_from=2025-02-01&date_to=2025-02-01", 16 + 32, 0, map[string]int64{"2025-02": 48}},
-		{"bills only", "date_from=2025-01-01&date_to=2025-01-31&type=bill", 2 + 4 + 8, 0, map[string]int64{"2025-01": 14}},
+		{"single last day (ledger)", "date_from=2025-01-31&date_to=2025-01-31", 4 + 8 + 32, 1000, map[string]int64{"2025-01": 44}},
+		{"whole month (rollup)", "date_from=2025-01-01&date_to=2025-01-31", 2 + 4 + 8 + 32, 1000, map[string]int64{"2025-01": 46}},
+		{"whole month with account filter (ledger)", "date_from=2025-01-01&date_to=2025-01-31&account_id=" + accountID, 2 + 4 + 8 + 32, 1000, map[string]int64{"2025-01": 46}},
+		{"two whole months (rollup)", "date_from=2025-01-01&date_to=2025-02-28", 2 + 4 + 8 + 32 + 16 + 64, 1000, map[string]int64{"2025-01": 46, "2025-02": 80}},
+		{"partial month then whole month", "date_from=2025-01-15&date_to=2025-02-28", 4 + 8 + 32 + 16 + 64, 1000, map[string]int64{"2025-01": 44, "2025-02": 80}},
+		{"reversed range", "date_from=2025-01-31&date_to=2025-01-01", 2 + 4 + 8 + 32, 1000, map[string]int64{"2025-01": 46}},
+		{"day after the last day", "date_from=2025-02-01&date_to=2025-02-01", 16, 0, map[string]int64{"2025-02": 16}},
+		{"bills only", "date_from=2025-01-01&date_to=2025-01-31&type=bill", 2 + 4 + 8 + 32, 0, map[string]int64{"2025-01": 46}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -145,7 +145,7 @@ func TestAnalyticsRepository_RateFallbackIsConsistent(t *testing.T) {
 		from, to time.Time
 	}{
 		{"partial month (ledger)", time.Date(2025, 1, 15, 0, 0, 0, 0, time.UTC), time.Date(2025, 1, 16, 0, 0, 0, 0, time.UTC)},
-		{"whole month (rollup)", time.Date(2025, 1, 1, 0, 0, 0, 0, time.UTC), time.Date(2025, 2, 1, 0, 0, 0, 0, time.UTC)},
+		{"whole month (rollup)", time.Date(2025, 1, 1, 4, 0, 0, 0, time.UTC), time.Date(2025, 2, 1, 4, 0, 0, 0, time.UTC)}, // local months
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

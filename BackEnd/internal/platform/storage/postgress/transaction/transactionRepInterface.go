@@ -28,5 +28,5 @@ type TransactionRepositoryInterface interface {
 	FindAllOfAllAccountsWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)
 	FindAllWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)
 	CountWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) (int64, error)
-	FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateTo time.Time) ([]*transaction.Transaction, error)
+	FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateToExclusive time.Time) ([]*transaction.Transaction, error)
 }

@@ -57,7 +57,7 @@ Return a JSON array. Each object must match this exact structure:
     "budget_id": "",
     "currency": "DOP or USD",
     "user_id": "",
-    "created_at": "YYYY-MM-DDTHH:MM:SSZ"
+    "created_at": "YYYY-MM-DDTHH:MM:SS-04:00, or YYYY-MM-DDT00:00:00Z when the document shows no time"
   }
 ]
 
@@ -68,5 +68,6 @@ CRITICAL:
 - All amounts as positive numbers
 - Currency must be either "DOP" or "USD"
 - ISO 8601 format for dates
+- Dates and times in the document are local time in Santo Domingo (UTC-4): when the document shows a time, write it with the -04:00 offset (e.g. "2026-10-31T21:30:00-04:00"); when it shows only a date, write that date at "T00:00:00Z" (e.g. "2026-10-31T00:00:00Z"), never shift it to another day
 - If document type is receipt or invoice, created_at should be the document date
 - If document type is statement, created_at should be the transaction date shown

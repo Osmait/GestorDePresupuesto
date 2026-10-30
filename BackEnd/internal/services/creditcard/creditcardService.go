@@ -11,6 +11,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/creditcard"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/creditcard"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	cardRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/creditcard"
@@ -56,18 +57,38 @@ type CreditCardService struct {
 	cardRepo        cardRepo.CreditCardRepositoryInterface
 	accountRepo     AccountRepositoryInterface
 	transactionRepo TransactionServiceInterface
+	loc             *time.Location
+}
+
+// Option configures a CreditCardService.
+type Option func(*CreditCardService)
+
+// WithLocation sets the app time zone that the next cut and due dates are
+// computed in (default apptime.Default()).
+func WithLocation(loc *time.Location) Option {
+	return func(s *CreditCardService) {
+		if loc != nil {
+			s.loc = loc
+		}
+	}
 }
 
 func NewCreditCardService(
 	cardRepo cardRepo.CreditCardRepositoryInterface,
 	accountRepo AccountRepositoryInterface,
 	transactionRepo TransactionServiceInterface,
+	opts ...Option,
 ) *CreditCardService {
-	return &CreditCardService{
+	s := &CreditCardService{
 		cardRepo:        cardRepo,
 		accountRepo:     accountRepo,
 		transactionRepo: transactionRepo,
+		loc:             apptime.Default(),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
 }
 
 func (s *CreditCardService) CreateCreditCard(ctx context.Context, req *dto.CreateCreditCardRequest, userId string) (*dto.CreditCardResponse, error) {
@@ -606,31 +627,32 @@ func (s *CreditCardService) buildCardResponse(ctx context.Context, card *creditc
 		CutDay:         card.CutDay,
 		DueDay:         card.DueDay,
 		Balances:       balanceResponses,
-		NextCutDate:    calculateNextDate(card.CutDay),
-		NextDueDate:    calculateNextDate(card.DueDay),
+		NextCutDate:    calculateNextDate(card.CutDay, time.Now(), s.loc),
+		NextDueDate:    calculateNextDate(card.DueDay, time.Now(), s.loc),
 		CreatedAt:      card.CreatedAt,
 		UpdatedAt:      card.UpdatedAt,
 	}
 }
 
-func calculateNextDate(day int) *time.Time {
-	now := time.Now()
-	var nextDate time.Time
+// calculateNextDate returns the next occurrence of day of month after today
+// in loc (the app time zone; today itself counts as passed), clamped to the
+// month's last day, as that calendar day at 12:00 UTC (the same day in UTC
+// and in the app time zone).
+func calculateNextDate(day int, now time.Time, loc *time.Location) *time.Time {
+	year, month, today := now.In(apptime.OrDefault(loc)).Date()
+	clamp := func(y int, m time.Month) int {
+		if last := apptime.DaysIn(y, m); day > last {
+			return last
+		}
+		return day
+	}
 
-	if now.Day() < day {
-		nextDate = time.Date(now.Year(), now.Month(), day, 0, 0, 0, 0, now.Location())
+	var nextDate time.Time
+	if d := clamp(year, month); today < d {
+		nextDate = apptime.NoonUTC(year, month, d)
 	} else {
-		nextMonth := now.Month() + 1
-		nextYear := now.Year()
-		if nextMonth > 12 {
-			nextMonth = 1
-			nextYear++
-		}
-		daysInMonth := time.Date(nextYear, nextMonth+1, 0, 0, 0, 0, 0, now.Location()).Day()
-		if day > daysInMonth {
-			day = daysInMonth
-		}
-		nextDate = time.Date(nextYear, nextMonth, day, 0, 0, 0, 0, now.Location())
+		first := time.Date(year, month+1, 1, 0, 0, 0, 0, time.UTC)
+		nextDate = apptime.NoonUTC(first.Year(), first.Month(), clamp(first.Year(), first.Month()))
 	}
 
 	return &nextDate

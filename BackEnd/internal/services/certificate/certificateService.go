@@ -10,6 +10,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/certificate"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
@@ -47,16 +48,49 @@ type CertificateService struct {
 	repository         certificateRepo.CertificateRepositoryInterface
 	transactionService TransactionCreator
 	accountRepository  AccountFinder
+	loc                *time.Location
 }
 
 // NewCertificateService builds the service. accountRepository validates the
 // payout account; when nil (unit tests) that validation is skipped.
-func NewCertificateService(repository certificateRepo.CertificateRepositoryInterface, transactionService TransactionCreator, accountRepository AccountFinder) *CertificateService {
-	return &CertificateService{
+// Option configures a CertificateService.
+type Option func(*CertificateService)
+
+// WithLocation sets the app time zone that payment days are cut in (default
+// apptime.Default()).
+func WithLocation(loc *time.Location) Option {
+	return func(s *CertificateService) {
+		if loc != nil {
+			s.loc = loc
+		}
+	}
+}
+
+func NewCertificateService(repository certificateRepo.CertificateRepositoryInterface, transactionService TransactionCreator, accountRepository AccountFinder, opts ...Option) *CertificateService {
+	s := &CertificateService{
 		repository:         repository,
 		transactionService: transactionService,
 		accountRepository:  accountRepository,
+		loc:                apptime.Default(),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// calendarDay returns t's calendar day as 12:00 UTC, the convention for
+// date-only values (the same day in UTC and in the app time zone). A legacy
+// date-only value stored at 00:00 UTC keeps its UTC day; any other instant
+// (e.g. a certificate's created_at) is the day it is in the app time zone.
+func (s *CertificateService) calendarDay(t time.Time) time.Time {
+	y, m, d := apptime.NormalizeMidnightUTC(t).In(apptime.OrDefault(s.loc)).Date()
+	return apptime.NoonUTC(y, m, d)
+}
+
+// afterMaturity reports whether a payment date falls after the maturity day.
+func (s *CertificateService) afterMaturity(paymentDate time.Time, maturity *time.Time) bool {
+	return maturity != nil && s.calendarDay(paymentDate).After(s.calendarDay(*maturity))
 }
 
 // validatePayoutAccount rejects a payout account that is not the user's or
@@ -170,7 +204,7 @@ func (s *CertificateService) FindAll(ctx context.Context, userId string) ([]*dto
 		nextPaymentDate := s.CalculateNextPaymentDate(cert, lastPayment)
 		projected := s.GetProjectedPayment(cert, effectiveCapital, calculator)
 
-		if cert.MaturityDate != nil && nextPaymentDate != nil && nextPaymentDate.After(*cert.MaturityDate) {
+		if nextPaymentDate != nil && s.afterMaturity(*nextPaymentDate, cert.MaturityDate) {
 			nextPaymentDate = nil
 			projected = nil
 		}
@@ -205,7 +239,7 @@ func (s *CertificateService) FindById(ctx context.Context, id string, userId str
 	nextPaymentDate := s.CalculateNextPaymentDate(cert, nil)
 	projected := s.GetProjectedPayment(cert, effectiveCapital, calculator)
 
-	if cert.MaturityDate != nil && nextPaymentDate != nil && nextPaymentDate.After(*cert.MaturityDate) {
+	if nextPaymentDate != nil && s.afterMaturity(*nextPaymentDate, cert.MaturityDate) {
 		nextPaymentDate = nil
 		projected = nil
 	}
@@ -299,26 +333,27 @@ func (s *CertificateService) UpdatePayment(ctx context.Context, paymentId string
 		return err
 	}
 
+	// Date-only values are calendar days at 12:00 UTC (see apptime).
 	if req.PaymentDate != nil {
 		t, err := time.Parse("2006-01-02", *req.PaymentDate)
 		if err != nil {
 			return fmt.Errorf("%w: invalid payment_date format, expected YYYY-MM-DD", errorhttp.ErrBadRequest)
 		}
-		payment.PaymentDate = t
+		payment.PaymentDate = apptime.NoonUTC(t.Date())
 	}
 	if req.PeriodStart != nil {
 		t, err := time.Parse("2006-01-02", *req.PeriodStart)
 		if err != nil {
 			return fmt.Errorf("%w: invalid period_start format, expected YYYY-MM-DD", errorhttp.ErrBadRequest)
 		}
-		payment.PeriodStart = t
+		payment.PeriodStart = apptime.NoonUTC(t.Date())
 	}
 	if req.PeriodEnd != nil {
 		t, err := time.Parse("2006-01-02", *req.PeriodEnd)
 		if err != nil {
 			return fmt.Errorf("%w: invalid period_end format, expected YYYY-MM-DD", errorhttp.ErrBadRequest)
 		}
-		payment.PeriodEnd = t
+		payment.PeriodEnd = apptime.NoonUTC(t.Date())
 	}
 	if req.GrossInterest != nil {
 		payment.GrossInterest = *req.GrossInterest
@@ -453,7 +488,7 @@ func (s *CertificateService) ProcessPendingPayments(ctx context.Context, userId 
 				break
 			}
 
-			if cert.MaturityDate != nil && nextPaymentDate.After(*cert.MaturityDate) {
+			if s.afterMaturity(nextPaymentDate, cert.MaturityDate) {
 				_ = s.repository.UpdateStatus(ctx, cert.Id, userId, certificate.StatusMatured)
 				break
 			}
@@ -548,10 +583,15 @@ func (s *CertificateService) CalculateNextPaymentDate(cert *certificate.Certific
 	return &nextDate
 }
 
+// calculateNextPaymentDate returns the first cut day after from's calendar
+// day (from's month if its day is before the cut day, else the next month),
+// clamped to the month's last day, at 12:00 UTC: the payment and its interest
+// transaction land on the cut day in the app time zone (at 00:00 UTC they
+// were the previous local evening).
 func (s *CertificateService) calculateNextPaymentDate(from time.Time, cutDay int) time.Time {
-	year, month, _ := from.Date()
+	year, month, fromDay := s.calendarDay(from).Date()
 
-	if from.Day() >= cutDay {
+	if fromDay >= cutDay {
 		month++
 		if month > 12 {
 			month = 1
@@ -559,13 +599,12 @@ func (s *CertificateService) calculateNextPaymentDate(from time.Time, cutDay int
 		}
 	}
 
-	daysInMonth := time.Date(year, month+1, 0, 0, 0, 0, 0, from.Location()).Day()
 	day := cutDay
-	if day > daysInMonth {
+	if daysInMonth := apptime.DaysIn(year, month); day > daysInMonth {
 		day = daysInMonth
 	}
 
-	return time.Date(year, month, day, 0, 0, 0, 0, from.Location())
+	return apptime.NoonUTC(year, month, day)
 }
 
 func (s *CertificateService) GetProjectedPayment(cert *certificate.Certificate, capital money.Amount, calculator *PaymentCalculator) *dto.ProjectedPaymentResponse {

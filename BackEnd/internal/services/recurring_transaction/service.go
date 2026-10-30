@@ -11,6 +11,7 @@ import (
 	"github.com/segmentio/ksuid"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/recurring_transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
@@ -18,7 +19,7 @@ import (
 )
 
 // DefaultTimezone is used when no location is configured.
-const DefaultTimezone = "America/Santo_Domingo"
+const DefaultTimezone = apptime.DefaultTimezone
 
 // maxOccurrencesPerRun bounds a single processing run as a safety net.
 const maxOccurrencesPerRun = 10000
@@ -72,14 +73,7 @@ func NewRecurringTransactionService(repo *recurringRepo.RecurringTransactionRepo
 	for _, opt := range opts {
 		opt(s)
 	}
-	if s.loc == nil {
-		loc, err := time.LoadLocation(DefaultTimezone)
-		if err != nil {
-			log.Warn().Err(err).Str("timezone", DefaultTimezone).Msg("failed to load default time zone, falling back to UTC")
-			loc = time.UTC
-		}
-		s.loc = loc
-	}
+	s.loc = apptime.OrDefault(s.loc)
 	return s
 }
 

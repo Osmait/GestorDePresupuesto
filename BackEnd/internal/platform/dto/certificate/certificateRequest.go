@@ -6,6 +6,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 )
 
 type CreateCertificateRequest struct {
@@ -50,6 +51,8 @@ func (r *CreateCertificateRequest) GetMaturityDate() *time.Time {
 	if err != nil {
 		return nil
 	}
+	// a calendar day at 12:00 UTC (the same day in the app time zone)
+	t = apptime.NoonUTC(t.Date())
 	return &t
 }
 

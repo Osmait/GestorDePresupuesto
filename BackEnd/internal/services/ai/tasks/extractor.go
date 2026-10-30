@@ -10,6 +10,7 @@ import (
 
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	"github.com/segmentio/ksuid"
 )
 
@@ -118,6 +119,11 @@ func (e *TransactionExtractor) ParseResponse(rawJSON string) (interface{}, error
 
 		if txn.CreatedAt.IsZero() {
 			txn.CreatedAt = time.Now()
+		} else {
+			// A statement line without a time comes back as midnight UTC,
+			// the previous evening in Santo Domingo: keep its calendar day
+			// (12:00 UTC is that day in UTC and in the app time zone).
+			txn.CreatedAt = apptime.NormalizeMidnightUTC(txn.CreatedAt)
 		}
 
 		txn.TypeTransation = strings.ToLower(txn.TypeTransation)

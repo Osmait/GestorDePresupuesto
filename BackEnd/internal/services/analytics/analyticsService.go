@@ -12,6 +12,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
 	certificateDomain "github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
 	postgres "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/analytics"
 	certificateRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/certificate"
@@ -24,13 +25,31 @@ func NewAnalyticsService(
 	investmentRepository investmentRepo.InvestmentRepoInterface,
 	certificateRepository certificateRepo.CertificateRepositoryInterface,
 	usdToDopRateFn func(context.Context) (money.Amount, error),
+	opts ...Option,
 ) *AnalyticsService {
-	return &AnalyticsService{
+	s := &AnalyticsService{
 		repo:                  repo,
 		accountRepository:     accountRepository,
 		investmentRepository:  investmentRepository,
 		certificateRepository: certificateRepository,
 		usdToDopRateFn:        usdToDopRateFn,
+	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// Option configures an AnalyticsService.
+type Option func(*AnalyticsService)
+
+// WithLocation sets the app time zone that the calendar days of dashboard
+// ranges are cut in (default apptime.Default()).
+func WithLocation(loc *time.Location) Option {
+	return func(s *AnalyticsService) {
+		if loc != nil {
+			s.loc = loc
+		}
 	}
 }
 
@@ -40,14 +59,15 @@ type AnalyticsService struct {
 	investmentRepository  investmentRepo.InvestmentRepoInterface
 	certificateRepository certificateRepo.CertificateRepositoryInterface
 	usdToDopRateFn        func(context.Context) (money.Amount, error)
+	loc                   *time.Location
 }
 
 // DashboardFilters selects the transactions aggregated by GetDashboardSummary.
 //
 // DateFrom and DateTo are the first and the last calendar day of the range,
 // both inclusive: only their year, month and day (in their own location) are
-// used. When either is zero the range is the current year to date in Santo
-// Domingo. See dashboardDateRange for the instants they select.
+// used. When either is zero the range is the current year to date in the app
+// time zone. See dashboardDateRange for the instants they select.
 type DashboardFilters struct {
 	DateFrom        time.Time
 	DateTo          time.Time
@@ -130,7 +150,7 @@ func (s *AnalyticsService) GetMonthlySummary(ctx context.Context, userID string)
 }
 
 func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID string, filters DashboardFilters) (*analytics.DashboardSummary, error) {
-	dateFrom, dateToExclusive := dashboardDateRange(filters.DateFrom, filters.DateTo, time.Now())
+	dateFrom, dateToExclusive := dashboardDateRange(filters.DateFrom, filters.DateTo, time.Now(), apptime.OrDefault(s.loc))
 	transactionType := normalizeTransactionType(filters.TransactionType)
 
 	usdToDop := s.resolveUsdToDop(ctx)
@@ -291,19 +311,20 @@ func (s *AnalyticsService) cardDebtDOP(ctx context.Context, cardId, userID strin
 }
 
 // dashboardDateRange returns the half-open range of instants [from, to) of
-// the inclusive calendar days [dateFrom, dateTo]: from 00:00 UTC of the first
-// day to 00:00 UTC of the day after the last one, so the whole last day is
-// included. Days are UTC days like in the transaction list (TransactionFilter
-// parses date_from/date_to as UTC dates) and like the months of the monthly
-// rollup, so the same period gives the same totals on both screens and a
-// range of whole months is served from the rollup. A reversed range is
-// swapped; a zero bound selects the current year to date in Santo Domingo.
-func dashboardDateRange(dateFrom, dateTo, now time.Time) (time.Time, time.Time) {
+// the inclusive calendar days [dateFrom, dateTo] in loc (the app time zone):
+// from 00:00 local of the first day to 00:00 local of the day after the last
+// one, so the whole last day is included. These are the same local days as
+// the transaction list (TransactionFilter cuts date_from/date_to in the app
+// time zone) and the same months as the monthly rollup (bucketed by
+// app_timezone(), migration 000062), so the same period gives the same totals
+// on every screen and a range of whole months is served from the rollup. A
+// reversed range is swapped; a zero bound selects the current year to date.
+func dashboardDateRange(dateFrom, dateTo, now time.Time, loc *time.Location) (time.Time, time.Time) {
 	if dateFrom.IsZero() || dateTo.IsZero() {
-		dateFrom, dateTo = currentYearToDateInSantoDomingo(now)
+		dateFrom, dateTo = apptime.StartOfYear(now, loc), now.In(loc)
 	}
 
-	from, to := utcDay(dateFrom), utcDay(dateTo)
+	from, to := localDay(dateFrom, loc), localDay(dateTo, loc)
 	if to.Before(from) {
 		from, to = to, from
 	}
@@ -311,10 +332,11 @@ func dashboardDateRange(dateFrom, dateTo, now time.Time) (time.Time, time.Time) 
 	return from, to.AddDate(0, 0, 1)
 }
 
-// utcDay returns 00:00 UTC of t's calendar day (in t's location).
-func utcDay(t time.Time) time.Time {
+// localDay returns 00:00 in loc of t's calendar day (year, month and day of t
+// in its own location).
+func localDay(t time.Time, loc *time.Location) time.Time {
 	year, month, day := t.Date()
-	return time.Date(year, month, day, 0, 0, 0, 0, time.UTC)
+	return apptime.Date(year, month, day, loc)
 }
 
 func normalizeTransactionType(transactionType string) string {
@@ -323,15 +345,4 @@ func normalizeTransactionType(transactionType string) string {
 		return normalized
 	}
 	return ""
-}
-
-// currentYearToDateInSantoDomingo returns January 1st and today of the
-// current year in Santo Domingo (in now's location if it cannot be loaded).
-func currentYearToDateInSantoDomingo(now time.Time) (time.Time, time.Time) {
-	if loc, err := time.LoadLocation("America/Santo_Domingo"); err == nil {
-		now = now.In(loc)
-	}
-
-	start := time.Date(now.Year(), time.January, 1, 0, 0, 0, 0, now.Location())
-	return start, now
 }

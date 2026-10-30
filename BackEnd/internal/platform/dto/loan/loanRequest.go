@@ -7,6 +7,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 )
 
 type CreateLoanRequest struct {
@@ -49,15 +50,19 @@ func (r *CreateLoanRequest) Validate() error {
 	return nil
 }
 
-func (r *CreateLoanRequest) ParsedStartDate() time.Time {
-	if r.StartDate == "" {
-		return time.Now()
+// ParsedStartDate returns the loan's start date as a calendar day at 12:00
+// UTC (the same day in UTC and in the app time zone, see apptime): the given
+// YYYY-MM-DD, or today in loc (at now) when it is empty or invalid.
+// loans.start_date is a DATE and the disbursement transaction is dated with
+// it, so 00:00 UTC (the previous evening in Santo Domingo) would put the
+// disbursement on the previous local day.
+func (r *CreateLoanRequest) ParsedStartDate(now time.Time, loc *time.Location) time.Time {
+	if r.StartDate != "" {
+		if y, m, d, err := apptime.ParseCalendarDate(r.StartDate); err == nil {
+			return apptime.NoonUTC(y, m, d)
+		}
 	}
-	parsed, err := time.Parse("2006-01-02", r.StartDate)
-	if err != nil {
-		return time.Now()
-	}
-	return parsed
+	return apptime.TodayNoonUTC(now, loc)
 }
 
 type UpdateLoanStatusRequest struct {
@@ -85,13 +90,15 @@ func (r *RegisterLoanPaymentRequest) Validate() error {
 	return nil
 }
 
-func (r *RegisterLoanPaymentRequest) ParsedPaymentDate() time.Time {
-	if r.PaymentDate == "" {
-		return time.Now()
+// ParsedPaymentDate returns the payment date: the given YYYY-MM-DD as that
+// calendar day at 12:00 UTC (the same day in UTC and in the app time zone; at
+// 00:00 UTC the collection transaction would land on the previous local
+// day), or now when it is empty or invalid.
+func (r *RegisterLoanPaymentRequest) ParsedPaymentDate(now time.Time) time.Time {
+	if r.PaymentDate != "" {
+		if y, m, d, err := apptime.ParseCalendarDate(r.PaymentDate); err == nil {
+			return apptime.NoonUTC(y, m, d)
+		}
 	}
-	parsed, err := time.Parse("2006-01-02", r.PaymentDate)
-	if err != nil {
-		return time.Now()
-	}
-	return parsed
+	return now
 }

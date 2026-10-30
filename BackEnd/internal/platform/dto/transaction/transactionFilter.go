@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 )
 
 // TransactionFilter represents the filtering and pagination parameters for transaction queries
@@ -46,7 +47,9 @@ type TransactionFilter struct {
 	// Search filter
 	Search string `json:"search" example:"grocery"`
 
-	// Internal fields for calculated values
+	// Internal fields for calculated values: the half-open range of instants
+	// [CalculatedDateFrom, CalculatedDateTo). CalculatedDateTo is exclusive
+	// (e.g. 00:00 local of the day after date_to). Zero = unbounded.
 	CalculatedDateFrom time.Time `json:"-"`
 	CalculatedDateTo   time.Time `json:"-"`
 }
@@ -74,8 +77,10 @@ func NewTransactionFilter() *TransactionFilter {
 	}
 }
 
-// ParseFromQuery parses query parameters from gin.Context and populates the TransactionFilter
-func (f *TransactionFilter) ParseFromQuery(ctx *gin.Context) error {
+// ParseFromQuery parses query parameters from gin.Context and populates the
+// TransactionFilter. loc is the app time zone that days and months are cut in
+// (nil = apptime.Default()).
+func (f *TransactionFilter) ParseFromQuery(ctx *gin.Context, loc *time.Location) error {
 	// Parse pagination parameters
 	if pageStr := ctx.Query("page"); pageStr != "" {
 		if page, err := strconv.Atoi(pageStr); err == nil && page > 0 {
@@ -158,69 +163,42 @@ func (f *TransactionFilter) ParseFromQuery(ctx *gin.Context) error {
 	f.Search = strings.TrimSpace(ctx.Query("search"))
 
 	// Process date calculations
-	if err := f.calculateDates(); err != nil {
+	if err := f.calculateDates(time.Now(), loc); err != nil {
 		return err
 	}
 
 	return nil
 }
 
-// calculateDates calculates the actual date range based on the provided parameters
-func (f *TransactionFilter) calculateDates() error {
-	now := time.Now()
+// calculateDates calculates the range of instants [CalculatedDateFrom,
+// CalculatedDateTo) from the period or the explicit dates. Days, weeks and
+// months are calendar ones in loc (the app time zone): date_from / date_to
+// are local calendar days, so date_to=2026-10-31 includes Oct 31 up to 23:59
+// local (Nov 1 03:59 UTC). Full RFC3339 values keep their exact instant.
+func (f *TransactionFilter) calculateDates(now time.Time, loc *time.Location) error {
+	loc = apptime.OrDefault(loc)
 
-	// If period is specified, calculate dates based on period
 	if f.Period != "" {
-		switch f.Period {
-		case "today":
-			f.CalculatedDateFrom = time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-			f.CalculatedDateTo = time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, now.Location())
-		case "this_week":
-			weekday := int(now.Weekday())
-			if weekday == 0 { // Sunday
-				weekday = 7
-			}
-			f.CalculatedDateFrom = now.AddDate(0, 0, -(weekday - 1)).Truncate(24 * time.Hour)
-			f.CalculatedDateTo = f.CalculatedDateFrom.AddDate(0, 0, 6).Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-		case "this_month":
-			f.CalculatedDateFrom = time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-			f.CalculatedDateTo = f.CalculatedDateFrom.AddDate(0, 1, 0).Add(-time.Nanosecond)
-		case "this_year":
-			f.CalculatedDateFrom = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
-			f.CalculatedDateTo = time.Date(now.Year()+1, 1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
-		case "last_week":
-			weekday := int(now.Weekday())
-			if weekday == 0 { // Sunday
-				weekday = 7
-			}
-			f.CalculatedDateFrom = now.AddDate(0, 0, -(weekday + 6)).Truncate(24 * time.Hour)
-			f.CalculatedDateTo = f.CalculatedDateFrom.AddDate(0, 0, 6).Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-		case "last_month":
-			lastMonth := now.AddDate(0, -1, 0)
-			f.CalculatedDateFrom = time.Date(lastMonth.Year(), lastMonth.Month(), 1, 0, 0, 0, 0, now.Location())
-			f.CalculatedDateTo = time.Date(lastMonth.Year(), lastMonth.Month()+1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
-		case "last_year":
-			f.CalculatedDateFrom = time.Date(now.Year()-1, 1, 1, 0, 0, 0, 0, now.Location())
-			f.CalculatedDateTo = time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
-		default:
+		r, ok := apptime.Period(f.Period, now, loc)
+		if !ok {
 			return fmt.Errorf("invalid period: %s", f.Period)
 		}
+		f.CalculatedDateFrom, f.CalculatedDateTo = r.From, r.To
 	} else {
-		// Parse explicit date strings
 		if f.DateFrom != "" {
-			if dateFrom, err := parseDate(f.DateFrom); err == nil {
-				f.CalculatedDateFrom = dateFrom
-			} else {
+			dateFrom, err := apptime.ParseRangeFrom(f.DateFrom, loc)
+			if err != nil {
 				return fmt.Errorf("invalid date_from format: %s", f.DateFrom)
 			}
+			f.CalculatedDateFrom = dateFrom
 		}
 
 		if f.DateTo != "" {
-			if dateTo, err := parseDate(f.DateTo); err == nil {
-				f.CalculatedDateTo = dateTo.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-			} else {
+			dateTo, err := apptime.ParseRangeTo(f.DateTo, loc)
+			if err != nil {
 				return fmt.Errorf("invalid date_to format: %s", f.DateTo)
 			}
+			f.CalculatedDateTo = dateTo
 		}
 	}
 
@@ -235,24 +213,6 @@ func (f *TransactionFilter) calculateDates() error {
 	}
 
 	return nil
-}
-
-// parseDate parses date string in YYYY/MM/DD format
-func parseDate(dateStr string) (time.Time, error) {
-	layouts := []string{
-		"2006/01/02",
-		"2006-01-02",
-		"02/01/2006",
-		"02-01-2006",
-	}
-
-	for _, layout := range layouts {
-		if t, err := time.Parse(layout, dateStr); err == nil {
-			return t, nil
-		}
-	}
-
-	return time.Time{}, fmt.Errorf("unable to parse date: %s", dateStr)
 }
 
 // Validate validates the filter parameters
