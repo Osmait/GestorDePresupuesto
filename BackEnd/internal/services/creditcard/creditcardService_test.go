@@ -111,6 +111,7 @@ type mockAccountRepo struct {
 	// the account holds plenty of money (1,000,000).
 	movements   *money.Amount
 	lockedForID []string
+	renamedTo   []string
 }
 
 func (m *mockAccountRepo) FindByIdAndUserIdForUpdate(ctx context.Context, id string, userId string) (*account.Account, error) {
@@ -132,6 +133,10 @@ func (m *mockAccountRepo) FindByIdAndUserId(_ context.Context, _ string, _ strin
 	return m.account, nil
 }
 func (m *mockAccountRepo) Delete(context.Context, string, string) error { return nil }
+func (m *mockAccountRepo) Update(_ context.Context, _ string, name string, bank string, _ string) error {
+	m.renamedTo = append(m.renamedTo, name+"|"+bank)
+	return nil
+}
 func (m *mockAccountRepo) BalanceByCurrency(context.Context, string, string, string) (money.Amount, error) {
 	return money.Zero, nil
 }
@@ -412,5 +417,26 @@ func TestConvertPaymentAmount_RejectsZeroDebit(t *testing.T) {
 	got, err := convertPaymentAmount(money.FromInt(100), "USD", "DOP", money.FromInt(60))
 	if err != nil || !got.Equal(money.FromInt(6000)) {
 		t.Fatalf("expected 6000 DOP, got %v %v", got, err)
+	}
+}
+
+// Renaming a card used to change only the in-memory account: the name lives on
+// the card's account row, which was never saved.
+func TestUpdateCreditCard_SavesTheAccountName(t *testing.T) {
+	t.Parallel()
+	cardRepo, accountRepo, _, service := newOverdraftFixture("1000", "0")
+	accountRepo.account.Name = "Visa"
+	accountRepo.account.Bank = "BHD"
+	name := "Visa Oro"
+
+	_, err := service.UpdateCreditCard(context.Background(), "card-1", &dto.UpdateCreditCardRequest{Name: &name}, "user-1")
+	if err != nil {
+		t.Fatalf("UpdateCreditCard: %v", err)
+	}
+	if len(accountRepo.renamedTo) != 1 || accountRepo.renamedTo[0] != "Visa Oro|BHD" {
+		t.Fatalf("account update = %v, want [Visa Oro|BHD]", accountRepo.renamedTo)
+	}
+	if cardRepo.card.Bank != "BHD" {
+		t.Fatalf("card bank = %q, want BHD", cardRepo.card.Bank)
 	}
 }
