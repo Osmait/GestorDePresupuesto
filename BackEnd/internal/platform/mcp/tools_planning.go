@@ -84,7 +84,7 @@ func (s *MCPServer) registerPlanningTools() {
 	)
 	s.addTool(
 		mcp.NewTool("get_net_worth",
-			mcp.WithDescription("Net worth in DOP: bank accounts + investments + certificates - credit card debt (USD converted at the current rate)"),
+			mcp.WithDescription("Net worth in DOP: bank accounts + investments (each in its own currency) + broker cash + active certificates + outstanding principal of active loans - credit card debt (USD converted at the current rate; defaulted loans reported, not added)"),
 		),
 		s.handleGetNetWorth,
 	)
@@ -313,14 +313,19 @@ func (s *MCPServer) handleGetMonthlyPlan(ctx context.Context, _ mcp.CallToolRequ
 	})
 }
 
-// netWorth is the dashboard's net worth, in DOP.
+// netWorth is the dashboard's net worth, in DOP: accounts + investments +
+// broker cash + certificates + loans receivable - credit card debt (see
+// analytics.DashboardSummary). Defaulted loans are reported, not added.
 type netWorth struct {
-	NetWorth          money.Amount `json:"net_worth"`
-	AccountsTotal     money.Amount `json:"accounts_total"`
-	InvestmentsTotal  money.Amount `json:"investments_total"`
-	CertificatesTotal money.Amount `json:"certificates_total"`
-	CreditCardDebt    money.Amount `json:"credit_card_debt"`
-	UsdToDopRate      money.Amount `json:"usd_to_dop_rate"`
+	NetWorth             money.Amount `json:"net_worth"`
+	AccountsTotal        money.Amount `json:"accounts_total"`
+	InvestmentsTotal     money.Amount `json:"investments_total"`
+	BrokerCashTotal      money.Amount `json:"broker_cash_total"`
+	CertificatesTotal    money.Amount `json:"certificates_total"`
+	LoansReceivableTotal money.Amount `json:"loans_receivable_total"`
+	LoansDefaultedTotal  money.Amount `json:"loans_defaulted_total"`
+	CreditCardDebt       money.Amount `json:"credit_card_debt"`
+	UsdToDopRate         money.Amount `json:"usd_to_dop_rate"`
 }
 
 func (s *MCPServer) handleGetNetWorth(ctx context.Context, _ mcp.CallToolRequest) (*mcp.CallToolResult, error) {
@@ -335,13 +340,15 @@ func (s *MCPServer) handleGetNetWorth(ctx context.Context, _ mcp.CallToolRequest
 			return nil, err
 		}
 		return netWorth{
-			NetWorth: summary.AccountsTotal.Add(summary.InvestmentsTotal).Add(summary.CertificatesTotal).
-				Sub(summary.CreditCardDebt).RoundCents(),
-			AccountsTotal:     summary.AccountsTotal,
-			InvestmentsTotal:  summary.InvestmentsTotal,
-			CertificatesTotal: summary.CertificatesTotal,
-			CreditCardDebt:    summary.CreditCardDebt,
-			UsdToDopRate:      summary.UsdToDopRate,
+			NetWorth:             summary.NetWorth,
+			AccountsTotal:        summary.AccountsTotal,
+			InvestmentsTotal:     summary.InvestmentsTotal,
+			BrokerCashTotal:      summary.BrokerCashTotal,
+			CertificatesTotal:    summary.CertificatesTotal,
+			LoansReceivableTotal: summary.LoansReceivableTotal,
+			LoansDefaultedTotal:  summary.LoansDefaultedTotal,
+			CreditCardDebt:       summary.CreditCardDebt,
+			UsdToDopRate:         summary.UsdToDopRate,
 		}, nil
 	})
 }

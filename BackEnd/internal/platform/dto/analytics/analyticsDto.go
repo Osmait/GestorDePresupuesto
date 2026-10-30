@@ -50,20 +50,26 @@ func NewGetMonthlySummaryResponse(monthlySummaries []*analytics.MonthlySummary) 
 }
 
 type DashboardSummaryResponse struct {
-	TotalIncome       money.Amount                  `json:"total_income"`
-	TotalExpenses     money.Amount                  `json:"total_expenses"`
-	NetAmount         money.Amount                  `json:"net_amount"`
-	UsdToDopRate      money.Amount                  `json:"usd_to_dop_rate"`
-	AccountsTotal     money.Amount                  `json:"accounts_total"`
-	InvestmentsTotal  money.Amount                  `json:"investments_total"`
-	CertificatesTotal money.Amount                  `json:"certificates_total"`
-	CreditCardDebt    money.Amount                  `json:"credit_card_debt"`
-	CreditCardsCount  int                           `json:"credit_cards_count"`
-	AccountsCount     int                           `json:"accounts_count"`
-	InvestmentsCount  int                           `json:"investments_count"`
-	CertificatesCount int                           `json:"certificates_count"`
-	CategoryExpenses  []GetCategoryExpensesResponse `json:"category_expenses"`
-	MonthlySummary    []GetMonthlySummaryResponse   `json:"monthly_summary"`
+	TotalIncome       money.Amount `json:"total_income"`
+	TotalExpenses     money.Amount `json:"total_expenses"`
+	NetAmount         money.Amount `json:"net_amount"`
+	UsdToDopRate      money.Amount `json:"usd_to_dop_rate"`
+	AccountsTotal     money.Amount `json:"accounts_total"`
+	InvestmentsTotal  money.Amount `json:"investments_total"`
+	CertificatesTotal money.Amount `json:"certificates_total"`
+	CreditCardDebt    money.Amount `json:"credit_card_debt"`
+	// Added net worth components (all DOP); the fields above keep their names.
+	BrokerCashTotal      money.Amount                  `json:"broker_cash_total"`
+	LoansReceivableTotal money.Amount                  `json:"loans_receivable_total"`
+	LoansDefaultedTotal  money.Amount                  `json:"loans_defaulted_total"`
+	NetWorth             money.Amount                  `json:"net_worth"`
+	CreditCardsCount     int                           `json:"credit_cards_count"`
+	AccountsCount        int                           `json:"accounts_count"`
+	InvestmentsCount     int                           `json:"investments_count"`
+	CertificatesCount    int                           `json:"certificates_count"`
+	LoansReceivableCount int                           `json:"loans_receivable_count"`
+	CategoryExpenses     []GetCategoryExpensesResponse `json:"category_expenses"`
+	MonthlySummary       []GetMonthlySummaryResponse   `json:"monthly_summary"`
 }
 
 func NewDashboardSummaryResponse(summary *analytics.DashboardSummary) DashboardSummaryResponse {
@@ -75,19 +81,24 @@ func NewDashboardSummaryResponse(summary *analytics.DashboardSummary) DashboardS
 	}
 
 	return DashboardSummaryResponse{
-		TotalIncome:       summary.TotalIncome,
-		TotalExpenses:     summary.TotalExpenses,
-		NetAmount:         summary.NetAmount,
-		UsdToDopRate:      summary.UsdToDopRate,
-		AccountsTotal:     summary.AccountsTotal,
-		InvestmentsTotal:  summary.InvestmentsTotal,
-		CertificatesTotal: summary.CertificatesTotal,
-		CreditCardDebt:    summary.CreditCardDebt,
-		CreditCardsCount:  summary.CreditCardsCount,
-		AccountsCount:     summary.AccountsCount,
-		InvestmentsCount:  summary.InvestmentsCount,
-		CertificatesCount: summary.CertificatesCount,
-		CategoryExpenses:  NewGetCategoryExpensesResponse(summary.CategoryExpenses),
-		MonthlySummary:    NewGetMonthlySummaryResponse(summary.MonthlySummary),
+		TotalIncome:          summary.TotalIncome,
+		TotalExpenses:        summary.TotalExpenses,
+		NetAmount:            summary.NetAmount,
+		UsdToDopRate:         summary.UsdToDopRate,
+		AccountsTotal:        summary.AccountsTotal,
+		InvestmentsTotal:     summary.InvestmentsTotal,
+		CertificatesTotal:    summary.CertificatesTotal,
+		CreditCardDebt:       summary.CreditCardDebt,
+		BrokerCashTotal:      summary.BrokerCashTotal,
+		LoansReceivableTotal: summary.LoansReceivableTotal,
+		LoansDefaultedTotal:  summary.LoansDefaultedTotal,
+		NetWorth:             summary.NetWorth,
+		LoansReceivableCount: summary.LoansReceivableCount,
+		CreditCardsCount:     summary.CreditCardsCount,
+		AccountsCount:        summary.AccountsCount,
+		InvestmentsCount:     summary.InvestmentsCount,
+		CertificatesCount:    summary.CertificatesCount,
+		CategoryExpenses:     NewGetCategoryExpensesResponse(summary.CategoryExpenses),
+		MonthlySummary:       NewGetMonthlySummaryResponse(summary.MonthlySummary),
 	}
 }
