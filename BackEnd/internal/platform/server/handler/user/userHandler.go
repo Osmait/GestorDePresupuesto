@@ -157,7 +157,7 @@ func CreateUserByAdmin(userService *user.UserService) gin.HandlerFunc {
 			return
 		}
 
-		if err := userService.CreateUser(c.Request.Context(), &userReq); err != nil {
+		if err := userService.CreateUserWithRole(c.Request.Context(), &userReq, userReq.Role); err != nil {
 			_ = c.Error(err)
 			return
 		}

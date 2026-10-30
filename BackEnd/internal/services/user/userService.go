@@ -30,8 +30,23 @@ func NewUserService(userRepo userRepo.UserRepositoryInterface) *UserService {
 	}
 }
 
-// CreateUser registers a new user in the system after validating the request and hashing the password.
+// CreateUser registers a new user (public self-registration). The account is
+// always a USER: userRequest.Role is ignored, otherwise anyone could sign up
+// as ADMIN through the public POST /user.
 func (u *UserService) CreateUser(ctx context.Context, userRequest *dto.UserRequest) error {
+	return u.createUser(ctx, userRequest, "")
+}
+
+// CreateUserWithRole creates a user with the given role (USER or ADMIN). Only
+// for the admin-only POST /users; an empty role means USER.
+func (u *UserService) CreateUserWithRole(ctx context.Context, userRequest *dto.UserRequest, role string) error {
+	if role != "" && role != "USER" && role != "ADMIN" {
+		return apperrors.NewValidationError("INVALID_ROLE", "role must be USER or ADMIN")
+	}
+	return u.createUser(ctx, userRequest, role)
+}
+
+func (u *UserService) createUser(ctx context.Context, userRequest *dto.UserRequest, role string) error {
 	// Use safe call to prevent panics
 	return apperrors.SafeCall(ctx, "CreateUser", func() error {
 		// Check for duplicate user with wrapped error handling
@@ -64,9 +79,9 @@ func (u *UserService) CreateUser(ctx context.Context, userRequest *dto.UserReque
 		// Create user domain object
 		userToSave := user.NewUser(id.String(), userRequest.Name, userRequest.LastName, userRequest.Email, hashPassword)
 
-		// Set role if provided (for admin-created users)
-		if userRequest.Role != "" {
-			userToSave.Role = userRequest.Role
+		// Only an admin-created user gets a role other than the default USER.
+		if role != "" {
+			userToSave.Role = role
 		}
 
 		// Save user with wrapped error handling
