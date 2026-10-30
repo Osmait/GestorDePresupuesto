@@ -14,6 +14,28 @@ const withBundleAnalyzer =
     ? require('@next/bundle-analyzer')({ enabled: true, openAnalyzer: false })
     : (config) => config;
 
+/**
+ * Security headers for every response. The CSP only carries directives that
+ * cannot break the app: no script-src/style-src (Next.js inline scripts and
+ * styles would need nonces). The app is never framed and every form (incl. the
+ * next-auth sign-in/sign-out POSTs) targets its own origin. Passkeys need the
+ * WebAuthn features on this origin.
+ */
+const securityHeaders = [
+  { key: 'X-Frame-Options', value: 'DENY' },
+  {
+    key: 'Content-Security-Policy',
+    value: "frame-ancestors 'none'; base-uri 'self'; object-src 'none'; form-action 'self'",
+  },
+  { key: 'X-Content-Type-Options', value: 'nosniff' },
+  { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
+  {
+    key: 'Permissions-Policy',
+    value:
+      'camera=(), microphone=(), geolocation=(), payment=(), usb=(), publickey-credentials-get=(self), publickey-credentials-create=(self)',
+  },
+]
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   // The repo root has its own lockfile (commit tooling); pin the app root so
@@ -30,6 +52,9 @@ const nextConfig = {
     staleTimes: {
       dynamic: 30,
     },
+  },
+  async headers() {
+    return [{ source: '/:path*', headers: securityHeaders }]
   },
 }
 
