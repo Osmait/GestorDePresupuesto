@@ -1,6 +1,7 @@
 'use client'
 
 import {
+	AlertTriangle,
 	Ban,
 	Calculator,
 	Calendar,
@@ -140,6 +141,13 @@ export function CertificateCard({ certificate, onEdit, onDelete, onViewHistory, 
 						</div>
 					))}
 				</dl>
+
+				{certificate.payout_error ? (
+					<p role='status' className='flex items-start gap-2 rounded-md bg-warning/10 p-3 text-xs text-warning'>
+						<AlertTriangle className='mt-0.5 h-4 w-4 shrink-0' aria-hidden='true' />
+						<span>{t('payoutPending', { reason: certificate.payout_error })}</span>
+					</p>
+				) : null}
 
 				{certificate.projected_payment && certificate.status === 'active' && (
 					<div className='rounded-md bg-muted/50 p-3'>

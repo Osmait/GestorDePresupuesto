@@ -45,6 +45,50 @@ describe('PatrimonyTab', () => {
 		expect(screen.getByText('100%')).toBeInTheDocument()
 	})
 
+	it('adds broker cash and loans receivable, and shows defaulted loans apart', () => {
+		renderWithIntl(
+			<PatrimonyTab
+				accountsTotal={90000}
+				investmentsTotal={0}
+				certificatesTotal={0}
+				brokerCashTotal={60000}
+				loansReceivableTotal={50000}
+				loansReceivableCount={1}
+				loansDefaultedTotal={15000}
+				accountsCount={1}
+				investmentsCount={0}
+				certificatesCount={0}
+				labels={{
+					...labels,
+					brokerCash: 'Broker cash',
+					loansReceivable: 'Loans receivable',
+					loansDefaulted: 'Defaulted',
+				}}
+			/>,
+		)
+		expect(screen.getAllByText('Broker cash').length).toBeGreaterThan(0)
+		expect(screen.getAllByText('Loans receivable').length).toBeGreaterThan(0)
+		expect(screen.getByText(/Defaulted/)).toBeInTheDocument()
+		// 90,000 + 60,000 + 50,000; the defaulted 15,000 is not added
+		expect(screen.getAllByText('RD$200,000.00').length).toBeGreaterThan(0)
+	})
+
+	it('uses the net worth from the API when given', () => {
+		renderWithIntl(
+			<PatrimonyTab
+				accountsTotal={1000}
+				investmentsTotal={0}
+				certificatesTotal={0}
+				netWorth={1234.5}
+				accountsCount={1}
+				investmentsCount={0}
+				certificatesCount={0}
+				labels={labels}
+			/>,
+		)
+		expect(screen.getByText('RD$1,234.50')).toBeInTheDocument()
+	})
+
 	it('has no debt card without credit cards', () => {
 		renderWithIntl(
 			<PatrimonyTab

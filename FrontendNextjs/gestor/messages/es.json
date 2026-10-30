@@ -270,6 +270,9 @@
     "accountsBalance": "Saldo de Cuentas",
     "investmentsValue": "Valor Inversiones",
     "certificatesValue": "Valor Certificados",
+    "brokerCash": "Efectivo en bróker",
+    "loansReceivable": "Préstamos por cobrar",
+    "loansDefaulted": "En mora (no incluido)",
     "totalPatrimony": "Patrimonio Total",
     "activeItems": "activos",
     "exchangeRate": "Tasa de cambio (1 US$)",
@@ -519,7 +522,10 @@
       "destinationAccountRequired": "Elige la cuenta que recibe el pago",
       "paymentDateRequired": "Elige la fecha del pago"
     },
-    "cancelLoanAction": "Cancelar préstamo"
+    "cancelLoanAction": "Cancelar préstamo",
+    "pendingByCurrency": "Incluye {amounts} a la tasa {rate}",
+    "defaultedPending": "En mora: {amount} (no incluido)",
+    "summaryInDop": "Totales en RD$; los préstamos en US$ se convierten a la tasa del día"
   },
   "categories": {
     "title": "Categorías",
@@ -824,7 +830,9 @@
     "trendMonthValue": "{month}: ingresos {income}, gastos {expenses}",
     "categoriesTitleCurrent": "En qué se fue este mes",
     "categoriesTitle": "En qué se fue el dinero",
-    "categoryShareLabel": "{category}: {amount}, {percent} del gasto"
+    "categoryShareLabel": "{category}: {amount}, {percent} del gasto",
+    "currencyLabel": "Moneda",
+    "balanceUnavailable": "Saldo en {currency} no disponible"
   },
   "settings": {
     "title": "Configuración",
@@ -1395,7 +1403,8 @@
       "capitalBase": "Capital base",
       "totalValueLegend": "Valor total (capital + intereses)",
       "ariaLabel": "Gráfico de líneas del valor proyectado del certificado en los próximos {months} meses"
-    }
+    },
+    "payoutPending": "Intereses pendientes de acreditar: {reason}"
   },
   "creditCards": {
     "title": "Tarjetas de crédito",
@@ -1408,7 +1417,8 @@
       "debtDop": "Deuda en DOP",
       "debtUsd": "Deuda en USD",
       "usdInDop": "≈ {amount} a {rate} DOP por USD",
-      "utilizationHint": "{status} · meta: menos de 30%"
+      "utilizationHint": "{status} · meta: menos de 30%",
+      "rateUnavailable": "Tasa no disponible: la deuda en US$ no está incluida"
     },
     "activeCards": "{count, plural, =1 {# tarjeta activa} other {# tarjetas activas}}",
     "creditHealth": "Salud crediticia",
@@ -1568,7 +1578,9 @@
       "totalProfit": "Ganancia/pérdida total",
       "totalProfitHint": "Realizada + no realizada",
       "roi": "ROI",
-      "roiHint": "Retorno sobre la inversión"
+      "roiHint": "Retorno sobre la inversión",
+      "convertedHint": "Posiciones en RD$ convertidas a la tasa {rate}",
+      "rateUnavailable": "Tasa no disponible: las posiciones en RD$ no están incluidas"
     },
     "dashboard": {
       "allocation": "Distribución de activos",
@@ -1612,11 +1624,13 @@
         "symbolRequired": "El símbolo es obligatorio",
         "currencyRequired": "La moneda es obligatoria",
         "minZero": "Debe ser mayor o igual a 0",
+        "greaterThanZero": "Debe ser mayor que 0",
         "quoteNotFound": "No se pudo obtener el precio de este símbolo",
         "quoteFailed": "Error al obtener el precio",
         "insufficientBalance": "Saldo insuficiente en el bróker ({currency}). Requerido: {required}, disponible: {available}",
         "saveFailed": "No se pudo guardar la inversión. Inténtalo de nuevo."
-      }
+      },
+      "currencyLocked": "La moneda no se puede cambiar: el costo se pagó con esa cartera"
     },
     "funding": {
       "title": "Fondear saldo del bróker",

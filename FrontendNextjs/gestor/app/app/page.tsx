@@ -224,8 +224,8 @@ export default async function DashboardPage({
 	const usdToDop = dashboardSummary?.usd_to_dop_rate ?? exchangeRate?.usd_to_dop ?? 60
 
 	const accountsTotal = dashboardSummary?.accounts_total || 0
+	// Each position is valued in its own currency by the API (DOP positions are not converted).
 	const investmentsTotalDOP = dashboardSummary?.investments_total || 0
-	const investmentsTotalUSD = usdToDop > 0 ? investmentsTotalDOP / usdToDop : 0
 	const certificatesTotal = dashboardSummary?.certificates_total || 0
 	const accountsCount = dashboardSummary?.accounts_count || 0
 	const investmentsCount = dashboardSummary?.investments_count || 0
@@ -447,8 +447,12 @@ export default async function DashboardPage({
 									<PatrimonyTab
 										accountsTotal={accountsTotal}
 										investmentsTotal={investmentsTotalDOP}
-										investmentsTotalUSD={investmentsTotalUSD}
 										certificatesTotal={certificatesTotal}
+										brokerCashTotal={dashboardSummary?.broker_cash_total ?? 0}
+										loansReceivableTotal={dashboardSummary?.loans_receivable_total ?? 0}
+										loansReceivableCount={dashboardSummary?.loans_receivable_count ?? 0}
+										loansDefaultedTotal={dashboardSummary?.loans_defaulted_total ?? 0}
+										netWorth={dashboardSummary?.net_worth}
 										creditCardDebt={dashboardSummary?.credit_card_debt ?? 0}
 										creditCardsCount={dashboardSummary?.credit_cards_count ?? 0}
 										accountsCount={accountsCount}
@@ -460,6 +464,9 @@ export default async function DashboardPage({
 											accounts: t('accountsBalance'),
 											investments: t('investmentsValue'),
 											certificates: t('certificatesValue'),
+											brokerCash: t('brokerCash'),
+											loansReceivable: t('loansReceivable'),
+											loansDefaulted: t('loansDefaulted'),
 											cardDebt: t('cardDebt'),
 											total: t('totalPatrimony'),
 											activeItems: t('activeItems'),

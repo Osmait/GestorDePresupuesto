@@ -270,6 +270,9 @@
     "accountsBalance": "Accounts Balance",
     "investmentsValue": "Investments Value",
     "certificatesValue": "Certificates Value",
+    "brokerCash": "Broker cash",
+    "loansReceivable": "Loans receivable",
+    "loansDefaulted": "Defaulted (not included)",
     "totalPatrimony": "Total Wealth",
     "activeItems": "active",
     "exchangeRate": "Exchange rate (1 US$)",
@@ -519,7 +522,10 @@
       "destinationAccountRequired": "Choose the account that receives the payment",
       "paymentDateRequired": "Choose the payment date"
     },
-    "cancelLoanAction": "Cancel loan"
+    "cancelLoanAction": "Cancel loan",
+    "pendingByCurrency": "Includes {amounts} at rate {rate}",
+    "defaultedPending": "Defaulted: {amount} (not included)",
+    "summaryInDop": "Totals in RD$; US$ loans converted at today's rate"
   },
   "categories": {
     "title": "Categories",
@@ -824,7 +830,9 @@
     "trendMonthValue": "{month}: income {income}, expenses {expenses}",
     "categoriesTitleCurrent": "Where this month's money went",
     "categoriesTitle": "Where the money went",
-    "categoryShareLabel": "{category}: {amount}, {percent} of spending"
+    "categoryShareLabel": "{category}: {amount}, {percent} of spending",
+    "currencyLabel": "Currency",
+    "balanceUnavailable": "{currency} balance unavailable"
   },
   "settings": {
     "title": "Settings",
@@ -1395,7 +1403,8 @@
       "capitalBase": "Base capital",
       "totalValueLegend": "Total value (capital + interest)",
       "ariaLabel": "Line chart of the certificate's projected value over the next {months} months"
-    }
+    },
+    "payoutPending": "Interest pending credit: {reason}"
   },
   "creditCards": {
     "title": "Credit Cards",
@@ -1408,7 +1417,8 @@
       "debtDop": "Debt in DOP",
       "debtUsd": "Debt in USD",
       "usdInDop": "≈ {amount} at {rate} DOP per USD",
-      "utilizationHint": "{status} · target below 30%"
+      "utilizationHint": "{status} · target below 30%",
+      "rateUnavailable": "Rate unavailable: US$ debt is not included"
     },
     "activeCards": "{count, plural, =1 {# active card} other {# active cards}}",
     "creditHealth": "Credit Health",
@@ -1568,7 +1578,9 @@
       "totalProfit": "Total Profit/Loss",
       "totalProfitHint": "Realized + unrealized",
       "roi": "ROI",
-      "roiHint": "Return on investment"
+      "roiHint": "Return on investment",
+      "convertedHint": "RD$ positions converted at rate {rate}",
+      "rateUnavailable": "Rate unavailable: RD$ positions are not included"
     },
     "dashboard": {
       "allocation": "Asset Allocation",
@@ -1612,11 +1624,13 @@
         "symbolRequired": "Symbol is required",
         "currencyRequired": "Currency is required",
         "minZero": "Must be greater than or equal to 0",
+        "greaterThanZero": "Must be greater than 0",
         "quoteNotFound": "Could not fetch price for this symbol",
         "quoteFailed": "Failed to fetch price",
         "insufficientBalance": "Insufficient broker balance in {currency}. Required: {required}, available: {available}",
         "saveFailed": "Failed to save investment. Please try again."
-      }
+      },
+      "currencyLocked": "The currency cannot be changed: the cost was paid from that wallet"
     },
     "funding": {
       "title": "Fund broker balance",

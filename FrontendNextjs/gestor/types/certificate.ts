@@ -21,6 +21,8 @@ export interface Certificate {
 	effective_capital: number
 	next_payment_date?: string
 	projected_payment?: ProjectedPayment
+	/** Why the interest due could not be credited to the payout account (payments stay pending); absent when fine. */
+	payout_error?: string
 }
 
 export interface ProjectedPayment {

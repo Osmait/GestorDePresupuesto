@@ -58,8 +58,20 @@ import {
 	RegisterLoanPaymentDTO,
 } from '@/types/loan'
 
-// The summary endpoint aggregates without a currency; amounts are reported in DOP.
+// The summary totals are in DOP: the API converts USD loans at usd_to_dop_rate.
 const SUMMARY_CURRENCY = 'DOP'
+
+/** The non-DOP part of a total (e.g. "US$1,000.00"), listed under the DOP figure. */
+function foreignParts(
+	summary: LoanSummary | null,
+	field: 'total_principal' | 'total_pending' | 'total_collected',
+	format: (value: number, currency: string) => string,
+): string {
+	return Object.entries(summary?.by_currency ?? {})
+		.filter(([currency, totals]) => currency !== SUMMARY_CURRENCY && totals[field] > 0)
+		.map(([currency, totals]) => format(totals[field], currency))
+		.join(' + ')
+}
 
 export default function LoansPage() {
 	const t = useTranslations('loans')
@@ -78,6 +90,19 @@ export default function LoansPage() {
 
 function LoansKpis({ summary, loading = false }: { summary: LoanSummary | null; loading?: boolean }) {
 	const t = useTranslations('loans')
+	const formatCurrency = useFormatCurrency()
+	const rate = summary?.usd_to_dop_rate ? summary.usd_to_dop_rate.toFixed(2) : ''
+	const converted = (field: 'total_principal' | 'total_pending' | 'total_collected') => {
+		const amounts = foreignParts(summary, field, formatCurrency)
+		return amounts ? t('pendingByCurrency', { amounts, rate }) : undefined
+	}
+	const defaulted = summary?.defaulted_pending ?? 0
+	const pendingHint = [
+		converted('total_pending'),
+		defaulted > 0 ? t('defaultedPending', { amount: formatCurrency(defaulted, SUMMARY_CURRENCY) }) : undefined,
+	]
+		.filter(Boolean)
+		.join(' · ')
 	return (
 		<StatGrid columns={4}>
 			<StatCard
@@ -85,19 +110,23 @@ function LoansKpis({ summary, loading = false }: { summary: LoanSummary | null; 
 				icon={Landmark}
 				loading={loading}
 				value={<Amount value={summary?.total_principal || 0} currency={SUMMARY_CURRENCY} />}
-				hint={t('activeLoansCount', { count: summary?.active_loans || 0 })}
+				hint={[t('activeLoansCount', { count: summary?.active_loans || 0 }), converted('total_principal')]
+					.filter(Boolean)
+					.join(' · ')}
 			/>
 			<StatCard
 				label={t('totalPending')}
 				icon={Wallet}
 				loading={loading}
 				value={<Amount value={summary?.total_pending || 0} currency={SUMMARY_CURRENCY} />}
+				hint={pendingHint || undefined}
 			/>
 			<StatCard
 				label={t('totalCollected')}
 				icon={Banknote}
 				loading={loading}
 				value={<Amount value={summary?.total_collected || 0} currency={SUMMARY_CURRENCY} />}
+				hint={converted('total_collected')}
 			/>
 			<StatCard
 				label={t('totalInterestEarned')}

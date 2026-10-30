@@ -3,6 +3,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 import React from 'react'
 import { vi } from 'vitest'
 import { BUDGET_KEYS, useBudgetTransactionCounts, useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
+import { getAppMonthRangeStrings } from '@/lib/app-time'
 
 // Mock the repository
 const mockFindAll = vi.fn()
@@ -74,15 +75,24 @@ describe('useBudgetsQuery', () => {
 	})
 
 	describe('useBudgetTransactionCounts', () => {
-		it('asks for one expense count per budget instead of every transaction', async () => {
-			mockCount.mockImplementation(async ({ budget_id }: { budget_id: string }) => (budget_id === 'b1' ? 3 : 7))
+		it("counts this month's expenses of each budget's category, once per category", async () => {
+			mockCount.mockImplementation(async ({ category_id }: { category_id: string }) => (category_id === 'food' ? 3 : 7))
+			const { from, to } = getAppMonthRangeStrings()
 
-			const { result } = renderHook(() => useBudgetTransactionCounts(['b2', 'b1']), { wrapper: createWrapper() })
+			const { result } = renderHook(
+				() =>
+					useBudgetTransactionCounts([
+						{ id: 'b2', category_id: 'fun' },
+						{ id: 'b1', category_id: 'food' },
+						{ id: 'b3', category_id: 'food' },
+					]),
+				{ wrapper: createWrapper() },
+			)
 
 			await waitFor(() => expect(result.current.isSuccess).toBe(true))
-			expect(result.current.data).toEqual({ b1: 3, b2: 7 })
+			expect(result.current.data).toEqual({ b1: 3, b2: 7, b3: 3 })
 			expect(mockCount).toHaveBeenCalledTimes(2)
-			expect(mockCount).toHaveBeenCalledWith({ budget_id: 'b1', type: 'bill' })
+			expect(mockCount).toHaveBeenCalledWith({ category_id: 'food', type: 'bill', date_from: from, date_to: to })
 		})
 
 		it('does nothing without budgets and lives under the budgets root key', () => {
