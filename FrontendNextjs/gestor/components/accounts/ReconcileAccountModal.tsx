@@ -7,11 +7,12 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 import { Amount } from '@/components/shared/Amount'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { useReconcileAccountMutation } from '@/hooks/queries/useAccountsQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyInputToNumber, moneyMessages, moneySchema } from '@/lib/money-input'
 import { DEFAULT_CURRENCY } from '@/lib/utils'
 import { Account } from '@/types/account'
 
@@ -30,6 +31,7 @@ const MATCH_EPSILON = 1e-6
  */
 export function ReconcileAccountModal({ open, setOpen, account }: ReconcileAccountModalProps) {
 	const t = useTranslations('accounts')
+	const tForms = useTranslations('forms')
 	const formatCurrency = useFormatCurrency()
 	const reconcile = useReconcileAccountMutation()
 	const [submitError, setSubmitError] = useState<string | null>(null)
@@ -40,19 +42,16 @@ export function ReconcileAccountModal({ open, setOpen, account }: ReconcileAccou
 	const schema = useMemo(
 		() =>
 			z.object({
-				bank_balance: z
-					.string()
-					.trim()
-					.min(1, t('reconcileBalanceRequired'))
-					.refine((v) => Number.isFinite(Number(v)), t('reconcileBalanceRequired'))
-					.refine((v) => hasAtMostDecimals(v), t('reconcileBalanceRequired')),
+				// A negative bank balance (overdraft) is valid.
+				bank_balance: moneySchema(moneyMessages(tForms, { required: t('reconcileBalanceRequired') })),
 				notes: z.string().trim().max(500),
 			}),
-		[t],
+		[t, tForms],
 	)
 	type ReconcileFormValues = z.infer<typeof schema>
+	type ReconcileFormInput = z.input<typeof schema>
 
-	const form = useForm<ReconcileFormValues>({
+	const form = useForm<ReconcileFormInput, unknown, ReconcileFormValues>({
 		resolver: zodResolver(schema),
 		defaultValues: { bank_balance: '', notes: '' },
 	})
@@ -63,7 +62,7 @@ export function ReconcileAccountModal({ open, setOpen, account }: ReconcileAccou
 	}, [open, form])
 
 	const typed = useWatch({ control: form.control, name: 'bank_balance' })
-	const typedNumber = typed?.trim() ? Number(typed) : Number.NaN
+	const typedNumber = moneyInputToNumber(typed)
 	const difference = Number.isFinite(typedNumber) ? typedNumber - appBalance : null
 	const matches = difference !== null && Math.abs(difference) < MATCH_EPSILON
 
@@ -78,7 +77,7 @@ export function ReconcileAccountModal({ open, setOpen, account }: ReconcileAccou
 		try {
 			const result = await reconcile.mutateAsync({
 				id: account.id,
-				bank_balance: Number(values.bank_balance),
+				bank_balance: values.bank_balance,
 				currency,
 				notes: values.notes || undefined,
 			})
@@ -119,7 +118,7 @@ export function ReconcileAccountModal({ open, setOpen, account }: ReconcileAccou
 							<FormItem>
 								<FormLabel>{t('reconcileBankBalance')}</FormLabel>
 								<FormControl>
-									<Input {...field} type='number' inputMode='decimal' step='0.01' autoComplete='off' />
+									<MoneyInput {...field} />
 								</FormControl>
 								<FormDescription>{t('reconcileBankBalanceHint')}</FormDescription>
 								<FormMessage />

@@ -7,27 +7,35 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { getSafeErrorDetail } from '@/lib/api-error'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyInputToNumber, moneyMessages, moneySchema } from '@/lib/money-input'
 import { Certificate, CreateCertificateDTO, InterestType, UpdateCertificateDTO } from '@/types/certificate'
 
-function createCertificateSchema(t: (key: string) => string, tForms: (key: string) => string) {
+type Translator = (key: string, values?: Record<string, string | number>) => string
+
+function createCertificateSchema(t: Translator, tForms: Translator) {
+	// certificates.current_interest_rate / current_tax_rate are DECIMAL(5,2).
+	const rate = (required: string) => moneySchema(moneyMessages(tForms, { required, number: true }))
 	return z
 		.object({
 			bank: z.string().min(2, t('errors.bankMin')),
-			// certificates.base_capital is DECIMAL(15,2): the API rejects sub-cent amounts.
-			base_capital: z.coerce
-				.number<number>()
-				.min(0.01, t('errors.capitalMin'))
-				.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals')),
+			// certificates.base_capital is DECIMAL(15,2): moneySchema rejects sub-cent amounts.
+			base_capital: moneySchema(moneyMessages(tForms, { required: t('errors.capitalMin') })).pipe(
+				z.number().min(0.01, t('errors.capitalMin')),
+			),
 			interest_type: z.enum(['simple', 'compound']),
-			current_interest_rate: z.coerce.number<number>().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
-			current_tax_rate: z.coerce.number<number>().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+			current_interest_rate: rate(t('errors.rateRange')).pipe(
+				z.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
+			),
+			current_tax_rate: rate(t('errors.taxRange')).pipe(
+				z.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+			),
 			cut_day: z.coerce.number<number>().min(1, t('errors.cutDayRange')).max(28, t('errors.cutDayRange')),
 			reinvest_interest: z.boolean(),
 			payout_account_id: z.string().optional(),
@@ -53,7 +61,7 @@ type FormData = z.infer<ReturnType<typeof createCertificateSchema>>
 
 type FormInput = z.input<ReturnType<typeof createCertificateSchema>>
 
-const EMPTY_VALUES: FormData = {
+const EMPTY_VALUES: FormInput = {
 	bank: '',
 	base_capital: 1000,
 	interest_type: 'simple',
@@ -134,10 +142,10 @@ export function CertificateFormModal({
 		try {
 			const submitData: CreateCertificateDTO = {
 				bank: data.bank,
-				base_capital: Number(data.base_capital),
+				base_capital: data.base_capital,
 				interest_type: data.interest_type as InterestType,
-				current_interest_rate: Number(data.current_interest_rate),
-				current_tax_rate: Number(data.current_tax_rate),
+				current_interest_rate: data.current_interest_rate,
+				current_tax_rate: data.current_tax_rate,
 				cut_day: Number(data.cut_day),
 				reinvest_interest: Boolean(data.reinvest_interest),
 			}
@@ -171,7 +179,7 @@ export function CertificateFormModal({
 				<FormItem>
 					<FormLabel>{label}</FormLabel>
 					<FormControl>
-						<Input type='number' step='0.01' inputMode='decimal' placeholder={placeholder} {...field} />
+						<MoneyInput placeholder={placeholder} {...field} />
 					</FormControl>
 					<FormMessage />
 				</FormItem>
@@ -323,9 +331,9 @@ export function CertificateFormModal({
 							size='sm'
 							onClick={() =>
 								onSimulate({
-									capital: Number(watch('base_capital')),
-									rate: Number(watch('current_interest_rate')),
-									taxRate: Number(watch('current_tax_rate')),
+									capital: moneyInputToNumber(watch('base_capital')),
+									rate: moneyInputToNumber(watch('current_interest_rate')),
+									taxRate: moneyInputToNumber(watch('current_tax_rate')),
 									interestType: watch('interest_type'),
 									reinvestInterest: watch('reinvest_interest'),
 								})

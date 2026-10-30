@@ -7,6 +7,7 @@ import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { ErrorState } from '@/components/shared/ErrorState'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -16,7 +17,7 @@ import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
 import { useAppLocale } from '@/lib/i18n/date-locale'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyInputToNumber, moneyMessages, moneySchema, parseMoneyInput } from '@/lib/money-input'
 import { getAccountRepository } from '@/lib/repositoryConfig'
 import { Account } from '@/types/account'
 import { CreatePaymentDTO, CreditCard } from '@/types/creditcard'
@@ -30,25 +31,31 @@ interface PaymentModalProps {
 
 type Translator = (key: string, values?: Record<string, string | number>) => string
 
+/** Exchange rates carry more precision than amounts (the recommended rate has 4). */
+const EXCHANGE_RATE_DECIMALS = 6
+const PREVIEW_DECIMALS = 20
+
 function createPaymentSchema(t: Translator, tForms: Translator) {
-	// card_payments.amount / interest_amount are DECIMAL(15,2): the API rejects sub-cent amounts.
-	const maxTwoDecimals = tForms('maxTwoDecimals')
-	return z.object({
-		fromAccountId: z.string().min(1, t('errors.selectAccount')),
-		currency: z.string().min(1),
-		amount: z.coerce
-			.number<number>()
-			.positive(t('errors.amountPositive'))
-			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals),
-		exchangeRate: z.string().optional().default(''),
-		includesInterest: z.boolean().default(false),
-		interestAmount: z.coerce
-			.number<number>()
-			.min(0)
-			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals)
-			.default(0),
-		notes: z.string().optional().default(''),
-	})
+	// card_payments.amount / interest_amount are DECIMAL(15,2): moneySchema rejects sub-cent amounts.
+	const messages = moneyMessages(tForms, { required: t('errors.amountPositive') })
+	return z
+		.object({
+			fromAccountId: z.string().min(1, t('errors.selectAccount')),
+			currency: z.string().min(1),
+			amount: moneySchema(messages).pipe(z.number().positive(t('errors.amountPositive'))),
+			exchangeRate: z.string().optional().default(''),
+			includesInterest: z.boolean().default(false),
+			// Only validated (and sent) when the payment includes interest; parsed on submit.
+			interestAmount: z.union([z.string(), z.number()]).default(0),
+			notes: z.string().optional().default(''),
+		})
+		.superRefine((values, ctx) => {
+			if (!values.includesInterest) return
+			const interest = parseMoneyInput(values.interestAmount)
+			if (interest.ok && interest.value >= 0) return
+			const message = !interest.ok && interest.error === 'decimals' ? messages.decimals : messages.invalid
+			ctx.addIssue({ code: 'custom', path: ['interestAmount'], message })
+		})
 }
 
 type PaymentFormValues = z.infer<ReturnType<typeof createPaymentSchema>>
@@ -129,9 +136,10 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 		// eslint-disable-next-line react-hooks/exhaustive-deps
 	}, [needsExchangeRate, recommendedRate, form.setValue, watchedValues.exchangeRate])
 
-	const parsedRate = parseFloat(watchedValues.exchangeRate || '0')
+	const parsedRate = moneyInputToNumber(watchedValues.exchangeRate, { decimals: EXCHANGE_RATE_DECIMALS })
 	const exchangeRateValid = !needsExchangeRate || (Number.isFinite(parsedRate) && parsedRate > 0)
-	const paymentAmountNumber = Number(watchedValues.amount)
+	// Any precision for the preview: too many decimals is reported by the schema on submit.
+	const paymentAmountNumber = moneyInputToNumber(watchedValues.amount, { decimals: PREVIEW_DECIMALS })
 	const hasValidAmount = Number.isFinite(paymentAmountNumber) && paymentAmountNumber > 0
 	const debitPreview = (() => {
 		if (!hasValidAmount) return 0
@@ -154,7 +162,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 	const handleFormSubmit = async (values: PaymentFormValues) => {
 		if (!card) return
 
-		const parsedExchangeRate = parseFloat(values.exchangeRate || '0')
+		const parsedExchangeRate = moneyInputToNumber(values.exchangeRate, { decimals: EXCHANGE_RATE_DECIMALS })
 
 		setLoading(true)
 		setSubmitError(null)
@@ -165,7 +173,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 				amount: values.amount,
 				exchange_rate: needsExchangeRate ? parsedExchangeRate : undefined,
 				includes_interest: values.includesInterest,
-				interest_amount: values.includesInterest ? values.interestAmount : 0,
+				interest_amount: values.includesInterest ? moneyInputToNumber(values.interestAmount) : 0,
 				notes: values.notes || undefined,
 			})
 			onClose()
@@ -274,13 +282,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 							<FormItem>
 								<FormLabel>{t('amount')}</FormLabel>
 								<FormControl>
-									<Input
-										type='number'
-										step='0.01'
-										inputMode='decimal'
-										placeholder={currentDebt.toString()}
-										{...field}
-									/>
+									<MoneyInput placeholder={currentDebt.toString()} {...field} />
 								</FormControl>
 								<p className='text-xs text-muted-foreground'>
 									{t('currentDebt', { amount: formatCurrency(currentDebt, watchedValues.currency) })}
@@ -318,9 +320,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 								<FormItem className='rounded-md border p-3'>
 									<FormLabel>{t('exchangeRate', { from: watchedValues.currency, to: sourceCurrency })}</FormLabel>
 									<FormControl>
-										<Input
-											type='number'
-											step='0.0001'
+										<MoneyInput
 											placeholder={recommendedRate ? recommendedRate.toFixed(4) : t('enterRate')}
 											{...field}
 										/>
@@ -354,13 +354,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 								render={({ field }) => (
 									<FormItem>
 										<FormControl>
-											<Input
-												type='number'
-												step='0.01'
-												placeholder={t('interestAmount')}
-												aria-label={t('interestAmount')}
-												{...field}
-											/>
+											<MoneyInput placeholder={t('interestAmount')} aria-label={t('interestAmount')} {...field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>

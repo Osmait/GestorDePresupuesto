@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import {
 } from '@/hooks/queries/useInvestmentsQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { getSafeErrorDetail } from '@/lib/api-error'
+import { moneyInputToNumber, moneyMessages, moneySchema } from '@/lib/money-input'
 import { getInvestmentRepository } from '@/lib/repositoryConfig'
 import { Investment, InvestmentType } from '@/types/investment'
 
@@ -27,9 +29,15 @@ interface InvestmentFormModalProps {
 	investmentToEdit?: Investment | null
 }
 
-type FormTranslator = (key: string) => string
+type FormTranslator = (key: string, values?: Record<string, string | number>) => string
 
-function createInvestmentSchema(t: FormTranslator) {
+/** investments.quantity is NUMERIC(38,18) (crypto units); the prices are NUMERIC(28,10). */
+const QUANTITY_DECIMALS = 18
+const PRICE_DECIMALS = 10
+
+function createInvestmentSchema(t: FormTranslator, tForms: FormTranslator) {
+	const quantity = moneyMessages(tForms, { decimals: QUANTITY_DECIMALS, number: true, required: t('errors.minZero') })
+	const price = moneyMessages(tForms, { decimals: PRICE_DECIMALS, required: t('errors.minZero') })
 	return z.object({
 		name: z.string().min(1, t('errors.nameRequired')),
 		symbol: z
@@ -37,9 +45,9 @@ function createInvestmentSchema(t: FormTranslator) {
 			.min(1, t('errors.symbolRequired'))
 			.transform((v) => v.toUpperCase()),
 		type: z.enum(InvestmentType),
-		quantity: z.coerce.number<number>().min(0, t('errors.minZero')),
-		purchase_price: z.coerce.number<number>().min(0, t('errors.minZero')),
-		current_price: z.coerce.number<number>().min(0, t('errors.minZero')),
+		quantity: moneySchema(quantity, { decimals: QUANTITY_DECIMALS }).pipe(z.number().min(0, t('errors.minZero'))),
+		purchase_price: moneySchema(price, { decimals: PRICE_DECIMALS }).pipe(z.number().min(0, t('errors.minZero'))),
+		current_price: moneySchema(price, { decimals: PRICE_DECIMALS }).pipe(z.number().min(0, t('errors.minZero'))),
 		settlement_currency: z
 			.string()
 			.min(1, t('errors.currencyRequired'))
@@ -65,7 +73,8 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 	const t = useTranslations('investments.form')
 	const tTypes = useTranslations('investments.typeSingular')
 	const formatCurrency = useFormatCurrency()
-	const investmentSchema = useMemo(() => createInvestmentSchema(t), [t])
+	const tForms = useTranslations('forms')
+	const investmentSchema = useMemo(() => createInvestmentSchema(t, tForms), [t, tForms])
 	const [error, setError] = useState<string | null>(null)
 	const [fetchLoading, setFetchLoading] = useState(false)
 	const createMutation = useCreateInvestmentMutation()
@@ -96,7 +105,12 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 
 	const watchedValues = form.watch()
 	const settlementCurrency = (watchedValues.settlement_currency || 'USD').toUpperCase()
-	const requiredAmount = Math.max(watchedValues.quantity, 0) * Math.max(watchedValues.purchase_price, 0)
+	const typedQuantity = moneyInputToNumber(watchedValues.quantity, { decimals: QUANTITY_DECIMALS })
+	const typedPurchasePrice = moneyInputToNumber(watchedValues.purchase_price, { decimals: PRICE_DECIMALS })
+	const requiredAmount =
+		Number.isFinite(typedQuantity) && Number.isFinite(typedPurchasePrice)
+			? Math.max(typedQuantity, 0) * Math.max(typedPurchasePrice, 0)
+			: 0
 	const availableBalance = useMemo(() => {
 		const match = balances.find((balance) => balance.currency === settlementCurrency)
 		return match?.available || 0
@@ -120,7 +134,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 				if ((!currentName || currentName === '') && quote.name) {
 					form.setValue('name', quote.name)
 				}
-				if (currentPurchasePrice === 0) {
+				if (!(moneyInputToNumber(currentPurchasePrice, { decimals: PRICE_DECIMALS }) > 0)) {
 					form.setValue('purchase_price', quote.regular_market_price)
 				}
 				setError(null)
@@ -280,7 +294,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								<FormItem>
 									<FormLabel>{t('quantity')}</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -294,7 +308,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								<FormItem>
 									<FormLabel>{t('purchasePrice')}</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -308,7 +322,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								<FormItem className='sm:col-span-2'>
 									<FormLabel>{t('currentPrice')}</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>

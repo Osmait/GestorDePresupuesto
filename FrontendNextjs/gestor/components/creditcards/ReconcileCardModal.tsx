@@ -7,12 +7,13 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 import { Amount } from '@/components/shared/Amount'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useReconcileAccountMutation } from '@/hooks/queries/useAccountsQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyInputToNumber, moneyMessages, moneySchema } from '@/lib/money-input'
 import { CreditCard } from '@/types/creditcard'
 
 type ReconcileCardModalProps = {
@@ -31,6 +32,7 @@ const MATCH_EPSILON = 1e-6
  */
 export function ReconcileCardModal({ open, setOpen, card }: ReconcileCardModalProps) {
 	const t = useTranslations('creditCards.item')
+	const tForms = useTranslations('forms')
 	const formatCurrency = useFormatCurrency()
 	const reconcile = useReconcileAccountMutation()
 	const [submitError, setSubmitError] = useState<string | null>(null)
@@ -40,19 +42,16 @@ export function ReconcileCardModal({ open, setOpen, card }: ReconcileCardModalPr
 		() =>
 			z.object({
 				currency: z.string().min(1),
-				bank_debt: z
-					.string()
-					.trim()
-					.min(1, t('reconcileDebtRequired'))
-					.refine((v) => Number.isFinite(Number(v)), t('reconcileDebtRequired'))
-					.refine((v) => hasAtMostDecimals(v), t('reconcileDebtRequired')),
+				// A negative debt (the bank owes the user a credit balance) is valid.
+				bank_debt: moneySchema(moneyMessages(tForms, { required: t('reconcileDebtRequired') })),
 				notes: z.string().trim().max(500),
 			}),
-		[t],
+		[t, tForms],
 	)
 	type ReconcileCardValues = z.infer<typeof schema>
+	type ReconcileCardInput = z.input<typeof schema>
 
-	const form = useForm<ReconcileCardValues>({
+	const form = useForm<ReconcileCardInput, unknown, ReconcileCardValues>({
 		resolver: zodResolver(schema),
 		defaultValues: { currency: '', bank_debt: '', notes: '' },
 	})
@@ -68,7 +67,7 @@ export function ReconcileCardModal({ open, setOpen, card }: ReconcileCardModalPr
 	const balance = balances.find((b) => b.currency === currency)
 	// The card balance is negative while it owes money.
 	const appDebt = -(balance?.current_balance ?? 0)
-	const typedNumber = typed?.trim() ? Number(typed) : Number.NaN
+	const typedNumber = moneyInputToNumber(typed)
 	// Change of the card balance: more debt is a negative adjustment.
 	const difference = Number.isFinite(typedNumber) ? appDebt - typedNumber : null
 	const matches = difference !== null && Math.abs(difference) < MATCH_EPSILON
@@ -81,7 +80,7 @@ export function ReconcileCardModal({ open, setOpen, card }: ReconcileCardModalPr
 	async function onSubmit(values: ReconcileCardValues) {
 		if (!card?.id) return
 		setSubmitError(null)
-		const debt = Number(values.bank_debt)
+		const debt = values.bank_debt
 		try {
 			await reconcile.mutateAsync({
 				id: card.id,
@@ -145,7 +144,7 @@ export function ReconcileCardModal({ open, setOpen, card }: ReconcileCardModalPr
 							<FormItem>
 								<FormLabel>{t('reconcileBankDebt')}</FormLabel>
 								<FormControl>
-									<Input {...field} type='number' inputMode='decimal' step='0.01' autoComplete='off' />
+									<MoneyInput {...field} />
 								</FormControl>
 								<FormDescription>{t('reconcileBankDebtHint')}</FormDescription>
 								<FormMessage />

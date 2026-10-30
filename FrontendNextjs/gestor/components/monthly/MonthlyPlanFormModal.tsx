@@ -6,28 +6,26 @@ import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useCreateMonthlyPlanItem, useUpdateMonthlyPlanItem } from '@/hooks/queries/useMonthlyPlanQuery'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyMessages, moneySchema } from '@/lib/money-input'
 import { MonthlyPlanItemRequest } from '@/types/monthlyPlan'
 import { useMonthlyPlanContext } from './MonthlyPlanContext'
 
 /** Sentinel for the "no category / no account" option, since Select needs a value. */
 const NONE = '__none__'
 
-function createPlanItemSchema(maxTwoDecimals: string) {
+function createPlanItemSchema(tForms: (key: string, values?: Record<string, string | number>) => string) {
 	return z.object({
 		name: z.string().min(1),
 		description: z.string().optional(),
-		// monthly_plan_items.amount is NUMERIC(15,2): the API rejects sub-cent amounts.
-		amount: z.coerce
-			.number<number>()
-			.positive()
-			.refine((value) => hasAtMostDecimals(value), maxTwoDecimals),
+		// monthly_plan_items.amount is NUMERIC(15,2): moneySchema rejects sub-cent amounts.
+		amount: moneySchema(moneyMessages(tForms)).pipe(z.number().positive(tForms('amountRequired'))),
 		currency: z.enum(['DOP', 'USD']),
 		type: z.enum(['income', 'bill']),
 		category_id: z.string().optional(),
@@ -44,7 +42,7 @@ type PlanItemFormInput = z.input<ReturnType<typeof createPlanItemSchema>>
 export function MonthlyPlanFormModal() {
 	const t = useTranslations('monthlyPlan')
 	const tForms = useTranslations('forms')
-	const planItemSchema = useMemo(() => createPlanItemSchema(tForms('maxTwoDecimals')), [tForms])
+	const planItemSchema = useMemo(() => createPlanItemSchema(tForms), [tForms])
 	const { isModalOpen, editingItem, defaultType, closeModal, setModalOpen } = useMonthlyPlanContext()
 	const { data: categories = [] } = useGetCategories()
 	const { data: accounts = [] } = useGetAccounts()
@@ -190,7 +188,7 @@ export function MonthlyPlanFormModal() {
 								<FormItem className='sm:col-span-2'>
 									<FormLabel>{t('fieldAmount')}</FormLabel>
 									<FormControl>
-										<Input type='number' step='0.01' min='0' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>

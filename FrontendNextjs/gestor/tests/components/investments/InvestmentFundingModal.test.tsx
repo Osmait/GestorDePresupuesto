@@ -150,9 +150,9 @@ describe('InvestmentFundingModal', () => {
 		expect(submitButton.closest('form')).toBeTruthy()
 
 		// Source amount input exists
-		const amountInput = screen.getByRole('spinbutton', { name: /Amount from account/ })
+		const amountInput = screen.getByRole('textbox', { name: /Amount from account/ })
 		expect(amountInput).toBeInTheDocument()
-		expect(amountInput).toHaveValue(0)
+		expect(amountInput).toHaveValue('0')
 	})
 
 	it('notes field accepts input', async () => {
@@ -184,10 +184,10 @@ describe('InvestmentFundingModal', () => {
 		)
 		renderModal()
 
-		const amountInput = screen.getByRole('spinbutton', { name: /Amount from account/ })
+		const amountInput = screen.getByRole('textbox', { name: /Amount from account/ })
 		await user.clear(amountInput)
 		await user.type(amountInput, '1000')
-		const rateInput = screen.getByRole('spinbutton', { name: /Exchange rate/ })
+		const rateInput = screen.getByRole('textbox', { name: /Exchange rate/ })
 		await user.clear(rateInput)
 		await user.type(rateInput, '58')
 		await user.click(screen.getByRole('button', { name: 'Fund broker' }))
@@ -215,10 +215,10 @@ describe('InvestmentFundingModal', () => {
 		)
 		renderModal()
 
-		const amountInput = screen.getByRole('spinbutton', { name: /Amount from account/ })
+		const amountInput = screen.getByRole('textbox', { name: /Amount from account/ })
 		await user.clear(amountInput)
 		await user.type(amountInput, '1000')
-		const rateInput = screen.getByRole('spinbutton', { name: /Exchange rate/ })
+		const rateInput = screen.getByRole('textbox', { name: /Exchange rate/ })
 		await user.clear(rateInput)
 		await user.type(rateInput, '58')
 		await user.click(screen.getByRole('button', { name: 'Fund broker' }))

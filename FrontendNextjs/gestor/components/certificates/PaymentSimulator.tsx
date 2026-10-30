@@ -9,6 +9,7 @@ import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { Amount } from '@/components/shared/Amount'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Switch } from '@/components/ui/switch'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { moneyMessages, moneySchema } from '@/lib/money-input'
 import { Certificate, InterestType } from '@/types/certificate'
 
 // Only shown after a simulation runs: load the chart code on demand.
@@ -25,11 +27,17 @@ const SimulationLineChart = dynamic(() => import('@/components/charts/Simulation
 	loading: () => <Skeleton className='h-full w-full' />,
 })
 
-function createSimulatorSchema(t: (key: string) => string) {
+type Translator = (key: string, values?: Record<string, string | number>) => string
+
+function createSimulatorSchema(t: Translator, tForms: Translator) {
+	const amount = (required: string) => moneySchema(moneyMessages(tForms, { required }))
+	const rate = (required: string) => moneySchema(moneyMessages(tForms, { required, number: true }))
 	return z.object({
-		capital: z.coerce.number<number>().min(0.01, t('errors.capitalMin')),
-		interestRate: z.coerce.number<number>().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
-		taxRate: z.coerce.number<number>().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+		capital: amount(t('errors.capitalMin')).pipe(z.number().min(0.01, t('errors.capitalMin'))),
+		interestRate: rate(t('errors.rateRange')).pipe(
+			z.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
+		),
+		taxRate: rate(t('errors.taxRange')).pipe(z.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange'))),
 		months: z.coerce.number<number>().min(1, t('errors.monthsRange')).max(120, t('errors.monthsRange')),
 		interestType: z.enum(['simple', 'compound']),
 		reinvestInterest: z.boolean(),
@@ -59,7 +67,8 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 	const t = useTranslations('certificates.simulator')
 	const tType = useTranslations('certificates.interestType')
 	const tActions = useTranslations('common.actions')
-	const simulatorSchema = useMemo(() => createSimulatorSchema(t), [t])
+	const tForms = useTranslations('forms')
+	const simulatorSchema = useMemo(() => createSimulatorSchema(t, tForms), [t, tForms])
 	const formatCurrency = useFormatCurrency()
 	const currency = certificate?.currency || 'DOP'
 	const [results, setResults] = useState<SimulationResult[]>([])
@@ -158,10 +167,10 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 			: []
 
 	const numberFields = [
-		{ name: 'capital', label: t('capital'), step: '0.01', inputMode: 'decimal' },
-		{ name: 'interestRate', label: t('interestRate'), step: '0.01', inputMode: 'decimal' },
-		{ name: 'taxRate', label: t('taxRate'), step: '0.01', inputMode: 'decimal' },
-		{ name: 'months', label: t('months'), step: '1', inputMode: 'numeric' },
+		{ name: 'capital', label: t('capital'), money: true },
+		{ name: 'interestRate', label: t('interestRate'), money: true },
+		{ name: 'taxRate', label: t('taxRate'), money: true },
+		{ name: 'months', label: t('months'), money: false },
 	] as const
 
 	return (
@@ -192,7 +201,11 @@ export function PaymentSimulator({ open, onOpenChange, certificate }: PaymentSim
 									<FormItem>
 										<FormLabel>{item.label}</FormLabel>
 										<FormControl>
-											<Input type='number' step={item.step} inputMode={item.inputMode} {...field} />
+											{item.money ? (
+												<MoneyInput {...field} />
+											) : (
+												<Input type='number' step='1' inputMode='numeric' {...field} />
+											)}
 										</FormControl>
 										<FormMessage />
 									</FormItem>

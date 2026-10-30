@@ -242,24 +242,24 @@ export function TransactionActions() {
 								<Label htmlFor={ids.minAmount}>{t('minAmount')}</Label>
 								<DebouncedInput
 									id={ids.minAmount}
-									type='number'
+									type='text'
 									inputMode='decimal'
+									autoComplete='off'
 									value={filters.minAmount}
 									onCommit={(minAmount) => setFilters((f) => ({ ...f, minAmount }))}
 									placeholder='0'
-									min={0}
 								/>
 							</div>
 							<div className='space-y-2'>
 								<Label htmlFor={ids.maxAmount}>{t('maxAmount')}</Label>
 								<DebouncedInput
 									id={ids.maxAmount}
-									type='number'
+									type='text'
 									inputMode='decimal'
+									autoComplete='off'
 									value={filters.maxAmount}
 									onCommit={(maxAmount) => setFilters((f) => ({ ...f, maxAmount }))}
 									placeholder='99999'
-									min={0}
 								/>
 							</div>
 						</div>
