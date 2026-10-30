@@ -1,6 +1,6 @@
 'use client'
 
-import { FileCheck, Landmark, PieChart, PiggyBank, TrendingUp } from 'lucide-react'
+import { CreditCard, FileCheck, Landmark, PieChart, PiggyBank, TrendingUp } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useChartTheme } from '@/components/charts/chart-theme'
 import { Amount } from '@/components/shared/Amount'
@@ -22,6 +22,9 @@ interface PatrimonyTabProps {
 	investmentsTotal: number
 	investmentsTotalUSD?: number
 	certificatesTotal: number
+	/** What is owed on credit cards, in DOP; subtracted from the total. */
+	creditCardDebt?: number
+	creditCardsCount?: number
 	accountsCount: number
 	investmentsCount: number
 	certificatesCount: number
@@ -33,6 +36,7 @@ interface PatrimonyTabProps {
 		accounts: string
 		investments: string
 		certificates: string
+		cardDebt: string
 		total: string
 		activeItems: string
 		exchangeRate: string
@@ -47,6 +51,8 @@ export function PatrimonyTab({
 	investmentsTotal,
 	investmentsTotalUSD,
 	certificatesTotal,
+	creditCardDebt = 0,
+	creditCardsCount = 0,
 	accountsCount,
 	investmentsCount,
 	certificatesCount,
@@ -57,7 +63,10 @@ export function PatrimonyTab({
 	const formatPercent = useFormatPercent()
 	const { colors } = useChartTheme()
 	const formatDOP = (value: number) => formatCurrency(value, 'DOP')
-	const totalPatrimony = accountsTotal + investmentsTotal + certificatesTotal
+	// Net worth: what the user has minus what they owe on cards. The
+	// distribution chart splits only what they have (the assets).
+	const totalAssets = accountsTotal + investmentsTotal + certificatesTotal
+	const totalPatrimony = totalAssets - creditCardDebt
 	const countHint = (count: number) => `${count} ${labels.activeItems}`
 
 	// Series colors in fixed entity order (accounts, investments, certificates).
@@ -69,7 +78,7 @@ export function PatrimonyTab({
 
 	return (
 		<div className='space-y-6'>
-			<StatGrid>
+			<StatGrid columns={creditCardsCount > 0 ? 5 : 4}>
 				<StatCard
 					label={labels.total}
 					icon={PiggyBank}
@@ -108,6 +117,14 @@ export function PatrimonyTab({
 					value={<Amount value={certificatesTotal} currency='DOP' />}
 					hint={countHint(certificatesCount)}
 				/>
+				{creditCardsCount > 0 ? (
+					<StatCard
+						label={labels.cardDebt}
+						icon={CreditCard}
+						value={<Amount value={-creditCardDebt} currency='DOP' tone={creditCardDebt > 0 ? 'negative' : 'neutral'} />}
+						hint={countHint(creditCardsCount)}
+					/>
+				) : null}
 			</StatGrid>
 
 			<Card>
@@ -120,7 +137,7 @@ export function PatrimonyTab({
 							<div className='h-[250px] w-full min-w-0'>
 								<PatrimonyPieChart
 									data={pieData}
-									total={totalPatrimony}
+									total={totalAssets}
 									formatValue={formatDOP}
 									ariaLabel={labels.distribution}
 								/>
@@ -139,7 +156,7 @@ export function PatrimonyTab({
 										<span className='shrink-0 text-right'>
 											<Amount value={item.value} currency='DOP' className='text-sm font-medium' />
 											<span className='block text-xs text-muted-foreground tabular-nums'>
-												{formatPercent(totalPatrimony > 0 ? (item.value / totalPatrimony) * 100 : 0)}
+												{formatPercent(totalAssets > 0 ? (item.value / totalAssets) * 100 : 0)}
 											</span>
 										</span>
 									</li>

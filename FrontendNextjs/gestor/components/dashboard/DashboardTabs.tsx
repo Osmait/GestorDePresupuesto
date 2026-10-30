@@ -6,6 +6,7 @@ import { AccountCard } from '@/components/accounts/AccountCard'
 import { AccountCardSkeleton } from '@/components/accounts/AccountCardSkeleton'
 import { BudgetCard } from '@/components/budgets/BudgetCard'
 import { BudgetCardSkeleton } from '@/components/budgets/BudgetCardSkeleton'
+import { CardDebtCard } from '@/components/creditcards/CardDebtCard'
 import { DashboardTransactionItem } from '@/components/dashboard/DashboardTransactionItem'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Button } from '@/components/ui/button'
@@ -13,7 +14,9 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { useGetCreditCards } from '@/hooks/queries/useCreditCardsQuery'
 import { useGetTransactions } from '@/hooks/queries/useTransactionsQuery'
+import type { Account } from '@/types/account'
 
 /**
  * Hidden dashboard tabs. They render on the client from the TanStack cache,
@@ -34,8 +37,16 @@ function apiOrder<T>(items: T[] | undefined): T[] {
 const CARD_GRID = 'grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3'
 const SKELETON_KEYS = ['sk-1', 'sk-2', 'sk-3']
 
-/** Read-only account cards (same component as /app/accounts, without the edit/delete menu). */
-export function DashboardAccountsTab({ labels }: { labels: { noAccounts: string; addAccount: string } }) {
+/**
+ * Read-only account cards (same component as /app/accounts, without the
+ * edit/delete menu), then the credit cards as debt (never as a negative
+ * account balance).
+ */
+export function DashboardAccountsTab({
+	labels,
+}: {
+	labels: { noAccounts: string; addAccount: string; creditCards: string }
+}) {
 	const { data, isPending } = useGetAccounts()
 	if (isPending) {
 		return (
@@ -65,11 +76,46 @@ export function DashboardAccountsTab({ labels }: { labels: { noAccounts: string;
 		)
 	}
 
+	const bankAccounts = accounts.filter((account) => (account.type || 'bank') !== 'credit_card')
+	const cardAccounts = accounts.filter((account) => account.type === 'credit_card')
+
+	return (
+		<div className='space-y-6'>
+			{bankAccounts.length > 0 ? (
+				<div className={CARD_GRID}>
+					{bankAccounts.map((account) => (
+						<AccountCard key={account.id} account={account} />
+					))}
+				</div>
+			) : null}
+			{cardAccounts.length > 0 ? (
+				<section className='space-y-3' aria-label={labels.creditCards}>
+					<h3 className='text-sm font-medium text-muted-foreground'>{labels.creditCards}</h3>
+					<DashboardCardDebts cardAccounts={cardAccounts} />
+				</section>
+			) : null}
+		</div>
+	)
+}
+
+/** Credit cards with their limits (credit card API), else the account balance alone. */
+function DashboardCardDebts({ cardAccounts }: { cardAccounts: Account[] }) {
+	const { data: cards } = useGetCreditCards()
 	return (
 		<div className={CARD_GRID}>
-			{accounts.map((account) => (
-				<AccountCard key={account.id} account={account} />
-			))}
+			{cardAccounts.map((account) => {
+				const card = cards?.find((c) => c.id === account.id)
+				const balances = card?.balances?.length
+					? card.balances
+					: [
+							{
+								currency: account.currency || 'DOP',
+								current_balance: account.current_balance ?? 0,
+								credit_limit: 0,
+							},
+						]
+				return <CardDebtCard key={account.id} name={account.name} bank={account.bank} balances={balances} />
+			})}
 		</div>
 	)
 }

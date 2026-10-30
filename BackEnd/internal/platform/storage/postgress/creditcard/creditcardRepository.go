@@ -99,6 +99,18 @@ func (r *CreditCardRepository) UpdateCard(ctx context.Context, card *creditcard.
 	return ownership.RequireAffected(result)
 }
 
+// DeleteBookkeeping deletes the card account's own bookkeeping transactions
+// (initial debt and reset adjustments, payments received): until migration
+// 000060 they lived in card_balances and went away with the card. Charges
+// stay, so a card with purchases still cannot be deleted (like any account
+// with transactions).
+func (r *CreditCardRepository) DeleteBookkeeping(ctx context.Context, cardId string, userId string) error {
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx,
+		`DELETE FROM transactions WHERE account_id = $1 AND user_id = $2
+		 AND type_transation::text IN ('adjustment_in', 'adjustment_out', 'card_payment_received')`, cardId, userId)
+	return err
+}
+
 func (r *CreditCardRepository) DeleteCard(ctx context.Context, accountId string, userId string) error {
 	query := `DELETE FROM credit_cards WHERE account_id = $1 AND ` + ownedCardClause("account_id", "$2")
 	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, accountId, userId)
@@ -108,10 +120,14 @@ func (r *CreditCardRepository) DeleteCard(ctx context.Context, accountId string,
 	return ownership.RequireAffected(result)
 }
 
+// SaveBalance stores a card currency with its credit limit. The card's
+// balance is the ledger of the card account (migration 000060), so
+// current_balance is always stored as 0 and balance.CurrentBalance is ignored;
+// write an initial debt as an adjustment transaction.
 func (r *CreditCardRepository) SaveBalance(ctx context.Context, balance *creditcard.CardBalance) error {
 	query := `INSERT INTO card_balances (id, card_id, currency, current_balance, credit_limit, created_at, updated_at)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)`
-	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, balance.Id, balance.CardId, balance.Currency, balance.CurrentBalance,
+		VALUES ($1, $2, $3, 0, $4, $5, $6)`
+	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, balance.Id, balance.CardId, balance.Currency,
 		balance.CreditLimit, balance.CreatedAt, balance.UpdatedAt)
 	if err != nil {
 		log.Error().Err(err).Str("card_id", balance.CardId).Str("currency", balance.Currency).Msg("Failed to save card balance")
@@ -194,74 +210,10 @@ func (r *CreditCardRepository) UpdateCreditLimit(ctx context.Context, id string,
 	return balance, nil
 }
 
-// AdjustBalance atomically adds delta to the current balance of balance `id`
-// and returns the resulting balance. The single UPDATE takes the row lock, so
-// concurrent adjustments serialise instead of overwriting each other. It runs
-// in the request transaction when there is one.
-func (r *CreditCardRepository) AdjustBalance(ctx context.Context, id string, userId string, delta money.Amount) (money.Amount, error) {
-	query := `UPDATE card_balances SET current_balance = current_balance + $1, updated_at = $2
-		WHERE id = $3 AND ` + ownedCardClause("card_id", "$4") + `
-		RETURNING current_balance`
-	var newBalance money.Amount
-	err := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, delta, time.Now(), id, userId).Scan(&newBalance)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return money.Zero, ownership.ErrNotFound
-		}
-		log.Error().Err(err).Str("balance_id", id).Stringer("delta", delta).Msg("Failed to adjust card balance")
-		return money.Zero, err
-	}
-	return newBalance, nil
-}
-
-// ResetBalance atomically zeroes the real balance of balance `id` and returns
-// the real balance it had right before, read under the same row lock.
-//
-// The real balance (what the API reports) is current_balance (initial debt and
-// payments) plus the card account's transactions (its charges, kept in
-// account_balances), so zeroing it stores current_balance = -transactions.
-// Zeroing only current_balance turned every past charge back into debt and
-// wiped out the payments that had covered them.
-func (r *CreditCardRepository) ResetBalance(ctx context.Context, id string, userId string) (money.Amount, error) {
-	query := `WITH previous AS (
-			SELECT id, card_id, currency, current_balance FROM card_balances
-			WHERE id = $1 AND ` + ownedCardClause("card_id", "$2") + `
-			FOR UPDATE
-		), ledger AS (
-			SELECT COALESCE(SUM(ab.balance), 0) AS total
-			FROM account_balances ab
-			JOIN previous p ON ab.account_id = p.card_id AND ab.currency = p.currency
-			WHERE ab.user_id = $2
-		)
-		UPDATE card_balances cb SET current_balance = -ledger.total, updated_at = $3
-		FROM previous, ledger WHERE cb.id = previous.id
-		RETURNING previous.current_balance + ledger.total`
-	var previous money.Amount
-	err := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, id, userId, time.Now()).Scan(&previous)
-	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return money.Zero, ownership.ErrNotFound
-		}
-		return money.Zero, err
-	}
-	return previous, nil
-}
-
 func (r *CreditCardRepository) DeleteBalance(ctx context.Context, id string, userId string) error {
 	query := `DELETE FROM card_balances WHERE id = $1 AND ` + ownedCardClause("card_id", "$2")
 	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, id, userId)
 	if err != nil {
-		return err
-	}
-	return ownership.RequireAffected(result)
-}
-
-func (r *CreditCardRepository) UpdateBalanceByAmount(ctx context.Context, cardId string, userId string, currency string, amount money.Amount) error {
-	query := `UPDATE card_balances SET current_balance = current_balance + $1, updated_at = $2
-		WHERE card_id = $3 AND currency = $4 AND ` + ownedCardClause("card_id", "$5")
-	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, amount, time.Now(), cardId, currency, userId)
-	if err != nil {
-		log.Error().Err(err).Str("card_id", cardId).Str("currency", currency).Stringer("amount", amount).Msg("Failed to update card balance by amount")
 		return err
 	}
 	return ownership.RequireAffected(result)
@@ -434,4 +386,10 @@ func PaymentCategoryID(userId string) string {
 // locale. Concurrent first calls converge on the same row.
 func (r *CreditCardRepository) EnsurePaymentCategory(ctx context.Context, userId string) (string, error) {
 	return categoryRepo.EnsureSystem(ctx, txhelper.FromContext(ctx, r.db), userId, category.SystemCardPayment)
+}
+
+// EnsureAdjustmentCategory returns the user's "Ajuste de saldo" system
+// category (initial card debt, card resets).
+func (r *CreditCardRepository) EnsureAdjustmentCategory(ctx context.Context, userId string) (string, error) {
+	return categoryRepo.EnsureSystem(ctx, txhelper.FromContext(ctx, r.db), userId, category.SystemBalanceAdjustment)
 }

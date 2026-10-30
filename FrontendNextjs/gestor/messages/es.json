@@ -274,7 +274,9 @@
     "activeItems": "activos",
     "exchangeRate": "Tasa de cambio (1 US$)",
     "distribution": "Distribución",
-    "sectionsLabel": "Secciones del panel"
+    "sectionsLabel": "Secciones del panel",
+    "cardDebt": "Deuda de tarjetas",
+    "creditCardsSection": "Tarjetas de crédito"
   },
   "accounts": {
     "title": "Cuentas",
@@ -430,6 +432,8 @@
       "loan_cancellation_refund": "Reembolso por cancelación de préstamo",
       "adjustment_in": "Ajuste de saldo (entrada)",
       "adjustment_out": "Ajuste de saldo (salida)",
+      "card_payment": "Pago de tarjeta",
+      "card_payment_received": "Pago recibido",
       "unknown": "Otro"
     },
     "sectionsLabel": "Secciones de transacciones"
@@ -1447,7 +1451,24 @@
       "noDebt": "Sin deuda",
       "cutDay": "Día de corte",
       "dueDay": "Día de pago",
-      "utilizationLabel": "Crédito usado en {currency}"
+      "utilizationLabel": "Crédito usado en {currency}",
+      "reconcile": "Cuadrar con estado de cuenta",
+      "reconcileTitle": "Cuadrar {name}",
+      "reconcileDescription": "Escribe la deuda que muestra tu estado de cuenta o la app del banco. Si no coincide con la de la app, se registra un ajuste por la diferencia (no cuenta como gasto).",
+      "reconcileCurrency": "Moneda",
+      "reconcileAppDebt": "Deuda en la app",
+      "reconcileBankDebt": "Deuda según el banco",
+      "reconcileBankDebtHint": "Escribe 0 si no debes nada.",
+      "reconcileDebtRequired": "Escribe la deuda que muestra el banco",
+      "reconcileDifference": "Ajuste",
+      "reconcileNotes": "Nota (opcional)",
+      "reconcileMatches": "Coincide: no hace falta ajuste",
+      "reconcileSubmit": "Cuadrar",
+      "reconcileSuccess": "Tarjeta cuadrada: debes {amount}",
+      "reconcileError": "No se pudo cuadrar la tarjeta",
+      "owes": "Debes {amount}",
+      "inFavor": "A favor {amount}",
+      "limitUsed": "{percent} del límite de {limit}"
     },
     "form": {
       "addTitle": "Agregar tarjeta de crédito",

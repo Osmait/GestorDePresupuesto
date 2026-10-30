@@ -22,6 +22,9 @@ export interface DashboardSummary {
 	accounts_total: number
 	investments_total: number
 	certificates_total: number
+	/** Credit card debt in DOP (USD converted at usd_to_dop_rate); net worth subtracts it. */
+	credit_card_debt?: number
+	credit_cards_count?: number
 	accounts_count: number
 	investments_count: number
 	certificates_count: number

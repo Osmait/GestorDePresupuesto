@@ -5,6 +5,10 @@ export enum TypeTransaction {
 	LOAN_COLLECTION = 'loan_collection',
 	INVESTMENT_PURCHASE = 'investment_purchase',
 	INVESTMENT_FUNDING = 'investment_funding',
+	/** Money out of the paying account for a card payment (neutral in reports). */
+	CARD_PAYMENT = 'card_payment',
+	/** Debt down on the card account for a card payment (neutral in reports). */
+	CARD_PAYMENT_RECEIVED = 'card_payment_received',
 	/** Balance adjustment from a reconciliation (neutral in reports). */
 	ADJUSTMENT_IN = 'adjustment_in',
 	ADJUSTMENT_OUT = 'adjustment_out',

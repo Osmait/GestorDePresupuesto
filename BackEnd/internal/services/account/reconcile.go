@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"strings"
 	"time"
 
@@ -26,10 +25,6 @@ var (
 	// ErrReconciliationUnavailable is returned when the service was built
 	// without WithReconciliation.
 	ErrReconciliationUnavailable = errors.New("account reconciliation is not configured")
-
-	// ErrReconcileCreditCard rejects credit cards: their debt is not (yet)
-	// the ledger balance of the card account, see the credit card balances.
-	ErrReconcileCreditCard = fmt.Errorf("%w: credit card accounts cannot be reconciled here; reset the card balance instead", errorhttp.ErrBadRequest)
 )
 
 // AdjustmentWriter creates the adjustment transaction (TransactionService).
@@ -72,6 +67,10 @@ type ReconcileResult struct {
 // difference (neutral in reports) so the account ends on BankBalance. Every
 // call is recorded, also when nothing had to change, so the account shows
 // when it was last checked.
+//
+// For a credit card the balance is its debt as a negative number (a card
+// statement saying "you owe 1,000" is BankBalance -1000); the currency must
+// be one the card has.
 func (s *AccountService) Reconcile(ctx context.Context, accountId, userId string, in ReconcileInput) (*ReconcileResult, error) {
 	if s.reconciliations == nil || s.adjustments == nil || s.categories == nil {
 		return nil, ErrReconciliationUnavailable
@@ -84,10 +83,6 @@ func (s *AccountService) Reconcile(ctx context.Context, accountId, userId string
 	if err != nil {
 		return nil, notFound(err)
 	}
-	if acc.Type == account.AccountTypeCreditCard {
-		return nil, ErrReconcileCreditCard
-	}
-
 	accountCurrency := normalizeCurrency(acc.Currency)
 	currency := normalizeCurrency(in.Currency)
 	if strings.TrimSpace(in.Currency) == "" {

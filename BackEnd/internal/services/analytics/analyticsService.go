@@ -195,6 +195,8 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 
 	accountsTotal := money.Zero
 	accountsCount := 0
+	creditCardDebt := money.Zero
+	creditCardsCount := 0
 	if s.accountRepository != nil {
 		accounts, accErr := s.accountRepository.FindAll(ctx, userID)
 		if accErr == nil {
@@ -202,6 +204,8 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 			if balErr == nil {
 				for _, acc := range accounts {
 					if acc.Type == accountDomain.AccountTypeCreditCard {
+						creditCardsCount++
+						creditCardDebt = creditCardDebt.Add(s.cardDebtDOP(ctx, acc.Id, userID, usdToDop))
 						continue
 					}
 					accountsCount++
@@ -258,12 +262,32 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		AccountsTotal:     accountsTotal.RoundCents(),
 		InvestmentsTotal:  investmentsTotalDOP,
 		CertificatesTotal: certificatesTotal.RoundCents(),
+		CreditCardDebt:    creditCardDebt.RoundCents(),
+		CreditCardsCount:  creditCardsCount,
 		AccountsCount:     accountsCount,
 		InvestmentsCount:  investmentsCount,
 		CertificatesCount: certificatesCount,
 		CategoryExpenses:  categoryExpenses,
 		MonthlySummary:    monthlySummaries,
 	}, nil
+}
+
+// cardDebtDOP is what the user owes on card cardId (the negative part of its
+// ledger balance per currency), in DOP. A card in credit counts as no debt.
+func (s *AnalyticsService) cardDebtDOP(ctx context.Context, cardId, userID string, usdToDop money.Amount) money.Amount {
+	debt := money.Zero
+	for _, currency := range []string{"DOP", "USD"} {
+		balance, err := s.accountRepository.BalanceByCurrency(ctx, cardId, userID, currency)
+		if err != nil || !balance.IsNegative() {
+			continue
+		}
+		owed := balance.Neg()
+		if currency == "USD" {
+			owed = owed.Mul(usdToDop)
+		}
+		debt = debt.Add(owed)
+	}
+	return debt
 }
 
 // dashboardDateRange returns the half-open range of instants [from, to) of

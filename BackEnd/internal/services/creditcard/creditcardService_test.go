@@ -18,18 +18,20 @@ import (
 )
 
 type mockCreditCardRepo struct {
-	balance           *creditcardDomain.CardBalance
-	card              *creditcardDomain.CreditCard
-	lastSavedPayment  *creditcardDomain.CardPayment
-	deletedPaymentID  string
-	updateBalanceCall int
-	updatedBalances   []money.Amount
-	categoryUserIDs   []string
+	balance          *creditcardDomain.CardBalance
+	card             *creditcardDomain.CreditCard
+	lastSavedPayment *creditcardDomain.CardPayment
+	deletedPaymentID string
+	categoryUserIDs  []string
 }
 
 func (m *mockCreditCardRepo) EnsurePaymentCategory(_ context.Context, userId string) (string, error) {
 	m.categoryUserIDs = append(m.categoryUserIDs, userId)
 	return "cpcat-" + userId, nil
+}
+
+func (m *mockCreditCardRepo) EnsureAdjustmentCategory(_ context.Context, userId string) (string, error) {
+	return "adjcat-" + userId, nil
 }
 
 func (m *mockCreditCardRepo) SaveCard(context.Context, *creditcardDomain.CreditCard) error {
@@ -49,6 +51,9 @@ func (m *mockCreditCardRepo) UpdateCard(context.Context, *creditcardDomain.Credi
 	return nil
 }
 func (m *mockCreditCardRepo) DeleteCard(context.Context, string, string) error { return nil }
+func (m *mockCreditCardRepo) DeleteBookkeeping(context.Context, string, string) error {
+	return nil
+}
 func (m *mockCreditCardRepo) SaveBalance(context.Context, *creditcardDomain.CardBalance) error {
 	return nil
 }
@@ -71,23 +76,6 @@ func (m *mockCreditCardRepo) UpdateCreditLimit(_ context.Context, _ string, _ st
 	return &balanceCopy, nil
 }
 
-// AdjustBalance mimics the atomic SQL increment and records every resulting
-// balance.
-func (m *mockCreditCardRepo) AdjustBalance(_ context.Context, _ string, _ string, delta money.Amount) (money.Amount, error) {
-	m.updateBalanceCall++
-	m.balance.CurrentBalance = m.balance.CurrentBalance.Add(delta)
-	m.updatedBalances = append(m.updatedBalances, m.balance.CurrentBalance)
-	return m.balance.CurrentBalance, nil
-}
-
-func (m *mockCreditCardRepo) ResetBalance(_ context.Context, _ string, _ string) (money.Amount, error) {
-	previous := m.balance.CurrentBalance
-	m.balance.CurrentBalance = money.Zero
-	return previous, nil
-}
-func (m *mockCreditCardRepo) UpdateBalanceByAmount(context.Context, string, string, string, money.Amount) error {
-	return nil
-}
 func (m *mockCreditCardRepo) DeleteBalance(context.Context, string, string) error { return nil }
 func (m *mockCreditCardRepo) SavePayment(_ context.Context, payment *creditcardDomain.CardPayment, _ string) error {
 	m.lastSavedPayment = payment
@@ -148,6 +136,7 @@ func (m *mockAccountRepo) BalanceByCurrency(context.Context, string, string, str
 }
 
 type transactionCall struct {
+	accountID       string
 	name            string
 	description     string
 	categoryID      string
@@ -166,8 +155,9 @@ func (m *mockTransactionService) CreateTransaction(context.Context, string, stri
 	return nil
 }
 
-func (m *mockTransactionService) CreateTransactionWithID(_ context.Context, name, description string, amount money.Amount, typeTransaction string, _ string, _ string, categoryID string, _ string, currency string, _ time.Time) (string, error) {
+func (m *mockTransactionService) CreateTransactionWithID(_ context.Context, name, description string, amount money.Amount, typeTransaction string, accountID string, _ string, categoryID string, _ string, currency string, _ time.Time) (string, error) {
 	m.calls = append(m.calls, transactionCall{
+		accountID:       accountID,
 		name:            name,
 		description:     description,
 		categoryID:      categoryID,
@@ -210,24 +200,25 @@ func TestCreatePayment_UsesCardPaymentTypeAndInterestAsBill(t *testing.T) {
 		t.Fatalf("expected no error, got %v", err)
 	}
 
-	if cardRepo.updateBalanceCall != 1 {
-		t.Fatalf("expected 1 balance update, got %d", cardRepo.updateBalanceCall)
-	}
-	if len(cardRepo.updatedBalances) == 0 || !cardRepo.updatedBalances[0].Equal(money.FromInt(-400)) {
-		t.Fatalf("expected updated card balance to be -400, got %v", cardRepo.updatedBalances)
-	}
 	if cardRepo.deletedPaymentID != "" {
 		t.Fatalf("expected no payment rollback, got delete id %s", cardRepo.deletedPaymentID)
 	}
 
-	if len(txRepo.calls) != 2 {
-		t.Fatalf("expected 2 transaction calls, got %d", len(txRepo.calls))
+	// The payment is a transfer: money out of the paying account, debt down on
+	// the card; the interest is an expense of the paying account.
+	want := []transactionCall{
+		{accountID: "acc-1", typeTransaction: "card_payment", amount: money.FromInt(100), currency: "DOP"},
+		{accountID: "card-1", typeTransaction: creditcardDomain.PaymentReceivedType, amount: money.FromInt(100), currency: "DOP"},
+		{accountID: "acc-1", typeTransaction: "bill", amount: money.FromInt(10), currency: "DOP"},
 	}
-	if txRepo.calls[0].typeTransaction != "card_payment" {
-		t.Fatalf("expected first transaction type card_payment, got %s", txRepo.calls[0].typeTransaction)
+	if len(txRepo.calls) != len(want) {
+		t.Fatalf("expected %d transaction calls, got %+v", len(want), txRepo.calls)
 	}
-	if txRepo.calls[1].typeTransaction != "bill" {
-		t.Fatalf("expected interest transaction type bill, got %s", txRepo.calls[1].typeTransaction)
+	for i, w := range want {
+		c := txRepo.calls[i]
+		if c.accountID != w.accountID || c.typeTransaction != w.typeTransaction || !c.amount.Equal(w.amount) || c.currency != w.currency {
+			t.Fatalf("call %d = %+v, want %+v", i, c, w)
+		}
 	}
 }
 
@@ -285,11 +276,12 @@ func TestCreatePayment_LocalizesGeneratedNames(t *testing.T) {
 		ctx          context.Context
 		wantName     string
 		wantDesc     string
+		wantReceived string
 		wantInterest string
 	}{
-		{"default is spanish", context.Background(), "Pago de tarjeta", "Pago a tarjeta BHD - nota", "Cargo por intereses"},
-		{"spanish", i18n.WithLocale(context.Background(), i18n.ES), "Pago de tarjeta", "Pago a tarjeta BHD - nota", "Cargo por intereses"},
-		{"english", i18n.WithLocale(context.Background(), i18n.EN), "Card payment", "Payment to BHD card - nota", "Interest charge"},
+		{"default is spanish", context.Background(), "Pago de tarjeta", "Pago a tarjeta BHD - nota", "Pago recibido", "Cargo por intereses"},
+		{"spanish", i18n.WithLocale(context.Background(), i18n.ES), "Pago de tarjeta", "Pago a tarjeta BHD - nota", "Pago recibido", "Cargo por intereses"},
+		{"english", i18n.WithLocale(context.Background(), i18n.EN), "Card payment", "Payment to BHD card - nota", "Payment received", "Interest charge"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -308,14 +300,17 @@ func TestCreatePayment_LocalizesGeneratedNames(t *testing.T) {
 			if err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
-			if len(txRepo.calls) != 2 {
-				t.Fatalf("expected 2 transaction calls, got %d", len(txRepo.calls))
+			if len(txRepo.calls) != 3 {
+				t.Fatalf("expected 3 transaction calls, got %d", len(txRepo.calls))
 			}
 			if txRepo.calls[0].name != tc.wantName || txRepo.calls[0].description != tc.wantDesc {
 				t.Fatalf("payment transaction = %q / %q, want %q / %q", txRepo.calls[0].name, txRepo.calls[0].description, tc.wantName, tc.wantDesc)
 			}
-			if txRepo.calls[1].name != tc.wantInterest {
-				t.Fatalf("interest transaction = %q, want %q", txRepo.calls[1].name, tc.wantInterest)
+			if txRepo.calls[1].name != tc.wantReceived {
+				t.Fatalf("received transaction = %q, want %q", txRepo.calls[1].name, tc.wantReceived)
+			}
+			if txRepo.calls[2].name != tc.wantInterest {
+				t.Fatalf("interest transaction = %q, want %q", txRepo.calls[2].name, tc.wantInterest)
 			}
 			for _, call := range txRepo.calls {
 				if call.categoryID != "cpcat-user-1" {
@@ -356,7 +351,7 @@ func TestCreatePayment_RejectsOverdraft(t *testing.T) {
 	if !ok || appErr.Code != funds.InsufficientFundsCode || appErr.ToHTTPStatus() != http.StatusBadRequest {
 		t.Fatalf("expected 400 %s, got %#v", funds.InsufficientFundsCode, appErr)
 	}
-	if cardRepo.lastSavedPayment != nil || cardRepo.updateBalanceCall != 0 || len(txRepo.calls) != 0 {
+	if cardRepo.lastSavedPayment != nil || len(txRepo.calls) != 0 {
 		t.Fatalf("nothing must be written on overdraft")
 	}
 	if len(accountRepo.lockedForID) != 1 || accountRepo.lockedForID[0] != "acc-1" {
@@ -372,8 +367,9 @@ func TestCreatePayment_AllowsPaymentOfExactBalance(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("expected the payment to pass, got %v", err)
 	}
-	if len(txRepo.calls) != 1 {
-		t.Fatalf("expected 1 ledger transaction, got %d", len(txRepo.calls))
+	// card_payment on the paying account + card_payment_received on the card.
+	if len(txRepo.calls) != 2 {
+		t.Fatalf("expected 2 ledger transactions, got %d", len(txRepo.calls))
 	}
 }
 
