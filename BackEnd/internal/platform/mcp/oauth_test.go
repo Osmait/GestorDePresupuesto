@@ -447,8 +447,15 @@ func exchangeCode(t *testing.T, f *oauthFixture, code, verifier string) (*httpte
 
 func authorizeCode(t *testing.T, f *oauthFixture, challenge string) string {
 	t.Helper()
+	return authorizeCodeWithScope(t, f, challenge, "mcp")
+}
+
+func authorizeCodeWithScope(t *testing.T, f *oauthFixture, challenge, scope string) string {
+	t.Helper()
 	// GET renders the page; the POST sends back exactly its hidden fields.
-	page := f.do(getAuthorize(authorizeQuery(challenge), ""))
+	q := authorizeQuery(challenge)
+	q.Set("scope", scope)
+	page := f.do(getAuthorize(q, ""))
 	require.Equal(t, http.StatusOK, page.Code)
 	body := page.Body.String()
 	form := url.Values{}
@@ -506,6 +513,24 @@ func TestAuthorizeFlow_EndToEndWithPKCE(t *testing.T) {
 		assert.Error(t, err)
 		_, err = f.provider.TokenVerifier()(refreshed.AccessToken)
 		assert.NoError(t, err)
+	})
+
+	t.Run("refresh keeps the granted scope", func(t *testing.T) {
+		verifier, challenge := newPKCE(t)
+		_, tokens := exchangeCode(t, f, authorizeCodeWithScope(t, f, challenge, "mcp:read"), verifier)
+		require.NotEmpty(t, tokens.RefreshToken)
+
+		// A read-only grant must not upgrade itself to write access.
+		refresh := f.do(postForm("/oauth/token", url.Values{
+			"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken},
+			"client_id": {testClientID}, "scope": {"mcp:write"},
+		}, ""))
+		require.Equal(t, http.StatusOK, refresh.Code, refresh.Body.String())
+		var refreshed tokenResponse
+		require.NoError(t, json.Unmarshal(refresh.Body.Bytes(), &refreshed))
+		info, err := f.provider.TokenVerifier()(refreshed.AccessToken)
+		require.NoError(t, err)
+		assert.Equal(t, "mcp:read", info.Scope)
 	})
 
 	t.Run("revoked refresh token cannot be used", func(t *testing.T) {

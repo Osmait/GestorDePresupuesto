@@ -390,7 +390,26 @@ func (s *LoanService) CancelLoan(ctx context.Context, loanId string, userId stri
 	return s.repository.UpdateLoanStatus(ctx, loanId, userId, loan.LoanStatusCancelled)
 }
 
+// UpdateStatus only moves a loan between active and defaulted. Paid is set by
+// the payment that settles the loan and cancelled by CancelLoan, which also
+// refunds the pending principal; allowing either here (or leaving cancelled)
+// would skip or repeat that bookkeeping.
 func (s *LoanService) UpdateStatus(ctx context.Context, loanId string, userId string, status loan.LoanStatus) error {
+	entity, err := s.repository.FindByIdForUpdate(ctx, loanId, userId)
+	if err != nil {
+		if isNotFound(err) {
+			return ErrLoanNotFound
+		}
+		return err
+	}
+	if entity.Status == status {
+		return nil
+	}
+	allowed := (entity.Status == loan.LoanStatusActive && status == loan.LoanStatusDefaulted) ||
+		(entity.Status == loan.LoanStatusDefaulted && status == loan.LoanStatusActive)
+	if !allowed {
+		return fmt.Errorf("%w: cannot change a %s loan to %s", errorhttp.ErrBadRequest, entity.Status, status)
+	}
 	if err := s.repository.UpdateLoanStatus(ctx, loanId, userId, status); err != nil {
 		if isNotFound(err) {
 			return ErrLoanNotFound

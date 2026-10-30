@@ -336,7 +336,7 @@ func TestStorage_Tokens(t *testing.T) {
 
 	t.Run("refresh token is consumed once, even concurrently", func(t *testing.T) {
 		t.Parallel()
-		_, email := newUser(t)
+		userID, email := newUser(t)
 		tok := newToken(t, s, c.ClientID, email, time.Now().Add(time.Hour), time.Now().Add(24*time.Hour))
 
 		const workers = 8
@@ -347,7 +347,7 @@ func TestStorage_Tokens(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				got, err := s.GetTokenByRefresh(tok.RefreshToken)
-				if err == nil && got.Subject != email {
+				if err == nil && got.Subject != userID {
 					err = errors.New("wrong subject")
 				}
 				results[i] = err
@@ -415,7 +415,7 @@ func TestStorage_Tokens(t *testing.T) {
 func TestStorage_ExpiryCleanup(t *testing.T) {
 	now := time.Now()
 	s := New(testDB)
-	_, email := newUser(t)
+	userID, email := newUser(t)
 	c := newClient(t, s, "")
 
 	expiredCode := newCode(t, s, c.ClientID, email, now.Add(time.Minute))
@@ -434,7 +434,7 @@ func TestStorage_ExpiryCleanup(t *testing.T) {
 	assert.Zero(t, countRows(t, `SELECT COUNT(*) FROM mcp_oauth_tokens WHERE access_token_hash = $1`, HashSecret(deadToken.AccessToken)))
 	got, err := later.GetTokenByRefresh(refreshable.RefreshToken)
 	require.NoError(t, err)
-	assert.Equal(t, email, got.Subject)
+	assert.Equal(t, userID, got.Subject, "a refresh hands over the stored user id, not the email")
 
 	// Writes purge on their own too.
 	stale := newCode(t, s, c.ClientID, email, now.Add(time.Minute))

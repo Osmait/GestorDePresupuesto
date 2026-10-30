@@ -48,6 +48,8 @@ type AccountRepositoryInterface interface {
 	// transaction; Balance feeds the overdraft check (see package funds).
 	FindByIdAndUserIdForUpdate(ctx context.Context, id string, userId string) (*account.Account, error)
 	Balance(ctx context.Context, id string, userId string) (money.Amount, error)
+	// Update renames the card's account (its name is what lists show).
+	Update(ctx context.Context, id string, name string, bank string, userId string) error
 }
 
 type CreditCardService struct {
@@ -205,6 +207,14 @@ func (s *CreditCardService) UpdateCreditCard(ctx context.Context, accountId stri
 			return nil, ErrCardNotFound
 		}
 		return nil, err
+	}
+	if req.Name != nil || req.Bank != nil {
+		if err := s.accountRepo.Update(ctx, accountId, acc.Name, acc.Bank, userId); err != nil {
+			if isNotFound(err) {
+				return nil, ErrCardNotFound
+			}
+			return nil, err
+		}
 	}
 
 	return s.FindCardById(ctx, accountId, userId)

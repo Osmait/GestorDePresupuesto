@@ -142,9 +142,33 @@ func (p *OAuthProvider) ServeAuthorize(w http.ResponseWriter, r *http.Request, c
 
 // TokenHandler serves POST /oauth/token (omniskill). When the storage keeps
 // client secrets hashed, the presented secret is hashed first so omniskill
-// compares hash with hash.
+// compares hash with hash. A refresh keeps the scope of the original grant.
 func (p *OAuthProvider) TokenHandler() http.Handler {
-	return p.withHashedClientSecret(p.server.TokenHandler())
+	return p.withHashedClientSecret(keepRefreshScope(p.server.TokenHandler()))
+}
+
+// keepRefreshScope drops the scope parameter of a refresh_token request, so
+// omniskill keeps the scope of the token being refreshed. omniskill grants
+// whatever scope a refresh asks for, which would let a read-only (mcp:read)
+// grant, or anyone holding its refresh token, upgrade itself to write access.
+// Narrowing on refresh (RFC 6749 §6) is not supported; nothing needs it.
+func keepRefreshScope(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			r.Body = http.MaxBytesReader(w, r.Body, maxTokenRequestBody)
+			if err := r.ParseForm(); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"invalid_request","error_description":"Failed to parse form"}`))
+				return
+			}
+			if r.Form.Get("grant_type") == "refresh_token" {
+				r.Form.Del("scope")
+				r.PostForm.Del("scope")
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // RevocationHandler serves POST /oauth/revoke (RFC 7009, omniskill). The

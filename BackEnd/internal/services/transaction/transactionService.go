@@ -84,6 +84,20 @@ func (s TransactionService) CreateTransaction(ctx context.Context, name, descrip
 	return err
 }
 
+// ErrNotUserType rejects creating, through a user-facing entry point (REST,
+// MCP, AI import), a type the app writes itself as part of a larger operation.
+var ErrNotUserType = fmt.Errorf("%w: only income and bill transactions can be created directly; use the card payment, loan, investment or reconcile flows for the others", errorhttp.ErrBadRequest)
+
+// CreateUserTransaction creates a transaction on behalf of the user. Unlike
+// CreateTransactionWithID, which services also use to write their managed
+// rows, it only accepts the user's own types (see transaction.IsUserType).
+func (s TransactionService) CreateUserTransaction(ctx context.Context, name, description string, amount money.Amount, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) (string, error) {
+	if !transaction.IsUserType(typeTransaction) {
+		return "", ErrNotUserType
+	}
+	return s.CreateTransactionWithID(ctx, name, description, amount, typeTransaction, accountId, userId, categoryId, budgetId, currency, createdAt)
+}
+
 func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, description string, amount money.Amount, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) (string, error) {
 	uuid, err := ksuid.NewRandom()
 	if err != nil {

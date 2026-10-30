@@ -331,14 +331,21 @@ func (repo *TransactionRepository) Update(ctx context.Context, id string, t *tra
 		return err
 	}
 
+	// A zero CreatedAt keeps the stored date; otherwise the transaction moves
+	// to that date (the ledger and monthly rollup triggers follow the move).
 	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3,
-		type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, currency = $8
+		type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, currency = $8,
+		created_at = COALESCE($11, created_at)
 		WHERE id = $9 AND user_id = $10`
 	currency := t.Currency
 	if currency == "" {
 		currency = "DOP"
 	}
-	result, err := q.ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id, t.UserId)
+	var createdAt any
+	if !t.CreatedAt.IsZero() {
+		createdAt = t.CreatedAt
+	}
+	result, err := q.ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id, t.UserId, createdAt)
 	if err != nil {
 		return err
 	}
