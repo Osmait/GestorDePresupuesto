@@ -292,9 +292,7 @@ func (u *UserService) UpdateUser(ctx context.Context, id string, userRequest *dt
 					WithContext(ctx).
 					WithOperation("UpdateUser").
 					WithDetails(map[string]interface{}{
-						"email":        userRequest.Email,
-						"existing_id":  duplicateUser.Id,
-						"requested_id": id,
+						"email": userRequest.Email,
 					})
 			}
 		}
