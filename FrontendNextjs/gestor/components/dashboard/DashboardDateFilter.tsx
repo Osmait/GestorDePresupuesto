@@ -8,6 +8,7 @@ import type { DateRange } from 'react-day-picker'
 import { CalendarDateRangePicker } from '@/components/date-range-picker'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { getAppMonthRangeStrings, getAppToday } from '@/lib/app-time'
 
 type Preset = 'this_month' | 'last_month' | 'last_3_months' | 'this_year' | 'all' | 'custom'
 
@@ -26,27 +27,19 @@ interface Props {
 	initialPreset?: Preset
 }
 
+/** Preset ranges in the app's time zone (Santo Domingo), not the browser's. */
 function computePresetRange(preset: Preset): { from: string; to: string } | null {
-	const now = new Date()
-	const startOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth(), 1)
-	const endOfMonth = (d: Date) => new Date(d.getFullYear(), d.getMonth() + 1, 0)
-
 	switch (preset) {
 		case 'this_month':
-			return { from: format(startOfMonth(now), 'yyyy-MM-dd'), to: format(endOfMonth(now), 'yyyy-MM-dd') }
-		case 'last_month': {
-			const prev = new Date(now.getFullYear(), now.getMonth() - 1, 1)
-			return { from: format(startOfMonth(prev), 'yyyy-MM-dd'), to: format(endOfMonth(prev), 'yyyy-MM-dd') }
+			return getAppMonthRangeStrings(0)
+		case 'last_month':
+			return getAppMonthRangeStrings(-1)
+		case 'last_3_months':
+			return { from: getAppMonthRangeStrings(-2).from, to: getAppMonthRangeStrings(0).to }
+		case 'this_year': {
+			const { year } = getAppToday()
+			return { from: `${year}-01-01`, to: `${year}-12-31` }
 		}
-		case 'last_3_months': {
-			const from = new Date(now.getFullYear(), now.getMonth() - 2, 1)
-			return { from: format(from, 'yyyy-MM-dd'), to: format(endOfMonth(now), 'yyyy-MM-dd') }
-		}
-		case 'this_year':
-			return {
-				from: format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd'),
-				to: format(new Date(now.getFullYear(), 11, 31), 'yyyy-MM-dd'),
-			}
 		default:
 			return null
 	}

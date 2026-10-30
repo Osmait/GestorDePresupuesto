@@ -22,6 +22,7 @@ import { useSuggestCategoryMutation } from '@/hooks/queries/useAIQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { APP_TIME_ZONE, getAppTodayDate, instantToCalendarDate, pickedDayToInstant } from '@/lib/app-time'
 import { onSessionExpired } from '@/lib/client-session'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { moneyInputToNumber, moneyMessages, moneySchema } from '@/lib/money-input'
@@ -175,6 +176,11 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 	}, [suggestCategoryMutation.mutateAsync])
 
 	const isEditing = !!editingTransaction
+	// Editing without changing the day keeps the transaction's time.
+	const originalCreatedAt = useMemo(
+		() => (editingTransaction?.created_at ? new Date(editingTransaction.created_at) : undefined),
+		[editingTransaction?.created_at],
+	)
 	const [cardCurrencies, setCardCurrencies] = useState<string[]>([])
 	const [cardCurrenciesLoaded, setCardCurrenciesLoaded] = useState(false)
 	const [categorySuggestion, setCategorySuggestion] = useState<AICategorySuggestion | null>(null)
@@ -734,7 +740,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 												)}
 											>
 												{field.value ? (
-													formatLocalDate(field.value, locale, { dateStyle: 'long' })
+													formatLocalDate(field.value, locale, { dateStyle: 'long', timeZone: APP_TIME_ZONE })
 												) : (
 													<span>{t('selectDate')}</span>
 												)}
@@ -745,9 +751,14 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 									<PopoverContent className='w-auto p-0' align='start'>
 										<Calendar
 											mode='single'
-											selected={field.value}
-											onSelect={field.onChange}
-											disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
+											// The calendar works with days; the field holds an instant.
+											// Days are those of the app's time zone (Santo Domingo).
+											selected={field.value ? instantToCalendarDate(field.value) : undefined}
+											onSelect={(day) => {
+												if (!day) return
+												field.onChange(pickedDayToInstant(day, originalCreatedAt))
+											}}
+											disabled={(date) => date > getAppTodayDate() || date < new Date('1900-01-01')}
 											autoFocus
 										/>
 									</PopoverContent>

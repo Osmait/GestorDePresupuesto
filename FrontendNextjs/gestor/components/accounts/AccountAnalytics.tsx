@@ -11,6 +11,7 @@ import { StatCard } from '@/components/shared/StatCard'
 import { StatGrid } from '@/components/shared/StatGrid'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { getAppTodayDate } from '@/lib/app-time'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { isInflowTransaction } from '@/lib/transaction-utils'
 import { cn, DEFAULT_CURRENCY } from '@/lib/utils'
@@ -101,7 +102,7 @@ export function AccountAnalytics({
 		const historyPoints: { label: string; value: number }[] = []
 		// Push current state
 		historyPoints.push({
-			label: formatLocalDate(new Date(), locale, { month: 'short', day: 'numeric' }),
+			label: formatLocalDate(getAppTodayDate(), locale, { month: 'short', day: 'numeric' }),
 			value: balanceTracker,
 		})
 

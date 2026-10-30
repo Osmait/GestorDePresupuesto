@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { format } from 'date-fns'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -12,6 +11,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { getAppTodayString } from '@/lib/app-time'
 import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
 import { useAppLocale } from '@/lib/i18n/date-locale'
 import { moneyMessages, moneySchema } from '@/lib/money-input'
@@ -54,7 +54,7 @@ function emptyValues(sourceAccountId = ''): LoanFormValues {
 		principal_amount: 0,
 		annual_rate: 0,
 		term_months: 12,
-		start_date: format(new Date(), 'yyyy-MM-dd'),
+		start_date: getAppTodayString(),
 		source_account_id: sourceAccountId,
 		notes: '',
 	}

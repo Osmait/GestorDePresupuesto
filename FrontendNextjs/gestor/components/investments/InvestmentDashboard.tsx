@@ -1,6 +1,5 @@
 'use client'
 
-import { format } from 'date-fns'
 import { LineChart, PieChart } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
@@ -11,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useGetInvestments } from '@/hooks/queries/useInvestmentsQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { formatDateInTimeZone, getAppTodayString } from '@/lib/app-time'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { InvestmentType } from '@/types/investment'
 import { InvestmentSummaryCards } from './InvestmentSummaryCards'
@@ -80,8 +80,8 @@ export function InvestmentDashboard() {
 			const cost = inv.quantity * inv.purchase_price
 			runningTotal += cost
 
-			// Group by the user's local calendar day (YYYY-MM-DD).
-			const date = format(new Date(inv.created_at), 'yyyy-MM-dd')
+			// Group by the calendar day (YYYY-MM-DD) in the app's time zone.
+			const date = formatDateInTimeZone(new Date(inv.created_at))
 
 			// If multiple investments on same day, update last entry, else push new
 			const lastEntry = history[history.length - 1]
@@ -94,7 +94,7 @@ export function InvestmentDashboard() {
 
 		// A single day draws no line: add today's point.
 		if (history.length === 1) {
-			const today = format(new Date(), 'yyyy-MM-dd')
+			const today = getAppTodayString()
 			if (history[0].x !== today) {
 				history.push({ x: today, y: runningTotal })
 			}
