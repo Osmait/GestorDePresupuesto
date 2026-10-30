@@ -53,6 +53,60 @@ function jsonError(status: number, message: string) {
 	return Response.json({ error: message }, { status, headers: { 'cache-control': 'no-store' } })
 }
 
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
+const SAME_ORIGIN_FETCH_SITES = new Set(['same-origin', 'none'])
+
+/**
+ * Hosts this request may legitimately come from: the request URL's own host,
+ * plus the `Host` / `X-Forwarded-Host` the server was reached with (behind a
+ * reverse proxy the URL can carry the internal host). A cross-site page cannot
+ * forge these on a browser request: setting X-Forwarded-Host needs a CORS
+ * preflight, which this route never grants.
+ */
+function ownHosts(req: NextRequest): Set<string> {
+	const hosts = new Set([req.nextUrl.host.toLowerCase()])
+	const host = req.headers.get('host')
+	if (host) hosts.add(host.trim().toLowerCase())
+	const forwardedHost = req.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
+	if (forwardedHost) hosts.add(forwardedHost.toLowerCase())
+	return hosts
+}
+
+/** Host of an `Origin` header value; null for `null` and anything unparsable. */
+function originHost(origin: string): string | null {
+	try {
+		return new URL(origin).host.toLowerCase()
+	} catch {
+		return null
+	}
+}
+
+/**
+ * CSRF guard: the proxy authenticates with the session cookie alone, so a
+ * state-changing request triggered by another site must not get through.
+ * Writes are rejected when the browser says they are cross-origin (`Origin`
+ * names another host, or `Sec-Fetch-Site` is not same-origin/none). Requests
+ * without either header (server-to-server calls, old browsers) pass.
+ *
+ * The scheme is not compared: behind a TLS-terminating proxy the request URL
+ * may say http while the browser's Origin says https.
+ *
+ * Returns the 403 response to send, or null when the request may proceed.
+ */
+export function rejectCrossOriginWrite(req: NextRequest): Response | null {
+	if (SAFE_METHODS.has(req.method.toUpperCase())) return null
+
+	const fetchSite = req.headers.get('sec-fetch-site')?.trim().toLowerCase()
+	if (fetchSite && !SAME_ORIGIN_FETCH_SITES.has(fetchSite)) return jsonError(403, 'Cross-origin request rejected')
+
+	const origin = req.headers.get('origin')
+	if (origin !== null) {
+		const host = originHost(origin.trim())
+		if (!host || !ownHosts(req).has(host)) return jsonError(403, 'Cross-origin request rejected')
+	}
+	return null
+}
+
 /**
  * 502 for a backend that could not be reached. The cause is logged server-side
  * only: node:http errors name the internal backend address (e.g. ECONNREFUSED host:port).

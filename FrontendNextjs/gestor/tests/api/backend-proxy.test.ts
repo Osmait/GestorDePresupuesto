@@ -264,6 +264,35 @@ describe('backend proxy route', () => {
 		expect(res.status).toBe(201)
 	})
 
+	it('rejects a cross-site write before reading the session or calling the backend', async () => {
+		const res = await POST(
+			browserRequest('http://localhost:3000/api/backend/account', {
+				method: 'POST',
+				body: '{}',
+				headers: { origin: 'https://evil.com', 'sec-fetch-site': 'cross-site' },
+			}),
+			ctx(['account']),
+		)
+
+		expect(res.status).toBe(403)
+		expect(upstream.requests).toHaveLength(0)
+		expect(readSessionJwtMock).not.toHaveBeenCalled()
+	})
+
+	it('forwards a same-origin browser write', async () => {
+		const res = await POST(
+			browserRequest('http://localhost:3000/api/backend/account', {
+				method: 'POST',
+				body: '{}',
+				headers: { origin: 'http://localhost:3000', 'sec-fetch-site': 'same-origin' },
+			}),
+			ctx(['account']),
+		)
+
+		expect(res.status).toBe(200)
+		expect(upstream.requests).toHaveLength(1)
+	})
+
 	it('forwards public calls without credentials when there is no session', async () => {
 		currentSession = null
 		respond = (_req, res) => {
