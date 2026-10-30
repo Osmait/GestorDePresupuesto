@@ -70,17 +70,24 @@ test.describe('Credit Cards @prod-write', () => {
 		await expect(editModal).toBeVisible()
 		const updatedCardName = `${cardName}-UPD`
 		await editModal.locator('input[name="name"]').fill(updatedCardName)
+		// The debt is not editable here (it changes by reconciling the card); the limit is,
+		// typed with a decimal comma as es-DO keyboards do.
+		await expect(editModal.getByText(/^(Initial Debt|Deuda inicial)$/i)).toHaveCount(0)
+		await expect(editModal.getByText(/(use "Reconcile"|usa "Cuadrar")/i)).toBeVisible()
+		const limitInput = editModal.getByRole('textbox', { name: /^(Credit Limit|Límite de crédito) DOP$/i })
+		await limitInput.fill('20000,50')
 		await editModal.getByRole('button', { name: /^(Update|Actualizar)$/i }).click()
+		await expect(editModal).not.toBeVisible({ timeout: 20000 })
 
-		if (await editModal.isVisible()) {
-			await page.keyboard.press('Escape')
-		}
-
+		// The name is matched loosely: the backend does not persist a renamed card yet
+		// (CreditCardService.UpdateCreditCard edits the account's name but never saves it).
 		const updatedCard = page.locator('[data-testid^="credit-card-item-"]').filter({
 			hasText: new RegExp(`${cardName}(-UPD)?`),
 		}).first()
 		await expect(updatedCard).toBeVisible({ timeout: 20000 })
 		await ensureCardBackVisible(updatedCard)
+		// Limit 20,000.50 minus the 1,400 still owed.
+		await expect(updatedCard).toContainText('18,600.50', { timeout: 20000 })
 
 		// Delete card
 		await updatedCard.getByRole('button', { name: /^(Acciones de|Actions for) /i }).dispatchEvent('pointerdown')

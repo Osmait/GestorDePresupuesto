@@ -1490,6 +1490,8 @@
       "removeCurrency": "Remove currency",
       "creditLimit": "Credit Limit",
       "initialDebt": "Initial Debt",
+      "currentDebt": "Current debt",
+      "debtReadOnlyHint": "To change the debt, use \"Reconcile\" on the card.",
       "create": "Create",
       "update": "Update",
       "errors": {
@@ -1499,7 +1501,7 @@
         "dayMin": "Min {min}",
         "dayMax": "Max {max}",
         "saveFailed": "The card could not be saved. Please try again.",
-        "limitRequired": "Enter a credit limit of 0 or more for each currency."
+        "limitRequired": "Enter a credit limit greater than 0 for each currency."
       }
     },
     "payment": {

@@ -1490,6 +1490,8 @@
       "removeCurrency": "Quitar moneda",
       "creditLimit": "Límite de crédito",
       "initialDebt": "Deuda inicial",
+      "currentDebt": "Deuda actual",
+      "debtReadOnlyHint": "Para cambiar la deuda, usa \"Cuadrar\" en la tarjeta.",
       "create": "Crear",
       "update": "Actualizar",
       "errors": {
@@ -1499,7 +1501,7 @@
         "dayMin": "Mínimo {min}",
         "dayMax": "Máximo {max}",
         "saveFailed": "No se pudo guardar la tarjeta. Inténtalo de nuevo.",
-        "limitRequired": "Ingresa un límite de crédito de 0 o más para cada moneda."
+        "limitRequired": "Ingresa un límite de crédito mayor que 0 para cada moneda."
       }
     },
     "payment": {
