@@ -14,6 +14,7 @@ import { useExtractFromFile } from '@/hooks/queries/useAIQuery'
 import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useCreateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { extractedDateToInstant } from '@/lib/app-time'
 import { AICategorySuggestion, AIExtractResponse, AIPotentialDuplicate, DocumentType } from '@/types/ai'
 import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
@@ -205,7 +206,8 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 					categoryId: txn.category_id || '',
 					budgetId: txn.budget_id,
 					currency: txn.currency || 'DOP',
-					createdAt: txn.created_at ? new Date(txn.created_at) : undefined,
+					// A date without a time (calendar day) is saved on that day.
+					createdAt: txn.created_at ? extractedDateToInstant(txn.created_at) : undefined,
 				})
 				saved++
 			} catch (error) {

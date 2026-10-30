@@ -190,7 +190,7 @@ func TestTransactionFilter_ParseFromQuery(t *testing.T) {
 			ctx := createGinContextWithQuery(tt.queryParams)
 
 			filter := NewTransactionFilter()
-			err := filter.ParseFromQuery(ctx)
+			err := filter.ParseFromQuery(ctx, nil)
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -307,92 +307,67 @@ func TestTransactionFilter_Validate(t *testing.T) {
 	}
 }
 
+// Days and months are cut in the app time zone (Santo Domingo, UTC-4), so a
+// bill paid on Sep 30 at 23:30 local (Oct 1 03:30 UTC) is not in October and
+// one paid on Oct 31 at 21:30 local (Nov 1 01:30 UTC) is. Ranges are half-open
+// [CalculatedDateFrom, CalculatedDateTo).
 func TestTransactionFilter_CalculateDates(t *testing.T) {
+	t.Parallel()
+	loc, err := time.LoadLocation("America/Santo_Domingo")
+	require.NoError(t, err)
+	local := func(y int, m time.Month, d int) time.Time { return time.Date(y, m, d, 0, 0, 0, 0, loc) }
+	// Saturday Oct 31 2026, 22:00 local = Sunday Nov 1 02:00 UTC
+	now := time.Date(2026, time.October, 31, 22, 0, 0, 0, loc)
+
 	tests := []struct {
-		name           string
-		filter         *TransactionFilter
-		expectError    bool
-		validateResult func(t *testing.T, filter *TransactionFilter)
+		name             string
+		filter           TransactionFilter
+		wantFrom, wantTo time.Time
+		expectError      bool
 	}{
+		{name: "today", filter: TransactionFilter{Period: "today"}, wantFrom: local(2026, 10, 31), wantTo: local(2026, 11, 1)},
+		{name: "this_week (Monday to Sunday)", filter: TransactionFilter{Period: "this_week"}, wantFrom: local(2026, 10, 26), wantTo: local(2026, 11, 2)},
+		{name: "last_week", filter: TransactionFilter{Period: "last_week"}, wantFrom: local(2026, 10, 19), wantTo: local(2026, 10, 26)},
+		{name: "this_month", filter: TransactionFilter{Period: "this_month"}, wantFrom: local(2026, 10, 1), wantTo: local(2026, 11, 1)},
+		{name: "last_month on Oct 31 is September", filter: TransactionFilter{Period: "last_month"}, wantFrom: local(2026, 9, 1), wantTo: local(2026, 10, 1)},
+		{name: "this_year", filter: TransactionFilter{Period: "this_year"}, wantFrom: local(2026, 1, 1), wantTo: local(2027, 1, 1)},
+		{name: "last_year", filter: TransactionFilter{Period: "last_year"}, wantFrom: local(2025, 1, 1), wantTo: local(2026, 1, 1)},
+		{name: "explicit October", filter: TransactionFilter{DateFrom: "2026-10-01", DateTo: "2026-10-31"}, wantFrom: local(2026, 10, 1), wantTo: local(2026, 11, 1)},
+		{name: "slashes", filter: TransactionFilter{DateFrom: "2024/01/01", DateTo: "2024/12/31"}, wantFrom: local(2024, 1, 1), wantTo: local(2025, 1, 1)},
+		{name: "single day", filter: TransactionFilter{DateFrom: "2026-10-31", DateTo: "2026-10-31"}, wantFrom: local(2026, 10, 31), wantTo: local(2026, 11, 1)},
 		{
-			name: "today period",
-			filter: &TransactionFilter{
-				Period: "today",
-			},
-			validateResult: func(t *testing.T, filter *TransactionFilter) {
-				now := time.Now()
-				expectedStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, now.Location())
-				expectedEnd := time.Date(now.Year(), now.Month(), now.Day(), 23, 59, 59, 999999999, now.Location())
-
-				assert.True(t, filter.CalculatedDateFrom.Equal(expectedStart))
-				assert.True(t, filter.CalculatedDateTo.Year() == expectedEnd.Year() &&
-					filter.CalculatedDateTo.Month() == expectedEnd.Month() &&
-					filter.CalculatedDateTo.Day() == expectedEnd.Day())
-			},
+			name:     "RFC3339 bounds keep their instant",
+			filter:   TransactionFilter{DateFrom: "2026-10-31T20:00:00-04:00", DateTo: "2026-11-01T01:30:00Z"},
+			wantFrom: time.Date(2026, 11, 1, 0, 0, 0, 0, time.UTC),
+			wantTo:   time.Date(2026, 11, 1, 1, 30, 0, 1000, time.UTC),
 		},
-		{
-			name: "this_month period",
-			filter: &TransactionFilter{
-				Period: "this_month",
-			},
-			validateResult: func(t *testing.T, filter *TransactionFilter) {
-				now := time.Now()
-				expectedStart := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-
-				assert.True(t, filter.CalculatedDateFrom.Equal(expectedStart))
-				assert.Equal(t, now.Month(), filter.CalculatedDateFrom.Month())
-				assert.Equal(t, now.Year(), filter.CalculatedDateFrom.Year())
-			},
-		},
-		{
-			name: "explicit date range",
-			filter: &TransactionFilter{
-				DateFrom: "2024/01/01",
-				DateTo:   "2024/12/31",
-			},
-			validateResult: func(t *testing.T, filter *TransactionFilter) {
-				expectedStart := time.Date(2024, 1, 1, 0, 0, 0, 0, time.UTC)
-				expectedEnd := time.Date(2024, 12, 31, 23, 59, 59, 0, time.UTC)
-
-				assert.Equal(t, expectedStart.Year(), filter.CalculatedDateFrom.Year())
-				assert.Equal(t, expectedStart.Month(), filter.CalculatedDateFrom.Month())
-				assert.Equal(t, expectedStart.Day(), filter.CalculatedDateFrom.Day())
-
-				assert.Equal(t, expectedEnd.Year(), filter.CalculatedDateTo.Year())
-				assert.Equal(t, expectedEnd.Month(), filter.CalculatedDateTo.Month())
-				assert.Equal(t, expectedEnd.Day(), filter.CalculatedDateTo.Day())
-			},
-		},
-		{
-			name: "invalid period",
-			filter: &TransactionFilter{
-				Period: "invalid_period",
-			},
-			expectError: true,
-		},
-		{
-			name: "invalid date format",
-			filter: &TransactionFilter{
-				DateFrom: "invalid-date",
-			},
-			expectError: true,
-		},
+		{name: "only date_from: 30 days", filter: TransactionFilter{DateFrom: "2026-10-01"}, wantFrom: local(2026, 10, 1), wantTo: local(2026, 10, 31)},
+		{name: "no dates: last 30 days up to now", filter: TransactionFilter{}, wantFrom: now.AddDate(0, 0, -30), wantTo: now},
+		{name: "invalid period", filter: TransactionFilter{Period: "invalid_period"}, expectError: true},
+		{name: "invalid date format", filter: TransactionFilter{DateFrom: "invalid-date"}, expectError: true},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.filter.calculateDates()
-
+			t.Parallel()
+			f := tt.filter
+			err := f.calculateDates(now, loc)
 			if tt.expectError {
 				assert.Error(t, err)
-			} else {
-				require.NoError(t, err)
-				if tt.validateResult != nil {
-					tt.validateResult(t, tt.filter)
-				}
+				return
 			}
+			require.NoError(t, err)
+			assert.True(t, f.CalculatedDateFrom.Equal(tt.wantFrom), "from: want %s got %s", tt.wantFrom, f.CalculatedDateFrom)
+			assert.True(t, f.CalculatedDateTo.Equal(tt.wantTo), "to: want %s got %s", tt.wantTo, f.CalculatedDateTo)
 		})
 	}
+
+	// the reproduced bug: the October filter
+	f := TransactionFilter{DateFrom: "2026-10-01", DateTo: "2026-10-31"}
+	require.NoError(t, f.calculateDates(now, loc))
+	in := func(at time.Time) bool { return !at.Before(f.CalculatedDateFrom) && at.Before(f.CalculatedDateTo) }
+	assert.True(t, in(time.Date(2026, 10, 31, 21, 30, 0, 0, loc)), "Oct 31 21:30 local must be in October")
+	assert.False(t, in(time.Date(2026, 9, 30, 23, 30, 0, 0, loc)), "Sep 30 23:30 local must not be in October")
 }
 
 func TestTransactionFilter_HasFilters(t *testing.T) {

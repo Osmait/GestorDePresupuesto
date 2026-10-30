@@ -13,6 +13,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { calendarDateParts, calendarDateToNoonUTC, getAppTodayDate, parseCalendarDate } from '@/lib/app-time'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { moneyInputToNumber, toMoneyInputText } from '@/lib/money-input'
 import { cn } from '@/lib/utils'
@@ -282,11 +283,13 @@ function TransactionPreviewView({
 											<fieldset className='min-w-0'>
 												<legend className='mb-1.5 text-sm font-medium leading-none'>{t('date')}</legend>
 												<DatePicker
-													value={editForm.created_at ? new Date(editForm.created_at) : new Date()}
+													// Calendar days: a statement date is a day, not an instant.
+													value={editForm.created_at ? parseCalendarDate(editForm.created_at) : getAppTodayDate()}
 													onChange={(date) =>
 														setEditForm({
 															...editForm,
-															created_at: date?.toISOString() || '',
+															// That day at 12:00 UTC: the same day in UTC and Santo Domingo.
+															created_at: date ? calendarDateToNoonUTC(calendarDateParts(date)).toISOString() : '',
 														})
 													}
 													placeholder={t('date')}

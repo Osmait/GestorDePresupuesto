@@ -8,6 +8,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
@@ -50,10 +51,24 @@ type TransactionService struct {
 	cache                 cache.CacheRepository
 	aiCache               AICacheInvalidator
 	usdToDopRateFn        func(context.Context) (money.Amount, error)
+	loc                   *time.Location
 }
 
-func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator, usdToDopRateFn func(context.Context) (money.Amount, error)) *TransactionService {
-	return &TransactionService{
+// Option configures a TransactionService.
+type Option func(*TransactionService)
+
+// WithLocation sets the app time zone that calendar days and months of
+// transaction filters are cut in (default apptime.Default()).
+func WithLocation(loc *time.Location) Option {
+	return func(s *TransactionService) {
+		if loc != nil {
+			s.loc = loc
+		}
+	}
+}
+
+func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator, usdToDopRateFn func(context.Context) (money.Amount, error), opts ...Option) *TransactionService {
+	s := &TransactionService{
 		transactionRepository: transactionRepository,
 		budgetRepository:      budgetReposiotry,
 		notificationService:   notificationService,
@@ -61,6 +76,19 @@ func NewTransactionService(transactionRepository transactionRepo.TransactionRepo
 		aiCache:               aiCache,
 		usdToDopRateFn:        usdToDopRateFn,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// Location returns the app time zone (apptime.Default() when none was
+// configured, or on a nil service).
+func (s *TransactionService) Location() *time.Location {
+	if s == nil {
+		return apptime.Default()
+	}
+	return apptime.OrDefault(s.loc)
 }
 
 // listCachePrefix is the cache invalidation group of userId's transaction

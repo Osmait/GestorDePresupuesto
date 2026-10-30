@@ -82,8 +82,9 @@ describe('calendar helpers', () => {
 		expect(effectiveDay(0, 30)).toBeNull()
 	})
 
-	it('reads today from the local date', () => {
-		expect(localToday(new Date(2026, 9, 11, 23, 59))).toEqual(OCT_11)
+	it('reads today in Santo Domingo, whatever the runtime zone', () => {
+		// 2026-10-11 23:59 in Santo Domingo (UTC-4) is already the 12th in UTC.
+		expect(localToday(new Date('2026-10-12T03:59:00Z'))).toEqual(OCT_11)
 	})
 
 	it('splits the month into 1–7, 8–15, 16–23 and 24–end', () => {

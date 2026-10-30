@@ -52,7 +52,7 @@ func (h *Handler) detectPotentialDuplicates(
 				continue
 			}
 
-			matchType, score := compareTransactionsForDuplicate(extractedTxn, existingTxn)
+			matchType, score := compareTransactionsForDuplicate(extractedTxn, existingTxn, h.location())
 			if matchType == "" {
 				continue
 			}
@@ -107,7 +107,7 @@ func (h *Handler) detectPotentialDuplicates(
 	return result
 }
 
-func compareTransactionsForDuplicate(extracted *transaction.Transaction, existing *transaction.Transaction) (string, float64) {
+func compareTransactionsForDuplicate(extracted *transaction.Transaction, existing *transaction.Transaction, loc *time.Location) (string, float64) {
 	if extracted == nil || existing == nil {
 		return "", 0
 	}
@@ -124,7 +124,7 @@ func compareTransactionsForDuplicate(extracted *transaction.Transaction, existin
 	existingAmount := existing.Amount
 	amountDiff := extractedAmount.Sub(existingAmount).Abs()
 
-	dateDiffDays := daysBetween(extracted.CreatedAt, existing.CreatedAt)
+	dateDiffDays := daysBetween(extracted.CreatedAt, existing.CreatedAt, loc)
 	nameSimilarity := nameSimilarityScore(extracted.Name, existing.Name)
 
 	currencyA := normalizeCurrency(extracted.Currency)
@@ -203,13 +203,15 @@ func getExtractionDateRange(transactions []*transaction.Transaction) (time.Time,
 	return minDate, maxDate
 }
 
-func daysBetween(a, b time.Time) int {
+// daysBetween is the number of calendar days between a and b in loc (the app
+// time zone), whatever locations a and b carry.
+func daysBetween(a, b time.Time, loc *time.Location) int {
 	if a.IsZero() || b.IsZero() {
 		return 2
 	}
-	aDate := time.Date(a.Year(), a.Month(), a.Day(), 0, 0, 0, 0, a.Location())
-	bDate := time.Date(b.Year(), b.Month(), b.Day(), 0, 0, 0, 0, b.Location())
-	diff := aDate.Sub(bDate)
+	ay, am, ad := a.In(loc).Date()
+	by, bm, bd := b.In(loc).Date()
+	diff := time.Date(ay, am, ad, 0, 0, 0, 0, time.UTC).Sub(time.Date(by, bm, bd, 0, 0, 0, 0, time.UTC))
 	if diff < 0 {
 		diff = -diff
 	}

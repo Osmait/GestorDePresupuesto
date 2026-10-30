@@ -36,6 +36,7 @@ import { DashboardCharts } from '@/components/transactions/DashboardCharts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getAppMonthRangeStrings, getAppTodayDate } from '@/lib/app-time'
 import { formatLocalDate } from '@/lib/i18n/date-locale'
 import { buildDashboardHydrationState } from '@/lib/query/dashboard-hydration'
 import {
@@ -154,13 +155,9 @@ function resolveDateRange(searchParams: { date_from?: string; date_to?: string; 
 		return { dateFrom: searchParams.date_from, dateTo: searchParams.date_to, preset: presetParam }
 	}
 
-	// Default: current month
-	const now = new Date()
-	const from = new Date(now.getFullYear(), now.getMonth(), 1)
-	const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-	const fmt = (d: Date) =>
-		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-	return { dateFrom: fmt(from), dateTo: fmt(to), preset: 'this_month' }
+	// Default: the current month in Santo Domingo (the server clock runs in UTC).
+	const { from, to } = getAppMonthRangeStrings()
+	return { dateFrom: from, dateTo: to, preset: 'this_month' }
 }
 
 // Componente principal - Server Component que carga datos directamente
@@ -255,7 +252,7 @@ export default async function DashboardPage({
 									<DashboardDateFilter initialFrom={dateFrom} initialTo={dateTo} initialPreset={preset} />
 									<Badge variant='outline' className='h-10 gap-1 px-3 font-normal text-muted-foreground'>
 										<Calendar className='h-3.5 w-3.5' aria-hidden='true' />
-										{formatLocalDate(new Date(), locale, {
+										{formatLocalDate(getAppTodayDate(), locale, {
 											day: 'numeric',
 											month: 'long',
 											year: 'numeric',

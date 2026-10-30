@@ -1,7 +1,6 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { format } from 'date-fns'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
@@ -12,6 +11,7 @@ import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, For
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { getAppTodayString } from '@/lib/app-time'
 import { getSafeErrorDetail } from '@/lib/api-error'
 import { moneyMessages, moneySchema } from '@/lib/money-input'
 import type { Account } from '@/types/account'
@@ -57,7 +57,7 @@ function emptyValues(destinationAccountId = ''): LoanPaymentInput {
 	return {
 		destination_account_id: destinationAccountId,
 		amount: '',
-		payment_date: format(new Date(), 'yyyy-MM-dd'),
+		payment_date: getAppTodayString(),
 		notes: '',
 	}
 }

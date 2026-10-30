@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"strings"
 	"sync/atomic"
 	"time"
 
@@ -12,41 +11,63 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
-func NewAnalyticsRepository(db *sql.DB) *AnalyticsRepository {
-	return &AnalyticsRepository{db: db}
+func NewAnalyticsRepository(db *sql.DB, opts ...Option) *AnalyticsRepository {
+	a := &AnalyticsRepository{db: db, loc: apptime.Default()}
+	for _, opt := range opts {
+		opt(a)
+	}
+	return a
+}
+
+// Option configures an AnalyticsRepository.
+type Option func(*AnalyticsRepository)
+
+// WithLocation sets the app time zone that months and days are cut in
+// (default apptime.Default()).
+func WithLocation(loc *time.Location) Option {
+	return func(a *AnalyticsRepository) {
+		if loc != nil {
+			a.loc = loc
+		}
+	}
 }
 
 // AnalyticsRepository serves the analytics aggregates.
 //
-// Large ranges are read from transaction_monthly_rollup (migration 000054):
-// per (user, UTC month, category, type, currency) SUM(amount) and COUNT(*),
-// maintained by triggers in the same transaction as every write to
-// transactions. A date range [from, to) — half-open: the ranged methods take
-// the instant just after the range, e.g. 00:00 of the day after its last day —
-// is split into the whole UTC months it contains (read from the rollup) and
-// the partial months at its edges (read from transactions), so results are
-// exactly those of aggregating the ledger.
+// Months are calendar months of the app time zone (loc, APP_TIMEZONE): every
+// query buckets with created_at AT TIME ZONE <loc>, never in the session time
+// zone, and ranges are cut at local midnight by the caller.
+//
+// Large ranges are read from transaction_monthly_rollup (migrations 000054,
+// 000062): per (user, month in app_timezone(), category, type, currency)
+// SUM(amount) and COUNT(*), maintained by triggers in the same transaction as
+// every write to transactions. A date range [from, to) — half-open: the
+// ranged methods take the instant just after the range, e.g. 00:00 local of
+// the day after its last day — is split into the whole local months it
+// contains (read from the rollup) and the partial months at its edges (read
+// from transactions), so results are exactly those of aggregating the ledger.
 // Currency conversion is applied to the sums (sum(amount)*rate ==
 // sum(amount*rate) in NUMERIC arithmetic, which is exact).
 //
 // The ledger is aggregated directly (the original queries) when a filter the
 // rollup does not have is set (account, min/max amount), when the range
-// contains no whole month, or when the session TimeZone is not UTC: months are
-// bucketed by EXTRACT(... FROM created_at), i.e. in the session time zone, and
-// the rollup buckets in UTC.
+// contains no whole month, or when the database's app_timezone() is not loc
+// (the rollup's months would not be loc's months).
 type AnalyticsRepository struct {
-	db *sql.DB
-	// sessionTZ caches whether the DB session buckets months in UTC.
-	sessionTZ atomic.Int32
+	db  *sql.DB
+	loc *time.Location
+	// rollupTZ caches whether app_timezone() matches loc.
+	rollupTZ atomic.Int32
 }
 
 const (
-	sessionTZUnknown int32 = iota
-	sessionTZUTC
-	sessionTZOther
+	rollupTZUnknown int32 = iota
+	rollupTZMatches
+	rollupTZOther
 )
 
 // Unbounded range [allTimeFrom, allTimeTo) used to serve the all-time
@@ -56,51 +77,47 @@ var (
 	allTimeTo   = time.Date(9999, time.December, 31, 23, 59, 59, 0, time.UTC)
 )
 
-// utcZoneNames are the PostgreSQL TimeZone values that are UTC at every
-// instant (compared case-insensitively).
-var utcZoneNames = map[string]bool{
-	"utc": true, "etc/utc": true, "uct": true, "etc/uct": true,
-	"gmt": true, "etc/gmt": true, "gmt0": true, "etc/gmt0": true,
-	"gmt+0": true, "gmt-0": true, "etc/gmt+0": true, "etc/gmt-0": true,
-	"greenwich": true, "etc/greenwich": true, "universal": true,
-	"etc/universal": true, "zulu": true, "etc/zulu": true,
+// tz is the app time zone name passed to the queries (AT TIME ZONE $n).
+func (a *AnalyticsRepository) tz() string {
+	return a.loc.String()
 }
 
-// rollupUsable reports whether the session buckets months in UTC, as the
-// rollup does. Checked once per process, through the request transaction.
+// rollupUsable reports whether the rollup buckets months in the repository's
+// time zone (app_timezone() = loc). Checked once per process, through the
+// request transaction.
 func (a *AnalyticsRepository) rollupUsable(ctx context.Context) (bool, error) {
-	switch a.sessionTZ.Load() {
-	case sessionTZUTC:
+	switch a.rollupTZ.Load() {
+	case rollupTZMatches:
 		return true, nil
-	case sessionTZOther:
+	case rollupTZOther:
 		return false, nil
 	}
-	var tz string
-	if err := txhelper.FromContext(ctx, a.db).QueryRowContext(ctx, "SELECT current_setting('TimeZone')").Scan(&tz); err != nil {
-		return false, fmt.Errorf("error reading session time zone: %w", err)
+	var dbTZ string
+	if err := txhelper.FromContext(ctx, a.db).QueryRowContext(ctx, "SELECT app_timezone()").Scan(&dbTZ); err != nil {
+		return false, fmt.Errorf("error reading app_timezone(): %w", err)
 	}
-	if utcZoneNames[strings.ToLower(tz)] {
-		a.sessionTZ.Store(sessionTZUTC)
+	if dbTZ == a.tz() {
+		a.rollupTZ.Store(rollupTZMatches)
 		return true, nil
 	}
-	if a.sessionTZ.CompareAndSwap(sessionTZUnknown, sessionTZOther) {
-		log.Warn().Str("timezone", tz).Msg("analytics: DB session time zone is not UTC, aggregating the ledger instead of the monthly rollup")
+	if a.rollupTZ.CompareAndSwap(rollupTZUnknown, rollupTZOther) {
+		log.Warn().Str("app_timezone", dbTZ).Str("timezone", a.tz()).Msg("analytics: database app_timezone() differs from APP_TIMEZONE, aggregating the ledger instead of the monthly rollup")
 	}
 	return false, nil
 }
 
-// wholeMonths returns the UTC month boundaries [start, end) of the whole
-// months contained in the half-open range [from, to); ok is false when there
-// is none. A month [m, m+1) is contained iff m >= from and m+1 <= to, so end
-// is the start of to's month: to = 00:00 of the 1st (the range ends with the
-// last day of the previous month) makes that previous month whole.
-func wholeMonths(from, to time.Time) (start, end time.Time, ok bool) {
-	f, t := from.UTC(), to.UTC()
-	start = time.Date(f.Year(), f.Month(), 1, 0, 0, 0, 0, time.UTC)
-	if start.Before(f) {
+// wholeMonths returns the local (loc) month boundaries [start, end) of the
+// whole months contained in the half-open range [from, to); ok is false when
+// there is none. A month [m, m+1) is contained iff m >= from and m+1 <= to,
+// so end is the start of to's month: to = 00:00 local of the 1st (the range
+// ends with the last day of the previous month) makes that previous month
+// whole.
+func wholeMonths(from, to time.Time, loc *time.Location) (start, end time.Time, ok bool) {
+	start = apptime.StartOfMonth(from, loc)
+	if start.Before(from) {
 		start = start.AddDate(0, 1, 0)
 	}
-	end = time.Date(t.Year(), t.Month(), 1, 0, 0, 0, 0, time.UTC)
+	end = apptime.StartOfMonth(to, loc)
 	return start, end, start.Before(end)
 }
 
@@ -110,7 +127,7 @@ func (a *AnalyticsRepository) rangeUsesRollup(ctx context.Context, dateFrom, dat
 	if accountID != "" || minAmount != nil || maxAmount != nil {
 		return time.Time{}, time.Time{}, false, nil
 	}
-	start, end, ok := wholeMonths(dateFrom, dateToExclusive)
+	start, end, ok := wholeMonths(dateFrom, dateToExclusive, a.loc)
 	if !ok {
 		return time.Time{}, time.Time{}, false, nil
 	}
@@ -147,15 +164,15 @@ const (
 			END), 0) AS total_bill`
 
 	// Ranged sources: $1 user, $3/$4 requested range [$3, $4) (half-open),
-	// $5/$6 the whole UTC months [start, end) read from the rollup; the ledger
-	// covers [$3, $5) and [$6, $4). $7 category filter, $8 type filter ('' =
-	// any; monthly source only).
+	// $5/$6 the whole local months [start, end) read from the rollup; the
+	// ledger covers [$3, $5) and [$6, $4). $7 category filter, $8 the app time
+	// zone, $9 type filter ('' = any; monthly source only).
 	rangedBillSource = `
 		SELECT r.category_id, r.currency, r.amount_sum AS amount, r.tx_count AS cnt
 		FROM transaction_monthly_rollup r
 		WHERE r.user_id = $1
 			AND r.type_transation = 'bill'
-			AND r.month >= ($5::timestamptz AT TIME ZONE 'UTC')::date AND r.month < ($6::timestamptz AT TIME ZONE 'UTC')::date
+			AND r.month >= ($5::timestamptz AT TIME ZONE $8::text)::date AND r.month < ($6::timestamptz AT TIME ZONE $8::text)::date
 			AND (NULLIF($7, '') IS NULL OR r.category_id = $7)
 		UNION ALL
 		SELECT t.category_id, COALESCE(t.currency, ''), t.amount, 1
@@ -169,15 +186,15 @@ const (
 		SELECT r.month, r.type_transation, r.currency, r.amount_sum AS amount
 		FROM transaction_monthly_rollup r
 		WHERE r.user_id = $1
-			AND r.month >= ($5::timestamptz AT TIME ZONE 'UTC')::date AND r.month < ($6::timestamptz AT TIME ZONE 'UTC')::date
+			AND r.month >= ($5::timestamptz AT TIME ZONE $8::text)::date AND r.month < ($6::timestamptz AT TIME ZONE $8::text)::date
 			AND (NULLIF($7, '') IS NULL OR r.category_id = $7)
-			AND (NULLIF($8, '') IS NULL OR r.type_transation::text = $8)
+			AND (NULLIF($9, '') IS NULL OR r.type_transation::text = $9)
 		UNION ALL
-		SELECT (date_trunc('month', t.created_at AT TIME ZONE 'UTC'))::date, t.type_transation, COALESCE(t.currency, ''), t.amount
+		SELECT (date_trunc('month', t.created_at AT TIME ZONE $8::text))::date, t.type_transation, COALESCE(t.currency, ''), t.amount
 		FROM transactions t
 		WHERE t.user_id = $1
 			AND (NULLIF($7, '') IS NULL OR t.category_id = $7)
-			AND (NULLIF($8, '') IS NULL OR t.type_transation::text = $8)
+			AND (NULLIF($9, '') IS NULL OR t.type_transation::text = $9)
 			AND ((t.created_at >= $3 AND t.created_at < $5) OR (t.created_at >= $6 AND t.created_at < $4))`
 )
 
@@ -204,7 +221,7 @@ func (a *AnalyticsRepository) GetCategoryExpensesInRange(ctx context.Context, us
 		GROUP BY c.id, c.name, c.color`
 
 	rows, err := txhelper.FromContext(ctx, a.db).QueryContext(ctx, query,
-		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID)
+		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID, a.tz())
 	if err != nil {
 		return nil, fmt.Errorf("error getting category expenses in range: %w", err)
 	}
@@ -294,7 +311,7 @@ func (a *AnalyticsRepository) GetMonthlySummaryInRange(ctx context.Context, user
 		ORDER BY s.month`
 
 	rows, err := txhelper.FromContext(ctx, a.db).QueryContext(ctx, query,
-		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID, transactionType)
+		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID, a.tz(), transactionType)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary in range: %w", err)
 	}
@@ -346,7 +363,7 @@ func (a *AnalyticsRepository) GetTotalsInRange(ctx context.Context, userID strin
 
 	var totals analytics.TotalsRepository
 	if err := txhelper.FromContext(ctx, a.db).QueryRowContext(ctx, query,
-		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID, transactionType,
+		userID, usdToDop, dateFrom, dateToExclusive, start, end, categoryID, a.tz(), transactionType,
 	).Scan(&totals.TotalIncome, &totals.TotalBill); err != nil {
 		return nil, err
 	}
@@ -403,8 +420,8 @@ func (a *AnalyticsRepository) ledgerCategoryExpenses(ctx context.Context, userID
 func (a *AnalyticsRepository) ledgerMonthlySummary(ctx context.Context, userID string, usdToDop money.Amount, dateFrom time.Time, dateToExclusive time.Time, accountID string, categoryID string, transactionType string, minAmount *money.Amount, maxAmount *money.Amount) ([]*analytics.MonthlySummaryRepository, error) {
 	query := `
 		SELECT
-			EXTRACT(YEAR FROM created_at)::int as year,
-			EXTRACT(MONTH FROM created_at)::int as month,
+			EXTRACT(YEAR FROM created_at AT TIME ZONE $10::text)::int as year,
+			EXTRACT(MONTH FROM created_at AT TIME ZONE $10::text)::int as month,
 			COALESCE(SUM(CASE
 				WHEN type_transation = 'income' AND currency = 'USD' THEN amount * $2
 				WHEN type_transation = 'income' THEN amount
@@ -439,6 +456,7 @@ func (a *AnalyticsRepository) ledgerMonthlySummary(ctx context.Context, userID s
 		transactionType,
 		nullableAmountArg(minAmount),
 		nullableAmountArg(maxAmount),
+		a.tz(),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error getting monthly summary in range: %w", err)

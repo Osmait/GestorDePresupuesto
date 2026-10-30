@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { parseCalendarDate } from '@/lib/app-time'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { Certificate, CertificatePayment } from '@/types/certificate'
 
@@ -36,12 +37,6 @@ function addMonths(date: Date, months: number): Date {
 
 function formatDate(date: Date | string, locale: string): string {
 	return formatLocalDate(date, locale, { month: 'short', year: '2-digit' })
-}
-
-/** 'YYYY-MM-DD…' API dates as local calendar dates (no shift to the previous day west of UTC). */
-function parseCalendarDate(value: string): Date {
-	const match = /^(\d{4})-(\d{2})-(\d{2})/.exec(value)
-	return match ? new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3])) : new Date(value)
 }
 
 function getMonthsUntilMaturity(maturityDate: string | undefined): number {
@@ -102,7 +97,7 @@ export function CertificateChart({ certificate, payments }: CertificateChartProp
 		const lastPaymentDate =
 			historicalPayments.length > 0
 				? parseCalendarDate(historicalPayments[historicalPayments.length - 1].payment_date)
-				: new Date(certificate.created_at)
+				: parseCalendarDate(certificate.created_at)
 
 		for (let i = 1; i <= monthsToShow; i++) {
 			const grossInterest = (currentCapital * (certificate.current_interest_rate / 100)) / 12

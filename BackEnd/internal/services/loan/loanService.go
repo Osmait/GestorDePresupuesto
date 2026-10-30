@@ -12,6 +12,7 @@ import (
 	categoryDomain "github.com/osmait/gestorDePresupuesto/internal/domain/category"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	loanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/loan"
@@ -52,15 +53,42 @@ type LoanService struct {
 	transactionService TransactionServiceInterface
 	accountRepository  AccountRepositoryInterface
 	categoryRepository CategoryRepositoryInterface
+	loc                *time.Location
 }
 
-func NewLoanService(repository loanRepo.LoanRepositoryInterface, transactionService TransactionServiceInterface, accountRepository AccountRepositoryInterface, categoryRepository CategoryRepositoryInterface) *LoanService {
-	return &LoanService{
+// Option configures a LoanService.
+type Option func(*LoanService)
+
+// WithLocation sets the app time zone that "today" and overdue installments
+// are evaluated in (default apptime.Default()).
+func WithLocation(loc *time.Location) Option {
+	return func(s *LoanService) {
+		if loc != nil {
+			s.loc = loc
+		}
+	}
+}
+
+func NewLoanService(repository loanRepo.LoanRepositoryInterface, transactionService TransactionServiceInterface, accountRepository AccountRepositoryInterface, categoryRepository CategoryRepositoryInterface, opts ...Option) *LoanService {
+	s := &LoanService{
 		repository:         repository,
 		transactionService: transactionService,
 		accountRepository:  accountRepository,
 		categoryRepository: categoryRepository,
+		loc:                apptime.Default(),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// isOverdue reports whether an installment due on due's calendar day (a DATE:
+// 00:00 or 12:00 UTC of the day) is past due at now: its due day is before
+// today in the app time zone. It is not overdue on the due day itself.
+func isOverdue(due, now time.Time, loc *time.Location) bool {
+	y, m, d := due.UTC().Date()
+	return apptime.NoonUTC(y, m, d).Before(apptime.TodayNoonUTC(now, loc))
 }
 
 func (s *LoanService) CreateLoan(ctx context.Context, req *dto.CreateLoanRequest, userId string) (*dto.LoanResponse, error) {
@@ -109,7 +137,7 @@ func (s *LoanService) CreateLoan(ctx context.Context, req *dto.CreateLoanRequest
 		InterestMode:    loan.InterestMode(req.InterestMode),
 		AnnualRate:      req.AnnualRate,
 		TermMonths:      req.TermMonths,
-		StartDate:       req.ParsedStartDate(),
+		StartDate:       req.ParsedStartDate(now, s.loc),
 		SourceAccountId: req.SourceAccountId,
 		Notes:           req.Notes,
 		TotalInterest:   totalInterest,
@@ -268,7 +296,7 @@ func (s *LoanService) RegisterPayment(ctx context.Context, loanId string, userId
 		Amount:               paymentAmount,
 		PrincipalComponent:   principalComponent,
 		InterestComponent:    interestComponent,
-		PaymentDate:          req.ParsedPaymentDate(),
+		PaymentDate:          req.ParsedPaymentDate(time.Now()),
 		Notes:                req.Notes,
 		CreatedAt:            time.Now(),
 	}
@@ -443,7 +471,7 @@ func (s *LoanService) GetSummary(ctx context.Context, userId string) (*dto.LoanS
 
 			installments, _ := s.repository.FindInstallmentsByLoan(ctx, item.Id, userId)
 			for _, installment := range installments {
-				if installment.Status != loan.InstallmentStatusPaid && installment.DueDate.Before(now) {
+				if installment.Status != loan.InstallmentStatusPaid && isOverdue(installment.DueDate, now, s.loc) {
 					summary.OverdueLoans++
 					break
 				}
@@ -472,7 +500,7 @@ func (s *LoanService) syncInstallments(ctx context.Context, entity *loan.Loan) e
 		installment.PaidAt = nil
 
 		if !remaining.IsPositive() {
-			if installment.DueDate.Before(now) {
+			if isOverdue(installment.DueDate, now, s.loc) {
 				installment.Status = loan.InstallmentStatusOverdue
 			} else {
 				installment.Status = loan.InstallmentStatusPending
@@ -510,7 +538,9 @@ func buildInstallments(entity *loan.Loan) []*loan.Installment {
 
 	for i := 1; i <= entity.TermMonths; i++ {
 		installmentId, _ := ksuid.NewRandom()
-		dueDate := entity.StartDate.AddDate(0, i, 0)
+		// Same day of month as the start date, clamped to the month's last
+		// day (Jan 31 -> Feb 28 -> Mar 31; AddDate would give Mar 3).
+		dueDate := apptime.AddMonthsClamped(entity.StartDate, i)
 		expected := baseAmount
 		if i == entity.TermMonths {
 			expected = entity.TotalAmount.Sub(running)
