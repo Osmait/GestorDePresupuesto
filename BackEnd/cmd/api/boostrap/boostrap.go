@@ -207,6 +207,9 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 			Analytics:   svcs.analyticsService,
 			CreditCard:  svcs.creditCardService,
 			Loan:        svcs.loanService,
+			Recurring:   svcs.recurringService,
+			MonthlyPlan: svcs.monthlyPlanService,
+			Search:      svcs.searchService,
 		}, db)
 
 		issuer := cfg.MCP.BaseURL

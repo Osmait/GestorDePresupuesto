@@ -10,6 +10,9 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/category"
 	"github.com/osmait/gestorDePresupuesto/internal/services/creditcard"
 	"github.com/osmait/gestorDePresupuesto/internal/services/loan"
+	"github.com/osmait/gestorDePresupuesto/internal/services/monthly_plan"
+	"github.com/osmait/gestorDePresupuesto/internal/services/recurring_transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/services/search"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 )
 
@@ -22,6 +25,9 @@ type Services struct {
 	Analytics   *analytics.AnalyticsService
 	CreditCard  *creditcard.CreditCardService
 	Loan        *loan.LoanService
+	Recurring   *recurring_transaction.RecurringTransactionService
+	MonthlyPlan *monthly_plan.MonthlyPlanService
+	Search      *search.SearchService
 }
 
 // MCPServer wraps the mcp-go server and registers all tool handlers.
@@ -42,6 +48,7 @@ func NewMCPServer(name, version string, services *Services, db *sql.DB) *MCPServ
 	}
 
 	mcpSrv.registerTools()
+	mcpSrv.registerPrompts()
 	return mcpSrv
 }
 

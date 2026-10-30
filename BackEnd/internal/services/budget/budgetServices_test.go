@@ -97,6 +97,11 @@ func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string,
 	return args.Get(0).(map[string]money.Amount), args.Error(1)
 }
 
+// TypeOf reports every transaction as a plain expense (editable and deletable).
+func (m *MockTransaction) TypeOf(context.Context, string, string) (string, error) {
+	return "bill", nil
+}
+
 func (m *MockTransaction) Delete(ctx context.Context, id string, userId string) error {
 	args := m.Called(ctx, id, userId)
 	return args.Error(0)

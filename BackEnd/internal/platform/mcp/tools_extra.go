@@ -20,8 +20,10 @@ import (
 // registerExtraTools registers the extended MCP tools (accounts, categories,
 // credit cards, loans, analytics by period). Called from registerTools.
 func (s *MCPServer) registerExtraTools() {
+	s.registerPlanningTools()
+
 	// --- Accounts ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("create_account",
 			mcp.WithDescription("Create a new bank account for the authenticated user"),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Account name")),
@@ -30,7 +32,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleCreateAccount,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("update_account",
 			mcp.WithDescription("Update an account's name and bank"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
@@ -39,14 +41,14 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleUpdateAccount,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("delete_account",
 			mcp.WithDescription("Delete an account owned by the authenticated user"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
 		),
 		s.handleDeleteAccount,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("reconcile_account",
 			mcp.WithDescription("Reconcile an account with the balance its bank shows right now. If the app balance differs, one balance adjustment transaction (neutral in income/expense reports) moves the account to the bank balance. For a credit card pass the statement debt as a negative balance (owes 1000 -> -1000)."),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID (bank account or credit card)")),
@@ -56,7 +58,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleReconcileAccount,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("list_account_reconciliations",
 			mcp.WithDescription("List the latest reconciliations of an account (newest first)"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
@@ -65,7 +67,7 @@ func (s *MCPServer) registerExtraTools() {
 	)
 
 	// --- Categories ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("create_category",
 			mcp.WithDescription("Create a new transaction category"),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Category name")),
@@ -74,7 +76,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleCreateCategory,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("update_category",
 			mcp.WithDescription("Update an existing category"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Category ID")),
@@ -84,7 +86,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleUpdateCategory,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("delete_category",
 			mcp.WithDescription("Delete a category owned by the authenticated user"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Category ID")),
@@ -93,7 +95,7 @@ func (s *MCPServer) registerExtraTools() {
 	)
 
 	// --- Balance / analytics by period ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("balance_by_period",
 			mcp.WithDescription("Return income, expenses and net for a period (current month by default)"),
 			mcp.WithString("period", mcp.Description("Preset period"), mcp.Enum("this_week", "this_month", "last_month", "this_year", "custom")),
@@ -102,7 +104,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleBalanceByPeriod,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("financial_summary",
 			mcp.WithDescription("Return a financial summary with current month, previous month and percentage change"),
 		),
@@ -110,19 +112,19 @@ func (s *MCPServer) registerExtraTools() {
 	)
 
 	// --- Credit cards ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("list_credit_cards",
 			mcp.WithDescription("List all credit cards with their current balances"),
 		),
 		s.handleListCreditCards,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("credit_card_summary",
 			mcp.WithDescription("Return aggregate credit card metrics: total debt, total limit and utilization per currency"),
 		),
 		s.handleCreditCardSummary,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("pay_credit_card",
 			mcp.WithDescription("Pay a credit card from a bank account"),
 			mcp.WithString("card_id", mcp.Required(), mcp.Description("Credit card (account) ID")),
@@ -136,7 +138,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handlePayCreditCard,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("reset_credit_card_balance",
 			mcp.WithDescription("Reset a credit card balance to zero for a given currency, storing the previous balance in history"),
 			mcp.WithString("card_id", mcp.Required(), mcp.Description("Credit card (account) ID")),
@@ -148,20 +150,20 @@ func (s *MCPServer) registerExtraTools() {
 	)
 
 	// --- Loans ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("list_loans",
 			mcp.WithDescription("List all loans for the authenticated user"),
 		),
 		s.handleListLoans,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("get_loan",
 			mcp.WithDescription("Get loan details including installments and payments"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Loan ID")),
 		),
 		s.handleGetLoan,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("create_loan",
 			mcp.WithDescription("Create a new loan issued from a source account"),
 			mcp.WithString("borrower_name", mcp.Required(), mcp.Description("Borrower name")),
@@ -177,7 +179,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleCreateLoan,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("register_loan_payment",
 			mcp.WithDescription("Register a payment received for a loan"),
 			mcp.WithString("loan_id", mcp.Required(), mcp.Description("Loan ID")),
@@ -188,7 +190,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleRegisterLoanPayment,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("loan_summary",
 			mcp.WithDescription("Return aggregated loan metrics for the authenticated user"),
 		),
