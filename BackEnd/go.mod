@@ -2,7 +2,7 @@ module github.com/osmait/gestorDePresupuesto
 
 go 1.27
 
-toolchain go1.27.2
+toolchain go1.27.3
 
 require (
 	github.com/DATA-DOG/go-sqlmock v1.5.2
@@ -20,7 +20,7 @@ require (
 	github.com/lib/pq v1.12.3
 	github.com/mark3labs/mcp-go v1.4.0
 	github.com/patrickmn/go-cache v2.1.0+incompatible
-	github.com/plexusone/omniskill v0.12.0
+	github.com/plexusone/omniskill v0.12.1
 	github.com/prometheus/client_golang v1.25.0
 	github.com/r3labs/sse/v2 v2.10.0
 	github.com/rs/cors/wrapper/gin v0.0.0-20261008204034-5d834403882d
@@ -47,7 +47,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.47.0
 	golang.org/x/crypto v0.58.0
 	golang.org/x/sync v0.24.0
-	google.golang.org/genai v1.76.0
+	google.golang.org/genai v1.77.0
 )
 
 require (
@@ -107,7 +107,7 @@ require (
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/grokify/mogo v0.75.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.31.0 // indirect
-	github.com/huandu/xstrings v1.6.2 // indirect
+	github.com/huandu/xstrings v1.6.3 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/cpuid/v2 v2.4.0 // indirect
 	github.com/leodido/go-urn v1.5.0 // indirect
@@ -159,7 +159,7 @@ require (
 	go.opentelemetry.io/proto/otlp v1.11.1 // indirect
 	go.yaml.in/yaml/v3 v3.0.5 // indirect
 	golang.org/x/arch v0.32.0 // indirect
-	golang.org/x/exp v0.0.0-20261011100332-faecfb24eb49 // indirect
+	golang.org/x/exp v0.0.0-20261014143641-f0251eb4aa3e // indirect
 	golang.org/x/mod v0.42.0 // indirect
 	golang.org/x/net v0.61.0 // indirect
 	golang.org/x/sys v0.49.0 // indirect
