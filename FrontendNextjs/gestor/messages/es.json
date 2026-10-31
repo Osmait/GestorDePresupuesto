@@ -560,7 +560,9 @@
     "saveError": "No se pudo guardar la categoría. Inténtalo de nuevo.",
     "totalDop": "Total (DOP)",
     "emptyTitle": "Aún no tienes categorías",
-    "emptyDescription": "Crea categorías para clasificar tus ingresos y gastos."
+    "emptyDescription": "Crea categorías para clasificar tus ingresos y gastos.",
+    "suggestedNameFallback": "Nueva categoría",
+    "aiSuggestedSuffix": "IA"
   },
   "budgets": {
     "title": "Presupuestos",

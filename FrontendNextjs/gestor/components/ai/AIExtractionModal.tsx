@@ -14,6 +14,7 @@ import { useExtractFromFile } from '@/hooks/queries/useAIQuery'
 import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useCreateTransactionMutation } from '@/hooks/queries/useTransactionsQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { useUniqueCategoryName } from '@/hooks/useUniqueCategoryName'
 import { extractedDateToInstant } from '@/lib/app-time'
 import { AICategorySuggestion, AIExtractResponse, AIPotentialDuplicate, DocumentType } from '@/types/ai'
 import { Category } from '@/types/category'
@@ -28,27 +29,10 @@ interface AIExtractionModalProps {
 	defaultAccountId?: string
 }
 
-function ensureUniqueCategoryName(baseName: string, existingNames: string[]): string {
-	const normalized = new Set(existingNames.map((name) => name.trim().toLowerCase()))
-	const cleanBase = baseName.trim() || 'Nueva categoría'
-
-	if (!normalized.has(cleanBase.toLowerCase())) {
-		return cleanBase
-	}
-
-	let candidate = `${cleanBase} (IA)`
-	let index = 2
-	while (normalized.has(candidate.toLowerCase())) {
-		candidate = `${cleanBase} (IA ${index})`
-		index++
-	}
-
-	return candidate
-}
-
 export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIExtractionModalProps) {
 	const t = useTranslations('ai.extraction')
 	const tCommon = useTranslations('ai.common')
+	const uniqueCategoryName = useUniqueCategoryName()
 	const fieldId = useId()
 	const [files, setFiles] = useState<File[]>([])
 	const [documentType, setDocumentType] = useState<DocumentType>('receipt')
@@ -291,7 +275,7 @@ export function AIExtractionModal({ open, onOpenChange, defaultAccountId }: AIEx
 	}
 
 	const handleCreateCategoryFromSuggestion = async (transactionId: string, categoryName: string) => {
-		const normalizedName = ensureUniqueCategoryName(
+		const normalizedName = uniqueCategoryName(
 			categoryName,
 			categories.map((category) => category.name),
 		)

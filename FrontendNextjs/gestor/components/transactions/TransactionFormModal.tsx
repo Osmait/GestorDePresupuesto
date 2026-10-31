@@ -22,6 +22,7 @@ import { useSuggestCategoryMutation } from '@/hooks/queries/useAIQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { useUniqueCategoryName } from '@/hooks/useUniqueCategoryName'
 import { APP_TIME_ZONE, getAppTodayDate, instantToCalendarDate, pickedDayToInstant } from '@/lib/app-time'
 import { onSessionExpired } from '@/lib/client-session'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
@@ -109,24 +110,6 @@ type TransactionFormModalProps = {
 	) => Promise<void>
 }
 
-function ensureUniqueCategoryName(baseName: string, existingNames: string[]): string {
-	const normalized = new Set(existingNames.map((name) => name.trim().toLowerCase()))
-	const cleanBase = baseName.trim() || 'Nueva categoría'
-
-	if (!normalized.has(cleanBase.toLowerCase())) {
-		return cleanBase
-	}
-
-	let candidate = `${cleanBase} - IA`
-	let index = 2
-	while (normalized.has(candidate.toLowerCase())) {
-		candidate = `${cleanBase} - IA ${index}`
-		index++
-	}
-
-	return candidate
-}
-
 function isSameSuggestion(a: AICategorySuggestion | null, b: AICategorySuggestion | null) {
 	if (!a || !b) {
 		return false
@@ -155,6 +138,7 @@ function getSubmitErrorKey(error: unknown): 'currencyMustMatchAccount' | 'cardCu
 export default function TransactionFormModal({ open, setOpen, createTransaction }: TransactionFormModalProps) {
 	const t = useTranslations('forms')
 	const tTx = useTranslations('transactions')
+	const uniqueCategoryName = useUniqueCategoryName()
 	const tSession = useTranslations('auth.session')
 	const locale = useAppLocale()
 	const transactionSchema = useMemo(() => createTransactionSchema(t), [t])
@@ -476,7 +460,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 			return
 		}
 
-		const suggestedName = ensureUniqueCategoryName(
+		const suggestedName = uniqueCategoryName(
 			categorySuggestion.new_category_name || categorySuggestion.category_name,
 			categories.map((category) => category.name),
 		)
@@ -709,7 +693,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 												size='sm'
 												onClick={createCategoryFromSuggestion}
 												disabled={createCategoryMutation.isPending}
-												title={ensureUniqueCategoryName(
+												title={uniqueCategoryName(
 													categorySuggestion.new_category_name || categorySuggestion.category_name,
 													categories.map((category) => category.name),
 												)}

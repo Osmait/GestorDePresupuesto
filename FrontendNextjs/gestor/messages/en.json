@@ -560,7 +560,9 @@
     "saveError": "Couldn't save the category. Try again.",
     "totalDop": "Total (DOP)",
     "emptyTitle": "No categories yet",
-    "emptyDescription": "Create categories to classify your income and expenses."
+    "emptyDescription": "Create categories to classify your income and expenses.",
+    "suggestedNameFallback": "New category",
+    "aiSuggestedSuffix": "AI"
   },
   "budgets": {
     "title": "Budgets",
