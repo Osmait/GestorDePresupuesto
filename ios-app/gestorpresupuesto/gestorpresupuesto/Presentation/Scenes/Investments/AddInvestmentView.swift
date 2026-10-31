@@ -15,7 +15,7 @@ struct AddInvestmentView: View {
 
     private var isValid: Bool {
         name.isNotBlank && symbol.isNotBlank &&
-        Double(quantity) != nil && Double(purchasePrice) != nil &&
+        (Double(quantity) ?? 0) > 0 && Double(purchasePrice) != nil &&
         Double(currentPrice) != nil
     }
 
@@ -40,7 +40,8 @@ struct AddInvestmentView: View {
                         HStack(spacing: Spacing.md.rawValue) {
                             FormField(title: "Cantidad", icon: "number.circle", placeholder: "0", text: $quantity, keyboardType: .decimalPad, validation: { value in
                                 if value.isEmpty { return "Requerido" }
-                                if Double(value) == nil { return "Número inválido" }
+                                guard let number = Double(value) else { return "Número inválido" }
+                                if number <= 0 { return "Debe ser mayor que 0" }
                                 return nil
                             })
                             FormField(title: "Precio Compra", icon: "dollarsign.circle", placeholder: "0.00", text: $purchasePrice, keyboardType: .decimalPad, validation: { value in
@@ -98,7 +99,7 @@ struct AddInvestmentView: View {
         )
 
         do {
-            _ = try await viewModel.createInvestment(request: request)
+            try await viewModel.createInvestment(request: request)
             dismiss()
         } catch {
             shakeTrigger = false

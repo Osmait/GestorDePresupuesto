@@ -31,20 +31,27 @@ class AuthRepositoryImpl: AuthRepository {
         return user
     }
 
-    func register(name: String, lastName: String, email: String, password: String) async throws -> User {
+    func register(name: String, lastName: String, email: String, password: String) async throws {
         let endpoint = Endpoints.register()
         let body = RegisterRequest(name: name, lastName: lastName, email: email, password: password)
 
-        let user: User = try await apiClient.request(
+        try await apiClient.requestVoid(
             Endpoint(path: endpoint.path, method: endpoint.method, body: try JSONEncoder().encode(body))
         )
-
-        return user
     }
 
     func logout() async throws {
-        try await apiClient.requestVoid(Endpoints.logout())
-        await apiClient.logout()
+        // Local tokens go away even if the server call fails (offline, expired).
+        defer { Task { await apiClient.logout() } }
+        guard let refreshToken = tokenStorage.getRefreshToken() else { return }
+        let endpoint = Endpoints.logout()
+        try await apiClient.requestVoid(
+            Endpoint(
+                path: endpoint.path,
+                method: endpoint.method,
+                body: try JSONEncoder().encode(RefreshTokenRequest(refreshToken: refreshToken))
+            )
+        )
     }
 
     func getProfile() async throws -> User {
@@ -67,14 +74,14 @@ class AccountRepositoryImpl: AccountRepository {
         try await apiClient.request(Endpoints.account(id: id))
     }
 
-    func create(_ request: CreateAccountRequest) async throws -> Account {
-        try await apiClient.request(
+    func create(_ request: CreateAccountRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/account", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
-    func update(_ id: String, request: UpdateAccountRequest) async throws -> Account {
-        try await apiClient.request(
+    func update(_ id: String, request: UpdateAccountRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/account/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
@@ -132,14 +139,14 @@ class CategoryRepositoryImpl: CategoryRepository {
         try await apiClient.request(Endpoints.categories())
     }
 
-    func create(_ request: CreateCategoryRequest) async throws -> Category {
-        try await apiClient.request(
+    func create(_ request: CreateCategoryRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/category", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
-    func update(_ id: String, request: UpdateCategoryRequest) async throws -> Category {
-        try await apiClient.request(
+    func update(_ id: String, request: UpdateCategoryRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/category/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
@@ -157,23 +164,70 @@ class BudgetRepositoryImpl: BudgetRepository {
     }
 
     func getAll() async throws -> [BudgetResponse] {
-        try await apiClient.request(Endpoints.budgets())
+        async let budgetsTask: [BudgetResponse] = apiClient.request(Endpoints.budgets())
+        async let categoriesTask: [Category] = apiClient.request(Endpoints.categories())
+        let budgets = try await budgetsTask
+        // Names are cosmetic: without categories the budgets still load.
+        guard let categories = try? await categoriesTask else { return budgets }
+        let names = Dictionary(categories.map { ($0.id, $0.name) }, uniquingKeysWith: { first, _ in first })
+        return budgets.map { $0.withCategoryName(names[$0.categoryId]) }
     }
 
-    func create(_ request: CreateBudgetRequest) async throws -> Budget {
-        try await apiClient.request(
+    func create(_ request: CreateBudgetRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/budget", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
-    func update(_ id: String, request: UpdateBudgetRequest) async throws -> Budget {
-        try await apiClient.request(
+    func update(_ id: String, request: UpdateBudgetRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/budget/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
 
     func delete(_ id: String) async throws {
         try await apiClient.requestVoid(Endpoints.deleteBudget(id: id))
+    }
+}
+
+class MonthlyPlanRepositoryImpl: MonthlyPlanRepository {
+    private let apiClient: APIClient
+
+    init(apiClient: APIClient = .shared) {
+        self.apiClient = apiClient
+    }
+
+    func getAll() async throws -> [MonthlyPlanItem] {
+        try await apiClient.request(Endpoints.monthlyPlan())
+    }
+
+    func getSummary() async throws -> MonthlyPlanSummary {
+        try await apiClient.request(Endpoints.monthlyPlanSummary())
+    }
+
+    func create(_ request: MonthlyPlanItemRequest) async throws {
+        try await apiClient.requestVoid(
+            Endpoints.createMonthlyPlanItem(body: try JSONEncoder().encode(request))
+        )
+    }
+
+    func update(_ id: String, request: MonthlyPlanItemRequest) async throws {
+        try await apiClient.requestVoid(
+            Endpoints.updateMonthlyPlanItem(id: id, body: try JSONEncoder().encode(request))
+        )
+    }
+
+    func setActive(_ id: String, isActive: Bool) async throws {
+        try await apiClient.requestVoid(
+            Endpoints.setMonthlyPlanItemActive(
+                id: id,
+                body: try JSONEncoder().encode(MonthlyPlanToggleRequest(isActive: isActive))
+            )
+        )
+    }
+
+    func delete(_ id: String) async throws {
+        try await apiClient.requestVoid(Endpoints.deleteMonthlyPlanItem(id: id))
     }
 }
 
@@ -192,8 +246,8 @@ class AnalyticsRepositoryImpl: AnalyticsRepository {
         try await apiClient.request(Endpoints.monthlySummary())
     }
 
-    func getDashboardSummary() async throws -> DashboardSummary {
-        try await apiClient.request(Endpoints.dashboardSummary())
+    func getDashboardSummary(dateFrom: String?, dateTo: String?) async throws -> DashboardSummary {
+        try await apiClient.request(Endpoints.dashboardSummary(dateFrom: dateFrom, dateTo: dateTo))
     }
 }
 
@@ -208,14 +262,14 @@ class RecurringTransactionRepositoryImpl: RecurringTransactionRepository {
         try await apiClient.request(Endpoints.recurringTransactions())
     }
 
-    func create(_ request: CreateRecurringTransactionRequest) async throws -> RecurringTransaction {
-        try await apiClient.request(
+    func create(_ request: CreateRecurringTransactionRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/recurring-transactions", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
-    func update(_ id: String, request: UpdateRecurringTransactionRequest) async throws -> RecurringTransaction {
-        try await apiClient.request(
+    func update(_ id: String, request: UpdateRecurringTransactionRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/recurring-transactions/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
@@ -270,7 +324,8 @@ class AIRepositoryImpl: AIRepository {
     }
 
     func getSavingsGoals() async throws -> [AISavingsGoal] {
-        try await apiClient.request(Endpoints.savingsGoals())
+        let response: AISavingsGoalsListResponse = try await apiClient.request(Endpoints.savingsGoals())
+        return response.data ?? []
     }
 
     func createSavingsGoal(request: AICreateSavingsGoalRequest) async throws -> AISavingsGoalResponse {
@@ -310,7 +365,9 @@ class CreditCardRepositoryImpl: CreditCardRepository {
     }
 
     func getAll() async throws -> [CreditCard] {
-        try await apiClient.request(Endpoints.creditCards())
+        // The backend answers `null` instead of `[]` when there are none.
+        let items: [CreditCard]? = try await apiClient.request(Endpoints.creditCards())
+        return items ?? []
     }
 
     func getById(_ id: String) async throws -> CreditCard {
@@ -338,7 +395,9 @@ class CreditCardRepositoryImpl: CreditCardRepository {
     }
 
     func getPayments(cardId: String) async throws -> [CardPayment] {
-        try await apiClient.request(Endpoints.creditCardPayments(cardId: cardId))
+        // The backend answers `null` instead of `[]` when there are none.
+        let items: [CardPayment]? = try await apiClient.request(Endpoints.creditCardPayments(cardId: cardId))
+        return items ?? []
     }
 
     func createPayment(cardId: String, request: CreateCardPaymentRequest) async throws -> CardPayment {
@@ -392,21 +451,23 @@ class CertificateRepositoryImpl: CertificateRepository {
     }
 
     func getAll() async throws -> [Certificate] {
-        try await apiClient.request(Endpoints.certificates())
+        // The backend answers `null` instead of `[]` when there are none.
+        let items: [Certificate]? = try await apiClient.request(Endpoints.certificates())
+        return items ?? []
     }
 
     func getById(_ id: String) async throws -> CertificateWithHistory {
         try await apiClient.request(Endpoints.certificate(id: id))
     }
 
-    func create(_ request: CreateCertificateRequest) async throws -> Certificate {
-        try await apiClient.request(
+    func create(_ request: CreateCertificateRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/certificate", method: .POST, body: try JSONEncoder().encode(request))
         )
     }
 
-    func update(_ id: String, request: UpdateCertificateRequest) async throws -> Certificate {
-        try await apiClient.request(
+    func update(_ id: String, request: UpdateCertificateRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/certificate/\(id)", method: .PUT, body: try JSONEncoder().encode(request))
         )
     }
@@ -436,15 +497,17 @@ class InvestmentRepositoryImpl: InvestmentRepository {
     }
 
     func getAll() async throws -> [Investment] {
-        try await apiClient.request(Endpoints.investments())
+        // The backend answers `null` instead of `[]` when there are none.
+        let items: [Investment]? = try await apiClient.request(Endpoints.investments())
+        return items ?? []
     }
 
     func getById(_ id: String) async throws -> Investment {
         try await apiClient.request(Endpoints.investment(id: id))
     }
 
-    func create(_ request: CreateInvestmentRequest) async throws -> Investment {
-        try await apiClient.request(
+    func create(_ request: CreateInvestmentRequest) async throws {
+        try await apiClient.requestVoid(
             Endpoint(path: "/investments", method: .POST, body: try JSONEncoder().encode(request))
         )
     }

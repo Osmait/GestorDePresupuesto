@@ -32,10 +32,10 @@ struct InvestmentDetailView: View {
                     SurfaceCard {
                         LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.md.rawValue) {
                             detailCell("Cantidad", String(format: "%.4f", investment.quantity))
-                            detailCell("Precio Compra", investment.purchasePrice.currencyFormatted)
-                            detailCell("Precio Actual", investment.currentPrice.currencyFormatted)
-                            detailCell("Costo Total", investment.totalCost.currencyFormatted)
-                            detailCell("Valor Actual", investment.totalValue.currencyFormatted)
+                            detailCell("Precio Compra", investment.purchasePrice.currencyFormatted(currency: investment.currency))
+                            detailCell("Precio Actual", investment.currentPrice.currencyFormatted(currency: investment.currency))
+                            detailCell("Costo Total", investment.totalCost.currencyFormatted(currency: investment.currency))
+                            detailCell("Valor Actual", investment.totalValue.currencyFormatted(currency: investment.currency))
                             detailCell("Tipo", investment.type.displayName)
                         }
                     }
@@ -47,7 +47,7 @@ struct InvestmentDetailView: View {
                                 .font(.app(.subheadline))
                                 .fontWeight(.medium)
 
-                            Text(investment.gainLoss.currencyFormatted)
+                            Text(investment.gainLoss.currencyFormatted(currency: investment.currency))
                                 .font(.app(.title2))
                                 .fontWeight(.bold)
                                 .foregroundStyle(investment.isProfit ? Color.app.success : Color.app.error)

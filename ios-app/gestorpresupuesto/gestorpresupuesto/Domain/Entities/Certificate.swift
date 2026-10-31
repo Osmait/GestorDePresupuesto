@@ -44,9 +44,13 @@ struct Certificate: Codable, Identifiable, Equatable {
     let effectiveCapital: Double
     let nextPaymentDate: String?
     let projectedPayment: ProjectedPayment?
+    /// Why the interest due could not be paid into the payout account (the
+    /// payments stay pending until it can); nil when there is no problem.
+    var payoutError: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, bank, status, currency
+        case payoutError = "payout_error"
         case baseCapital = "base_capital"
         case interestType = "interest_type"
         case currentInterestRate = "current_interest_rate"

@@ -5,7 +5,7 @@ struct AnalyticsView: View {
     @StateObject private var viewModel = AnalyticsViewModel()
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
             ZStack {
                 Color.app.background.ignoresSafeArea()
 
@@ -69,7 +69,7 @@ struct AnalyticsView: View {
                     .padding(Spacing.lg.rawValue)
                 }
             }
-            .navigationTitle("Analíticas")
+            .navigationTitle("Análisis")
             .notificationToolbar()
             .task { await viewModel.loadAnalytics() }
             .refreshable { await viewModel.loadAnalytics() }

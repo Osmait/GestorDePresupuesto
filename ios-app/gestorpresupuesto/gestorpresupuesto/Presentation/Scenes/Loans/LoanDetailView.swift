@@ -73,7 +73,7 @@ struct LoanDetailView: View {
                                             Text("Cuota #\(installment.installmentNumber)")
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.medium)
-                                            Text(installment.dueDate)
+                                            Text(installment.dueDate.calendarDayFormatted)
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
                                         }
@@ -108,7 +108,7 @@ struct LoanDetailView: View {
                                     SurfaceCard {
                                         HStack {
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text(payment.paymentDate)
+                                                Text(payment.paymentDate.calendarDayFormatted)
                                                     .font(.app(.caption))
                                                     .foregroundStyle(Color.app.textSecondary)
                                                 if !payment.notes.isEmpty {

@@ -1,7 +1,8 @@
 import Foundation
 
 struct FeaturesResponse: Codable {
-    let map: [String: Bool]
+    /// The backend omits `map` when the user has no features.
+    let map: [String: Bool]?
 }
 
 struct FeatureFlags {

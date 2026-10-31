@@ -15,10 +15,13 @@ struct AddCertificateView: View {
     @State private var selectedPayoutAccountId = ""
     @State private var shakeTrigger = false
 
+    /// Mirrors the backend DTO rules (dto/certificate): cut day 1–28, rate in
+    /// (0, 100], a positive capital.
     private var isValid: Bool {
-        bank.isNotBlank && Double(baseCapital) != nil &&
-        Double(interestRate) != nil && Double(taxRate) != nil &&
-        Int(cutDay) != nil
+        bank.isNotBlank && (Double(baseCapital) ?? 0) > 0 &&
+        (0.0...100.0).contains(Double(interestRate) ?? -1) && (Double(interestRate) ?? 0) > 0 &&
+        Double(taxRate) != nil &&
+        (1...28).contains(Int(cutDay) ?? 0)
     }
 
     var body: some View {
@@ -52,7 +55,7 @@ struct AddCertificateView: View {
                             })
                         }
 
-                        FormField(title: "Día de corte", icon: "calendar", placeholder: "15", text: $cutDay, keyboardType: .numberPad)
+                        FormField(title: "Día de corte (1–28)", icon: "calendar", placeholder: "15", text: $cutDay, keyboardType: .numberPad)
 
                         Toggle(isOn: $reinvestInterest) {
                             HStack {
@@ -115,7 +118,7 @@ struct AddCertificateView: View {
         )
 
         do {
-            _ = try await viewModel.createCertificate(request: request)
+            try await viewModel.createCertificate(request: request)
             dismiss()
         } catch {
             shakeTrigger = false

@@ -73,17 +73,18 @@ extension View {
         self
             .background(
                 RoundedRectangle(cornerRadius: cornerRadius.rawValue)
-                    .fill(.ultraThinMaterial)
-                    .opacity(opacity)
+                    .fill(Color.app.surface)
             )
             .overlay(
                 RoundedRectangle(cornerRadius: cornerRadius.rawValue)
-                    .stroke(Color.app.border, lineWidth: 0.5)
+                    .strokeBorder(Color.app.border, lineWidth: 1)
             )
     }
 
+    /// Flat surfaces: hierarchy comes from the 1px border, not elevation.
+    /// Kept so existing call sites compile; `elevation` is ignored.
     func cardShadow(elevation: Elevation = .md) -> some View {
-        self.shadow(color: Color.black.opacity(0.08), radius: elevation.rawValue, x: 0, y: elevation.rawValue / 2)
+        self
     }
 
     func gradientOverlay(colors: [Color], startPoint: UnitPoint = .topLeading, endPoint: UnitPoint = .bottomTrailing) -> some View {

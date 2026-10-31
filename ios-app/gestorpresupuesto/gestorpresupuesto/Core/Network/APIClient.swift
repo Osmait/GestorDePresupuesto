@@ -108,37 +108,47 @@ actor APIClient {
                 #endif
                 throw APIError.decodingError(error)
             }
-        case 401:
-            throw APIError.unauthorized
-        case 400...499:
-            let errorMessage = try? decoder.decode(ErrorMessage.self, from: data)
-            throw APIError.serverError(httpResponse.statusCode, errorMessage?.message)
-        case 500...599:
-            throw APIError.serverError(httpResponse.statusCode, "Server error")
         default:
-            throw APIError.unknown
+            throw Self.failure(httpResponse, data: data)
         }
     }
 
     private func performVoidRequest(_ request: URLRequest) async throws {
-        let (_, response) = try await session.data(for: request)
+        let (data, response) = try await session.data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw APIError.unknown
         }
 
-        switch httpResponse.statusCode {
-        case 200...299:
-            return
+        if (200...299).contains(httpResponse.statusCode) { return }
+        throw Self.failure(httpResponse, data: data)
+    }
+
+    /// The error for a non-2xx reply, with the server's message when it sent one.
+    private static func failure(_ response: HTTPURLResponse, data: Data) -> APIError {
+        let status = response.statusCode
+        switch status {
         case 401:
-            throw APIError.unauthorized
-        case 400...499:
-            throw APIError.serverError(httpResponse.statusCode, nil)
-        case 500...599:
-            throw APIError.serverError(httpResponse.statusCode, "Server error")
+            return .unauthorized
+        case 413:
+            return .serverError(status, "El archivo es demasiado grande.")
+        case 429:
+            let wait = response.value(forHTTPHeaderField: "Retry-After").flatMap(Int.init)
+            return .serverError(status, wait.map { "Demasiadas solicitudes. Intenta de nuevo en \($0) s." }
+                ?? "Demasiadas solicitudes. Intenta de nuevo en un momento.")
+        case 503:
+            return .serverError(status, "El servicio está ocupado. Intenta de nuevo en un momento.")
+        case 400...599:
+            return .serverError(status, ErrorMessage.decode(from: data))
         default:
-            throw APIError.unknown
+            return .unknown
         }
+    }
+
+    /// Refreshes the access token for callers outside APIClient (the
+    /// notifications stream). nil when the session is over.
+    func refreshAccessToken() async throws -> String? {
+        try await refreshToken()
     }
 
     private func refreshToken() async throws -> String? {
@@ -161,10 +171,22 @@ actor APIClient {
 
             let (data, response) = try await self.session.data(for: request)
 
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                throw APIError.unknown
+            }
+            switch httpResponse.statusCode {
+            case 200:
+                break
+            case 400, 401:
                 await self.tokenStorage.clearTokens()
+                // The server rejected the refresh token (expired, revoked or
+                // unknown user): the session is over, send the user to login.
+                NotificationCenter.default.post(name: .sessionExpired, object: nil)
                 return nil
+            default:
+                // Rate limit, deploy or server error: the refresh token is
+                // still good, keep it and let the next request try again.
+                throw Self.failure(httpResponse, data: data)
             }
 
             let tokenResponse = try self.decoder.decode(RefreshTokenResponse.self, from: data)
@@ -183,6 +205,28 @@ actor APIClient {
     }
 }
 
-struct ErrorMessage: Decodable {
-    let message: String
+/// The backend sends `{"error": "..."}`, `{"error": {"message": "..."}}` or
+/// `{"message": "..."}`.
+enum ErrorMessage {
+    private struct Flat: Decodable { let error: String?; let message: String? }
+    private struct Nested: Decodable {
+        struct Detail: Decodable { let message: String? }
+        let error: Detail
+    }
+
+    static func decode(from data: Data) -> String? {
+        let decoder = JSONDecoder()
+        if let nested = try? decoder.decode(Nested.self, from: data), let message = nested.error.message, !message.isEmpty {
+            return message
+        }
+        if let flat = try? decoder.decode(Flat.self, from: data) {
+            return [flat.message, flat.error].compactMap { $0 }.first { !$0.isEmpty }
+        }
+        return nil
+    }
+}
+
+extension Notification.Name {
+    /// Posted when the refresh token is rejected; AuthViewModel returns to login.
+    static let sessionExpired = Notification.Name("APIClient.sessionExpired")
 }

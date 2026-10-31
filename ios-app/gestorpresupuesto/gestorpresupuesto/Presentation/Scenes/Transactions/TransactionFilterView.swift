@@ -181,7 +181,7 @@ struct TransactionFilterView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .padding(.horizontal, Spacing.sm.rawValue)
                             .padding(.vertical, Spacing.sm.rawValue)
-                            .foregroundStyle(isSelected ? .white : Color.app.textPrimary)
+                            .foregroundStyle(isSelected ? Color.app.onAccent : Color.app.textPrimary)
                             .background(isSelected ? category.colorValue : Color.app.surfaceSecondary)
                             .clipShape(RoundedRectangle(cornerRadius: Radius.md.rawValue))
                             .overlay(
@@ -342,12 +342,12 @@ struct TransactionFilterView: View {
             Text(title)
                 .font(.app(.caption))
                 .fontWeight(isSelected ? .semibold : .regular)
-                .foregroundStyle(isSelected ? .white : Color.app.textPrimary)
+                .foregroundStyle(isSelected ? Color.app.onAccent : Color.app.textPrimary)
                 .padding(.horizontal, Spacing.md.rawValue)
                 .padding(.vertical, Spacing.sm.rawValue)
                 .background(
                     isSelected
-                        ? AnyShapeStyle(LinearGradient(colors: Color.app.gradientPrimary, startPoint: .leading, endPoint: .trailing))
+                        ? AnyShapeStyle(Color.app.accent)
                         : AnyShapeStyle(Color.app.surfaceSecondary)
                 )
                 .clipShape(Capsule())

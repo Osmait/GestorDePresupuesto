@@ -33,6 +33,18 @@ class InvestmentsViewModel: BaseViewModel {
         investments.reduce(0) { $0 + $1.gainLoss }
     }
 
+    /// Totals per currency (USD first): positions are valued in their own
+    /// currency, so USD and DOP are never added together.
+    private func formattedTotals(_ value: (Investment) -> Double) -> String {
+        Dictionary(grouping: investments, by: \.currency)
+            .sorted { $0.key == "USD" || ($1.key != "USD" && $0.key < $1.key) }
+            .map { currency, items in items.reduce(0) { $0 + value($1) }.currencyFormatted(currency: currency) }
+            .joined(separator: " · ")
+    }
+
+    var formattedPortfolioValue: String { formattedTotals(\.totalValue) }
+    var formattedGainLoss: String { formattedTotals(\.gainLoss) }
+
     func loadInvestments() async {
         isLoading = true
         defer { isLoading = false }
@@ -51,11 +63,10 @@ class InvestmentsViewModel: BaseViewModel {
         }
     }
 
-    func createInvestment(request: CreateInvestmentRequest) async throws -> Investment {
-        let investment = try await investmentRepository.create(request)
+    func createInvestment(request: CreateInvestmentRequest) async throws {
+        try await investmentRepository.create(request)
         showSuccess("Inversión creada")
         await loadInvestments()
-        return investment
     }
 
     func deleteInvestment(_ id: String) async {

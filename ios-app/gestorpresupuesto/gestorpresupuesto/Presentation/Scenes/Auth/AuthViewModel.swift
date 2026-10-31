@@ -11,6 +11,7 @@ class AuthViewModel: BaseViewModel {
     private let authRepository: AuthRepository
     private let biometricService: BiometricAuthServiceProtocol
     private let userDefaults = UserDefaultsStorage.shared
+    private var sessionExpiredObserver: AnyCancellable?
 
     var isBiometricAvailable: Bool {
         biometricService.isBiometricAvailable
@@ -31,7 +32,19 @@ class AuthViewModel: BaseViewModel {
         self.authRepository = authRepository ?? DependencyContainer.shared.resolve(AuthRepository.self)
         self.biometricService = biometricService
         super.init()
+        sessionExpiredObserver = NotificationCenter.default.publisher(for: .sessionExpired)
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in self?.handleSessionExpired() }
         checkAuthStatus()
+    }
+
+    /// The tokens are already cleared by APIClient; leave the app and explain why.
+    func handleSessionExpired() {
+        guard isAuthenticated || requiresBiometricUnlock else { return }
+        isAuthenticated = false
+        requiresBiometricUnlock = false
+        user = nil
+        showWarning("Tu sesión expiró. Inicia sesión de nuevo.")
     }
 
     func checkAuthStatus() {
@@ -71,7 +84,7 @@ class AuthViewModel: BaseViewModel {
         error = nil
 
         do {
-            _ = try await authRepository.register(name: name, lastName: lastName, email: email, password: password)
+            try await authRepository.register(name: name, lastName: lastName, email: email, password: password)
             await login(email: email, password: password)
         } catch {
             showError(error.localizedDescription)

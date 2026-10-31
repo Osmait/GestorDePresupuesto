@@ -51,6 +51,13 @@ struct DashboardSummary: Codable {
     let certificatesCount: Int
     let categoryExpenses: [CategoryExpense]
     let monthlySummary: [MonthlySummary]
+    // Net worth and its other parts, in DOP. Optional so an older backend
+    // still decodes.
+    var netWorth: Double? = nil
+    var creditCardDebt: Double? = nil
+    var brokerCashTotal: Double? = nil
+    var loansReceivableTotal: Double? = nil
+    var loansDefaultedTotal: Double? = nil
 
     enum CodingKeys: String, CodingKey {
         case totalIncome = "total_income"
@@ -65,5 +72,10 @@ struct DashboardSummary: Codable {
         case certificatesCount = "certificates_count"
         case categoryExpenses = "category_expenses"
         case monthlySummary = "monthly_summary"
+        case netWorth = "net_worth"
+        case creditCardDebt = "credit_card_debt"
+        case brokerCashTotal = "broker_cash_total"
+        case loansReceivableTotal = "loans_receivable_total"
+        case loansDefaultedTotal = "loans_defaulted_total"
     }
 }

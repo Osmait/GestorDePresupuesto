@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import gestorpresupuesto
 
@@ -15,5 +16,31 @@ struct StringExtensionTests {
     @Test func isNotBlank_whitespaceOnly() {
         #expect(!"   ".isNotBlank)
         #expect(!"\n\t".isNotBlank)
+    }
+}
+
+@Suite("Calendar day formatting")
+struct CalendarDayFormattingTests {
+
+    @Test func noonUTCKeepsTheDay() {
+        #expect("2026-10-31T12:00:00Z".calendarDayFormatted == "2026-10-31".calendarDayFormatted)
+        #expect("2026-10-31".calendarDayFormatted.contains("31"))
+    }
+
+    @Test func notADateIsReturnedAsIs() {
+        #expect("pendiente".calendarDayFormatted == "pendiente")
+    }
+}
+
+@Suite("App calendar")
+struct AppCalendarTests {
+
+    @Test func monthRange_coversTheLocalMonth() {
+        // Nov 1 2026 02:00 UTC is still Oct 31 in Santo Domingo.
+        let date = Date(timeIntervalSince1970: 1_793_498_400)
+        let month = AppCalendar.monthRange(containing: date)
+        #expect(month.from == "2026-10-01")
+        #expect(month.to == "2026-10-31")
+        #expect(month.title.lowercased().contains("octubre"))
     }
 }

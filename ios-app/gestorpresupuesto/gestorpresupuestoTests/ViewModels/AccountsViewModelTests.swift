@@ -34,11 +34,10 @@ struct AccountsViewModelTests {
         mock.getAllResult = .success([.fixture()])
         let vm = AccountsViewModel(accountRepository: mock)
 
-        let account = try await vm.createAccount(request: CreateAccountRequest(
+        try await vm.createAccount(request: CreateAccountRequest(
             name: "Test", bank: "BHD", initialBalance: 1000
         ))
 
-        #expect(account.name == "Cuenta Principal")
         #expect(mock.getAllCallCount >= 1)
     }
 
@@ -70,7 +69,7 @@ struct AccountsViewModelTests {
         mock.getAllResult = .success([.fixture()])
         let vm = AccountsViewModel(accountRepository: mock)
 
-        _ = try await vm.updateAccount("acc-1", request: UpdateAccountRequest(
+        try await vm.updateAccount("acc-1", request: UpdateAccountRequest(
             name: "Updated", bank: "BHD", initialBalance: 2000
         ))
 

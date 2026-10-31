@@ -54,6 +54,17 @@ struct DashboardViewModelTests {
         #expect(!vm.isLoading)
     }
 
+    @Test @MainActor func loadAll_asksForTheCurrentMonth() async {
+        let (vm, _, _, _, anaRepo) = makeSUT()
+        anaRepo.getDashboardSummaryResult = .failure(MockError.forced)
+
+        await vm.loadAll()
+
+        let month = AppCalendar.monthRange()
+        #expect(anaRepo.lastDashboardRange?.from == month.from)
+        #expect(anaRepo.lastDashboardRange?.to == month.to)
+    }
+
     @Test @MainActor func loadAll_fallbackWhenSummaryFails() async {
         let (vm, accRepo, txnRepo, budRepo, anaRepo) = makeSUT()
         anaRepo.getDashboardSummaryResult = .failure(MockError.forced)

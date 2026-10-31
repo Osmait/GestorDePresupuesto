@@ -7,7 +7,7 @@ struct BudgetsListView: View {
     @State private var budgetToDelete: BudgetResponse?
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
             ZStack {
             Color.app.background.ignoresSafeArea()
 
@@ -30,6 +30,7 @@ struct BudgetsListView: View {
                         ForEach(viewModel.budgets) { budget in
                             BudgetRowView(budget: budget)
                                 .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                                 .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
                                 .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                     Button(role: .destructive) {
@@ -85,7 +86,7 @@ struct BudgetRowView: View {
             VStack(spacing: .md) {
                 HStack {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("Presupuesto")
+                        Text(budget.displayName)
                             .font(.caption)
                             .foregroundStyle(Color.app.textSecondary)
 
@@ -254,7 +255,7 @@ struct AddBudgetView: View {
         )
 
         do {
-            _ = try await viewModel.createBudget(request: request)
+            try await viewModel.createBudget(request: request)
             isPresented = false
         } catch {
             shakeTrigger = false

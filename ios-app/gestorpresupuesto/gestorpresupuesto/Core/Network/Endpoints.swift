@@ -18,7 +18,8 @@ enum APIError: Error, LocalizedError {
         case .decodingError(let error):
             return "Error de decodificación: \(error.localizedDescription)"
         case .serverError(let code, let message):
-            return "Error del servidor (\(code)): \(message ?? "Error desconocido")"
+            if let message, !message.isEmpty { return message }
+            return "Error del servidor (\(code))"
         case .unauthorized:
             return "No autorizado"
         case .networkError(let error):
@@ -198,6 +199,31 @@ struct Endpoints {
 
     static func monthlySummary() -> Endpoint {
         Endpoint(path: "/analytics/monthly-summary", method: .GET)
+    }
+
+    // MARK: - Monthly Plan
+    static func monthlyPlan() -> Endpoint {
+        Endpoint(path: "/monthly-plan", method: .GET)
+    }
+
+    static func monthlyPlanSummary() -> Endpoint {
+        Endpoint(path: "/monthly-plan/summary", method: .GET)
+    }
+
+    static func createMonthlyPlanItem(body: Data) -> Endpoint {
+        Endpoint(path: "/monthly-plan", method: .POST, body: body)
+    }
+
+    static func updateMonthlyPlanItem(id: String, body: Data) -> Endpoint {
+        Endpoint(path: "/monthly-plan/\(encode(id))", method: .PUT, body: body)
+    }
+
+    static func setMonthlyPlanItemActive(id: String, body: Data) -> Endpoint {
+        Endpoint(path: "/monthly-plan/\(encode(id))/active", method: .PATCH, body: body)
+    }
+
+    static func deleteMonthlyPlanItem(id: String) -> Endpoint {
+        Endpoint(path: "/monthly-plan/\(encode(id))", method: .DELETE)
     }
 
     // MARK: - Recurring Transactions
@@ -404,8 +430,12 @@ struct Endpoints {
     }
 
     // MARK: - Dashboard Summary
-    static func dashboardSummary() -> Endpoint {
-        Endpoint(path: "/analytics/dashboard-summary", method: .GET)
+    /// Without dates the backend totals the year so far.
+    static func dashboardSummary(dateFrom: String? = nil, dateTo: String? = nil) -> Endpoint {
+        var items: [URLQueryItem] = []
+        if let dateFrom { items.append(URLQueryItem(name: "date_from", value: dateFrom)) }
+        if let dateTo { items.append(URLQueryItem(name: "date_to", value: dateTo)) }
+        return Endpoint(path: "/analytics/dashboard-summary", method: .GET, queryItems: items.isEmpty ? nil : items)
     }
 
     // MARK: - Notifications

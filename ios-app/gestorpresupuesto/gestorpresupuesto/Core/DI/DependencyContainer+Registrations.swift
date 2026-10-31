@@ -9,6 +9,7 @@ extension DependencyContainer {
         register(CategoryRepository.self) { CategoryRepositoryImpl() }
         register(BudgetRepository.self) { BudgetRepositoryImpl() }
         register(AnalyticsRepository.self) { AnalyticsRepositoryImpl() }
+        register(MonthlyPlanRepository.self) { MonthlyPlanRepositoryImpl() }
         register(RecurringTransactionRepository.self) { RecurringTransactionRepositoryImpl() }
         register(AIRepository.self) { AIRepositoryImpl() }
         register(CreditCardRepository.self) { CreditCardRepositoryImpl() }

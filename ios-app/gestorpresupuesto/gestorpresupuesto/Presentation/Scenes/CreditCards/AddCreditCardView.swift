@@ -14,10 +14,15 @@ struct AddCreditCardView: View {
     @State private var initialDebt = ""
     @State private var shakeTrigger = false
 
+    /// Mirrors the backend DTO rules (dto/creditcard): days 1–28, exactly 4
+    /// digits when given, names of 2+ characters, a positive limit.
     private var isValid: Bool {
-        name.isNotBlank && bank.isNotBlank &&
-        Int(cutDay) != nil && Int(dueDay) != nil &&
-        Double(creditLimit) != nil
+        let digitsOK = lastFourDigits.isEmpty || (lastFourDigits.count == 4 && lastFourDigits.allSatisfy(\.isNumber))
+        return name.trimmingCharacters(in: .whitespaces).count >= 2
+            && bank.trimmingCharacters(in: .whitespaces).count >= 2
+            && (1...28).contains(Int(cutDay) ?? 0) && (1...28).contains(Int(dueDay) ?? 0)
+            && (Double(creditLimit) ?? 0) > 0
+            && digitsOK
     }
 
     var body: some View {
@@ -35,8 +40,8 @@ struct AddCreditCardView: View {
                         })
 
                         HStack(spacing: Spacing.md.rawValue) {
-                            FormField(title: "Día de corte", icon: "calendar", placeholder: "15", text: $cutDay, keyboardType: .numberPad)
-                            FormField(title: "Día de pago", icon: "calendar.badge.clock", placeholder: "5", text: $dueDay, keyboardType: .numberPad)
+                            FormField(title: "Día de corte (1–28)", icon: "calendar", placeholder: "15", text: $cutDay, keyboardType: .numberPad)
+                            FormField(title: "Día de pago (1–28)", icon: "calendar.badge.clock", placeholder: "5", text: $dueDay, keyboardType: .numberPad)
                         }
 
                         Text("Balance Inicial")

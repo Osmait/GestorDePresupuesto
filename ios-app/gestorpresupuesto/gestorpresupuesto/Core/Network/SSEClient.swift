@@ -16,6 +16,9 @@ actor SSEClient {
     private var parser = SSEParser()
     private var buffer = ""
     private var reconnectAttempt = 0
+    /// The stream was refused with 401: refresh the access token (it lives
+    /// 15 minutes) before reconnecting.
+    private var needsTokenRefresh = false
 
     init(tokenStorage: TokenStorage = KeychainTokenStorage()) {
         self.tokenStorage = tokenStorage
@@ -60,6 +63,10 @@ actor SSEClient {
     // MARK: - Connection
 
     private func startConnection() {
+        // Never leave a previous stream open: the server caps streams per user.
+        dataTask?.cancel()
+        session?.invalidateAndCancel()
+
         guard let url = URL(string: Endpoints.baseURL + "/notifications") else { return }
 
         var request = URLRequest(url: url)
@@ -96,7 +103,10 @@ actor SSEClient {
             #if DEBUG
             print("🔔 SSE connected with status: \(httpResponse.statusCode)")
             #endif
-            if httpResponse.statusCode == 401 {
+            // Anything but a 200 (401 expired token, 429 too many streams,
+            // 503 during a deploy) is retried with backoff.
+            guard httpResponse.statusCode == 200 else {
+                needsTokenRefresh = httpResponse.statusCode == 401
                 completionHandler(.cancel)
                 return
             }
@@ -120,7 +130,10 @@ actor SSEClient {
         }
     }
 
-    func handleCompletion(error: Error?) {
+    func handleCompletion(session: URLSession, error: Error?) {
+        // A stream replaced by a newer connection must not schedule another one.
+        guard session === self.session else { return }
+
         #if DEBUG
         if let error {
             print("🔔 SSE connection closed: \(error.localizedDescription)")
@@ -138,11 +151,21 @@ actor SSEClient {
             try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
             guard let self = self else { return }
             guard await self.dataTask != nil else { return }
+            if await self.consumeTokenRefresh() {
+                _ = try? await APIClient.shared.refreshAccessToken()
+            }
             #if DEBUG
             print("🔔 SSE: reconnecting after \(String(format: "%.1f", delay))s…")
             #endif
             await self.startConnection()
         }
+    }
+}
+
+extension SSEClient {
+    fileprivate func consumeTokenRefresh() -> Bool {
+        defer { needsTokenRefresh = false }
+        return needsTokenRefresh
     }
 }
 
@@ -169,7 +192,7 @@ private final class SSESessionDelegate: NSObject, URLSessionDataDelegate {
 
     func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         Task { [owner] in
-            await owner?.handleCompletion(error: error)
+            await owner?.handleCompletion(session: session, error: error)
         }
     }
 }

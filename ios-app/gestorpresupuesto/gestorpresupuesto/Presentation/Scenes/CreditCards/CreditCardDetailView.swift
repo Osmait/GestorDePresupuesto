@@ -106,7 +106,7 @@ struct CreditCardDetailView: View {
                                             Text(payment.currency)
                                                 .font(.app(.caption))
                                                 .foregroundStyle(Color.app.textSecondary)
-                                            Text(payment.paymentDate)
+                                            Text(payment.paymentDate.calendarDayFormatted)
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
                                         }

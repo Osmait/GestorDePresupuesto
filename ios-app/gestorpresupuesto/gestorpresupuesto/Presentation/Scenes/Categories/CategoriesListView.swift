@@ -8,7 +8,7 @@ struct CategoriesListView: View {
     @State private var categoryToDelete: Category?
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
             ZStack {
                 Color.app.background.ignoresSafeArea()
 
@@ -353,7 +353,7 @@ struct AddCategoryView: View {
         )
 
         do {
-            _ = try await viewModel.createCategory(request: request)
+            try await viewModel.createCategory(request: request)
             isPresented = false
         } catch {
             shakeTrigger = false

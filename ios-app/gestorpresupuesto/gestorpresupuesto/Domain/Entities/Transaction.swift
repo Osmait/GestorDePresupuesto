@@ -9,6 +9,10 @@ enum TransactionType: String, Codable, CaseIterable {
     case loanCollection = "loan_collection"
     case investmentPurchase = "investment_purchase"
     case investmentFunding = "investment_funding"
+    case cardPaymentReceived = "card_payment_received"
+    case loanCancellationRefund = "loan_cancellation_refund"
+    case adjustmentIn = "adjustment_in"
+    case adjustmentOut = "adjustment_out"
 
     var displayName: String {
         switch self {
@@ -20,6 +24,9 @@ enum TransactionType: String, Codable, CaseIterable {
         case .loanCollection: return "Cobro préstamo"
         case .investmentPurchase: return "Compra inversión"
         case .investmentFunding: return "Fondeo inversión"
+        case .cardPaymentReceived: return "Pago recibido"
+        case .loanCancellationRefund: return "Reembolso préstamo"
+        case .adjustmentIn, .adjustmentOut: return "Ajuste de saldo"
         }
     }
 }
@@ -60,6 +67,32 @@ struct Transaction: Codable, Identifiable, Equatable {
 
     var isIncome: Bool {
         typeTransaction == "income"
+    }
+
+    /// Money coming into the account: the backend's balance effect is positive
+    /// for these types (fn_transaction_balance_effect), e.g. a card payment
+    /// lowers the card's debt with `card_payment_received`.
+    var isInflow: Bool {
+        switch transactionType {
+        case .income, .loanCollection, .loanCancellationRefund, .adjustmentIn, .cardPaymentReceived: true
+        default: false
+        }
+    }
+
+    /// The amount with the sign of its effect on the account balance.
+    var signedAmount: Double {
+        isInflow ? abs(amount) : -abs(amount)
+    }
+
+    /// Only plain incomes and expenses can be edited; the rest are written by
+    /// card payments, loans, investments or balance adjustments.
+    var isEditable: Bool {
+        typeTransaction == "income" || typeTransaction == "bill"
+    }
+
+    /// Incomes, expenses and balance adjustments can be deleted on their own.
+    var isDeletable: Bool {
+        isEditable || transactionType == .adjustmentIn || transactionType == .adjustmentOut
     }
 }
 
@@ -125,6 +158,7 @@ struct TransactionFilter: Codable {
     var amountMin: Double?
     var amountMax: Double?
     var search: String?
+    var includeSummary: Bool = false
 
     enum CodingKeys: String, CodingKey {
         case page
@@ -155,7 +189,8 @@ struct TransactionFilter: Codable {
         if let type = type { items.append(URLQueryItem(name: "type", value: type)) }
         if let categoryId = categoryId { items.append(URLQueryItem(name: "category_id", value: categoryId)) }
         if let categories = categories, !categories.isEmpty {
-            categories.forEach { items.append(URLQueryItem(name: "categories", value: $0)) }
+            // The backend reads one comma-separated value.
+            items.append(URLQueryItem(name: "categories", value: categories.joined(separator: ",")))
         }
         if let accountId = accountId { items.append(URLQueryItem(name: "account_id", value: accountId)) }
         if let budgetId = budgetId { items.append(URLQueryItem(name: "budget_id", value: budgetId)) }
@@ -165,6 +200,7 @@ struct TransactionFilter: Codable {
         if let amountMin = amountMin { items.append(URLQueryItem(name: "amount_min", value: "\(amountMin)")) }
         if let amountMax = amountMax { items.append(URLQueryItem(name: "amount_max", value: "\(amountMax)")) }
         if let search = search, !search.isEmpty { items.append(URLQueryItem(name: "search", value: search)) }
+        if includeSummary { items.append(URLQueryItem(name: "include_summary", value: "true")) }
 
         return items
     }
@@ -173,16 +209,21 @@ struct TransactionFilter: Codable {
 struct PaginatedTransactionResponse: Codable {
     let data: [Transaction]
     let pagination: PaginationMeta
+    /// Totals over every filtered transaction (all pages), in DOP; only sent
+    /// when the request asks for `include_summary`.
+    let summary: TransactionSummary?
 
-    init(data: [Transaction], pagination: PaginationMeta) {
+    init(data: [Transaction], pagination: PaginationMeta, summary: TransactionSummary? = nil) {
         self.data = data
         self.pagination = pagination
+        self.summary = summary
     }
 
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         self.data = try container.decodeIfPresent([Transaction].self, forKey: .data) ?? []
         self.pagination = try container.decode(PaginationMeta.self, forKey: .pagination)
+        self.summary = try? container.decodeIfPresent(TransactionSummary.self, forKey: .summary)
     }
 }
 

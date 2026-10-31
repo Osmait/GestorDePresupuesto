@@ -31,11 +31,11 @@ struct CategoriesViewModelTests {
         mock.getAllResult = .success([.fixture()])
         let vm = CategoriesViewModel(categoryRepository: mock)
 
-        let category = try await vm.createCategory(request: CreateCategoryRequest(
+        try await vm.createCategory(request: CreateCategoryRequest(
             name: "Comida", icon: "fork.knife", color: "#FF5733"
         ))
 
-        #expect(category.name == "Alimentación")
+        #expect(vm.categories.first?.name == "Alimentación")
     }
 
     @Test @MainActor func updateCategory_success() async throws {
@@ -44,7 +44,7 @@ struct CategoriesViewModelTests {
         mock.getAllResult = .success([.fixture()])
         let vm = CategoriesViewModel(categoryRepository: mock)
 
-        _ = try await vm.updateCategory("cat-1", request: UpdateCategoryRequest(
+        try await vm.updateCategory("cat-1", request: UpdateCategoryRequest(
             name: "Updated", icon: "star", color: "#000000"
         ))
 

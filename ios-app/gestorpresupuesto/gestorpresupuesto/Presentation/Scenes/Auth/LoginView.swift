@@ -49,19 +49,12 @@ struct LoginView: View {
     private var logoView: some View {
         ZStack {
             Circle()
-                .fill(
-                    LinearGradient(
-                        colors: Color.app.gradientPrimary,
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
+                .fill(Color.app.accent)
                 .frame(width: 80, height: 80)
-                .shadow(color: Color.app.accent.opacity(0.3), radius: 20, x: 0, y: 10)
 
             Image(systemName: "wallet.fill")
                 .font(.system(size: 36))
-                .foregroundStyle(.white)
+                .foregroundStyle(Color.app.onAccent)
         }
         .scaleEffect(animationPhase == .initial ? 0.5 : 1.0)
         .opacity(animationPhase == .initial ? 0 : 1)

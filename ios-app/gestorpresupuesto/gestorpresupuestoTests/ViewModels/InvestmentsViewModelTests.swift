@@ -115,12 +115,12 @@ struct InvestmentsViewModelTests {
         invRepo.getFundingBalancesResult = .success([])
         accRepo.getAllResult = .success([])
 
-        let result = try await vm.createInvestment(request: CreateInvestmentRequest(
+        try await vm.createInvestment(request: CreateInvestmentRequest(
             name: "AAPL", symbol: "AAPL", type: "stock",
             quantity: 10, purchasePrice: 150, currentPrice: 160,
             settlementCurrency: "USD"
         ))
 
-        #expect(result.name == "Apple Inc")
+        #expect(vm.investments.count == 1)
     }
 }

@@ -2,7 +2,8 @@ import Foundation
 
 protocol AuthRepository {
     func login(email: String, password: String) async throws -> User
-    func register(name: String, lastName: String, email: String, password: String) async throws -> User
+    /// The backend answers with an empty 200; log in afterwards to get the user.
+    func register(name: String, lastName: String, email: String, password: String) async throws
     func logout() async throws
     func getProfile() async throws -> User
 }
@@ -10,8 +11,8 @@ protocol AuthRepository {
 protocol AccountRepository {
     func getAll() async throws -> [AccountResponse]
     func getById(_ id: String) async throws -> AccountResponse
-    func create(_ request: CreateAccountRequest) async throws -> Account
-    func update(_ id: String, request: UpdateAccountRequest) async throws -> Account
+    func create(_ request: CreateAccountRequest) async throws
+    func update(_ id: String, request: UpdateAccountRequest) async throws
     func delete(_ id: String) async throws
 }
 
@@ -26,28 +27,39 @@ protocol TransactionRepository {
 
 protocol CategoryRepository {
     func getAll() async throws -> [Category]
-    func create(_ request: CreateCategoryRequest) async throws -> Category
-    func update(_ id: String, request: UpdateCategoryRequest) async throws -> Category
+    func create(_ request: CreateCategoryRequest) async throws
+    func update(_ id: String, request: UpdateCategoryRequest) async throws
     func delete(_ id: String) async throws
 }
 
 protocol BudgetRepository {
     func getAll() async throws -> [BudgetResponse]
-    func create(_ request: CreateBudgetRequest) async throws -> Budget
-    func update(_ id: String, request: UpdateBudgetRequest) async throws -> Budget
+    func create(_ request: CreateBudgetRequest) async throws
+    func update(_ id: String, request: UpdateBudgetRequest) async throws
+    func delete(_ id: String) async throws
+}
+
+protocol MonthlyPlanRepository {
+    func getAll() async throws -> [MonthlyPlanItem]
+    func getSummary() async throws -> MonthlyPlanSummary
+    func create(_ request: MonthlyPlanItemRequest) async throws
+    func update(_ id: String, request: MonthlyPlanItemRequest) async throws
+    func setActive(_ id: String, isActive: Bool) async throws
     func delete(_ id: String) async throws
 }
 
 protocol AnalyticsRepository {
     func getCategoryExpenses(dateFrom: String?, dateTo: String?) async throws -> [CategoryExpense]
     func getMonthlySummary() async throws -> [MonthlySummary]
-    func getDashboardSummary() async throws -> DashboardSummary
+    /// Income and expense totals for [dateFrom, dateTo] (calendar days); the
+    /// balances and net worth are always as of now.
+    func getDashboardSummary(dateFrom: String?, dateTo: String?) async throws -> DashboardSummary
 }
 
 protocol RecurringTransactionRepository {
     func getAll() async throws -> [RecurringTransaction]
-    func create(_ request: CreateRecurringTransactionRequest) async throws -> RecurringTransaction
-    func update(_ id: String, request: UpdateRecurringTransactionRequest) async throws -> RecurringTransaction
+    func create(_ request: CreateRecurringTransactionRequest) async throws
+    func update(_ id: String, request: UpdateRecurringTransactionRequest) async throws
     func delete(_ id: String) async throws
 }
 
@@ -88,8 +100,8 @@ protocol LoanRepository {
 protocol CertificateRepository {
     func getAll() async throws -> [Certificate]
     func getById(_ id: String) async throws -> CertificateWithHistory
-    func create(_ request: CreateCertificateRequest) async throws -> Certificate
-    func update(_ id: String, request: UpdateCertificateRequest) async throws -> Certificate
+    func create(_ request: CreateCertificateRequest) async throws
+    func update(_ id: String, request: UpdateCertificateRequest) async throws
     func delete(_ id: String) async throws
     func simulate(id: String, request: SimulatePaymentRequest) async throws -> SimulationResult
     func getSummary() async throws -> CertificateSummary
@@ -98,7 +110,7 @@ protocol CertificateRepository {
 protocol InvestmentRepository {
     func getAll() async throws -> [Investment]
     func getById(_ id: String) async throws -> Investment
-    func create(_ request: CreateInvestmentRequest) async throws -> Investment
+    func create(_ request: CreateInvestmentRequest) async throws
     func update(_ id: String, request: UpdateInvestmentRequest) async throws -> Investment
     func delete(_ id: String) async throws
     func fundBroker(_ request: FundBrokerRequest) async throws

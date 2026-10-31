@@ -5,7 +5,7 @@ struct SpendingAnalysisView: View {
     @StateObject private var viewModel = SpendingAnalysisViewModel()
 
     var body: some View {
-        NavigationStack {
+        Group { // The tab or the "Más" stack provides the NavigationStack
             ZStack {
                 Color.app.background.ignoresSafeArea()
 

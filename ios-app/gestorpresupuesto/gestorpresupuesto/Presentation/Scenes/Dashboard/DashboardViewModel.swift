@@ -15,27 +15,41 @@ class DashboardViewModel: BaseViewModel {
     @Published var savingsRate: Double = 0
     @Published var investmentsTotal: Double = 0
     @Published var certificatesTotal: Double = 0
+    @Published var creditCardDebt: Double = 0
+    @Published var brokerCashTotal: Double = 0
+    @Published var loansReceivableTotal: Double = 0
+    @Published var accountsCount = 0
+    /// The backend's net worth (it subtracts card debt and adds broker cash
+    /// and loans receivable); nil on an older backend.
+    @Published var netWorth: Double?
+    @Published var monthlyPlanSummary: MonthlyPlanSummary?
+    @Published var nextBill: MonthlyPlanItem?
+    /// The month the income and expense totals cover ("octubre 2026").
+    @Published var monthTitle = AppCalendar.monthRange().title
 
     var patrimonyTotal: Double {
-        totalBalance + investmentsTotal + certificatesTotal
+        netWorth ?? totalBalance + investmentsTotal + certificatesTotal
     }
 
     private let accountRepository: AccountRepository
     private let transactionRepository: TransactionRepository
     private let budgetRepository: BudgetRepository
     private let analyticsRepository: AnalyticsRepository
+    private let monthlyPlanRepository: MonthlyPlanRepository?
 
     init(
         accountRepository: AccountRepository? = nil,
         transactionRepository: TransactionRepository? = nil,
         budgetRepository: BudgetRepository? = nil,
-        analyticsRepository: AnalyticsRepository? = nil
+        analyticsRepository: AnalyticsRepository? = nil,
+        monthlyPlanRepository: MonthlyPlanRepository? = nil
     ) {
         let container = DependencyContainer.shared
         self.accountRepository = accountRepository ?? container.resolve(AccountRepository.self)
         self.transactionRepository = transactionRepository ?? container.resolve(TransactionRepository.self)
         self.budgetRepository = budgetRepository ?? container.resolve(BudgetRepository.self)
         self.analyticsRepository = analyticsRepository ?? container.resolve(AnalyticsRepository.self)
+        self.monthlyPlanRepository = monthlyPlanRepository ?? container.resolveOptional(MonthlyPlanRepository.self)
     }
 
     func loadAll() async {
@@ -47,9 +61,11 @@ class DashboardViewModel: BaseViewModel {
         async let summaryTask = loadDashboardSummary()
         async let transactionsTask = transactionRepository.getAll(filter: TransactionFilter(limit: 10))
         async let budgetsTask = budgetRepository.getAll()
+        async let planTask: Void = loadMonthlyPlan()
 
         do {
             await summaryTask
+            await planTask
             let transactionsResponse = try await transactionsTask
             recentTransactions = transactionsResponse.data
             budgets = try await budgetsTask
@@ -60,7 +76,10 @@ class DashboardViewModel: BaseViewModel {
 
     private func loadDashboardSummary() async {
         do {
-            let summary = try await analyticsRepository.getDashboardSummary()
+            // Income and expenses of the current month, like the web.
+            let month = AppCalendar.monthRange()
+            monthTitle = month.title
+            let summary = try await analyticsRepository.getDashboardSummary(dateFrom: month.from, dateTo: month.to)
             totalIncome = summary.totalIncome
             totalExpenses = summary.totalExpenses
             totalBalance = summary.accountsTotal
@@ -69,6 +88,11 @@ class DashboardViewModel: BaseViewModel {
                 : 0
             investmentsTotal = summary.investmentsTotal
             certificatesTotal = summary.certificatesTotal
+            creditCardDebt = summary.creditCardDebt ?? 0
+            brokerCashTotal = summary.brokerCashTotal ?? 0
+            loansReceivableTotal = summary.loansReceivableTotal ?? 0
+            netWorth = summary.netWorth
+            accountsCount = summary.accountsCount
             categoryExpenses = summary.categoryExpenses
             monthlySummary = summary.monthlySummary
 
@@ -79,11 +103,24 @@ class DashboardViewModel: BaseViewModel {
         }
     }
 
+    /// The plan card is optional: a failure here leaves it hidden instead of
+    /// failing the whole dashboard.
+    private func loadMonthlyPlan() async {
+        guard let monthlyPlanRepository else { return }
+        async let summaryTask = monthlyPlanRepository.getSummary()
+        async let itemsTask = monthlyPlanRepository.getAll()
+        guard let summary = try? await summaryTask, let items = try? await itemsTask else { return }
+        monthlyPlanSummary = summary.totalIncome > 0 || summary.totalExpenses > 0 ? summary : nil
+        nextBill = items.nextBill(from: Date())
+    }
+
     private func loadFallback() async {
         do {
             accounts = try await accountRepository.getAll()
             categoryExpenses = try await analyticsRepository.getCategoryExpenses(dateFrom: nil, dateTo: nil)
-            totalBalance = accounts.reduce(0) { $0 + $1.currentBalance }
+            let bankAccounts = accounts.bankAccounts
+            totalBalance = bankAccounts.reduce(0) { $0 + $1.currentBalance }
+            accountsCount = bankAccounts.count
         } catch {
             showError(error.localizedDescription)
         }

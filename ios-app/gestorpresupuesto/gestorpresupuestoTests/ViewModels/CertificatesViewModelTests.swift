@@ -44,7 +44,7 @@ struct CertificatesViewModelTests {
         certRepo.getSummaryResult = .success(.fixture())
         accRepo.getAllResult = .success([])
 
-        let cert = try await vm.createCertificate(request: CreateCertificateRequest(
+        try await vm.createCertificate(request: CreateCertificateRequest(
             bank: "BHD", baseCapital: 100000,
             interestType: "compound", currentInterestRate: 12.5,
             currentTaxRate: 10, cutDay: 15,
@@ -52,7 +52,7 @@ struct CertificatesViewModelTests {
             maturityDate: nil, currency: "DOP"
         ))
 
-        #expect(cert.bank == "BHD")
+        #expect(vm.certificates.count == 1)
     }
 
     @Test @MainActor func deleteCertificate_success() async {

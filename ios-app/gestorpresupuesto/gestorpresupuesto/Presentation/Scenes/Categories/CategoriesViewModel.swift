@@ -23,18 +23,16 @@ class CategoriesViewModel: BaseViewModel {
         }
     }
 
-    func createCategory(request: CreateCategoryRequest) async throws -> Category {
-        let category = try await categoryRepository.create(request)
+    func createCategory(request: CreateCategoryRequest) async throws {
+        try await categoryRepository.create(request)
         showSuccess("Categoría creada")
         await loadCategories()
-        return category
     }
 
-    func updateCategory(_ id: String, request: UpdateCategoryRequest) async throws -> Category {
-        let category = try await categoryRepository.update(id, request: request)
+    func updateCategory(_ id: String, request: UpdateCategoryRequest) async throws {
+        try await categoryRepository.update(id, request: request)
         showSuccess("Categoría actualizada")
         await loadCategories()
-        return category
     }
 
     func deleteCategory(_ id: String) async {
