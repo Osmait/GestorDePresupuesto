@@ -374,13 +374,6 @@ func (s *Server) registerRoutes() {
 	// routes.RecurringTransactionProcessRoute.
 	routes.RecurringTransactionProcessRoute(s.Engine, s.recurringService)
 
-	// RLS middleware: pins each DB-touching authenticated request to a transaction
-	// with set_config('app.current_user_id', userID, true). Every query that runs
-	// below this point must use that transaction (txhelper.FromContext/InTx):
-	// the request already holds a pooled connection, and waiting for a second
-	// one deadlocks once concurrent requests exhaust the pool. The connection
-	// is acquired with a bounded wait (DB_TX_ACQUIRE_TIMEOUT) and the request
-	// fails fast with 503 when the pool stays exhausted.
 	// Per-user limits on the AI endpoints that call the provider (the savings
 	// goals CRUD and reading/applying a reconciliation do not), before RLS so
 	// a rejected call takes no connection.
@@ -405,6 +398,15 @@ func (s *Server) registerRoutes() {
 	aiH := aiHandler.NewHandler(s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache, s.featureFlags)
 	routes.AIProviderRoutes(s.Engine, aiH, s.featureFlags, s.config.AI.MaxConcurrentCalls)
 
+	// RLS middleware: pins each DB-touching authenticated request to a transaction
+	// with set_config('app.current_user_id', userID, true). Every query that runs
+	// below this point must use that transaction (txhelper.FromContext/InTx):
+	// the request already holds a pooled connection, and waiting for a second
+	// one deadlocks once concurrent requests exhaust the pool. The connection
+	// is acquired with a bounded wait (DB_TX_ACQUIRE_TIMEOUT) and the request
+	// fails fast with 503 when the pool stays exhausted.
+	// The request also gets a deadline (DB_REQUEST_TIMEOUT) and transaction-
+	// local statement / idle-in-transaction timeouts (txhelper.SessionLimits).
 	s.Engine.Use(middleware.RLSMiddlewareWithConfig(s.db, middleware.RLSConfig{
 		AcquireTimeout: s.config.Database.TxAcquireTimeout,
 		RequestTimeout: s.config.Database.RequestTimeout,

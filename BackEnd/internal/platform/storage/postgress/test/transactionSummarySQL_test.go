@@ -18,7 +18,7 @@ import (
 // The include_summary numbers computed in SQL (SummarizeWithFilters +
 // CalculateSummaryFromGroups) are exactly those of the previous in-memory
 // computation (every matching row loaded, CalculateSummary), for a seeded
-// dataset with mixed types, currencies (incl. NULL and ''), categories and
+// dataset with mixed types, currencies (including NULL), categories and
 // fractional amounts, under several filters.
 func TestSummarizeWithFilters_MatchesInMemorySummary(t *testing.T) {
 	t.Parallel()
