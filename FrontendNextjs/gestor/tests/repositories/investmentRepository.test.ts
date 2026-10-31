@@ -70,6 +70,14 @@ describe('InvestmentRepository', () => {
 			mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(mockQuote) })
 			const result = await repo.getQuote('AAPL')
 			expect(result).toEqual(mockQuote)
+			expect(mockFetch).toHaveBeenCalledWith(expect.stringMatching(/\/quotes\/AAPL$/), expect.anything())
+		})
+
+		it('asks for the crypto quote of a coin', async () => {
+			const mockQuote = { regular_market_price: 0.5, symbol: 'COIN' }
+			mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(mockQuote) })
+			await repo.getQuote('COIN', 'crypto')
+			expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining('/quotes/COIN?type=crypto'), expect.anything())
 		})
 	})
 })

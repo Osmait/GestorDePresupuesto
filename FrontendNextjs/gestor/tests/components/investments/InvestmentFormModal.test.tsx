@@ -167,7 +167,7 @@ describe('InvestmentFormModal', () => {
 		await user.click(fetchButton)
 
 		await waitFor(() => {
-			expect(mockGetQuote).toHaveBeenCalledWith('AAPL')
+			expect(mockGetQuote).toHaveBeenCalledWith('AAPL', 'stock')
 		})
 	})
 

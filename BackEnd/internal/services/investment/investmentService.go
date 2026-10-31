@@ -330,7 +330,11 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 	results := make(chan quoteUpdate, len(stale))
 	for _, inv := range stale {
 		go func(i *investment.Investment) {
-			price, _, _, err := s.quoteService.GetQuoteContext(waitCtx, i.Symbol)
+			class := quote.AssetAny
+			if i.Type == investment.Crypto {
+				class = quote.AssetCrypto
+			}
+			price, _, _, err := s.quoteService.GetAssetQuote(waitCtx, i.Symbol, class)
 			if err != nil || !price.IsPositive() {
 				price = money.Zero
 			}
