@@ -3,6 +3,7 @@ import Combine
 
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -136,7 +137,12 @@ struct SearchView: View {
                 }
             }
             .navigationTitle("Buscar")
-            .searchable(text: $viewModel.query, prompt: "Buscar...")
+            .searchable(text: $viewModel.query, prompt: "Buscar")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { dismiss() }
+                }
+            }
             .onChange(of: viewModel.query) { _, newValue in
                 viewModel.debouncedSearch(newValue)
             }

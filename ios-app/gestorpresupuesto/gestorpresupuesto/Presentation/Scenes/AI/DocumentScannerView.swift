@@ -85,9 +85,8 @@ struct DocumentScannerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .notificationToolbar()
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cerrar") { dismiss() }
-                    .foregroundStyle(Color.app.textSecondary)
             }
         }
         .confirmationDialog("Agregar documento", isPresented: $showSourcePicker) {

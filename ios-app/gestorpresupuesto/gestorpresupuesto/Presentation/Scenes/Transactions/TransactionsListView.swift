@@ -379,26 +379,24 @@ struct AddTransactionView: View {
 
                         // Date
                         DatePickerField(title: "Fecha", date: $transactionDate)
-
-                        // Save
-                        PrimaryButton(
-                            "Guardar Transacción",
-                            icon: "checkmark",
-                            isLoading: isLoading
-                        ) {
-                            Task { await saveTransaction() }
-                        }
-                        .disabled(!isValid)
                     }
                     .padding(Spacing.lg.rawValue)
                 }
                 .shake(trigger: shakeTrigger)
             }
-            .navigationTitle("Nueva Transacción")
+            .navigationTitle("Nuevo movimiento")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { isPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Button("Guardar") { Task { await saveTransaction() } }
+                            .disabled(!isValid)
+                    }
                 }
             }
             .task {
@@ -410,35 +408,11 @@ struct AddTransactionView: View {
     // MARK: - Type Toggle
 
     private var typeToggle: some View {
-        HStack(spacing: 0) {
-            typeButton(title: "Gasto", icon: "arrow.down.circle.fill", active: !isIncome, color: .app.error) {
-                withAnimation(.spring(response: 0.3)) { isIncome = false }
-            }
-            typeButton(title: "Ingreso", icon: "arrow.up.circle.fill", active: isIncome, color: .app.success) {
-                withAnimation(.spring(response: 0.3)) { isIncome = true }
-            }
+        Picker("Tipo", selection: $isIncome) {
+            Text("Gasto").tag(false)
+            Text("Ingreso").tag(true)
         }
-        .background(Color.app.surfaceSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
-    }
-
-    private func typeButton(title: String, icon: String, active: Bool, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: Spacing.xs.rawValue) {
-                Image(systemName: icon)
-                    .font(.body)
-                Text(title)
-                    .font(.app(.subheadline))
-                    .fontWeight(.semibold)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.md.rawValue)
-            .foregroundStyle(active ? Color.app.onStatus : Color.app.textSecondary)
-            .background(active ? color : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
-        }
-        .buttonStyle(.plain)
-        .chipAccessibility(selected: active)
+        .pickerStyle(.segmented)
     }
 
     // MARK: - Amount
