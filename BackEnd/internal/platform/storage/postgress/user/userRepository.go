@@ -29,7 +29,30 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 	return &UserRepository{db: db}
 }
 
-// DeleteDemoUsersOlderThan deletes all demo users created before the specified time
+// DemoCleanupTables are the tables DeleteDemoUsersOlderThan empties, in
+// order, before deleting the demo users themselves: every table whose foreign
+// key to users or account would block the delete (no ON DELETE CASCADE or SET
+// NULL), parents before the rows they are referenced by. Tables that cascade
+// from users or account are cleaned by those deletes. A test checks the
+// schema against this list, so a new blocking table fails CI instead of the
+// cleanup worker in production.
+var DemoCleanupTables = []string{
+	"loans",                   // loans.source_account_id and loan_payments.destination_account_id are RESTRICT
+	"certificates",            // certificates.user_id has no ON DELETE
+	"reconciliation_sessions", // user_id and account_id have no ON DELETE
+	"savings_goals",           // user_id and account_id have no ON DELETE
+	"transactions",
+	"recurring_transactions",
+	"notifications",
+	"budgets",
+	"investments",
+	"cryptos",
+	"account",
+	"categorys",
+}
+
+// DeleteDemoUsersOlderThan deletes all demo users created before the specified
+// time, with their data (see DemoCleanupTables).
 func (u *UserRepository) DeleteDemoUsersOlderThan(ctx context.Context, olderThan time.Time) error {
 	// WithAdminTx reuses the request transaction when called from an HTTP
 	// handler (DELETE /users/demos, admin only) instead of opening a second
@@ -38,106 +61,15 @@ func (u *UserRepository) DeleteDemoUsersOlderThan(ctx context.Context, olderThan
 	// a role subject to row level security would delete nothing.
 	return txhelper.WithAdminTx(ctx, u.db, func(ctx context.Context) error {
 		tx := txhelper.FromContext(ctx, u.db)
-		var err error
-
-		// 1. Delete transactions
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM transactions 
-		WHERE user_id IN (
-			SELECT id FROM users WHERE is_demo = true AND created_at < $1
-		)`, olderThan)
-		if err != nil {
-			return err
-		}
-
-		// 2. Delete recurring transactions
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM recurring_transactions 
-		WHERE user_id IN (
-			SELECT id FROM users WHERE is_demo = true AND created_at < $1
-		)`, olderThan)
-		if err != nil {
-			// Ignore if table does not exist
-			if strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "no such table") {
-				log.Warn().Err(err).Msg("recurring_transactions table not found, skipping cleanup")
-			} else {
-				return err
+		for _, table := range DemoCleanupTables {
+			// table comes from the constant list above, never from input.
+			if _, err := tx.ExecContext(ctx, `DELETE FROM `+table+` /* demo cleanup */
+				WHERE user_id IN (SELECT id FROM users WHERE is_demo = true AND created_at < $1)`, olderThan); err != nil {
+				return fmt.Errorf("delete demo %s: %w", table, err)
 			}
 		}
-
-		// 2.1 Delete notifications
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM notifications 
-		WHERE user_id IN (
-			SELECT id FROM users WHERE is_demo = true AND created_at < $1
-		)`, olderThan)
-		if err != nil {
-			if strings.Contains(err.Error(), "does not exist") || strings.Contains(err.Error(), "no such table") {
-				log.Warn().Err(err).Msg("notifications table not found, skipping cleanup")
-			} else {
-				return err
-			}
-		}
-
-		// 3. Delete budgets
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM budgets 
-		WHERE user_id IN (
-			SELECT id FROM users WHERE is_demo = true AND created_at < $1
-		)`, olderThan)
-		if err != nil {
-			return err
-		}
-
-		// 4. Delete investments
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM investments 
-		WHERE user_id IN (
-			SELECT id FROM users WHERE is_demo = true AND created_at < $1
-		)`, olderThan)
-		if err != nil {
-			return err
-		}
-
-		// 5. Delete cryptos
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM cryptos 
-		WHERE user_id IN (
-			SELECT id FROM users WHERE is_demo = true AND created_at < $1
-		)`, olderThan)
-		if err != nil {
-			return err
-		}
-
-		// 6. Delete accounts (must be after transactions)
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM account 
-		WHERE user_id IN (
-			SELECT id FROM users WHERE is_demo = true AND created_at < $1
-		)`, olderThan)
-		if err != nil {
-			return err
-		}
-
-		// 7. Delete categories (must be after transactions/budgets)
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM categorys 
-		WHERE user_id IN (
-			SELECT id FROM users WHERE is_demo = true AND created_at < $1
-		)`, olderThan)
-		if err != nil {
-			return err
-		}
-
-		// 8. Delete users
-		_, err = tx.ExecContext(ctx, `
-		DELETE FROM users 
-		WHERE is_demo = true AND created_at < $1`, olderThan)
-		if err != nil {
-			return err
-		}
-
-		return nil
+		_, err := tx.ExecContext(ctx, `DELETE FROM users WHERE is_demo = true AND created_at < $1`, olderThan)
+		return err
 	})
 }
 
