@@ -1554,7 +1554,8 @@
       "accountDebit": "Débito de la cuenta",
       "rate": "Tasa",
       "interest": "Intereses",
-      "notes": "Notas"
+      "notes": "Notas",
+      "currencyFilter": "Filtrar por moneda"
     }
   },
   "investments": {
@@ -1811,7 +1812,7 @@
       "security": "Seguridad",
       "notifications": "Notificaciones",
       "data": "Datos y Privacidad",
-      "apikeys": "API Keys"
+      "apikeys": "Claves API"
     },
     "actions": {
       "edit": "Editar",

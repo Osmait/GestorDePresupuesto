@@ -32,6 +32,7 @@ import {
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatNumber } from '@/hooks/useFormatNumber'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
 import { cardDebtTotals, usableRate } from '@/lib/valuation'
 import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard, UpdateCreditCardInput } from '@/types/creditcard'
@@ -84,6 +85,7 @@ function CreditCardsContent() {
 	const t = useTranslations('creditCards')
 	const formatCurrency = useFormatCurrency()
 	const formatPercent = useFormatPercent()
+	const formatNumber = useFormatNumber()
 
 	const { data: exchangeRateData } = useExchangeRateQuery()
 	const { data: cards = [], isLoading, isError, refetch } = useGetCreditCards()
@@ -284,7 +286,7 @@ function CreditCardsContent() {
 						usdToDopRate !== null
 							? t('kpis.usdInDop', {
 									amount: formatCurrency(totalDebtUSD * usdToDopRate, 'DOP'),
-									rate: usdToDopRate.toFixed(2),
+									rate: formatNumber(usdToDopRate, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 								})
 							: totalDebtUSD > 0
 								? t('kpis.rateUnavailable')

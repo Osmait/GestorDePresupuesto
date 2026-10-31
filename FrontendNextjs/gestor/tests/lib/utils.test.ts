@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cn, formatCurrency, toIntlLocale } from '@/lib/utils'
+import { cn, formatCurrency, formatFileSize, formatNumber, toIntlLocale } from '@/lib/utils'
 
 describe('lib/utils', () => {
 	describe('cn (class name merger)', () => {
@@ -107,6 +107,29 @@ describe('lib/utils', () => {
 			expect(toIntlLocale('en')).toBe('en-US')
 			expect(toIntlLocale('es')).toBe('es-DO')
 			expect(toIntlLocale(undefined)).toBe('es-DO')
+		})
+	})
+
+	describe('formatNumber', () => {
+		it('groups thousands and fixes the decimals with the locale', () => {
+			expect(formatNumber(1234.5, { locale: 'en', minimumFractionDigits: 4, maximumFractionDigits: 4 })).toBe(
+				'1,234.5000',
+			)
+			expect(formatNumber(58.123456, { locale: 'es', minimumFractionDigits: 2, maximumFractionDigits: 2 })).toBe(
+				'58.12',
+			)
+		})
+
+		it('prints 0 for a non-finite value', () => {
+			expect(formatNumber(Number.NaN, { locale: 'en' })).toBe('0')
+		})
+	})
+
+	describe('formatFileSize', () => {
+		it('picks bytes, kilobytes or megabytes', () => {
+			expect(formatFileSize(820, 'en')).toMatch(/^820\s?byte/)
+			expect(formatFileSize(12_595, 'en')).toBe('12.3 kB')
+			expect(formatFileSize(1.5 * 1024 * 1024, 'en')).toBe('1.5 MB')
 		})
 	})
 })

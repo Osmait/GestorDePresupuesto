@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Amount } from '@/components/shared/Amount'
 import { StatCard, type StatTone } from '@/components/shared/StatCard'
 import { StatGrid } from '@/components/shared/StatGrid'
+import { useFormatNumber } from '@/hooks/useFormatNumber'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
 
 interface InvestmentMetrics {
@@ -39,10 +40,11 @@ function toneFor(value: number): StatTone {
 export function InvestmentSummaryCards({ metrics, loading = false, usdToDop }: InvestmentSummaryCardsProps) {
 	const t = useTranslations('investments.summary')
 	const formatPercent = useFormatPercent()
+	const formatNumber = useFormatNumber()
 	const valueHint = metrics.excluded
 		? t('rateUnavailable')
 		: metrics.convertedDop && usdToDop
-			? t('convertedHint', { rate: usdToDop.toFixed(2) })
+			? t('convertedHint', { rate: formatNumber(usdToDop, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })
 			: t('totalValueHint')
 
 	return (

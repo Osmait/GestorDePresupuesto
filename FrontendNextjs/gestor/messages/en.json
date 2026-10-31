@@ -1554,7 +1554,8 @@
       "accountDebit": "Account Debit",
       "rate": "Rate",
       "interest": "Interest",
-      "notes": "Notes"
+      "notes": "Notes",
+      "currencyFilter": "Filter by currency"
     }
   },
   "investments": {

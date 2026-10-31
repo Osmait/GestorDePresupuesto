@@ -53,6 +53,7 @@ import {
 } from '@/hooks/queries/useLoansQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatNumber } from '@/hooks/useFormatNumber'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import {
 	CreateLoanDTO,
@@ -96,7 +97,10 @@ export default function LoansPage() {
 function LoansKpis({ summary, loading = false }: { summary: LoanSummary | null; loading?: boolean }) {
 	const t = useTranslations('loans')
 	const formatCurrency = useFormatCurrency()
-	const rate = summary?.usd_to_dop_rate ? summary.usd_to_dop_rate.toFixed(2) : ''
+	const formatNumber = useFormatNumber()
+	const rate = summary?.usd_to_dop_rate
+		? formatNumber(summary.usd_to_dop_rate, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+		: ''
 	const converted = (field: 'total_principal' | 'total_pending' | 'total_collected') => {
 		const amounts = foreignParts(summary, field, formatCurrency)
 		return amounts ? t('pendingByCurrency', { amounts, rate }) : undefined
