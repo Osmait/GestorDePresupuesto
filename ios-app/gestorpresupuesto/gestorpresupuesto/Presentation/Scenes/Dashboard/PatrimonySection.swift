@@ -21,7 +21,7 @@ struct PatrimonySection: View {
                     .foregroundStyle(Color.app.textPrimary)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Text(totalPatrimony.currencyFormatted)
+                Text(totalPatrimony.currencyFormatted).singleLineAmount()
                     .font(.app(.title2))
                     .fontWeight(.bold)
                     .foregroundStyle(Color.app.textPrimary)
@@ -63,7 +63,7 @@ struct PatrimonySection: View {
                             .font(.app(.caption))
                             .foregroundStyle(Color.app.textSecondary)
                         Spacer()
-                        Text((-creditCardDebt).currencyFormatted)
+                        Text((-creditCardDebt).currencyFormatted).singleLineAmount()
                             .font(.app(.caption))
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.app.error)
@@ -83,7 +83,7 @@ struct PatrimonySection: View {
                     .font(.caption2)
                     .foregroundStyle(Color.app.textSecondary)
             }
-            Text(value.currencyFormatted)
+            Text(value.currencyFormatted).singleLineAmount()
                 .font(.system(.caption2, weight: .semibold))
                 .foregroundStyle(Color.app.textPrimary)
         }

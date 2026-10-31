@@ -89,7 +89,7 @@ struct BudgetRowView: View {
                             .font(.caption)
                             .foregroundStyle(Color.app.textSecondary)
 
-                        Text(budget.amount.currencyFormatted)
+                        Text(budget.amount.currencyFormatted).singleLineAmount()
                             .font(.app(.title3))
                             .fontWeight(.bold)
                             .foregroundStyle(Color.app.textPrimary)
@@ -102,7 +102,7 @@ struct BudgetRowView: View {
                             .font(.caption)
                             .foregroundStyle(Color.app.textSecondary)
 
-                        Text(budget.spent.currencyFormatted)
+                        Text(budget.spent.currencyFormatted).singleLineAmount()
                             .font(.app(.headline))
                             .foregroundStyle(budget.isOverBudget ? Color.app.error : Color.app.textPrimary)
                     }

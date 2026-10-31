@@ -44,7 +44,7 @@ struct SpendingAnalysisView: View {
                                             Text("Ingresos")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(insights.summary.totalIncome.currencyFormatted)
+                                            Text(insights.summary.totalIncome.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .foregroundStyle(Color.app.success)
                                         }
@@ -53,7 +53,7 @@ struct SpendingAnalysisView: View {
                                             Text("Gastos")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(insights.summary.totalExpenses.currencyFormatted)
+                                            Text(insights.summary.totalExpenses.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .foregroundStyle(Color.app.error)
                                         }

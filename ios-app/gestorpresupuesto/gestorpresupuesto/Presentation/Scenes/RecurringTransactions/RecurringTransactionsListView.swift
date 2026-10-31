@@ -179,7 +179,7 @@ struct RecurringTransactionRow: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(transaction.amount.currencyFormatted)
+                    Text(transaction.amount.currencyFormatted).singleLineAmount()
                         .font(.app(.headline))
                         .foregroundStyle(color)
 

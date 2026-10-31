@@ -156,7 +156,7 @@ private struct NotificationRow: View {
 
                 HStack(spacing: CGFloat.sm) {
                     if let amount = notification.amount {
-                        Text(amount.currencyFormatted)
+                        Text(amount.currencyFormatted).singleLineAmount()
                             .font(.app(.caption))
                             .foregroundStyle(Color.app.accent)
                     }

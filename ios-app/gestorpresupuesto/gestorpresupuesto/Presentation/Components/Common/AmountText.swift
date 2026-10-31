@@ -25,6 +25,7 @@ struct AmountText: View {
         Text(formatted)
             .monospacedDigit()
             .foregroundStyle(color)
+            .singleLineAmount()
     }
 
     private var cents: Int {
@@ -63,4 +64,12 @@ struct AmountText: View {
         AmountText(value: -15.49, currency: "USD", tone: .auto)
     }
     .padding()
+}
+
+extension View {
+    /// Amounts never break mid-number: at large text sizes they shrink to fit
+    /// their line instead of wrapping ("RD$254,860.7" / "5").
+    func singleLineAmount() -> some View {
+        lineLimit(1).minimumScaleFactor(0.5)
+    }
 }

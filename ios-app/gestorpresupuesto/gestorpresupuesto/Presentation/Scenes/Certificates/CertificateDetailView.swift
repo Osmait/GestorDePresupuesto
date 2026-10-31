@@ -63,7 +63,7 @@ struct CertificateDetailView: View {
                                         Text("Bruto")
                                             .font(.caption2)
                                             .foregroundStyle(Color.app.textTertiary)
-                                        Text(projected.grossInterest.currencyFormatted)
+                                        Text(projected.grossInterest.currencyFormatted).singleLineAmount()
                                             .font(.app(.subheadline))
                                     }
                                     Spacer()
@@ -71,7 +71,7 @@ struct CertificateDetailView: View {
                                         Text("Impuesto")
                                             .font(.caption2)
                                             .foregroundStyle(Color.app.textTertiary)
-                                        Text(projected.taxWithheld.currencyFormatted)
+                                        Text(projected.taxWithheld.currencyFormatted).singleLineAmount()
                                             .font(.app(.subheadline))
                                             .foregroundStyle(Color.app.error)
                                     }
@@ -80,7 +80,7 @@ struct CertificateDetailView: View {
                                         Text("Neto")
                                             .font(.caption2)
                                             .foregroundStyle(Color.app.textTertiary)
-                                        Text(projected.netInterest.currencyFormatted)
+                                        Text(projected.netInterest.currencyFormatted).singleLineAmount()
                                             .font(.app(.subheadline))
                                             .fontWeight(.semibold)
                                             .foregroundStyle(Color.app.success)
@@ -115,7 +115,7 @@ struct CertificateDetailView: View {
                                                     .foregroundStyle(Color.app.textTertiary)
                                             }
                                             Spacer()
-                                            Text(payment.netInterest.currencyFormatted)
+                                            Text(payment.netInterest.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.semibold)
                                                 .foregroundStyle(Color.app.success)

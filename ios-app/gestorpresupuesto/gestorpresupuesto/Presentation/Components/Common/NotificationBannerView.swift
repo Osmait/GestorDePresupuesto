@@ -27,7 +27,7 @@ struct NotificationBannerView: View {
                         .multilineTextAlignment(.leading)
 
                     if let amount = event.amount {
-                        Text(amount.currencyFormatted)
+                        Text(amount.currencyFormatted).singleLineAmount()
                             .font(.app(.caption))
                             .foregroundStyle(Color.app.textSecondary)
                     }

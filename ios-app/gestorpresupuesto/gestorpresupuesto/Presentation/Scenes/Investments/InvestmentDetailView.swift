@@ -47,7 +47,7 @@ struct InvestmentDetailView: View {
                                 .font(.app(.subheadline))
                                 .fontWeight(.medium)
 
-                            Text(investment.gainLoss.currencyFormatted(currency: investment.currency))
+                            Text(investment.gainLoss.currencyFormatted(currency: investment.currency)).singleLineAmount()
                                 .font(.app(.title2))
                                 .fontWeight(.bold)
                                 .foregroundStyle(investment.isProfit ? Color.app.success : Color.app.error)

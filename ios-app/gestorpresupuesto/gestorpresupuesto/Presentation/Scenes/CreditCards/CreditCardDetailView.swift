@@ -44,7 +44,7 @@ struct CreditCardDetailView: View {
                                             Text("Balance")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(balance.currentBalance.currencyFormatted)
+                                            Text(balance.currentBalance.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.semibold)
                                         }
@@ -53,7 +53,7 @@ struct CreditCardDetailView: View {
                                             Text("Disponible")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(balance.availableCredit.currencyFormatted)
+                                            Text(balance.availableCredit.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .foregroundStyle(Color.app.success)
                                         }
@@ -111,7 +111,7 @@ struct CreditCardDetailView: View {
                                                 .foregroundStyle(Color.app.textTertiary)
                                         }
                                         Spacer()
-                                        Text(payment.amount.currencyFormatted)
+                                        Text(payment.amount.currencyFormatted).singleLineAmount()
                                             .font(.app(.subheadline))
                                             .fontWeight(.semibold)
                                             .foregroundStyle(Color.app.success)

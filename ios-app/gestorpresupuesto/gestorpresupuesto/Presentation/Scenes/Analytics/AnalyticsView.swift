@@ -3,6 +3,7 @@ import Charts
 
 struct AnalyticsView: View {
     @StateObject private var viewModel = AnalyticsViewModel()
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
         Group { // The tab or the "Más" stack provides the NavigationStack
@@ -12,7 +13,11 @@ struct AnalyticsView: View {
                 ScrollView {
                     VStack(spacing: Spacing.lg.rawValue) {
                         // Date Range
-                        HStack(spacing: Spacing.md.rawValue) {
+                        // Side by side, or stacked when large text would not fit.
+                        let dateLayout = dynamicTypeSize.isAccessibilitySize
+                            ? AnyLayout(VStackLayout(spacing: Spacing.md.rawValue))
+                            : AnyLayout(HStackLayout(spacing: Spacing.md.rawValue))
+                        dateLayout {
                             DatePickerField(title: "Desde", date: $viewModel.dateFrom)
                             DatePickerField(title: "Hasta", date: $viewModel.dateTo)
                         }
@@ -55,7 +60,7 @@ struct AnalyticsView: View {
                                                     .font(.app(.caption))
                                                     .foregroundStyle(Color.app.textPrimary)
                                                 Spacer()
-                                                Text(expense.totalAmount.currencyFormatted)
+                                                Text(expense.totalAmount.currencyFormatted).singleLineAmount()
                                                     .font(.app(.caption))
                                                     .fontWeight(.semibold)
                                             }

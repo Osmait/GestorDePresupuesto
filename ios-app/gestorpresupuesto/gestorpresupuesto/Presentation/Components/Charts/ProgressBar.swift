@@ -169,7 +169,7 @@ struct AnimatedBarChart: View {
                     }
                     .frame(height: 24)
 
-                    Text(abs(item.value).currencyFormatted)
+                    Text(abs(item.value).currencyFormatted).singleLineAmount()
                         .font(.caption)
                         .foregroundStyle(Color.app.textPrimary)
                         .frame(width: 70, alignment: .trailing)
@@ -212,7 +212,7 @@ struct BudgetProgressCard: View {
                         .foregroundStyle(Color.app.textPrimary)
                         .lineLimit(1)
 
-                    Text(budget.amount.currencyFormatted)
+                    Text(budget.amount.currencyFormatted).singleLineAmount()
                         .font(.app(.headline))
                         .foregroundStyle(Color.app.textPrimary)
                 }
@@ -242,7 +242,7 @@ struct BudgetProgressCard: View {
                     Text("Gastado")
                         .font(.caption2)
                         .foregroundStyle(Color.app.textTertiary)
-                    Text(budget.spent.currencyFormatted)
+                    Text(budget.spent.currencyFormatted).singleLineAmount()
                         .font(.app(.caption))
                         .fontWeight(.medium)
                         .foregroundStyle(Color.app.textSecondary)
@@ -254,7 +254,7 @@ struct BudgetProgressCard: View {
                     Text(budget.isOverBudget ? "Excedido" : "Disponible")
                         .font(.caption2)
                         .foregroundStyle(Color.app.textTertiary)
-                    Text(budget.remaining.currencyFormatted)
+                    Text(budget.remaining.currencyFormatted).singleLineAmount()
                         .font(.app(.caption))
                         .fontWeight(.medium)
                         .foregroundStyle(budget.isOverBudget ? Color.app.error : Color.app.success)

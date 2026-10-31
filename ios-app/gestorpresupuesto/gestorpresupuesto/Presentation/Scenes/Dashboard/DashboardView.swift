@@ -314,28 +314,31 @@ struct RecentTransactionsSection: View {
 /// A transaction as a bare line, for use inside a card or a List row.
 struct TransactionLine: View {
     let transaction: Transaction
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
 
     var body: some View {
-        HStack(spacing: .md) {
-            Text(transaction.name.prefix(1).uppercased())
-                .font(.app(.subheadline))
-                .fontWeight(.semibold)
-                .foregroundStyle(Color.app.textSecondary)
-                .frame(width: 36, height: 36)
-                .background(Color.app.surfaceSecondary, in: Circle())
-                .accessibilityHidden(true)
+        // At accessibility text sizes the amount moves under the name, where
+        // it has the full width, and the initial badge steps aside.
+        let stacked = dynamicTypeSize.isAccessibilitySize
+        let layout = stacked ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4)) : AnyLayout(HStackLayout(spacing: .md))
+        layout {
+            if !stacked {
+                initialBadge
+            }
 
             VStack(alignment: .leading, spacing: 2) {
                 Text(transaction.name)
                     .font(.app(.callout))
                     .foregroundStyle(Color.app.textPrimary)
-                    .lineLimit(1)
+                    .lineLimit(stacked ? 2 : 1)
                 Text(transaction.createdAt.shortFormatted)
                     .font(.app(.footnote))
                     .foregroundStyle(Color.app.textSecondary)
             }
 
-            Spacer(minLength: .sm)
+            if !stacked {
+                Spacer(minLength: .sm)
+            }
 
             AmountText(
                 value: transaction.signedAmount,
@@ -346,7 +349,18 @@ struct TransactionLine: View {
             .font(.app(.callout))
             .fontWeight(.medium)
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityElement(children: .combine)
+    }
+
+    private var initialBadge: some View {
+        Text(transaction.name.prefix(1).uppercased())
+            .font(.app(.subheadline))
+            .fontWeight(.semibold)
+            .foregroundStyle(Color.app.textSecondary)
+            .frame(width: 36, height: 36)
+            .background(Color.app.surfaceSecondary, in: Circle())
+            .accessibilityHidden(true)
     }
 }
 

@@ -110,7 +110,7 @@ struct CertificatesListView: View {
                         Text("Capital")
                             .font(.caption2)
                             .foregroundStyle(Color.app.textTertiary)
-                        Text(cert.effectiveCapital.currencyFormatted(currency: cert.currency))
+                        Text(cert.effectiveCapital.currencyFormatted(currency: cert.currency)).singleLineAmount()
                             .font(.app(.subheadline))
                             .fontWeight(.semibold)
                     }
@@ -120,7 +120,7 @@ struct CertificatesListView: View {
                             Text("Próximo pago")
                                 .font(.caption2)
                                 .foregroundStyle(Color.app.textTertiary)
-                            Text(projected.netInterest.currencyFormatted)
+                            Text(projected.netInterest.currencyFormatted).singleLineAmount()
                                 .font(.app(.subheadline))
                                 .foregroundStyle(Color.app.success)
                         }

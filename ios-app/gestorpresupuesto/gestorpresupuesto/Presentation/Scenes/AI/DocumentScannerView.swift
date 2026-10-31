@@ -394,7 +394,7 @@ struct ExtractedTransactionCard: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(transaction.amount.currencyFormatted)
+                        Text(transaction.amount.currencyFormatted).singleLineAmount()
                             .font(.app(.headline))
                             .foregroundStyle(transaction.typeTransaction == "income" ? Color.app.success : Color.app.error)
 

@@ -88,7 +88,7 @@ struct BalanceStatCard: View {
                         .font(.app(.caption))
                         .foregroundStyle(Color.app.textSecondary)
 
-                    Text(totalBalance.currencyFormatted)
+                    Text(totalBalance.currencyFormatted).singleLineAmount()
                         .font(.app(.largeTitle))
                         .foregroundStyle(totalBalance >= 0 ? Color.app.success : Color.app.error)
                 }

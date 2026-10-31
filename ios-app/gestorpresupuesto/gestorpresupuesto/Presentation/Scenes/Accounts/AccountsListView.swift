@@ -113,7 +113,7 @@ struct AccountsListView: View {
                 .font(.app(.caption))
                 .foregroundStyle(Color.app.textTertiary)
 
-            Text(totalBalance.currencyFormatted)
+            Text(totalBalance.currencyFormatted).singleLineAmount()
                 .font(.appAmount)
                 .foregroundStyle(Color.app.textPrimary)
                 .minimumScaleFactor(0.6)
@@ -172,7 +172,7 @@ struct AccountsListView: View {
             // Balance
             VStack(alignment: .trailing, spacing: 2) {
                 // A card's balance is negative while it has debt; show the debt as a positive amount.
-                Text((isCard ? abs(account.currentBalance) : account.currentBalance).currencyFormatted(currency: account.currency))
+                Text((isCard ? abs(account.currentBalance) : account.currentBalance).currencyFormatted(currency: account.currency)).singleLineAmount()
                     .font(.app(.subheadline))
                     .fontWeight(.bold)
                     .foregroundStyle(isPositive || isCard ? Color.app.textPrimary : Color.app.error)

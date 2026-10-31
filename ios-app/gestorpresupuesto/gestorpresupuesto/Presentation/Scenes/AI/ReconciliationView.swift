@@ -95,7 +95,7 @@ struct ReconciliationView: View {
                         .fontWeight(.medium)
                         .foregroundStyle(Color.app.textPrimary)
                     Spacer()
-                    Text(item.extracted.amount.currencyFormatted)
+                    Text(item.extracted.amount.currencyFormatted).singleLineAmount()
                         .font(.app(.subheadline))
                         .fontWeight(.semibold)
                 }

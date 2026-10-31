@@ -51,7 +51,7 @@ struct InvestmentsListView: View {
                                                 Text(balance.currency)
                                                     .font(.app(.caption))
                                                 Spacer()
-                                                Text(balance.available.currencyFormatted(currency: balance.currency))
+                                                Text(balance.available.currencyFormatted(currency: balance.currency)).singleLineAmount()
                                                     .font(.app(.subheadline))
                                                     .fontWeight(.semibold)
                                             }
@@ -174,7 +174,7 @@ struct InvestmentsListView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(investment.totalValue.currencyFormatted(currency: investment.currency))
+                    Text(investment.totalValue.currencyFormatted(currency: investment.currency)).singleLineAmount()
                         .font(.app(.subheadline))
                         .fontWeight(.semibold)
                     GainLossIndicator(value: investment.gainLoss, percent: investment.gainLossPercent)

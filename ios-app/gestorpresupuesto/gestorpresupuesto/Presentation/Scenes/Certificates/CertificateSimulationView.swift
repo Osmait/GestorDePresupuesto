@@ -43,7 +43,7 @@ struct CertificateSimulationView: View {
                                             Text("Interés Bruto")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(result.totals.grossInterest.currencyFormatted)
+                                            Text(result.totals.grossInterest.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.semibold)
                                         }
@@ -52,7 +52,7 @@ struct CertificateSimulationView: View {
                                             Text("Impuesto")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(result.totals.taxWithheld.currencyFormatted)
+                                            Text(result.totals.taxWithheld.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .foregroundStyle(Color.app.error)
                                         }
@@ -61,7 +61,7 @@ struct CertificateSimulationView: View {
                                             Text("Interés Neto")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(result.totals.netInterest.currencyFormatted)
+                                            Text(result.totals.netInterest.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.bold)
                                                 .foregroundStyle(Color.app.success)

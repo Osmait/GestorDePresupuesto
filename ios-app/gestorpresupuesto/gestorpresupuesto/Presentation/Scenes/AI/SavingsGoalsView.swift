@@ -48,7 +48,7 @@ struct SavingsGoalsView: View {
                                                 Text("Ahorrado")
                                                     .font(.caption2)
                                                     .foregroundStyle(Color.app.textTertiary)
-                                                Text(goal.currentSaved.currencyFormatted)
+                                                Text(goal.currentSaved.currencyFormatted).singleLineAmount()
                                                     .font(.app(.subheadline))
                                                     .fontWeight(.semibold)
                                             }
@@ -57,7 +57,7 @@ struct SavingsGoalsView: View {
                                                 Text("Meta")
                                                     .font(.caption2)
                                                     .foregroundStyle(Color.app.textTertiary)
-                                                Text(goal.targetAmount.currencyFormatted)
+                                                Text(goal.targetAmount.currencyFormatted).singleLineAmount()
                                                     .font(.app(.subheadline))
                                             }
                                         }
