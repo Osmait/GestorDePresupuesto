@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -144,10 +145,14 @@ func (rls *RateLimitService) generateRateLimitKey(c *gin.Context) string {
 	return "ip:" + c.ClientIP()
 }
 
-// matchEndpointConfig matches the request path to an endpoint configuration
-func (rls *RateLimitService) matchEndpointConfig(path string) *config.EndpointRateLimitConfig {
+// matchEndpointConfig matches the request method and path to an endpoint
+// configuration.
+func (rls *RateLimitService) matchEndpointConfig(method, path string) *config.EndpointRateLimitConfig {
 	for i := range rls.config.RateLimit.Endpoints {
 		endpoint := &rls.config.RateLimit.Endpoints[i]
+		if len(endpoint.Methods) > 0 && !slices.Contains(endpoint.Methods, method) {
+			continue
+		}
 		// support wildcard at the end (e.g. /api/auth/*)
 		if strings.HasSuffix(endpoint.Path, "*") {
 			prefix := strings.TrimSuffix(endpoint.Path, "*")
@@ -182,7 +187,7 @@ func (rls *RateLimitService) Middleware() gin.HandlerFunc {
 		window := cfg.RateLimit.Window
 		burst := cfg.RateLimit.Burst
 
-		endpointConfig := rls.matchEndpointConfig(c.Request.URL.Path)
+		endpointConfig := rls.matchEndpointConfig(c.Request.Method, c.Request.URL.Path)
 		if endpointConfig != nil {
 			limit = endpointConfig.Requests
 			window = endpointConfig.Window
@@ -192,7 +197,11 @@ func (rls *RateLimitService) Middleware() gin.HandlerFunc {
 		// Generate rate limit key (append path if endpoint specific to isolate quotas)
 		key := rls.generateRateLimitKey(c)
 		if endpointConfig != nil {
-			key = key + ":" + endpointConfig.Path
+			if endpointConfig.Bucket != "" {
+				key = key + ":bucket:" + endpointConfig.Bucket
+			} else {
+				key = key + ":" + endpointConfig.Path
+			}
 		}
 
 		allowed, remaining := rls.allow(key, limit, window, burst)

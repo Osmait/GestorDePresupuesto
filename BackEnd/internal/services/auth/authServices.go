@@ -49,8 +49,8 @@ var (
 	ErrTooManyLoginAttempts = errors.New("too many failed login attempts")
 )
 
-// LoginLockedError is returned while an (email, IP) pair is locked out after
-// too many failed password attempts.
+// LoginLockedError is returned while an (email, IP) pair, or the account
+// itself, is locked out after too many failed password attempts.
 type LoginLockedError struct {
 	RetryAfter time.Duration
 }
@@ -103,6 +103,7 @@ type AuthService struct {
 	refreshTokenRepo authRepo.RefreshTokenRepositoryInterface
 	config           *config.Config
 	loginLimiter     *loginAttemptLimiter
+	accountLimiter   *accountLoginLimiter
 }
 
 func newLoginLimiterFromConfig(cfg *config.Config) *loginAttemptLimiter {
@@ -110,6 +111,14 @@ func newLoginLimiterFromConfig(cfg *config.Config) *loginAttemptLimiter {
 		return newLoginAttemptLimiter(0, 0)
 	}
 	return newLoginAttemptLimiter(cfg.Security.MaxLoginAttempts, cfg.Security.AccountLockTime)
+}
+
+func newAccountLimiterFromConfig(cfg *config.Config) *accountLoginLimiter {
+	if cfg == nil {
+		return newAccountLoginLimiter(0, 0, 0, 0)
+	}
+	s := cfg.Security
+	return newAccountLoginLimiter(s.LoginAccountMaxFailures, s.LoginAccountWindow, s.LoginAccountLockTime, s.LoginAccountMaxLockTime)
 }
 
 // NewAuthService creates a new instance of AuthService with necessary dependencies.
@@ -129,6 +138,7 @@ func NewAuthService(
 		transactionRepo: transactionRepo,
 		config:          config,
 		loginLimiter:    newLoginLimiterFromConfig(config),
+		accountLimiter:  newAccountLimiterFromConfig(config),
 	}
 }
 
@@ -151,16 +161,19 @@ func NewAuthServiceWithRefreshTokens(
 		refreshTokenRepo: refreshTokenRepo,
 		config:           config,
 		loginLimiter:     newLoginLimiterFromConfig(config),
+		accountLimiter:   newAccountLimiterFromConfig(config),
 	}
 }
 
 // authenticate verifies email + password with constant work (one bcrypt
 // comparison whether or not the user exists), enforces the per (email, IP)
-// failed-attempt lockout, and returns ErrInvalidCredentials for both an
-// unknown email and a wrong password.
+// and per account failed-attempt lockouts, and returns ErrInvalidCredentials
+// for both an unknown email and a wrong password. It is shared by the REST
+// logins and the MCP OAuth login page.
 func (a *AuthService) authenticate(ctx context.Context, authRequest *authDomain.AuthRequest, ipAddress string) (*userDomain.User, error) {
 	key := loginAttemptKey(authRequest.Email, ipAddress)
-	if wait := a.loginLimiter.retryAfter(key); wait > 0 {
+	wait := max(a.loginLimiter.retryAfter(key), a.accountLimiter.retryAfter(authRequest.Email))
+	if wait > 0 {
 		return nil, &LoginLockedError{RetryAfter: wait}
 	}
 
@@ -182,10 +195,18 @@ func (a *AuthService) authenticate(ctx context.Context, authRequest *authDomain.
 		if lock := a.loginLimiter.recordFailure(key); lock > 0 {
 			log.Warn().Str("ip", ipAddress).Msg("login locked out after too many failed attempts")
 		}
+		if lock := a.accountLimiter.recordFailure(authRequest.Email); lock > 0 {
+			ev := log.Warn().Str("ip", ipAddress).Dur("lock", lock)
+			if found {
+				ev = ev.Str("user_id", user.Id)
+			}
+			ev.Msg("account locked out after too many failed attempts across clients")
+		}
 		return nil, ErrInvalidCredentials
 	}
 
 	a.loginLimiter.recordSuccess(key)
+	a.accountLimiter.recordSuccess(authRequest.Email)
 	log.Debug().Str("user_id", user.Id).Msg("user authenticated successfully")
 	return user, nil
 }

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -139,10 +140,18 @@ type SecurityConfig struct {
 	PasswordRequireSymbol bool          `json:"password_require_symbol"`
 	MaxLoginAttempts      int           `json:"max_login_attempts" validate:"min=1,max=100"`
 	AccountLockTime       time.Duration `json:"account_lock_time" validate:"required"`
-	SessionTimeout        time.Duration `json:"session_timeout"`
-	EnableTLS             bool          `json:"enable_tls"`
-	TLSCertFile           string        `json:"tls_cert_file"`
-	TLSKeyFile            string        `json:"tls_key_file"`
+	// Per-account (email) lockout across all client IPs: after
+	// LoginAccountMaxFailures failed passwords within LoginAccountWindow the
+	// email is locked for LoginAccountLockTime, doubling on each consecutive
+	// lockout up to LoginAccountMaxLockTime. A successful login resets it.
+	LoginAccountMaxFailures int           `json:"login_account_max_failures"`
+	LoginAccountWindow      time.Duration `json:"login_account_window"`
+	LoginAccountLockTime    time.Duration `json:"login_account_lock_time"`
+	LoginAccountMaxLockTime time.Duration `json:"login_account_max_lock_time"`
+	SessionTimeout          time.Duration `json:"session_timeout"`
+	EnableTLS               bool          `json:"enable_tls"`
+	TLSCertFile             string        `json:"tls_cert_file"`
+	TLSKeyFile              string        `json:"tls_key_file"`
 }
 
 // RateLimitConfig holds rate limiting configuration
@@ -156,12 +165,18 @@ type RateLimitConfig struct {
 	Endpoints   []EndpointRateLimitConfig `json:"endpoints"`
 }
 
-// EndpointRateLimitConfig holds rate limiting configuration for a specific endpoint
+// EndpointRateLimitConfig holds rate limiting configuration for a specific
+// endpoint. Path is exact, or a prefix when it ends in "*".
 type EndpointRateLimitConfig struct {
 	Path     string        `json:"path" validate:"required"`
 	Requests int           `json:"requests" validate:"min=1"`
 	Window   time.Duration `json:"window" validate:"required"`
-	Burst    int           `json:"burst" validate:"min=1"`
+	Burst    int           `json:"burst"`
+	// Methods restricts the limit to these HTTP methods (all when empty).
+	Methods []string `json:"methods,omitempty"`
+	// Bucket shares one quota between every endpoint with the same bucket
+	// (per client key); empty means the endpoint's own quota.
+	Bucket string `json:"bucket,omitempty"`
 }
 
 // CORSConfig holds CORS configuration
@@ -424,17 +439,21 @@ func LoadConfig() (*Config, error) {
 		},
 
 		Security: SecurityConfig{
-			PasswordMinLength:     getEnvInt("PASSWORD_MIN_LENGTH", 8),
-			PasswordRequireUpper:  getEnvBool("PASSWORD_REQUIRE_UPPER", true),
-			PasswordRequireLower:  getEnvBool("PASSWORD_REQUIRE_LOWER", true),
-			PasswordRequireDigit:  getEnvBool("PASSWORD_REQUIRE_DIGIT", true),
-			PasswordRequireSymbol: getEnvBool("PASSWORD_REQUIRE_SYMBOL", false),
-			MaxLoginAttempts:      getEnvInt("MAX_LOGIN_ATTEMPTS", 5),
-			AccountLockTime:       getDuration(getEnvString("ACCOUNT_LOCK_TIME", "15m")),
-			SessionTimeout:        getDuration(getEnvString("SESSION_TIMEOUT", "30m")),
-			EnableTLS:             getEnvBool("ENABLE_TLS", false),
-			TLSCertFile:           getEnvString("TLS_CERT_FILE", ""),
-			TLSKeyFile:            getEnvString("TLS_KEY_FILE", ""),
+			PasswordMinLength:       getEnvInt("PASSWORD_MIN_LENGTH", 8),
+			PasswordRequireUpper:    getEnvBool("PASSWORD_REQUIRE_UPPER", true),
+			PasswordRequireLower:    getEnvBool("PASSWORD_REQUIRE_LOWER", true),
+			PasswordRequireDigit:    getEnvBool("PASSWORD_REQUIRE_DIGIT", true),
+			PasswordRequireSymbol:   getEnvBool("PASSWORD_REQUIRE_SYMBOL", false),
+			MaxLoginAttempts:        getEnvInt("MAX_LOGIN_ATTEMPTS", 5),
+			AccountLockTime:         getDuration(getEnvString("ACCOUNT_LOCK_TIME", "15m")),
+			LoginAccountMaxFailures: getEnvInt("LOGIN_ACCOUNT_MAX_FAILURES", 10),
+			LoginAccountWindow:      getEnvDuration("LOGIN_ACCOUNT_WINDOW", 15*time.Minute),
+			LoginAccountLockTime:    getEnvDuration("LOGIN_ACCOUNT_LOCK_TIME", 15*time.Minute),
+			LoginAccountMaxLockTime: getEnvDuration("LOGIN_ACCOUNT_MAX_LOCK_TIME", 4*time.Hour),
+			SessionTimeout:          getDuration(getEnvString("SESSION_TIMEOUT", "30m")),
+			EnableTLS:               getEnvBool("ENABLE_TLS", false),
+			TLSCertFile:             getEnvString("TLS_CERT_FILE", ""),
+			TLSKeyFile:              getEnvString("TLS_KEY_FILE", ""),
 		},
 
 		RateLimit: RateLimitConfig{
@@ -444,14 +463,11 @@ func LoadConfig() (*Config, error) {
 			Burst:       getEnvInt("RATE_LIMIT_BURST", 50),
 			IPWhitelist: getEnvStringSlice("RATE_LIMIT_IP_WHITELIST", []string{"127.0.0.1", "::1"}),
 			UserBased:   getEnvBool("RATE_LIMIT_USER_BASED", false),
-			Endpoints: []EndpointRateLimitConfig{
-				{
-					Path:     "/auth/demo",  // Strict limit for demo user creation
-					Requests: 5,             // Only 5 requests
-					Window:   1 * time.Hour, // Per hour
-					Burst:    1,             // No burst allowed
-				},
-			},
+			Endpoints: authRateLimits(
+				getEnvInt("RATE_LIMIT_LOGIN_PER_MINUTE", 10),
+				getEnvInt("RATE_LIMIT_REGISTER_PER_MINUTE", 5),
+				getEnvInt("RATE_LIMIT_PASSKEY_PER_MINUTE", 20),
+			),
 		},
 
 		CORS: CORSConfig{
@@ -733,6 +749,43 @@ func (c *Config) validateSecurity() error {
 	}
 
 	return nil
+}
+
+// authRateLimits are the per-IP limits of the unauthenticated auth endpoints,
+// stricter than the global limit: password logins (the REST logins and the
+// MCP OAuth login page share one quota), registration (bcrypt on every call),
+// passkey login ceremonies and demo user creation. A limit <= 0 drops that
+// endpoint's entry (it then falls under the global limit).
+func authRateLimits(loginPerMinute, registerPerMinute, passkeyPerMinute int) []EndpointRateLimitConfig {
+	limits := []EndpointRateLimitConfig{
+		{
+			Path:     "/auth/demo",  // Strict limit for demo user creation
+			Requests: 5,             // Only 5 requests
+			Window:   1 * time.Hour, // Per hour
+			Burst:    1,             // No burst allowed
+		},
+	}
+	if loginPerMinute > 0 {
+		for _, e := range []EndpointRateLimitConfig{
+			{Path: "/auth/login"},
+			{Path: "/login"},
+			{Path: "/oauth/authorize", Methods: []string{http.MethodPost}},
+		} {
+			e.Requests, e.Window, e.Bucket = loginPerMinute, time.Minute, "password-login"
+			limits = append(limits, e)
+		}
+	}
+	if registerPerMinute > 0 {
+		limits = append(limits, EndpointRateLimitConfig{
+			Path: "/user", Methods: []string{http.MethodPost}, Requests: registerPerMinute, Window: time.Minute,
+		})
+	}
+	if passkeyPerMinute > 0 {
+		limits = append(limits, EndpointRateLimitConfig{
+			Path: "/auth/passkey/login/*", Requests: passkeyPerMinute, Window: time.Minute,
+		})
+	}
+	return limits
 }
 
 // validateRateLimit validates rate limiting configuration

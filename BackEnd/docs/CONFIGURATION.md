@@ -96,8 +96,12 @@ The application uses a comprehensive configuration system that supports:
 | `PASSWORD_REQUIRE_LOWER` | `true` | Require lowercase letters |
 | `PASSWORD_REQUIRE_DIGIT` | `true` | Require digits |
 | `PASSWORD_REQUIRE_SYMBOL` | `false` | Require special characters |
-| `MAX_LOGIN_ATTEMPTS` | `5` | Maximum login attempts (1-100) |
-| `ACCOUNT_LOCK_TIME` | `15m` | Account lock duration |
+| `MAX_LOGIN_ATTEMPTS` | `5` | Failed password logins per (email, client IP) before that pair is locked (1-100) |
+| `ACCOUNT_LOCK_TIME` | `15m` | Lock duration of an (email, client IP) pair |
+| `LOGIN_ACCOUNT_MAX_FAILURES` | `10` | Failed password logins per account (email) across all client IPs, within `LOGIN_ACCOUNT_WINDOW`, before the account is locked. Applies to `/auth/login`, `/login` and the MCP OAuth login page; passkey login is not affected |
+| `LOGIN_ACCOUNT_WINDOW` | `15m` | Window in which the account failures are counted |
+| `LOGIN_ACCOUNT_LOCK_TIME` | `15m` | First account lock; each consecutive lock (no successful login in between) doubles it |
+| `LOGIN_ACCOUNT_MAX_LOCK_TIME` | `4h` | Upper bound of the account lock. A successful login resets the backoff |
 | `SESSION_TIMEOUT` | `30m` | Session timeout |
 | `ENABLE_TLS` | `false` | Enable TLS/HTTPS |
 | `TLS_CERT_FILE` | | TLS certificate file |
@@ -113,6 +117,11 @@ The application uses a comprehensive configuration system that supports:
 | `RATE_LIMIT_BURST` | `50` | Burst size |
 | `RATE_LIMIT_IP_WHITELIST` | `127.0.0.1,::1` | IP whitelist (comma-separated) |
 | `RATE_LIMIT_USER_BASED` | `true` | Enable user-based rate limiting |
+| `RATE_LIMIT_LOGIN_PER_MINUTE` | `10` | Password logins per client IP per minute, one quota shared by `POST /auth/login`, `POST /login` and `POST /oauth/authorize`. `0` leaves them under the global limit |
+| `RATE_LIMIT_REGISTER_PER_MINUTE` | `5` | `POST /user` (registration, a bcrypt hash per call) per client IP per minute. `0` leaves it under the global limit |
+| `RATE_LIMIT_PASSKEY_PER_MINUTE` | `20` | `/auth/passkey/login/*` requests (two per login) per client IP per minute. `0` leaves them under the global limit |
+
+Limited requests get `429` with `Retry-After`. Login lockouts (above) also answer `429` with `Retry-After`. The per-IP limits key on the resolved client IP: behind the Next.js frontend set `PROXY_SHARED_SECRET` on both sides, otherwise every browser shares the frontend server's IP and quota.
 
 ### CORS Configuration
 
