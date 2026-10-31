@@ -62,6 +62,15 @@ func (e *LoginLockedError) Error() string {
 // Is makes errors.Is(err, ErrTooManyLoginAttempts) true.
 func (e *LoginLockedError) Is(target error) bool { return target == ErrTooManyLoginAttempts }
 
+// Colors of the seeded demo categories: the green, orange and blue of the
+// frontend category palette (FrontendNextjs/gestor/lib/category-color.ts).
+// CSS names such as "blue" (#0000FF) are nearly invisible on the dark theme.
+const (
+	seedColorGreen  = "#22C55E"
+	seedColorOrange = "#F97316"
+	seedColorBlue   = "#3B82F6"
+)
+
 // defaultRefreshReuseGrace is used when the config does not set one.
 const defaultRefreshReuseGrace = 30 * time.Second
 
@@ -399,7 +408,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	// 3. Create Categories
 	// Income
 	salaryCatID := uuid.New().String()
-	salaryCat := categoryDomain.NewCategory(salaryCatID, "Salario", "💰", "green")
+	salaryCat := categoryDomain.NewCategory(salaryCatID, "Salario", "💰", seedColorGreen)
 	salaryCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, salaryCat); err != nil {
 		log.Error().Err(err).Msg("failed to save salary category")
@@ -408,7 +417,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 
 	// Expense
 	foodCatID := uuid.New().String()
-	foodCat := categoryDomain.NewCategory(foodCatID, "Comida", "🍔", "orange")
+	foodCat := categoryDomain.NewCategory(foodCatID, "Comida", "🍔", seedColorOrange)
 	foodCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, foodCat); err != nil {
 		log.Error().Err(err).Msg("failed to save food category")
@@ -416,7 +425,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	}
 
 	transportCatID := uuid.New().String()
-	transportCat := categoryDomain.NewCategory(transportCatID, "Transporte", "🚌", "blue")
+	transportCat := categoryDomain.NewCategory(transportCatID, "Transporte", "🚌", seedColorBlue)
 	transportCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, transportCat); err != nil {
 		log.Error().Err(err).Msg("failed to save transport category")
