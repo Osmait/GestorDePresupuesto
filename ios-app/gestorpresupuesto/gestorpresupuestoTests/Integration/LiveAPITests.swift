@@ -22,7 +22,8 @@ struct LiveAPITests {
     /// One user per test run, registered on first use.
     private enum Session {
         static let email = "ios-qa-\(UUID().uuidString.prefix(8).lowercased())@example.com"
-        static let password = "Qa-Passw0rd!2026"
+        // Generated per run: no credential in the source.
+        static let password = "Qa-\(UUID().uuidString.prefix(12))-9z!"
         static var loggedIn = false
     }
 

@@ -16,6 +16,8 @@ final class TabWalkthroughUITests: XCTestCase {
 
     @MainActor
     func testWalkThroughTabs() throws {
+        // UI_ORIENTATION=landscape runs the same flow on a rotated device.
+        XCUIDevice.shared.orientation = environment["UI_ORIENTATION"] == "landscape" ? .landscapeLeft : .portrait
         let app = XCUIApplication()
         app.launch()
 
@@ -58,16 +60,22 @@ final class TabWalkthroughUITests: XCTestCase {
             XCTAssertFalse(app.staticTexts["Error al cargar"].exists, "\(module) failed to load")
             attachScreenshot(named: "Más - \(module)", app: app)
             app.navigationBars.buttons.element(boundBy: 0).tap()
-            app.collectionViews.firstMatch.swipeDown()
+            // Wait for the Más list to be back before scrolling it.
+            let list = app.collectionViews.firstMatch
+            if list.waitForExistence(timeout: 3) { list.swipeDown() }
         }
     }
 
-    /// iPhone shows a tab bar; iPad (sidebar-adaptable) shows its own tab
-    /// strip, which is not exposed as a tab bar.
+    /// iPhone shows a tab bar; iPad shows a tab strip (portrait) or an open
+    /// sidebar (landscape), neither exposed as a tab bar.
     @MainActor
     private func tab(_ name: String, in app: XCUIApplication) -> XCUIElement {
         let tabBarButton = app.tabBars.buttons[name]
-        return tabBarButton.exists ? tabBarButton : app.buttons[name].firstMatch
+        if tabBarButton.exists { return tabBarButton }
+        // iPad in landscape keeps the sidebar open; its tabs are list rows.
+        let sidebarRow = app.cells.containing(.staticText, identifier: name).firstMatch
+        if sidebarRow.exists { return sidebarRow }
+        return app.buttons[name].firstMatch
     }
 
     @MainActor
