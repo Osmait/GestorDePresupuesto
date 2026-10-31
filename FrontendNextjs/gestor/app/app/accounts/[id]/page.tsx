@@ -1,10 +1,12 @@
 'use client'
 
-import { ArrowLeft, Receipt } from 'lucide-react'
+import { ArrowLeft, Receipt, Scale } from 'lucide-react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
+import { useState } from 'react'
 import { AccountAnalytics } from '@/components/accounts/AccountAnalytics'
+import { ReconcileAccountModal } from '@/components/accounts/ReconcileAccountModal'
 import { Amount } from '@/components/shared/Amount'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorState } from '@/components/shared/ErrorState'
@@ -15,8 +17,9 @@ import TransactionItem from '@/components/transactions/TransactionItem'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useGetAccount } from '@/hooks/queries/useAccountsQuery'
+import { useGetAccount, useGetAccountReconciliations } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { useGetCreditCard } from '@/hooks/queries/useCreditCardsQuery'
 import { useDeleteTransactionMutation, useGetTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { DEFAULT_CURRENCY } from '@/lib/utils'
@@ -39,6 +42,8 @@ export default function AccountDetailsPage() {
 	const locale = useAppLocale()
 
 	const { data: account, isLoading: isLoadingAccount, isError, refetch } = useGetAccount(id)
+	const { data: reconciliations = [] } = useGetAccountReconciliations(id)
+	const [reconcileOpen, setReconcileOpen] = useState(false)
 
 	const { data: transactionData, isLoading: isLoadingTx } = useGetTransactions({
 		account_id: id,
@@ -47,6 +52,11 @@ export default function AccountDetailsPage() {
 	const deleteTransaction = useDeleteTransactionMutation()
 
 	const { data: categories = [] } = useGetCategories()
+	// A credit card holds a balance per currency (the account balance is its primary one).
+	const { data: card } = useGetCreditCard(account?.type === 'credit_card' ? id : '')
+	const balancesByCurrency = card?.balances
+		? Object.fromEntries(card.balances.map((balance) => [balance.currency, balance.current_balance]))
+		: undefined
 
 	const transactions = transactionData?.transactions || []
 
@@ -89,6 +99,8 @@ export default function AccountDetailsPage() {
 
 	const currency = account.currency || DEFAULT_CURRENCY
 	const currentBalance = account.current_balance ?? account.initial_balance
+	// Credit card debt is not reconciled here (see the credit card page).
+	const isBank = (account.type || 'bank') === 'bank'
 
 	return (
 		<PageShell>
@@ -97,6 +109,14 @@ export default function AccountDetailsPage() {
 				title={account.name}
 				description={account.bank}
 				className='break-words'
+				actions={
+					isBank ? (
+						<Button variant='outline' onClick={() => setReconcileOpen(true)}>
+							<Scale className='mr-2 h-4 w-4' aria-hidden='true' />
+							{t('reconcile')}
+						</Button>
+					) : undefined
+				}
 			/>
 
 			<AccountAnalytics
@@ -104,6 +124,7 @@ export default function AccountDetailsPage() {
 				categories={categories}
 				currentBalance={currentBalance}
 				currency={currency}
+				balancesByCurrency={balancesByCurrency}
 			/>
 
 			<div className='grid gap-6 md:grid-cols-3'>
@@ -161,6 +182,16 @@ export default function AccountDetailsPage() {
 										<Amount value={account.initial_balance ?? 0} currency={currency} />
 									</dd>
 								</div>
+								{isBank ? (
+									<div className='py-4'>
+										<dt className='text-sm font-medium text-muted-foreground'>{t('detail.lastReconciled')}</dt>
+										<dd className='font-medium'>
+											{account.last_reconciled_at
+												? formatLocalDate(account.last_reconciled_at, locale, { dateStyle: 'long' })
+												: t('neverReconciled')}
+										</dd>
+									</div>
+								) : null}
 								{account.created_at && (
 									<div className='pt-4'>
 										<dt className='text-sm font-medium text-muted-foreground'>{t('detail.createdAt')}</dt>
@@ -172,8 +203,47 @@ export default function AccountDetailsPage() {
 							</dl>
 						</CardContent>
 					</Card>
+
+					{isBank ? (
+						<Card className='mt-6'>
+							<CardHeader>
+								<h2 className='text-xl font-semibold leading-none tracking-tight'>{t('detail.reconciliations')}</h2>
+							</CardHeader>
+							<CardContent>
+								{reconciliations.length > 0 ? (
+									<ul className='divide-y'>
+										{reconciliations.map((r) => {
+											const difference = r.bank_balance - r.app_balance
+											return (
+												<li key={r.id} className='space-y-1 py-3 first:pt-0 last:pb-0'>
+													<div className='flex items-baseline justify-between gap-2'>
+														<span className='text-sm text-muted-foreground'>
+															{formatLocalDate(r.created_at, locale, { dateStyle: 'medium' })}
+														</span>
+														<Amount value={r.bank_balance} currency={r.currency} className='font-medium' />
+													</div>
+													<div className='flex items-baseline justify-between gap-2 text-xs'>
+														<span className='min-w-0 truncate text-muted-foreground'>{r.notes}</span>
+														{Math.abs(difference) < 1e-6 ? (
+															<span className='text-muted-foreground'>{t('detail.reconcileNoAdjustment')}</span>
+														) : (
+															<Amount value={difference} currency={r.currency} tone='auto' signed />
+														)}
+													</div>
+												</li>
+											)
+										})}
+									</ul>
+								) : (
+									<p className='text-sm text-muted-foreground'>{t('detail.noReconciliations')}</p>
+								)}
+							</CardContent>
+						</Card>
+					) : null}
 				</div>
 			</div>
+
+			<ReconcileAccountModal open={reconcileOpen} setOpen={setReconcileOpen} account={account} />
 		</PageShell>
 	)
 }

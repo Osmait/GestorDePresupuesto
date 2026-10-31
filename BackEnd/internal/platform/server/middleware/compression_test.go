@@ -194,10 +194,10 @@ func TestCompression_WithRLSBuffering(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config`).WithArgs("user-1", "false").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`SELECT set_config`).WithArgs("user-1", "false", "15000", "30000").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config`).WithArgs("user-1", "false").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`SELECT set_config`).WithArgs("user-1", "false", "15000", "30000").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit().WillReturnError(assert.AnError)
 
 	r := newCompressionRouter(injectUserContext("user-1", nil), RLSMiddleware(db))

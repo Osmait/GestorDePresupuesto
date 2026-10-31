@@ -14,10 +14,11 @@ import (
 )
 
 // The budget "spent this month" queries use a range predicate on created_at
-// instead of date_trunc('month', created_at) = date_trunc('month',
-// CURRENT_DATE). Both must select exactly the same rows in every session time
-// zone, including instants a microsecond around the local month boundaries.
-func TestFindCurrentBudgets_RangePredicateMatchesDateTrunc(t *testing.T) {
+// for the current month of the app time zone (app_timezone(), migration
+// 000062). It must select exactly the rows whose local month is the current
+// local month, whatever the session time zone, including instants a
+// microsecond around the month boundaries of several zones.
+func TestFindCurrentSpentByCategory_RangePredicateMatchesDateTrunc(t *testing.T) {
 	db := rollupRLSDB(t)
 	ctx := context.Background()
 	repo := transactionRepo.NewTransactionRepository(db)
@@ -75,17 +76,17 @@ func TestFindCurrentBudgets_RangePredicateMatchesDateTrunc(t *testing.T) {
 			}
 			var want money.Amount
 			require.NoError(t, tx.QueryRowContext(ctx, `SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0)
-				FROM transactions WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill'
-				AND date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE)`, userID, rate).Scan(&want))
+				FROM transactions WHERE user_id = $1 AND category_id = $3 AND type_transation = 'bill'
+				AND date_trunc('month', created_at AT TIME ZONE app_timezone()) = date_trunc('month', now() AT TIME ZONE app_timezone())`, userID, rate, category).Scan(&want))
 			require.True(t, want.IsPositive(), zone)
 
-			got, err := repo.FindCurrentBudgets(ctx, userID, rate)
+			got, err := repo.FindCurrentSpentByCategory(ctx, userID, rate)
 			require.NoError(t, err)
-			require.True(t, want.Equal(got[budget]), "%s: FindCurrentBudgets want %s got %s", zone, want, got[budget])
+			require.True(t, want.Equal(got[category]), "%s: FindCurrentSpentByCategory want %s got %s", zone, want, got[category])
 
-			one, err := repo.FindCurrentBudget(ctx, budget, userID, rate)
+			one, err := repo.FindCurrentCategorySpent(ctx, category, userID, rate)
 			require.NoError(t, err)
-			require.True(t, want.Equal(one), "%s: FindCurrentBudget want %s got %s", zone, want, one)
+			require.True(t, want.Equal(one), "%s: FindCurrentCategorySpent want %s got %s", zone, want, one)
 			return nil
 		}))
 	}

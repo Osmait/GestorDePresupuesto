@@ -39,6 +39,7 @@ import (
 	passkeyRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/passkey"
 	recurringRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/recurring_transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	userRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/user"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/utils"
@@ -67,7 +68,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/search"
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 )
 
 func Run() error {
@@ -135,6 +136,7 @@ func Run() error {
 	if err := runMigrations(cfg, logger); err != nil {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
+	warnOnTimezoneMismatch(ctx, db, cfg.Server.Timezone)
 
 	// Wire repositories, services and the HTTP router.
 	app, err := NewAppWithTelemetry(ctx, cfg, db, tel)
@@ -151,16 +153,21 @@ func Run() error {
 	scheduler := worker.NewTransactionScheduler(app.services.recurringService)
 	scheduler.Start(ctx)
 
-	demoCleanupWorker := worker.NewDemoCleanupWorker(app.services.userService, 24*time.Hour)
+	demoCleanupWorker := worker.NewDemoCleanupWorker(app.services.userService, worker.DefaultDemoCleanupInitialDelay, worker.DefaultDemoCleanupInterval)
 	demoCleanupWorker.Start(ctx)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
 
 	// Start server
-	if err := app.Server.Run(app.Ctx); err != nil {
-		return fmt.Errorf("server failed: %w", err)
-	}
+	runErr := app.Server.Run(app.Ctx)
 
+	// Asynchronous notifications still in flight write to the database:
+	// let them finish (each is bounded) before the deferred db.Close.
+	app.services.notificationService.Wait()
+
+	if runErr != nil {
+		return fmt.Errorf("server failed: %w", runErr)
+	}
 	logger.Info("Application shutdown completed")
 	return nil
 }
@@ -182,15 +189,48 @@ type App struct {
 // port, seed data or start background workers, so tests (e.g. the e2e suite)
 // can serve app.Server.Engine through httptest and exercise the same
 // middleware chain (auth, RLS transactions, rate limiting, CORS) as production.
-func NewApp(ctx context.Context, cfg *config.Config, db *sql.DB) (*App, error) {
-	return NewAppWithTelemetry(ctx, cfg, db, telemetry.Disabled())
+func NewApp(ctx context.Context, cfg *config.Config, db *sql.DB, opts ...AppOption) (*App, error) {
+	return NewAppWithTelemetry(ctx, cfg, db, telemetry.Disabled(), opts...)
+}
+
+// AppOption customizes NewApp (tests).
+type AppOption func(*appOptions)
+
+type appOptions struct {
+	aiProvider aiService.AIProvider
+}
+
+// WithAIProvider makes the AI service use p instead of the configured
+// provider (Gemini), e.g. a fake in end-to-end tests.
+func WithAIProvider(p aiService.AIProvider) AppOption {
+	return func(o *appOptions) { o.aiProvider = p }
 }
 
 // NewAppWithTelemetry is NewApp with the HTTP server instrumented by tel.
-func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, tel *telemetry.Telemetry) (*App, error) {
-	repos := initializeRepositories(db)
+func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, tel *telemetry.Telemetry, opts ...AppOption) (*App, error) {
+	var options appOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
 
-	svcs, err := initializeServices(repos, cfg)
+	// The app time zone: calendar days and months (filters, budgets,
+	// analytics, "today") are cut in it; instants are stored as they are.
+	appLocation, err := time.LoadLocation(cfg.Server.Timezone)
+	if err != nil {
+		return nil, fmt.Errorf("invalid APP_TIMEZONE %q: %w", cfg.Server.Timezone, err)
+	}
+
+	// Timeouts applied to every per-user transaction (request, AI, MCP,
+	// scheduler).
+	txhelper.ConfigureSessionLimits(txhelper.SessionLimits{
+		StatementTimeout: cfg.Database.StatementTimeout,
+		IdleInTxTimeout:  cfg.Database.IdleInTxTimeout,
+		AcquireTimeout:   cfg.Database.TxAcquireTimeout,
+	})
+
+	repos := initializeRepositories(db, appLocation)
+
+	svcs, err := initializeServices(repos, cfg, appLocation, options.aiProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize services: %w", err)
 	}
@@ -207,7 +247,10 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 			Analytics:   svcs.analyticsService,
 			CreditCard:  svcs.creditCardService,
 			Loan:        svcs.loanService,
-		}, db)
+			Recurring:   svcs.recurringService,
+			MonthlyPlan: svcs.monthlyPlanService,
+			Search:      svcs.searchService,
+		}, db, mcp.WithLocation(appLocation))
 
 		issuer := cfg.MCP.BaseURL
 		if issuer == "" {
@@ -356,6 +399,7 @@ func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 // repositories holds all repository interfaces
 type repositories struct {
 	accountRepository      accountRepo.AccountRepositoryInterface
+	reconciliationRepo     accountRepo.ReconciliationRepositoryInterface
 	transactionRepository  transactionRepo.TransactionRepositoryInterface
 	userRepository         userRepo.UserRepositoryInterface
 	budgetRepository       budgetRepo.BudgetRepoInterface
@@ -374,15 +418,16 @@ type repositories struct {
 }
 
 // initializeRepositories creates all repository instances
-func initializeRepositories(db *sql.DB) *repositories {
+func initializeRepositories(db *sql.DB, appLocation *time.Location) *repositories {
 	return &repositories{
 		accountRepository:      accountRepo.NewAccountRepository(db),
+		reconciliationRepo:     accountRepo.NewReconciliationRepository(db),
 		transactionRepository:  transactionRepo.NewTransactionRepository(db),
 		userRepository:         userRepo.NewUserRepository(db),
 		budgetRepository:       budgetRepo.NewBudgetRepository(db),
 		categoryRepository:     categoryRepo.NewCategoryRepository(db),
 		investmentRepository:   investmentRepo.NewInvestmentRepository(db),
-		analyticsRepository:    analyticsRepo.NewAnalyticsRepository(db),
+		analyticsRepository:    analyticsRepo.NewAnalyticsRepository(db, analyticsRepo.WithLocation(appLocation)),
 		recurringRepository:    recurringRepo.NewRecurringTransactionRepository(db),
 		monthlyPlanRepository:  monthlyPlanRepo.NewMonthlyPlanRepository(db),
 		notificationRepository: notificationRepo.NewNotificationRepository(db),
@@ -421,19 +466,14 @@ type services struct {
 }
 
 // initializeServices creates all service instances
-func initializeServices(repos *repositories, cfg *config.Config) (*services, error) {
-	appLocation, err := time.LoadLocation(cfg.Server.Timezone)
-	if err != nil {
-		return nil, fmt.Errorf("invalid APP_TIMEZONE %q: %w", cfg.Server.Timezone, err)
-	}
-
+func initializeServices(repos *repositories, cfg *config.Config, appLocation *time.Location, aiProvider aiService.AIProvider) (*services, error) {
 	// Services
 	quoteService := quote.NewQuoteService()
 
 	notificationService := notification.NewNotificationService(repos.notificationRepository)
 
 	// Initialize AI Service first (needed for cache)
-	aiSvc := initializeAIService(cfg)
+	aiSvc := initializeAIService(cfg, aiProvider)
 
 	// Create AI cache service
 	transactionCache := cache.NewInMemoryCache(5*time.Minute, 10*time.Minute)
@@ -454,12 +494,12 @@ func initializeServices(repos *repositories, cfg *config.Config) (*services, err
 		return rateResp.USDToDOP, nil
 	}
 
-	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator, usdToDopRateFn)
+	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator, usdToDopRateFn, transaction.WithLocation(appLocation))
 
-	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService, repos.accountRepository)
+	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService, repos.accountRepository, certificate.WithLocation(appLocation), certificate.WithUsdToDopRate(usdToDopRateFn))
 
-	creditCardService := creditcard.NewCreditCardService(repos.creditCardRepository, repos.accountRepository, transactionService)
-	loanService := loan.NewLoanService(repos.loanRepository, transactionService, repos.accountRepository, repos.categoryRepository)
+	creditCardService := creditcard.NewCreditCardService(repos.creditCardRepository, repos.accountRepository, transactionService, creditcard.WithLocation(appLocation))
+	loanService := loan.NewLoanService(repos.loanRepository, transactionService, repos.accountRepository, repos.categoryRepository, loan.WithLocation(appLocation), loan.WithUsdToDopRate(usdToDopRateFn))
 
 	userService := user.NewUserService(repos.userRepository)
 	// Short-TTL cache for the auth middleware's per-request user lookup
@@ -481,14 +521,14 @@ func initializeServices(repos *repositories, cfg *config.Config) (*services, err
 	}
 
 	return &services{
-		accountService:      account.NewAccountService(repos.accountRepository),
+		accountService:      account.NewAccountService(repos.accountRepository, account.WithReconciliation(repos.reconciliationRepo, transactionService, repos.categoryRepository)),
 		transactionService:  transactionService,
 		userService:         userService,
 		authService:         authService,
 		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository, usdToDopRateFn),
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService, transactionService, repos.accountRepository, repos.categoryRepository),
-		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn),
+		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn, analytics.WithLocation(appLocation), analytics.WithLoans(repos.loanRepository)),
 		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService, recurring_transaction.WithLocation(appLocation)),
 		monthlyPlanService:  monthly_plan.NewMonthlyPlanService(repos.monthlyPlanRepository, usdToDopRateFn),
 		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository, repos.loanRepository, repos.certificateRepository),
@@ -505,19 +545,44 @@ func initializeServices(repos *repositories, cfg *config.Config) (*services, err
 	}, nil
 }
 
-// initializeAIService creates the AI service instance
-func initializeAIService(cfg *config.Config) *aiService.Service {
-	// Check if AI is configured
-	if cfg.AI.GeminiAPIKey == "" {
-		log.Info().Msg("AI service not configured (missing GEMINI_API_KEY)")
-		return nil
+// warnOnTimezoneMismatch logs a warning when APP_TIMEZONE is not the
+// database's app_timezone() (migration 000062), which buckets the monthly
+// analytics rollup and cuts the budget month. With a mismatch the analytics
+// repository aggregates the ledger instead of the rollup, and the budget month
+// is the database zone's month: change app_timezone() in a migration (and
+// rebuild the rollup) to really move the app to another zone.
+func warnOnTimezoneMismatch(ctx context.Context, db *sql.DB, timezone string) {
+	var dbTimezone string
+	// startup, before the server runs: no request transaction to reuse
+	if err := txhelper.FromContext(ctx, db).QueryRowContext(ctx, "SELECT app_timezone()").Scan(&dbTimezone); err != nil {
+		log.Warn().Err(err).Msg("could not read app_timezone() from the database")
+		return
 	}
+	if dbTimezone != timezone {
+		log.Warn().
+			Str("app_timezone", timezone).
+			Str("db_app_timezone", dbTimezone).
+			Msg("APP_TIMEZONE differs from the database app_timezone(): budget months and the analytics rollup use the database zone")
+	}
+}
 
-	// Create Gemini provider
-	provider, err := gemini.NewProvider(cfg.AI.GeminiAPIKey, cfg.AI.Model)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to create Gemini provider")
-		return nil
+// initializeAIService creates the AI service instance (on provider when
+// given, else on Gemini when GEMINI_API_KEY is set).
+func initializeAIService(cfg *config.Config, provider aiService.AIProvider) *aiService.Service {
+	if provider == nil {
+		// Check if AI is configured
+		if cfg.AI.GeminiAPIKey == "" {
+			log.Info().Msg("AI service not configured (missing GEMINI_API_KEY)")
+			return nil
+		}
+
+		// Create Gemini provider
+		var err error
+		provider, err = gemini.NewProvider(cfg.AI.GeminiAPIKey, cfg.AI.Model)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to create Gemini provider")
+			return nil
+		}
 	}
 
 	// Create AI service config

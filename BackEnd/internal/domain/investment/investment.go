@@ -84,4 +84,10 @@ type InvestmentRepository interface {
 	GetFundingBalances(ctx context.Context, userId string) ([]*FundingBalance, error)
 	AddFunding(ctx context.Context, movement *FundingMovement) error
 	ConsumeFundingForInvestment(ctx context.Context, inv *Investment, currency string, requiredAmount money.Amount) error
+	// AdjustFundingForInvestment moves delta (positive: debit, negative:
+	// credit) between the user's wallet in currency and investment
+	// investmentID, recording an "adjustment" movement. A debit larger than
+	// the wallet balance fails with the repository's insufficient-funding
+	// error and changes nothing.
+	AdjustFundingForInvestment(ctx context.Context, userId, investmentID, currency string, delta money.Amount, description string) error
 }

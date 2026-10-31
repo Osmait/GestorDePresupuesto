@@ -8,6 +8,7 @@ import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -17,6 +18,7 @@ import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { isFundingAccount } from '@/lib/accounts'
 import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
 import { useAppLocale } from '@/lib/i18n/date-locale'
+import { moneyInputToNumber, moneyMessages, moneySchema, optionalMoneySchema } from '@/lib/money-input'
 
 interface InvestmentFundingModalProps {
 	isOpen: boolean
@@ -25,23 +27,35 @@ interface InvestmentFundingModalProps {
 
 const SUPPORTED_CURRENCIES = ['USD', 'DOP']
 
-function createFundingSchema(t: (key: string) => string) {
+type Translator = (key: string, values?: Record<string, string | number>) => string
+
+/** investment exchange rates are NUMERIC(24,10). */
+const RATE_DECIMALS = 10
+
+function createFundingSchema(t: Translator, tForms: Translator) {
 	return z.object({
 		sourceAccountID: z.string().min(1, t('errors.sourceRequired')),
-		sourceAmount: z.coerce.number().positive(t('errors.amountPositive')),
+		sourceAmount: moneySchema(moneyMessages(tForms, { required: t('errors.amountPositive') })).pipe(
+			z.number().positive(t('errors.amountPositive')),
+		),
 		targetCurrency: z.string().min(1),
-		exchangeRate: z.coerce.number().min(0),
-		feeAmount: z.coerce.number().min(0),
+		// Empty means "not set": only required when the currencies differ (checked on submit).
+		exchangeRate: optionalMoneySchema(moneyMessages(tForms, { decimals: RATE_DECIMALS, number: true }), {
+			decimals: RATE_DECIMALS,
+		}).pipe(z.number().min(0).optional()),
+		feeAmount: optionalMoneySchema(moneyMessages(tForms)).pipe(z.number().min(0).optional()),
 		notes: z.string().optional().default(''),
 	})
 }
 
 type FundingFormValues = z.infer<ReturnType<typeof createFundingSchema>>
 
+type FundingFormInput = z.input<ReturnType<typeof createFundingSchema>>
+
 export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingModalProps) {
 	const t = useTranslations('investments.funding')
 	const tForms = useTranslations('forms')
-	const fundingSchema = useMemo(() => createFundingSchema(t), [t])
+	const fundingSchema = useMemo(() => createFundingSchema(t, tForms), [t, tForms])
 	const locale = useAppLocale()
 	const formatCurrency = useFormatCurrency()
 	const { data: allAccounts = [] } = useGetAccounts()
@@ -51,7 +65,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 	const fundMutation = useFundBrokerMutation()
 	const [error, setError] = useState<{ message: string; detail?: string | null } | null>(null)
 
-	const form = useForm<FundingFormValues>({
+	const form = useForm<FundingFormInput, unknown, FundingFormValues>({
 		resolver: zodResolver(fundingSchema),
 		defaultValues: {
 			sourceAccountID: '',
@@ -82,8 +96,8 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 	const sourceCurrency = selectedAccount?.currency || 'DOP'
 	const requiresExchangeRate = sourceCurrency !== watchedValues.targetCurrency
 	const estimatedTargetAmount = useMemo(() => {
-		const sourceAmount = Number(watchedValues.sourceAmount) || 0
-		const exchangeRate = Number(watchedValues.exchangeRate) || 0
+		const sourceAmount = moneyInputToNumber(watchedValues.sourceAmount) || 0
+		const exchangeRate = moneyInputToNumber(watchedValues.exchangeRate, { decimals: RATE_DECIMALS }) || 0
 		if (sourceAmount <= 0) return 0
 		if (!requiresExchangeRate) return sourceAmount
 		if (exchangeRate <= 0) return 0
@@ -93,7 +107,9 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 	const onSubmit = async (values: FundingFormValues) => {
 		setError(null)
 
-		if (requiresExchangeRate && values.exchangeRate <= 0) {
+		const exchangeRate = values.exchangeRate ?? 0
+		const feeAmount = values.feeAmount ?? 0
+		if (requiresExchangeRate && exchangeRate <= 0) {
 			setError({ message: t('errors.exchangeRateRequired') })
 			return
 		}
@@ -103,8 +119,8 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 				source_account_id: values.sourceAccountID,
 				source_amount: values.sourceAmount,
 				target_currency: values.targetCurrency,
-				exchange_rate: requiresExchangeRate ? values.exchangeRate : undefined,
-				fee_amount: values.feeAmount > 0 ? values.feeAmount : undefined,
+				exchange_rate: requiresExchangeRate ? exchangeRate : undefined,
+				fee_amount: feeAmount > 0 ? feeAmount : undefined,
 				notes: values.notes,
 			})
 			onClose()
@@ -197,7 +213,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 								<FormItem>
 									<FormLabel>{t('amountFromAccount', { currency: sourceCurrency })}</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -238,7 +254,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 										{t('exchangeRate', { source: sourceCurrency, target: watchedValues.targetCurrency })}
 									</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} disabled={!requiresExchangeRate} />
+										<MoneyInput {...field} disabled={!requiresExchangeRate} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -252,7 +268,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 								<FormItem>
 									<FormLabel>{t('fees', { currency: sourceCurrency })}</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -263,7 +279,7 @@ export function InvestmentFundingModal({ isOpen, onClose }: InvestmentFundingMod
 					<div className='rounded-md bg-muted/50 p-3 text-sm text-muted-foreground'>
 						<p className='font-medium text-foreground'>{t('estimatedCredit')}</p>
 						<div className='mt-1 flex flex-wrap items-center gap-2 tabular-nums'>
-							<span>{formatCurrency(Number(watchedValues.sourceAmount) || 0, sourceCurrency)}</span>
+							<span>{formatCurrency(moneyInputToNumber(watchedValues.sourceAmount) || 0, sourceCurrency)}</span>
 							<ArrowRightLeft className='h-4 w-4' aria-hidden='true' />
 							<span>{formatCurrency(estimatedTargetAmount, watchedValues.targetCurrency)}</span>
 						</div>

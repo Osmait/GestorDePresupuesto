@@ -270,11 +270,16 @@
     "accountsBalance": "Saldo de Cuentas",
     "investmentsValue": "Valor Inversiones",
     "certificatesValue": "Valor Certificados",
+    "brokerCash": "Efectivo en bróker",
+    "loansReceivable": "Préstamos por cobrar",
+    "loansDefaulted": "En mora (no incluido)",
     "totalPatrimony": "Patrimonio Total",
     "activeItems": "activos",
     "exchangeRate": "Tasa de cambio (1 US$)",
     "distribution": "Distribución",
-    "sectionsLabel": "Secciones del panel"
+    "sectionsLabel": "Secciones del panel",
+    "cardDebt": "Deuda de tarjetas",
+    "creditCardsSection": "Tarjetas de crédito"
   },
   "accounts": {
     "title": "Cuentas",
@@ -328,8 +333,31 @@
       "typeBank": "Cuenta bancaria",
       "typeCreditCard": "Tarjeta de crédito",
       "currency": "Moneda",
-      "createdAt": "Creada el"
-    }
+      "createdAt": "Creada el",
+      "lastReconciled": "Última vez cuadrada",
+      "reconciliations": "Historial de cuadres",
+      "noReconciliations": "Aún no has cuadrado esta cuenta",
+      "reconcileNoAdjustment": "Sin ajuste"
+    },
+    "reconcile": "Cuadrar saldo",
+    "reconcileTitle": "Cuadrar {name}",
+    "reconcileDescription": "Escribe el saldo que muestra tu banco ahora mismo. Si no coincide con el de la app, se registra un ajuste por la diferencia (no cuenta como ingreso ni como gasto).",
+    "reconcileAppBalance": "Saldo en la app",
+    "reconcileBankBalance": "Saldo en el banco",
+    "reconcileBankBalanceHint": "Puede ser negativo si la cuenta está en sobregiro.",
+    "reconcileBalanceRequired": "Escribe el saldo que muestra el banco",
+    "reconcileNotes": "Nota (opcional)",
+    "reconcileNotesPlaceholder": "Ej: saldo de la app del banco",
+    "reconcileDifference": "Ajuste",
+    "reconcileMatches": "Coincide: no hace falta ajuste",
+    "reconcileSubmit": "Cuadrar",
+    "reconcileSuccessAdjusted": "Cuenta cuadrada con un ajuste de {amount}",
+    "reconcileSuccessMatched": "Cuenta cuadrada: el saldo ya coincidía",
+    "reconcileError": "No se pudo cuadrar la cuenta",
+    "reconciledAgo": "Cuadrada {ago}",
+    "reconciledToday": "Cuadrada hoy",
+    "neverReconciled": "Nunca cuadrada",
+    "reconcileStale": "Hace más de {days} días que no se cuadra"
   },
   "transactions": {
     "noDescription": "Sin descripción",
@@ -405,6 +433,10 @@
       "investment_purchase": "Compra de inversión",
       "investment_funding": "Fondeo de inversión",
       "loan_cancellation_refund": "Reembolso por cancelación de préstamo",
+      "adjustment_in": "Ajuste de saldo (entrada)",
+      "adjustment_out": "Ajuste de saldo (salida)",
+      "card_payment": "Pago de tarjeta",
+      "card_payment_received": "Pago recibido",
       "unknown": "Otro"
     },
     "sectionsLabel": "Secciones de transacciones"
@@ -490,7 +522,10 @@
       "destinationAccountRequired": "Elige la cuenta que recibe el pago",
       "paymentDateRequired": "Elige la fecha del pago"
     },
-    "cancelLoanAction": "Cancelar préstamo"
+    "cancelLoanAction": "Cancelar préstamo",
+    "pendingByCurrency": "Incluye {amounts} a la tasa {rate}",
+    "defaultedPending": "En mora: {amount} (no incluido)",
+    "summaryInDop": "Totales en RD$; los préstamos en US$ se convierten a la tasa del día"
   },
   "categories": {
     "title": "Categorías",
@@ -525,7 +560,9 @@
     "saveError": "No se pudo guardar la categoría. Inténtalo de nuevo.",
     "totalDop": "Total (DOP)",
     "emptyTitle": "Aún no tienes categorías",
-    "emptyDescription": "Crea categorías para clasificar tus ingresos y gastos."
+    "emptyDescription": "Crea categorías para clasificar tus ingresos y gastos.",
+    "suggestedNameFallback": "Nueva categoría",
+    "aiSuggestedSuffix": "IA"
   },
   "budgets": {
     "title": "Presupuestos",
@@ -795,7 +832,9 @@
     "trendMonthValue": "{month}: ingresos {income}, gastos {expenses}",
     "categoriesTitleCurrent": "En qué se fue este mes",
     "categoriesTitle": "En qué se fue el dinero",
-    "categoryShareLabel": "{category}: {amount}, {percent} del gasto"
+    "categoryShareLabel": "{category}: {amount}, {percent} del gasto",
+    "currencyLabel": "Moneda",
+    "balanceUnavailable": "Saldo en {currency} no disponible"
   },
   "settings": {
     "title": "Configuración",
@@ -995,6 +1034,10 @@
     "delete": "Eliminar",
     "deleting": "Eliminando...",
     "maxTwoDecimals": "Usa como máximo 2 decimales",
+    "maxDecimals": "Usa como máximo {count} decimales",
+    "amountMissing": "Ingresa un monto",
+    "invalidAmount": "Ingresa un monto válido, p. ej. 1,500.50",
+    "invalidNumber": "Ingresa un número válido, p. ej. 12.5",
     "insufficientFunds": "La cuenta de origen no tiene fondos suficientes para esta operación.",
     "insufficientFundsAvailable": "La cuenta de origen no tiene fondos suficientes: solo hay {amount} disponibles.",
     "availableBalance": "Disponible: {amount}"
@@ -1362,7 +1405,8 @@
       "capitalBase": "Capital base",
       "totalValueLegend": "Valor total (capital + intereses)",
       "ariaLabel": "Gráfico de líneas del valor proyectado del certificado en los próximos {months} meses"
-    }
+    },
+    "payoutPending": "Intereses pendientes de acreditar: {reason}"
   },
   "creditCards": {
     "title": "Tarjetas de crédito",
@@ -1375,7 +1419,8 @@
       "debtDop": "Deuda en DOP",
       "debtUsd": "Deuda en USD",
       "usdInDop": "≈ {amount} a {rate} DOP por USD",
-      "utilizationHint": "{status} · meta: menos de 30%"
+      "utilizationHint": "{status} · meta: menos de 30%",
+      "rateUnavailable": "Tasa no disponible: la deuda en US$ no está incluida"
     },
     "activeCards": "{count, plural, =1 {# tarjeta activa} other {# tarjetas activas}}",
     "creditHealth": "Salud crediticia",
@@ -1422,7 +1467,24 @@
       "noDebt": "Sin deuda",
       "cutDay": "Día de corte",
       "dueDay": "Día de pago",
-      "utilizationLabel": "Crédito usado en {currency}"
+      "utilizationLabel": "Crédito usado en {currency}",
+      "reconcile": "Cuadrar con estado de cuenta",
+      "reconcileTitle": "Cuadrar {name}",
+      "reconcileDescription": "Escribe la deuda que muestra tu estado de cuenta o la app del banco. Si no coincide con la de la app, se registra un ajuste por la diferencia (no cuenta como gasto).",
+      "reconcileCurrency": "Moneda",
+      "reconcileAppDebt": "Deuda en la app",
+      "reconcileBankDebt": "Deuda según el banco",
+      "reconcileBankDebtHint": "Escribe 0 si no debes nada.",
+      "reconcileDebtRequired": "Escribe la deuda que muestra el banco",
+      "reconcileDifference": "Ajuste",
+      "reconcileNotes": "Nota (opcional)",
+      "reconcileMatches": "Coincide: no hace falta ajuste",
+      "reconcileSubmit": "Cuadrar",
+      "reconcileSuccess": "Tarjeta cuadrada: debes {amount}",
+      "reconcileError": "No se pudo cuadrar la tarjeta",
+      "owes": "Debes {amount}",
+      "inFavor": "A favor {amount}",
+      "limitUsed": "{percent} del límite de {limit}"
     },
     "form": {
       "addTitle": "Agregar tarjeta de crédito",
@@ -1440,16 +1502,19 @@
       "removeCurrency": "Quitar moneda",
       "creditLimit": "Límite de crédito",
       "initialDebt": "Deuda inicial",
+      "currentDebt": "Deuda actual",
+      "debtReadOnlyHint": "Para cambiar la deuda, usa \"Cuadrar\" en la tarjeta.",
       "create": "Crear",
       "update": "Actualizar",
       "errors": {
         "nameRequired": "El nombre de la tarjeta es obligatorio",
         "bankRequired": "El banco es obligatorio",
-        "digitsOnly": "Solo se permiten dígitos",
         "dayMin": "Mínimo {min}",
         "dayMax": "Máximo {max}",
         "saveFailed": "No se pudo guardar la tarjeta. Inténtalo de nuevo.",
-        "limitRequired": "Ingresa un límite de crédito de 0 o más para cada moneda."
+        "limitRequired": "Ingresa un límite de crédito mayor que 0 para cada moneda.",
+        "textLength": "Usa entre {min} y {max} caracteres",
+        "lastFourDigits": "Escribe los 4 dígitos o déjalo vacío"
       }
     },
     "payment": {
@@ -1489,7 +1554,8 @@
       "accountDebit": "Débito de la cuenta",
       "rate": "Tasa",
       "interest": "Intereses",
-      "notes": "Notas"
+      "notes": "Notas",
+      "currencyFilter": "Filtrar por moneda"
     }
   },
   "investments": {
@@ -1516,7 +1582,9 @@
       "totalProfit": "Ganancia/pérdida total",
       "totalProfitHint": "Realizada + no realizada",
       "roi": "ROI",
-      "roiHint": "Retorno sobre la inversión"
+      "roiHint": "Retorno sobre la inversión",
+      "convertedHint": "Posiciones en RD$ convertidas a la tasa {rate}",
+      "rateUnavailable": "Tasa no disponible: las posiciones en RD$ no están incluidas"
     },
     "dashboard": {
       "allocation": "Distribución de activos",
@@ -1560,11 +1628,13 @@
         "symbolRequired": "El símbolo es obligatorio",
         "currencyRequired": "La moneda es obligatoria",
         "minZero": "Debe ser mayor o igual a 0",
+        "greaterThanZero": "Debe ser mayor que 0",
         "quoteNotFound": "No se pudo obtener el precio de este símbolo",
         "quoteFailed": "Error al obtener el precio",
         "insufficientBalance": "Saldo insuficiente en el bróker ({currency}). Requerido: {required}, disponible: {available}",
         "saveFailed": "No se pudo guardar la inversión. Inténtalo de nuevo."
-      }
+      },
+      "currencyLocked": "La moneda no se puede cambiar: el costo se pagó con esa cartera"
     },
     "funding": {
       "title": "Fondear saldo del bróker",
@@ -1742,7 +1812,7 @@
       "security": "Seguridad",
       "notifications": "Notificaciones",
       "data": "Datos y Privacidad",
-      "apikeys": "API Keys"
+      "apikeys": "Claves API"
     },
     "actions": {
       "edit": "Editar",
@@ -1942,5 +2012,140 @@
     "close": "Cerrar búsqueda",
     "inputLabel": "Buscar transacciones, cuentas y más",
     "resultsLabel": "Resultados de búsqueda"
+  },
+  "landing": {
+    "nav": {
+      "architecture": "Arquitectura",
+      "patterns": "Patrones",
+      "techStack": "Tecnologías",
+      "highlights": "Destacados",
+      "github": "GitHub",
+      "liveDemo": "Demo en vivo",
+      "switchToLight": "Cambiar a modo claro",
+      "switchToDark": "Cambiar a modo oscuro",
+      "logoAlt": "Logo de SBFinance"
+    },
+    "hero": {
+      "badge": "Proyecto de portafolio técnico",
+      "tagline": "Aplicación full-stack de finanzas personales",
+      "description": "Un sistema de gestión financiera listo para producción que demuestra Clean Architecture, los principios SOLID y patrones modernos de desarrollo full-stack. Hecho con Next.js 16, Go y PostgreSQL.",
+      "badges": {
+        "cleanArchitecture": "Clean Architecture",
+        "solid": "Principios SOLID",
+        "repository": "Patrón Repository",
+        "dependencyInjection": "Inyección de dependencias"
+      },
+      "tryDemo": "Probar la demo",
+      "viewSource": "Ver el código fuente",
+      "scroll": "Desliza para explorar la arquitectura"
+    },
+    "architecture": {
+      "badge": "Arquitectura del sistema",
+      "title": "Clean Architecture",
+      "description": "El backend sigue los principios de Clean Architecture con una separación clara de responsabilidades. Las dependencias apuntan hacia adentro y el dominio queda independiente de los frameworks.",
+      "layers": {
+        "frameworks": {
+          "name": "Frameworks y drivers",
+          "description": "Interfaces externas (HTTP, base de datos, logger)"
+        },
+        "adapters": {
+          "name": "Adaptadores de interfaz",
+          "description": "Convierten los datos entre capas"
+        },
+        "application": {
+          "name": "Capa de aplicación",
+          "description": "Lógica de negocio y casos de uso"
+        },
+        "domain": {
+          "name": "Capa de dominio",
+          "description": "Entidades y reglas centrales del negocio"
+        }
+      },
+      "dependencyRule": "Las dependencias siempre apuntan hacia adentro → el dominio nunca depende de las capas externas"
+    },
+    "patterns": {
+      "badge": "Patrones de diseño",
+      "title": "Patrones implementados",
+      "description": "Patrones de diseño estándar de la industria que aseguran mantenibilidad, facilidad de prueba y código limpio.",
+      "items": {
+        "repository": {
+          "name": "Patrón Repository",
+          "description": "Abstrae el acceso a datos detrás de interfaces, lo que facilita probar con mocks y cambiar de base de datos."
+        },
+        "dependencyInjection": {
+          "name": "Inyección de dependencias",
+          "description": "Los servicios reciben sus dependencias por el constructor, con bajo acoplamiento y fáciles de probar."
+        },
+        "dto": {
+          "name": "Patrón DTO",
+          "description": "Objetos de petición y respuesta separados de las entidades del dominio para controlar el contrato de la API."
+        },
+        "factory": {
+          "name": "Patrón Factory",
+          "description": "Funciones constructoras crean las entidades del dominio correctamente inicializadas."
+        }
+      }
+    },
+    "techStack": {
+      "badge": "Stack tecnológico",
+      "title": "Tecnologías utilizadas",
+      "description": "Un stack moderno y listo para producción, optimizado para el rendimiento, la experiencia de desarrollo y la escalabilidad.",
+      "frontend": "Frontend",
+      "backend": "Backend",
+      "items": {
+        "nextjs": "App Router y Server Components",
+        "react": "Funciones concurrentes y hooks",
+        "typescript": "Tipado completo",
+        "tanstackQuery": "Estado del servidor y caché",
+        "tailwind": "Estilos utility-first",
+        "shadcn": "Componentes de Radix UI",
+        "go": "Backend de alto rendimiento",
+        "gin": "Framework web HTTP",
+        "postgres": "Base de datos relacional",
+        "jwt": "Autenticación segura",
+        "docker": "Contenedores"
+      }
+    },
+    "highlights": {
+      "badge": "Aspectos técnicos",
+      "title": "Implementaciones clave",
+      "description": "Funciones técnicas y decisiones de ingeniería que hacen este proyecto apto para producción.",
+      "items": {
+        "jwt": {
+          "title": "Autenticación JWT",
+          "description": "Autenticación sin estado con tokens, contraseñas con bcrypt y expiración configurable."
+        },
+        "migrations": {
+          "title": "Migraciones de base de datos",
+          "description": "Migraciones versionadas con golang-migrate, sobre PostgreSQL en producción y en las pruebas (testcontainers)."
+        },
+        "workers": {
+          "title": "Procesos en segundo plano",
+          "description": "Tareas programadas para las transacciones recurrentes, con apagado ordenado."
+        },
+        "cache": {
+          "title": "Caché en memoria",
+          "description": "Capa de caché de transacciones con un TTL de 5 minutos para lecturas más rápidas."
+        },
+        "logging": {
+          "title": "Logs estructurados",
+          "description": "Zerolog para logs en JSON con niveles configurables e IDs de correlación."
+        },
+        "i18n": {
+          "title": "Internacionalización",
+          "description": "Soporte completo de idiomas (ES/EN) con next-intl y traducciones tipadas."
+        }
+      }
+    },
+    "repository": {
+      "terminal": "terminal",
+      "title": "Código abierto",
+      "description": "Explora el código, aprende de la implementación o contribuye al proyecto.",
+      "clone": "Clona el repositorio",
+      "view": "Ver el repositorio"
+    },
+    "footer": {
+      "credits": "© {year} {name}. Desarrollado por {developer}."
+    }
   }
 }

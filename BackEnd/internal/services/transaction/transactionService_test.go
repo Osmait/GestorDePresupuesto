@@ -49,14 +49,19 @@ func (m *MockTransaction) BalanceByAccountAndCurrency(ctx context.Context, accou
 	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string, userId string, usdToDop money.Amount) (money.Amount, error) {
-	args := m.Called(ctx, budgetId, userId, usdToDop)
+func (m *MockTransaction) FindCurrentCategorySpent(ctx context.Context, categoryId string, userId string, usdToDop money.Amount) (money.Amount, error) {
+	args := m.Called(ctx, categoryId, userId, usdToDop)
 	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
+func (m *MockTransaction) FindCurrentSpentByCategory(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
 	args := m.Called(ctx, userId, usdToDop)
 	return args.Get(0).(map[string]money.Amount), args.Error(1)
+}
+
+// TypeOf reports every transaction as a plain expense (editable and deletable).
+func (m *MockTransaction) TypeOf(context.Context, string, string) (string, error) {
+	return "bill", nil
 }
 
 func (m *MockTransaction) Delete(ctx context.Context, id string, userId string) error {
@@ -173,7 +178,7 @@ func TestTransactionService_CreateTransaction(t *testing.T) {
 
 	mockBudgetRepo.On("FindByCategory", mock.Anything, mock.Anything, mock.Anything).Return(utils.GetNewRandomBudget(), nil)
 	mockRepo.On("ResolveAndValidateCurrencyForAccount", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return("DOP", nil)
-	mockRepo.On("FindCurrentBudget", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(money.FromInt(1000), nil)
+	mockRepo.On("FindCurrentCategorySpent", mock.Anything, mock.Anything, mock.Anything, mock.Anything).Return(money.FromInt(1000), nil)
 	mockRepo.On("Save", context.Background(), mock.AnythingOfType("*transaction.Transaction")).Return(nil)
 
 	ctx := context.Background()
@@ -244,4 +249,22 @@ func TestFindAllTransactionofAllAccount(t *testing.T) {
 	_, err := s.FindAllOfAllAccounts(ctx, "1")
 	assert.NoError(t, err, "CreateAccount should not return an error")
 	mockRepo.AssertExpectations(t)
+}
+
+// REST, MCP and the AI import create through CreateUserTransaction, which only
+// takes the user's own types: a card_payment_received written directly would
+// lower a card's debt with no money leaving any account.
+func TestTransactionService_CreateUserTransactionRejectsManagedTypes(t *testing.T) {
+	t.Parallel()
+	for _, typ := range []string{"card_payment_received", "card_payment", "adjustment_in", "adjustment_out", "loan_collection", "loan_cancellation_refund", "investment_funding"} {
+		t.Run(typ, func(t *testing.T) {
+			t.Parallel()
+			mockRepo := &MockTransaction{}
+			s := NewTransactionService(mockRepo, &MockBudgetRepository{}, nil, &MockCache{}, &MockAICache{}, nil)
+
+			_, err := s.CreateUserTransaction(context.Background(), "x", "", money.FromInt(5000), typ, "acc", "user", "cat", "", "DOP", time.Now())
+			assert.ErrorIs(t, err, ErrNotUserType)
+			mockRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+		})
+	}
 }

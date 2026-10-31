@@ -24,13 +24,18 @@ function createUserSchema(t: Translate) {
 	return z.object({
 		name: z.string().trim().min(2, t('errors.name')),
 		last_name: z.string().trim().min(2, t('errors.lastName')),
-		email: z.string().trim().email(t('errors.email')),
+		email: z
+			.string()
+			.trim()
+			.pipe(z.email(t('errors.email'))),
 		password: z.string().min(8, t('errors.password')),
 		role: z.enum(['USER', 'ADMIN']),
 	})
 }
 
 type CreateUserValues = z.infer<ReturnType<typeof createUserSchema>>
+
+type CreateUserInput = z.input<ReturnType<typeof createUserSchema>>
 
 const DEFAULT_VALUES: CreateUserValues = { name: '', last_name: '', email: '', password: '', role: 'USER' }
 
@@ -41,7 +46,10 @@ export function CreateUserModal({ onUserCreated }: CreateUserModalProps) {
 	const [showPassword, setShowPassword] = useState(false)
 	const [serverError, setServerError] = useState<string | null>(null)
 	const schema = useMemo(() => createUserSchema(t), [t])
-	const form = useForm<CreateUserValues>({ resolver: zodResolver(schema), defaultValues: DEFAULT_VALUES })
+	const form = useForm<CreateUserInput, unknown, CreateUserValues>({
+		resolver: zodResolver(schema),
+		defaultValues: DEFAULT_VALUES,
+	})
 	const isLoading = form.formState.isSubmitting
 
 	function handleOpenChange(open: boolean) {

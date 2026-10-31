@@ -1,2 +1,5 @@
+# Paste the access token from POST /auth/login here; never commit a real one.
+@token = <access-token>
+
 GET http://localhost:8080/account
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjJab29YUTZpVlpnb1g3cE05SE9oMExZY2g1SiIsImV4cCI6MTcwNTQ0NzQzM30.eq1vvJmruZ2yciNYmR-6a9J5EY0ijt5oAurlHyAeJCo
+Authorization: Bearer {{token}}

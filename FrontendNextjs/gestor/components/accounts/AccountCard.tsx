@@ -1,5 +1,6 @@
 'use client'
-import { Building, Edit, MoreHorizontal, Trash2 } from 'lucide-react'
+import { formatDistanceToNow } from 'date-fns'
+import { Building, Edit, MoreHorizontal, Scale, Trash2 } from 'lucide-react'
 import Link from 'next/link'
 import { useTranslations } from 'next-intl'
 import { useState } from 'react'
@@ -11,7 +12,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { DEFAULT_CURRENCY } from '@/lib/utils'
+import { useDateFnsLocale } from '@/lib/i18n/date-locale'
+import { cn, DEFAULT_CURRENCY } from '@/lib/utils'
 import { Account } from '@/types/account'
 
 interface AccountCardProps {
@@ -19,18 +21,47 @@ interface AccountCardProps {
 	/** Deletes the account (after confirmation). Omit both handlers for a read-only card (no menu). */
 	onAccountDeleted?: () => void | Promise<void>
 	onAccountEdit?: (_account: Account) => void
+	/** Opens "reconcile balance" for the account (bank accounts only). */
+	onAccountReconcile?: (_account: Account) => void
 }
 
-export function AccountCard({ account, onAccountDeleted, onAccountEdit }: AccountCardProps) {
+/** An account not reconciled for longer than this is flagged. */
+export const RECONCILE_STALE_DAYS = 30
+
+const DAY_MS = 24 * 60 * 60 * 1000
+
+/** Whether the account was never reconciled or not within RECONCILE_STALE_DAYS of `now`. */
+export function isReconcileStale(lastReconciledAt: string | undefined, now: Date = new Date()): boolean {
+	if (!lastReconciledAt) return true
+	const at = new Date(lastReconciledAt).getTime()
+	if (Number.isNaN(at)) return true
+	return now.getTime() - at > RECONCILE_STALE_DAYS * DAY_MS
+}
+
+export function AccountCard({ account, onAccountDeleted, onAccountEdit, onAccountReconcile }: AccountCardProps) {
 	const t = useTranslations('accounts')
 	const tCommon = useTranslations('common')
+	const dateLocale = useDateFnsLocale()
 	const [showDeleteDialog, setShowDeleteDialog] = useState(false)
 
 	const currency = account.currency || DEFAULT_CURRENCY
 	const currentBalance = account.current_balance ?? account.initial_balance ?? 0
 	const initialBalance = account.initial_balance ?? 0
 	const balanceDelta = currentBalance - initialBalance
-	const hasActions = Boolean(onAccountEdit || onAccountDeleted)
+	// Credit card debt is not reconciled here (see the credit card page).
+	const isBank = (account.type || 'bank') === 'bank'
+	const canReconcile = isBank && Boolean(onAccountReconcile)
+	const hasActions = Boolean(onAccountEdit || onAccountDeleted || canReconcile)
+	const reconcileStale = isReconcileStale(account.last_reconciled_at)
+	const reconcileStatus = getReconcileStatus()
+
+	// Under a day reads "today": "less than a minute ago" does not fit the card footer.
+	function getReconcileStatus() {
+		if (!account.last_reconciled_at) return t('neverReconciled')
+		const at = new Date(account.last_reconciled_at)
+		if (Date.now() - at.getTime() < DAY_MS) return t('reconciledToday')
+		return t('reconciledAgo', { ago: formatDistanceToNow(at, { addSuffix: true, locale: dateLocale }) })
+	}
 
 	const handleDeleteAccount = async () => {
 		if (!account.id || !onAccountDeleted) return
@@ -84,6 +115,12 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
 									</Button>
 								</DropdownMenuTrigger>
 								<DropdownMenuContent align='end'>
+									{canReconcile && onAccountReconcile ? (
+										<DropdownMenuItem className='flex items-center gap-2' onSelect={() => onAccountReconcile(account)}>
+											<Scale className='h-4 w-4' aria-hidden='true' />
+											{t('reconcile')}
+										</DropdownMenuItem>
+									) : null}
 									{onAccountEdit ? (
 										<DropdownMenuItem className='flex items-center gap-2' onSelect={() => onAccountEdit(account)}>
 											<Edit className='h-4 w-4' aria-hidden='true' />
@@ -122,8 +159,21 @@ export function AccountCard({ account, onAccountDeleted, onAccountEdit }: Accoun
 								<Amount value={balanceDelta} currency={currency} tone='auto' signed className='font-medium' />
 							</div>
 						)}
-						<div className='flex items-center justify-between border-t pt-3'>
-							<span className='text-xs text-muted-foreground'>{currency}</span>
+						<div className='flex items-center justify-between gap-2 border-t pt-3'>
+							<span className='min-w-0 truncate text-xs text-muted-foreground'>
+								{currency}
+								{isBank ? (
+									<>
+										{' · '}
+										<span
+											className={cn(reconcileStale && 'text-warning')}
+											title={reconcileStale ? t('reconcileStale', { days: RECONCILE_STALE_DAYS }) : undefined}
+										>
+											{reconcileStatus}
+										</span>
+									</>
+								) : null}
+							</span>
 							<Badge variant='outline'>
 								{currentBalance > 10000 ? t('high') : currentBalance > 5000 ? t('medium') : t('low')}
 							</Badge>

@@ -270,11 +270,16 @@
     "accountsBalance": "Accounts Balance",
     "investmentsValue": "Investments Value",
     "certificatesValue": "Certificates Value",
+    "brokerCash": "Broker cash",
+    "loansReceivable": "Loans receivable",
+    "loansDefaulted": "Defaulted (not included)",
     "totalPatrimony": "Total Wealth",
     "activeItems": "active",
     "exchangeRate": "Exchange rate (1 US$)",
     "distribution": "Distribution",
-    "sectionsLabel": "Dashboard sections"
+    "sectionsLabel": "Dashboard sections",
+    "cardDebt": "Credit card debt",
+    "creditCardsSection": "Credit cards"
   },
   "accounts": {
     "title": "Accounts",
@@ -328,8 +333,31 @@
       "typeBank": "Bank account",
       "typeCreditCard": "Credit card",
       "currency": "Currency",
-      "createdAt": "Created on"
-    }
+      "createdAt": "Created on",
+      "lastReconciled": "Last reconciled",
+      "reconciliations": "Reconciliation history",
+      "noReconciliations": "You have not reconciled this account yet",
+      "reconcileNoAdjustment": "No adjustment"
+    },
+    "reconcile": "Reconcile balance",
+    "reconcileTitle": "Reconcile {name}",
+    "reconcileDescription": "Enter the balance your bank shows right now. If it differs from the app, an adjustment is recorded for the difference (it counts as neither income nor expense).",
+    "reconcileAppBalance": "Balance in the app",
+    "reconcileBankBalance": "Balance at the bank",
+    "reconcileBankBalanceHint": "May be negative if the account is overdrawn.",
+    "reconcileBalanceRequired": "Enter the balance the bank shows",
+    "reconcileNotes": "Note (optional)",
+    "reconcileNotesPlaceholder": "E.g. balance from the bank app",
+    "reconcileDifference": "Adjustment",
+    "reconcileMatches": "Matches: no adjustment needed",
+    "reconcileSubmit": "Reconcile",
+    "reconcileSuccessAdjusted": "Account reconciled with an adjustment of {amount}",
+    "reconcileSuccessMatched": "Account reconciled: the balance already matched",
+    "reconcileError": "Could not reconcile the account",
+    "reconciledAgo": "Reconciled {ago}",
+    "reconciledToday": "Reconciled today",
+    "neverReconciled": "Never reconciled",
+    "reconcileStale": "Not reconciled for more than {days} days"
   },
   "transactions": {
     "noDescription": "No description",
@@ -405,6 +433,10 @@
       "investment_purchase": "Investment purchase",
       "investment_funding": "Investment funding",
       "loan_cancellation_refund": "Loan cancellation refund",
+      "adjustment_in": "Balance adjustment (in)",
+      "adjustment_out": "Balance adjustment (out)",
+      "card_payment": "Card payment",
+      "card_payment_received": "Payment received",
       "unknown": "Other"
     },
     "sectionsLabel": "Transaction sections"
@@ -490,7 +522,10 @@
       "destinationAccountRequired": "Choose the account that receives the payment",
       "paymentDateRequired": "Choose the payment date"
     },
-    "cancelLoanAction": "Cancel loan"
+    "cancelLoanAction": "Cancel loan",
+    "pendingByCurrency": "Includes {amounts} at rate {rate}",
+    "defaultedPending": "Defaulted: {amount} (not included)",
+    "summaryInDop": "Totals in RD$; US$ loans converted at today's rate"
   },
   "categories": {
     "title": "Categories",
@@ -525,7 +560,9 @@
     "saveError": "Couldn't save the category. Try again.",
     "totalDop": "Total (DOP)",
     "emptyTitle": "No categories yet",
-    "emptyDescription": "Create categories to classify your income and expenses."
+    "emptyDescription": "Create categories to classify your income and expenses.",
+    "suggestedNameFallback": "New category",
+    "aiSuggestedSuffix": "AI"
   },
   "budgets": {
     "title": "Budgets",
@@ -795,7 +832,9 @@
     "trendMonthValue": "{month}: income {income}, expenses {expenses}",
     "categoriesTitleCurrent": "Where this month's money went",
     "categoriesTitle": "Where the money went",
-    "categoryShareLabel": "{category}: {amount}, {percent} of spending"
+    "categoryShareLabel": "{category}: {amount}, {percent} of spending",
+    "currencyLabel": "Currency",
+    "balanceUnavailable": "{currency} balance unavailable"
   },
   "settings": {
     "title": "Settings",
@@ -995,6 +1034,10 @@
     "delete": "Delete",
     "deleting": "Deleting...",
     "maxTwoDecimals": "Use at most 2 decimal places",
+    "maxDecimals": "Use at most {count} decimal places",
+    "amountMissing": "Enter an amount",
+    "invalidAmount": "Enter a valid amount, e.g. 1,500.50",
+    "invalidNumber": "Enter a valid number, e.g. 12.5",
     "insufficientFunds": "The source account doesn't have enough funds for this operation.",
     "insufficientFundsAvailable": "The source account doesn't have enough funds: only {amount} available.",
     "availableBalance": "Available: {amount}"
@@ -1362,7 +1405,8 @@
       "capitalBase": "Base capital",
       "totalValueLegend": "Total value (capital + interest)",
       "ariaLabel": "Line chart of the certificate's projected value over the next {months} months"
-    }
+    },
+    "payoutPending": "Interest pending credit: {reason}"
   },
   "creditCards": {
     "title": "Credit Cards",
@@ -1375,7 +1419,8 @@
       "debtDop": "Debt in DOP",
       "debtUsd": "Debt in USD",
       "usdInDop": "≈ {amount} at {rate} DOP per USD",
-      "utilizationHint": "{status} · target below 30%"
+      "utilizationHint": "{status} · target below 30%",
+      "rateUnavailable": "Rate unavailable: US$ debt is not included"
     },
     "activeCards": "{count, plural, =1 {# active card} other {# active cards}}",
     "creditHealth": "Credit Health",
@@ -1422,7 +1467,24 @@
       "noDebt": "No debt",
       "cutDay": "Cut Day",
       "dueDay": "Due Day",
-      "utilizationLabel": "{currency} credit used"
+      "utilizationLabel": "{currency} credit used",
+      "reconcile": "Reconcile with statement",
+      "reconcileTitle": "Reconcile {name}",
+      "reconcileDescription": "Enter the debt your statement or bank app shows. If it differs from the app, an adjustment is recorded for the difference (it does not count as an expense).",
+      "reconcileCurrency": "Currency",
+      "reconcileAppDebt": "Debt in the app",
+      "reconcileBankDebt": "Debt at the bank",
+      "reconcileBankDebtHint": "Enter 0 if you owe nothing.",
+      "reconcileDebtRequired": "Enter the debt the bank shows",
+      "reconcileDifference": "Adjustment",
+      "reconcileNotes": "Note (optional)",
+      "reconcileMatches": "Matches: no adjustment needed",
+      "reconcileSubmit": "Reconcile",
+      "reconcileSuccess": "Card reconciled: you owe {amount}",
+      "reconcileError": "Could not reconcile the card",
+      "owes": "You owe {amount}",
+      "inFavor": "In credit {amount}",
+      "limitUsed": "{percent} of the {limit} limit"
     },
     "form": {
       "addTitle": "Add Credit Card",
@@ -1440,16 +1502,19 @@
       "removeCurrency": "Remove currency",
       "creditLimit": "Credit Limit",
       "initialDebt": "Initial Debt",
+      "currentDebt": "Current debt",
+      "debtReadOnlyHint": "To change the debt, use \"Reconcile\" on the card.",
       "create": "Create",
       "update": "Update",
       "errors": {
         "nameRequired": "Card name is required",
         "bankRequired": "Bank is required",
-        "digitsOnly": "Only digits allowed",
         "dayMin": "Min {min}",
         "dayMax": "Max {max}",
         "saveFailed": "The card could not be saved. Please try again.",
-        "limitRequired": "Enter a credit limit of 0 or more for each currency."
+        "limitRequired": "Enter a credit limit greater than 0 for each currency.",
+        "textLength": "Use between {min} and {max} characters",
+        "lastFourDigits": "Enter all 4 digits or leave it empty"
       }
     },
     "payment": {
@@ -1489,7 +1554,8 @@
       "accountDebit": "Account Debit",
       "rate": "Rate",
       "interest": "Interest",
-      "notes": "Notes"
+      "notes": "Notes",
+      "currencyFilter": "Filter by currency"
     }
   },
   "investments": {
@@ -1516,7 +1582,9 @@
       "totalProfit": "Total Profit/Loss",
       "totalProfitHint": "Realized + unrealized",
       "roi": "ROI",
-      "roiHint": "Return on investment"
+      "roiHint": "Return on investment",
+      "convertedHint": "RD$ positions converted at rate {rate}",
+      "rateUnavailable": "Rate unavailable: RD$ positions are not included"
     },
     "dashboard": {
       "allocation": "Asset Allocation",
@@ -1560,11 +1628,13 @@
         "symbolRequired": "Symbol is required",
         "currencyRequired": "Currency is required",
         "minZero": "Must be greater than or equal to 0",
+        "greaterThanZero": "Must be greater than 0",
         "quoteNotFound": "Could not fetch price for this symbol",
         "quoteFailed": "Failed to fetch price",
         "insufficientBalance": "Insufficient broker balance in {currency}. Required: {required}, available: {available}",
         "saveFailed": "Failed to save investment. Please try again."
-      }
+      },
+      "currencyLocked": "The currency cannot be changed: the cost was paid from that wallet"
     },
     "funding": {
       "title": "Fund broker balance",
@@ -1942,5 +2012,140 @@
     "close": "Close search",
     "inputLabel": "Search transactions, accounts and more",
     "resultsLabel": "Search results"
+  },
+  "landing": {
+    "nav": {
+      "architecture": "Architecture",
+      "patterns": "Patterns",
+      "techStack": "Tech stack",
+      "highlights": "Highlights",
+      "github": "GitHub",
+      "liveDemo": "Live Demo",
+      "switchToLight": "Switch to light mode",
+      "switchToDark": "Switch to dark mode",
+      "logoAlt": "SBFinance logo"
+    },
+    "hero": {
+      "badge": "Technical Portfolio Project",
+      "tagline": "Full-Stack Personal Finance Application",
+      "description": "A production-ready financial management system demonstrating Clean Architecture, SOLID principles, and modern full-stack development patterns. Built with Next.js 16, Go, and PostgreSQL.",
+      "badges": {
+        "cleanArchitecture": "Clean Architecture",
+        "solid": "SOLID Principles",
+        "repository": "Repository Pattern",
+        "dependencyInjection": "Dependency Injection"
+      },
+      "tryDemo": "Try Live Demo",
+      "viewSource": "View Source Code",
+      "scroll": "Scroll to explore architecture"
+    },
+    "architecture": {
+      "badge": "System Architecture",
+      "title": "Clean Architecture",
+      "description": "The backend follows Clean Architecture principles with clear separation of concerns. Dependencies point inward, keeping the core domain independent of frameworks.",
+      "layers": {
+        "frameworks": {
+          "name": "Framework & Drivers",
+          "description": "External interfaces (HTTP, Database, Logger)"
+        },
+        "adapters": {
+          "name": "Interface Adapters",
+          "description": "Convert data between layers"
+        },
+        "application": {
+          "name": "Application Layer",
+          "description": "Business logic and use cases"
+        },
+        "domain": {
+          "name": "Domain Layer",
+          "description": "Core business entities and rules"
+        }
+      },
+      "dependencyRule": "Dependencies always point inward → Domain never depends on outer layers"
+    },
+    "patterns": {
+      "badge": "Design Patterns",
+      "title": "Patterns Implemented",
+      "description": "Industry-standard design patterns ensuring maintainability, testability, and clean code.",
+      "items": {
+        "repository": {
+          "name": "Repository Pattern",
+          "description": "Abstract data access behind interfaces, enabling easy testing with mocks and database swapping."
+        },
+        "dependencyInjection": {
+          "name": "Dependency Injection",
+          "description": "Services receive dependencies via constructors, promoting loose coupling and testability."
+        },
+        "dto": {
+          "name": "DTO Pattern",
+          "description": "Separate request/response objects from domain entities to control API contracts."
+        },
+        "factory": {
+          "name": "Factory Pattern",
+          "description": "Constructor functions create domain entities with proper initialization."
+        }
+      }
+    },
+    "techStack": {
+      "badge": "Tech Stack",
+      "title": "Technologies Used",
+      "description": "A modern, production-ready stack optimized for performance, developer experience, and scalability.",
+      "frontend": "Frontend",
+      "backend": "Backend",
+      "items": {
+        "nextjs": "App Router & Server Components",
+        "react": "Concurrent Features & Hooks",
+        "typescript": "Full Type Safety",
+        "tanstackQuery": "Server State & Caching",
+        "tailwind": "Utility-First Styling",
+        "shadcn": "Radix UI Components",
+        "go": "High-Performance Backend",
+        "gin": "HTTP Web Framework",
+        "postgres": "Relational Database",
+        "jwt": "Secure Authentication",
+        "docker": "Containerization"
+      }
+    },
+    "highlights": {
+      "badge": "Technical Highlights",
+      "title": "Key Implementations",
+      "description": "Notable technical features and engineering decisions that make this project production-ready.",
+      "items": {
+        "jwt": {
+          "title": "JWT Authentication",
+          "description": "Stateless token-based auth with bcrypt password hashing and configurable expiration."
+        },
+        "migrations": {
+          "title": "Database Migrations",
+          "description": "Version-controlled migrations with golang-migrate, on PostgreSQL in production and in tests (testcontainers)."
+        },
+        "workers": {
+          "title": "Background Workers",
+          "description": "Scheduled jobs for recurring transactions with graceful shutdown handling."
+        },
+        "cache": {
+          "title": "In-Memory Cache",
+          "description": "Transaction caching layer with 5-minute TTL for improved read performance."
+        },
+        "logging": {
+          "title": "Structured Logging",
+          "description": "Zerolog for JSON-formatted logs with configurable levels and correlation IDs."
+        },
+        "i18n": {
+          "title": "Internationalization",
+          "description": "Full i18n support (ES/EN) using next-intl with type-safe translations."
+        }
+      }
+    },
+    "repository": {
+      "terminal": "terminal",
+      "title": "Open Source",
+      "description": "Explore the code, learn from the implementation, or contribute to the project.",
+      "clone": "Clone the repository",
+      "view": "View Repository"
+    },
+    "footer": {
+      "credits": "© {year} {name}. Built by {developer}."
+    }
   }
 }

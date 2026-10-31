@@ -5,6 +5,7 @@ import { useTranslations } from 'next-intl'
 import { Amount } from '@/components/shared/Amount'
 import { StatCard, type StatTone } from '@/components/shared/StatCard'
 import { StatGrid } from '@/components/shared/StatGrid'
+import { useFormatNumber } from '@/hooks/useFormatNumber'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
 
 interface InvestmentMetrics {
@@ -12,14 +13,20 @@ interface InvestmentMetrics {
 	totalCost: number
 	totalProfit: number
 	roi: number
+	/** Some DOP positions were converted to USD at the rate. */
+	convertedDop?: boolean
+	/** Some positions are not included (DOP without a rate). */
+	excluded?: boolean
 }
 
 interface InvestmentSummaryCardsProps {
 	metrics: InvestmentMetrics
 	loading?: boolean
+	/** USD->DOP rate the DOP positions were converted at. */
+	usdToDop?: number
 }
 
-// Portfolio totals are aggregated without FX conversion; positions are settled in USD by default.
+// The portfolio is reported in USD: USD positions as is, DOP positions converted at the rate.
 const PORTFOLIO_CURRENCY = 'USD'
 
 /** Sign-aware tone with a neutral zero (rounded to hundredths, like the displayed value). */
@@ -30,9 +37,15 @@ function toneFor(value: number): StatTone {
 	return 'default'
 }
 
-export function InvestmentSummaryCards({ metrics, loading = false }: InvestmentSummaryCardsProps) {
+export function InvestmentSummaryCards({ metrics, loading = false, usdToDop }: InvestmentSummaryCardsProps) {
 	const t = useTranslations('investments.summary')
 	const formatPercent = useFormatPercent()
+	const formatNumber = useFormatNumber()
+	const valueHint = metrics.excluded
+		? t('rateUnavailable')
+		: metrics.convertedDop && usdToDop
+			? t('convertedHint', { rate: formatNumber(usdToDop, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) })
+			: t('totalValueHint')
 
 	return (
 		<StatGrid columns={4}>
@@ -40,8 +53,9 @@ export function InvestmentSummaryCards({ metrics, loading = false }: InvestmentS
 				label={t('totalValue')}
 				icon={DollarSign}
 				loading={loading}
+				tone={metrics.excluded ? 'warning' : undefined}
 				value={<Amount value={metrics.totalValue} currency={PORTFOLIO_CURRENCY} />}
-				hint={t('totalValueHint')}
+				hint={valueHint}
 			/>
 			<StatCard
 				label={t('totalCost')}

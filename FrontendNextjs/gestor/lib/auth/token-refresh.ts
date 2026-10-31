@@ -33,8 +33,11 @@ export function getRefreshBufferMs(accessToken: unknown): number {
  * previous session cookie, or a Server Component render whose refreshed cookie
  * could not be persisted). Without this, those callers would replay a rotated
  * refresh token and the backend would revoke every session of the user.
+ *
+ * Kept short (same as the backend's default refresh reuse grace): the cached
+ * pair is a live token pair handed to anyone presenting the old refresh token.
  */
-const ROTATION_GRACE_MS = 2 * 60 * 1000
+export const ROTATION_GRACE_MS = 30 * 1000
 
 export const REFRESH_TOKEN_ERROR = 'RefreshTokenError' as const
 
@@ -46,15 +49,21 @@ export interface RefreshedTokens {
 
 export type RefreshResult = { ok: true; tokens: RefreshedTokens } | { ok: false }
 
+/** A rotation in flight or in its grace period, bound to the user whose session started it. */
+interface RefreshEntry {
+	userId: string
+	result: Promise<RefreshResult>
+}
+
 /**
- * Map<refreshToken, Promise<result>> shared by every caller in this process.
+ * Map<refreshToken, entry> shared by every caller in this process.
  * Stored on globalThis so the separate Next.js bundles (route handlers, RSC,
  * the auth route) share a single instance instead of one per bundle.
  */
 const STORE_KEY = Symbol.for('gestor.auth.refreshInFlight')
 
-function getRefreshStore(): Map<string, Promise<RefreshResult>> {
-	const holder = globalThis as unknown as Record<symbol, Map<string, Promise<RefreshResult>> | undefined>
+function getRefreshStore(): Map<string, RefreshEntry> {
+	const holder = globalThis as unknown as Record<symbol, Map<string, RefreshEntry> | undefined>
 	let store = holder[STORE_KEY]
 	if (!store) {
 		store = new Map()
@@ -98,31 +107,57 @@ async function callRefreshEndpoint(refreshToken: string): Promise<RefreshResult>
  * same refresh token share one backend call, and a successful result is kept
  * for a short grace period so late callers reuse it instead of replaying the
  * (already rotated) refresh token.
+ *
+ * The shared result is only handed to sessions of the same user (`userId`):
+ * a session of another user presenting that refresh token gets a failure, and
+ * the token is not replayed to the backend (that would revoke every session of
+ * the user who rotated it).
  */
-export function refreshBackendTokens(refreshToken: string): Promise<RefreshResult> {
+export function refreshBackendTokens(refreshToken: string, userId: string): Promise<RefreshResult> {
 	const store = getRefreshStore()
 	const existing = store.get(refreshToken)
-	if (existing) return existing
+	if (existing) return existing.userId === userId ? existing.result : Promise.resolve({ ok: false })
 
-	const pending = callRefreshEndpoint(refreshToken).then((result) => {
-		if (result.ok) {
-			const timer = setTimeout(() => {
-				if (store.get(refreshToken) === pending) store.delete(refreshToken)
-			}, ROTATION_GRACE_MS)
-			;(timer as { unref?: () => void }).unref?.()
-		} else {
-			store.delete(refreshToken)
-		}
-		return result
-	})
+	const entry: RefreshEntry = {
+		userId,
+		result: callRefreshEndpoint(refreshToken).then((result) => {
+			if (result.ok) {
+				const timer = setTimeout(() => {
+					if (store.get(refreshToken) === entry) store.delete(refreshToken)
+				}, ROTATION_GRACE_MS)
+				;(timer as { unref?: () => void }).unref?.()
+			} else {
+				store.delete(refreshToken)
+			}
+			return result
+		}),
+	}
 
-	store.set(refreshToken, pending)
-	return pending
+	store.set(refreshToken, entry)
+	return entry.result
+}
+
+/**
+ * The refresh token that replaced `refreshToken` in this process, while the
+ * rotation (started by `userId`'s session) is still in its grace period. Never
+ * calls the backend. Used on sign-out: a cookie that missed the rotation still
+ * carries the old token, and the one that replaced it must be revoked too.
+ */
+export async function getRotatedRefreshToken(refreshToken: string, userId: string): Promise<string | null> {
+	const entry = getRefreshStore().get(refreshToken)
+	if (!entry || entry.userId !== userId) return null
+	const result = await entry.result
+	return result.ok && result.tokens.refreshToken ? result.tokens.refreshToken : null
 }
 
 /** Test helper: forget every in-flight / cached rotation. */
 export function resetRefreshStore() {
 	getRefreshStore().clear()
+}
+
+/** The user a session belongs to, as stored in the cookie by the `jwt` callback at sign-in. */
+export function sessionUserId(token: JWT): string {
+	return typeof token.id === 'string' ? token.id : ''
 }
 
 function failedToken(token: JWT): JWT {
@@ -158,7 +193,7 @@ export async function ensureFreshToken(token: JWT): Promise<JWT> {
 		return token.accessToken && Date.now() < expiresAt ? token : failedToken(token)
 	}
 
-	const result = await refreshBackendTokens(token.refreshToken)
+	const result = await refreshBackendTokens(token.refreshToken, sessionUserId(token))
 	if (!result.ok) return failedToken(token)
 
 	return { ...token, ...result.tokens, error: undefined }

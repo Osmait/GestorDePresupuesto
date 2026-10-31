@@ -8,6 +8,7 @@ import { CreditCardFormModal } from '@/components/creditcards/CreditCardFormModa
 import { CreditCardItem } from '@/components/creditcards/CreditCardItem'
 import { CreditCardPaymentHistory } from '@/components/creditcards/CreditCardPaymentHistory'
 import { PaymentModal } from '@/components/creditcards/PaymentModal'
+import { ReconcileCardModal } from '@/components/creditcards/ReconcileCardModal'
 import { Amount } from '@/components/shared/Amount'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -31,8 +32,10 @@ import {
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatNumber } from '@/hooks/useFormatNumber'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
-import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard } from '@/types/creditcard'
+import { cardDebtTotals, usableRate } from '@/lib/valuation'
+import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard, UpdateCreditCardInput } from '@/types/creditcard'
 
 /** Header + KPI + card skeletons, shared by the feature-flag and the cards loading states. */
 function CreditCardsSkeleton() {
@@ -78,9 +81,11 @@ function CreditCardsContent() {
 	const [selectedCard, setSelectedCard] = useState<CreditCard | null>(null)
 	const [cardToDelete, setCardToDelete] = useState<CreditCard | null>(null)
 	const [cardToReset, setCardToReset] = useState<CreditCard | null>(null)
+	const [cardToReconcile, setCardToReconcile] = useState<CreditCard | null>(null)
 	const t = useTranslations('creditCards')
 	const formatCurrency = useFormatCurrency()
 	const formatPercent = useFormatPercent()
+	const formatNumber = useFormatNumber()
 
 	const { data: exchangeRateData } = useExchangeRateQuery()
 	const { data: cards = [], isLoading, isError, refetch } = useGetCreditCards()
@@ -98,7 +103,7 @@ function CreditCardsContent() {
 		toast.success(t('toasts.created'))
 	}
 
-	const handleUpdateCard = async (data: CreateCreditCardDTO) => {
+	const handleUpdateCard = async (data: UpdateCreditCardInput) => {
 		if (!selectedCard) return
 		await updateMutation.mutateAsync({ id: selectedCard.id, data })
 		toast.success(t('toasts.updated'))
@@ -180,7 +185,8 @@ function CreditCardsContent() {
 	}
 
 	const cardsList = cards || []
-	const usdToDopRate = exchangeRateData?.usd_to_dop || 0
+	// null when the rate is missing: USD amounts are then shown apart, never as 0.
+	const usdToDopRate = usableRate(exchangeRateData?.usd_to_dop)
 	const summaryDebtDOP = summary?.total_debt?.DOP || 0
 	const summaryDebtUSD = summary?.total_debt?.USD || 0
 	const summaryLimitDOP = summary?.total_credit_limit?.DOP || 0
@@ -204,8 +210,6 @@ function CreditCardsContent() {
 	)
 	const totalDebtDOP = summary ? summaryDebtDOP : localTotalDebtDOP
 	const totalDebtUSD = summary ? summaryDebtUSD : localTotalDebtUSD
-	const totalDebtUSDInDOP = totalDebtUSD * usdToDopRate
-	const totalDebt = totalDebtDOP + totalDebtUSDInDOP
 
 	const localTotalLimitDOP = cardsList.reduce(
 		(sum, card) =>
@@ -219,8 +223,14 @@ function CreditCardsContent() {
 	)
 	const totalLimitDOP = summary ? summaryLimitDOP : localTotalLimitDOP
 	const totalLimitUSD = summary ? summaryLimitUSD : localTotalLimitUSD
-	const totalLimit = totalLimitDOP + totalLimitUSD * usdToDopRate
-	const avgUtilization = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0
+	const { totalDebt, usdIncluded, utilization } = cardDebtTotals({
+		debtDop: totalDebtDOP,
+		debtUsd: totalDebtUSD,
+		limitDop: totalLimitDOP,
+		limitUsd: totalLimitUSD,
+		rate: usdToDopRate,
+	})
+	const avgUtilization = utilization ?? 0
 	const utilizationStatus =
 		avgUtilization > 60
 			? t('utilizationStatus.highRisk')
@@ -263,8 +273,9 @@ function CreditCardsContent() {
 				<StatCard
 					label={t('kpis.totalDebt')}
 					icon={Wallet}
+					tone={usdIncluded ? undefined : 'warning'}
 					value={<Amount value={totalDebt} currency='DOP' />}
-					hint={t('activeCards', { count: cardsList.length })}
+					hint={usdIncluded ? t('activeCards', { count: cardsList.length }) : t('kpis.rateUnavailable')}
 				/>
 				<StatCard label={t('kpis.debtDop')} icon={Banknote} value={<Amount value={totalDebtDOP} currency='DOP' />} />
 				<StatCard
@@ -272,20 +283,26 @@ function CreditCardsContent() {
 					icon={DollarSign}
 					value={<Amount value={totalDebtUSD} currency='USD' />}
 					hint={
-						usdToDopRate > 0
+						usdToDopRate !== null
 							? t('kpis.usdInDop', {
-									amount: formatCurrency(totalDebtUSDInDOP, 'DOP'),
-									rate: usdToDopRate.toFixed(2),
+									amount: formatCurrency(totalDebtUSD * usdToDopRate, 'DOP'),
+									rate: formatNumber(usdToDopRate, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
 								})
-							: undefined
+							: totalDebtUSD > 0
+								? t('kpis.rateUnavailable')
+								: undefined
 					}
 				/>
 				<StatCard
 					label={t('creditHealth')}
 					icon={Gauge}
-					tone={utilizationTone}
-					value={formatPercent(avgUtilization)}
-					hint={t('kpis.utilizationHint', { status: utilizationStatus })}
+					tone={utilization === null ? undefined : utilizationTone}
+					value={utilization === null ? '—' : formatPercent(avgUtilization)}
+					hint={
+						utilization === null && !usdIncluded
+							? t('kpis.rateUnavailable')
+							: t('kpis.utilizationHint', { status: utilizationStatus })
+					}
 				/>
 			</StatGrid>
 
@@ -312,6 +329,7 @@ function CreditCardsContent() {
 							onPay={handlePay}
 							onViewPayments={handleViewPayments}
 							onReset={setCardToReset}
+							onReconcile={setCardToReconcile}
 						/>
 					))}
 				</div>
@@ -320,11 +338,18 @@ function CreditCardsContent() {
 			<CreditCardFormModal
 				open={formOpen}
 				onClose={handleFormClose}
-				onSubmit={selectedCard ? handleUpdateCard : handleCreateCard}
+				onSubmit={handleCreateCard}
+				onUpdate={handleUpdateCard}
 				card={selectedCard}
 			/>
 
 			<PaymentModal open={paymentOpen} onClose={handlePaymentClose} onSubmit={handlePayment} card={selectedCard} />
+
+			<ReconcileCardModal
+				open={Boolean(cardToReconcile)}
+				setOpen={(open) => !open && setCardToReconcile(null)}
+				card={cardToReconcile}
+			/>
 
 			<CreditCardPaymentHistory open={historyOpen} onClose={handleHistoryClose} card={selectedCard} />
 

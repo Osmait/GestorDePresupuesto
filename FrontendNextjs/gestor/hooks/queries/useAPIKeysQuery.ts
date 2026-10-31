@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAPIKeyRepository } from '@/lib/repositoryConfig'
+import { nonFinancialMutation } from './invalidateFinancialData'
 
 export const API_KEY_KEYS = {
 	all: ['apikeys'] as const,
@@ -22,6 +23,7 @@ export function useCreateAPIKeyMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
+		...nonFinancialMutation,
 		mutationFn: async (name: string) => {
 			const repo = await getAPIKeyRepository()
 			return repo.create(name)
@@ -37,6 +39,7 @@ export function useRevokeAPIKeyMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
+		...nonFinancialMutation,
 		mutationFn: async (id: string) => {
 			const repo = await getAPIKeyRepository()
 			return repo.revoke(id)

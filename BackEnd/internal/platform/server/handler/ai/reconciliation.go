@@ -12,35 +12,78 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
+	"github.com/osmait/gestorDePresupuesto/internal/services/ai/tasks"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 )
 
+// ReconciliationPreview extracts the statement with the AI provider and
+// matches it against the account. It runs outside the request transaction
+// (see routes.AIProviderRoutes): ownership and categories are read in one
+// short transaction, the provider is called with no connection held, and the
+// matching plus the session insert run in a second transaction.
 func (h *Handler) ReconciliationPreview(c *gin.Context) {
 	userID := c.GetString("X-User-Id")
 
 	var req dto.ReconciliationPreviewRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body"))
 		return
 	}
 
-	if err := h.verifyAccountOwnership(c.Request.Context(), userID, req.AccountID); err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	transactions, err := h.extractTransactionsFromDocuments(c.Request.Context(), userID, req.AccountID, req.AccountCurrency, req.DocumentType, req.Language, req.Files)
+	files, err := decodeDocumentFiles(req.Files)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	duplicates := h.detectPotentialDuplicates(c.Request.Context(), userID, transactions)
+	var categoryData []tasks.CategoryData
+	if err := h.inTx(c, func(ctx context.Context) error {
+		if err := h.verifyAccountOwnership(ctx, userID, req.AccountID); err != nil {
+			return err
+		}
+		var loadErr error
+		categoryData, loadErr = h.loadCategoryData(ctx, userID)
+		return loadErr
+	}); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	transactions, err := h.extractTransactionsFromDocuments(c.Request.Context(), userID, req.AccountID, req.AccountCurrency, req.DocumentType, req.Language, categoryData, files)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	var preview dto.ReconciliationPreviewData
+	if err := h.inTx(c, func(ctx context.Context) error {
+		var buildErr error
+		preview, buildErr = h.buildReconciliationPreview(ctx, userID, req.AccountID, req.DocumentType, transactions)
+		return buildErr
+	}); err != nil {
+		_ = c.Error(apperrors.NewInternalError("Failed to persist reconciliation session", err))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ReconciliationPreviewResponse{Success: true, Data: preview})
+}
+
+// buildReconciliationPreview classifies the extracted transactions against
+// the existing ones and stores the session.
+func (h *Handler) buildReconciliationPreview(
+	ctx context.Context,
+	userID string,
+	accountID string,
+	documentType string,
+	transactions []*transaction.Transaction,
+) (dto.ReconciliationPreviewData, error) {
+	duplicates := h.detectPotentialDuplicates(ctx, userID, transactions)
 	duplicateByID := make(map[string]dto.PotentialDuplicate, len(duplicates))
 	for _, item := range duplicates {
 		duplicateByID[item.ExtractedTransactionID] = item
@@ -85,29 +128,25 @@ func (h *Handler) ReconciliationPreview(c *gin.Context) {
 	}
 
 	sessionID, err := h.saveReconciliationSession(
-		c.Request.Context(),
+		ctx,
 		userID,
-		req.AccountID,
-		req.DocumentType,
+		accountID,
+		documentType,
 		exactMatches,
 		similarMatches,
 		unmatched,
 	)
 	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("Failed to persist reconciliation session", err))
-		return
+		return dto.ReconciliationPreviewData{}, err
 	}
 
-	c.JSON(http.StatusOK, dto.ReconciliationPreviewResponse{
-		Success: true,
-		Data: dto.ReconciliationPreviewData{
-			SessionID:      sessionID,
-			ExtractedCount: len(transactions),
-			ExactMatches:   exactMatches,
-			SimilarMatches: similarMatches,
-			Unmatched:      unmatched,
-		},
-	})
+	return dto.ReconciliationPreviewData{
+		SessionID:      sessionID,
+		ExtractedCount: len(transactions),
+		ExactMatches:   exactMatches,
+		SimilarMatches: similarMatches,
+		Unmatched:      unmatched,
+	}, nil
 }
 
 func (h *Handler) GetReconciliationSession(c *gin.Context) {
@@ -133,7 +172,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 
 	var req dto.ReconciliationApplyRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body: "+err.Error()))
+		_ = c.Error(apperrors.NewValidationError("INVALID_REQUEST", "Invalid request body"))
 		return
 	}
 
@@ -147,7 +186,9 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 		return
 	}
 
-	sessionAccountID, err := h.getReconciliationSessionAccountID(c.Request.Context(), userID, sessionID)
+	// Locked until the request transaction ends: a concurrent apply of the
+	// same session waits and then sees the actions this one stored.
+	sessionAccountID, err := h.lockReconciliationSession(c.Request.Context(), userID, sessionID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			_ = c.Error(apperrors.NewNotFoundError("RECONCILIATION_NOT_FOUND", "Reconciliation session not found"))
@@ -162,6 +203,12 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 		if item.Extracted != nil {
 			itemsByExtractedID[item.Extracted.Id] = item
 		}
+	}
+
+	applied, err := h.appliedReconciliationItems(c.Request.Context(), userID, sessionID)
+	if err != nil {
+		_ = c.Error(apperrors.NewInternalError("Failed to load reconciliation items", err))
+		return
 	}
 
 	summary := dto.ReconciliationSummary{SessionID: sessionID, Linked: len(data.ExactMatches)}
@@ -186,7 +233,16 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 		logger.Msg("reconciliation action failed")
 	}
 
+	seen := make(map[string]bool, len(req.Actions))
 	for _, action := range req.Actions {
+		// Each extracted transaction is acted on once: a replayed request, a
+		// double click or a repeated id must not create it twice.
+		if seen[action.ExtractedTransactionID] || applied[action.ExtractedTransactionID] {
+			summary.Skipped++
+			continue
+		}
+		seen[action.ExtractedTransactionID] = true
+
 		item, ok := itemsByExtractedID[action.ExtractedTransactionID]
 		if !ok || item.Extracted == nil {
 			addFailure(action.ExtractedTransactionID, action.Action, "ITEM_NOT_FOUND", "Extracted transaction was not found in session", nil)
@@ -222,7 +278,9 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 			summary.Linked++
 		case "create":
 			tx := item.Extracted
-			createdAt := tx.CreatedAt
+			// a date-only statement line (midnight UTC, also in sessions
+			// saved before extraction normalized it) keeps its calendar day
+			createdAt := apptime.NormalizeMidnightUTC(tx.CreatedAt)
 			if createdAt.IsZero() {
 				createdAt = time.Now()
 			}
@@ -251,7 +309,7 @@ func (h *Handler) ApplyReconciliationSession(c *gin.Context) {
 			}
 
 			amount := tx.Amount
-			createdID, createErr := h.transactionService.CreateTransactionWithID(
+			createdID, createErr := h.transactionService.CreateUserTransaction(
 				c.Request.Context(),
 				tx.Name,
 				tx.Description,
@@ -456,7 +514,9 @@ func (h *Handler) loadReconciliationSession(ctx context.Context, userID string, 
 	return data, rows.Err()
 }
 
-func (h *Handler) getReconciliationSessionAccountID(ctx context.Context, userID string, sessionID string) (string, error) {
+// lockReconciliationSession returns the session's account and locks the
+// session row until the request transaction ends.
+func (h *Handler) lockReconciliationSession(ctx context.Context, userID string, sessionID string) (string, error) {
 	if h.db == nil {
 		return "", fmt.Errorf("database connection not available")
 	}
@@ -464,7 +524,7 @@ func (h *Handler) getReconciliationSessionAccountID(ctx context.Context, userID 
 	var accountID string
 	err := h.q(ctx).QueryRowContext(
 		ctx,
-		`SELECT account_id FROM reconciliation_sessions WHERE id = $1 AND user_id = $2`,
+		`SELECT account_id FROM reconciliation_sessions WHERE id = $1 AND user_id = $2 FOR UPDATE`,
 		sessionID,
 		userID,
 	).Scan(&accountID)
@@ -516,6 +576,31 @@ func classifyReconciliationCreateError(err error) (string, string) {
 
 // updateReconciliationItemAction records the action taken on an item of a
 // session owned by userID; items of other users' sessions are never touched.
+// appliedReconciliationItems returns the extracted transaction ids of the
+// session that already have an action (created, linked or ignored).
+func (h *Handler) appliedReconciliationItems(ctx context.Context, userID string, sessionID string) (map[string]bool, error) {
+	if h.db == nil {
+		return nil, fmt.Errorf("database connection not available")
+	}
+	rows, err := h.q(ctx).QueryContext(ctx,
+		`SELECT i.extracted_transaction_id FROM reconciliation_items i
+		 JOIN reconciliation_sessions s ON s.id = i.session_id AND s.user_id = $2
+		 WHERE i.session_id = $1 AND i.action <> 'pending'`, sessionID, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+	applied := make(map[string]bool)
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		applied[id] = true
+	}
+	return applied, rows.Err()
+}
+
 func (h *Handler) updateReconciliationItemAction(ctx context.Context, userID string, sessionID string, extractedTransactionID string, action string, linkedID string, createdID string) error {
 	if h.db == nil {
 		return fmt.Errorf("database connection not available")

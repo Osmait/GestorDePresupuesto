@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 )
 
 // ValidationMiddleware provides comprehensive input validation for all API endpoints.
@@ -214,7 +215,7 @@ func validatePasswordStrength(fl validator.FieldLevel) bool {
 // Custom validator: transaction_type - validates transaction types
 func validateTransactionType(fl validator.FieldLevel) bool {
 	txType := fl.Field().String()
-	return txType == "income" || txType == "bill" || txType == "card_payment" || txType == "loan_disbursement" || txType == "loan_collection" || txType == "investment_purchase" || txType == "investment_funding"
+	return transaction.IsUserType(txType)
 }
 
 // Custom validator: positive_amount - ensures positive financial amounts

@@ -50,7 +50,7 @@ func TestRLSMiddleware_AcquireTimeoutDoesNotBoundTheTransaction(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config`).WithArgs("u1", "false").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`SELECT set_config`).WithArgs("u1", "false", "15000", "30000").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 
 	gin.SetMode(gin.TestMode)
@@ -77,7 +77,7 @@ func TestRLSMiddleware_RunsAfterTxHooksAfterCommit(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	mock.ExpectBegin()
-	mock.ExpectExec(`SELECT set_config`).WithArgs("u1", "false").WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectExec(`SELECT set_config`).WithArgs("u1", "false", "15000", "30000").WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 
 	ranInHandler, ranAfter := false, false

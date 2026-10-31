@@ -74,6 +74,25 @@ describe('TransactionFormModal draft restore', () => {
 		vi.mocked(useSession).mockReset()
 	})
 
+	it('reads a decimal comma as the decimal mark ("12,5" is 12.5, not 125)', async () => {
+		window.sessionStorage.clear()
+		const user = userEvent.setup()
+		const createTransaction = vi.fn().mockResolvedValue(undefined)
+		renderWithIntl(<TransactionFormModal open setOpen={vi.fn()} createTransaction={createTransaction} />)
+
+		await user.type(screen.getByLabelText('Name'), 'Café')
+		await user.clear(screen.getByLabelText('Amount'))
+		await user.type(screen.getByLabelText('Amount'), '12,5')
+		await user.click(screen.getByRole('combobox', { name: 'Account' }))
+		await user.click(await screen.findByRole('option', { name: 'Checking' }))
+		await user.click(screen.getByRole('combobox', { name: 'Category' }))
+		await user.click(await screen.findByRole('option', { name: /Food/ }))
+		await user.click(screen.getByRole('button', { name: /Create Transaction/ }))
+
+		await waitFor(() => expect(createTransaction).toHaveBeenCalledTimes(1))
+		expect(createTransaction.mock.calls[0][2]).toBe(12.5)
+	})
+
 	it('shows an actionable inline error (not the raw API message) when saving fails', async () => {
 		window.sessionStorage.clear()
 		const user = userEvent.setup()
@@ -122,7 +141,7 @@ describe('TransactionFormModal draft restore', () => {
 
 		const nameInput = await screen.findByPlaceholderText('Ex: Electricity bill')
 		expect(nameInput).toHaveValue('')
-		expect(screen.getByRole('spinbutton')).not.toHaveValue(777.77)
+		expect(screen.getByLabelText('Amount')).not.toHaveValue('777.77')
 		expect(screen.queryByText(/We restored the draft/)).not.toBeInTheDocument()
 	})
 })

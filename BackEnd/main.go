@@ -1,7 +1,7 @@
 package main
 
 import (
-	"log"
+	"github.com/rs/zerolog/log"
 
 	"github.com/osmait/gestorDePresupuesto/cmd/api/boostrap"
 )
@@ -28,6 +28,6 @@ import (
 
 func main() {
 	if err := boostrap.Run(); err != nil {
-		log.Fatal(err)
+		log.Fatal().Err(err).Msg("application failed")
 	}
 }

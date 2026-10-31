@@ -75,7 +75,7 @@ func CreateTransaction(transactionservice *transaction.TransactionService) gin.H
 			Stringer("amount", transactionRequest.Amount).
 			Msg("Creating transaction")
 
-		err := transactionservice.CreateTransaction(
+		_, err := transactionservice.CreateUserTransaction(
 			ctx.Request.Context(),
 			transactionRequest.Name,
 			transactionRequest.Description,
@@ -143,7 +143,7 @@ func FindAllTransactionOfAllAccount(transactionService *transaction.TransactionS
 
 		// Parse filter parameters
 		filter := dto.NewTransactionFilter()
-		if err := filter.ParseFromQuery(ctx); err != nil {
+		if err := filter.ParseFromQuery(ctx, transactionService.Location()); err != nil {
 			log.Error().Err(err).Msg("failed to parse filter parameters")
 			_ = ctx.Error(apperrors.NewValidationError("INVALID_QUERY_PARAMS", "Invalid filter parameters: "+err.Error()))
 			return
@@ -231,7 +231,7 @@ func FindAllTransaction(transactionService *transaction.TransactionService) gin.
 
 		// Parse filter parameters
 		filter := dto.NewTransactionFilter()
-		if err := filter.ParseFromQuery(ctx); err != nil {
+		if err := filter.ParseFromQuery(ctx, transactionService.Location()); err != nil {
 			log.Error().Err(err).Msg("failed to parse filter parameters")
 			_ = ctx.Error(apperrors.NewValidationError("INVALID_QUERY_PARAMS", "Invalid filter parameters: "+err.Error()))
 			return

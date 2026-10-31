@@ -9,13 +9,15 @@ permissions:
   contents: write
   pull-requests: write
 
+concurrency:
+  group: ${{ github.workflow }}
+  cancel-in-progress: false
+
 jobs:
   release-please:
     runs-on: ubuntu-latest
-    env:
-      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
-      - uses: googleapis/release-please-action@v4.4.0
+      - uses: googleapis/release-please-action@v5
         id: release
         continue-on-error: true
         with:
@@ -24,11 +26,32 @@ jobs:
           manifest-file: .release-please-manifest.json
           skip-labeling: true
 
-      # Auto-merge the release PR when CI passes
+      - uses: actions/checkout@v7
+        if: steps.release.outputs.pr
+        with:
+          fetch-depth: 0
+
+      # Auto-merge the release PR when CI passes. A release PR only bumps
+      # versions and changelogs; when several PRs are merged in a row it can be
+      # generated from an older main and rewrite package.json/package-lock.json
+      # with stale content, silently reverting a dependency update (2026-10-29:
+      # @hookform/resolvers 6 -> 5 through #136). Compare it with the current
+      # main and leave it for review when it changes anything but versions.
       - name: Enable auto-merge on release PR
         if: steps.release.outputs.pr
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_PR: ${{ steps.release.outputs.pr }}
         run: |
-          PR_NUMBER=$(echo '${{ steps.release.outputs.pr }}' | jq -r '.number')
-          gh pr merge "$PR_NUMBER" --auto --squash --repo ${{ github.repository }}
+          PR_NUMBER=$(jq -r '.number' <<< "$RELEASE_PR")
+          BRANCH=$(jq -r '.headBranchName' <<< "$RELEASE_PR")
+          git fetch --quiet origin main "$BRANCH"
+          CHANGED=$(git diff "origin/main" "origin/$BRANCH" -- '*package.json' '*package-lock.json' \
+            | grep -E '^[-+][^-+]' | grep -vE '^[-+][[:space:]]*"version":' || true)
+          if [ -n "$CHANGED" ]; then
+            echo "::warning::Release PR #$PR_NUMBER changes dependencies; not auto-merging"
+            printf '%s\n' "$CHANGED" | head -20
+            gh pr comment "$PR_NUMBER" --repo "$GITHUB_REPOSITORY" --body "Not auto-merged: this release PR changes dependency lines in package.json/package-lock.json compared with main (probably generated from an older main). It will be regenerated on the next push to main."
+            exit 0
+          fi
+          gh pr merge "$PR_NUMBER" --auto --squash --repo "$GITHUB_REPOSITORY"

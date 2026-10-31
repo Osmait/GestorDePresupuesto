@@ -36,6 +36,7 @@ import { DashboardCharts } from '@/components/transactions/DashboardCharts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { getAppMonthRangeStrings, getAppTodayDate } from '@/lib/app-time'
 import { formatLocalDate } from '@/lib/i18n/date-locale'
 import { buildDashboardHydrationState } from '@/lib/query/dashboard-hydration'
 import {
@@ -154,13 +155,9 @@ function resolveDateRange(searchParams: { date_from?: string; date_to?: string; 
 		return { dateFrom: searchParams.date_from, dateTo: searchParams.date_to, preset: presetParam }
 	}
 
-	// Default: current month
-	const now = new Date()
-	const from = new Date(now.getFullYear(), now.getMonth(), 1)
-	const to = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-	const fmt = (d: Date) =>
-		`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
-	return { dateFrom: fmt(from), dateTo: fmt(to), preset: 'this_month' }
+	// Default: the current month in Santo Domingo (the server clock runs in UTC).
+	const { from, to } = getAppMonthRangeStrings()
+	return { dateFrom: from, dateTo: to, preset: 'this_month' }
 }
 
 // Componente principal - Server Component que carga datos directamente
@@ -227,8 +224,8 @@ export default async function DashboardPage({
 	const usdToDop = dashboardSummary?.usd_to_dop_rate ?? exchangeRate?.usd_to_dop ?? 60
 
 	const accountsTotal = dashboardSummary?.accounts_total || 0
+	// Each position is valued in its own currency by the API (DOP positions are not converted).
 	const investmentsTotalDOP = dashboardSummary?.investments_total || 0
-	const investmentsTotalUSD = usdToDop > 0 ? investmentsTotalDOP / usdToDop : 0
 	const certificatesTotal = dashboardSummary?.certificates_total || 0
 	const accountsCount = dashboardSummary?.accounts_count || 0
 	const investmentsCount = dashboardSummary?.investments_count || 0
@@ -255,7 +252,7 @@ export default async function DashboardPage({
 									<DashboardDateFilter initialFrom={dateFrom} initialTo={dateTo} initialPreset={preset} />
 									<Badge variant='outline' className='h-10 gap-1 px-3 font-normal text-muted-foreground'>
 										<Calendar className='h-3.5 w-3.5' aria-hidden='true' />
-										{formatLocalDate(new Date(), locale, {
+										{formatLocalDate(getAppTodayDate(), locale, {
 											day: 'numeric',
 											month: 'long',
 											year: 'numeric',
@@ -407,7 +404,11 @@ export default async function DashboardPage({
 								icon: <CreditCard className='h-4 w-4' />,
 								content: (
 									<DashboardAccountsTab
-										labels={{ noAccounts: tAccounts('emptyTitle'), addAccount: tAccounts('addAccount') }}
+										labels={{
+											noAccounts: tAccounts('emptyTitle'),
+											addAccount: tAccounts('addAccount'),
+											creditCards: t('creditCardsSection'),
+										}}
 									/>
 								),
 							},
@@ -446,8 +447,14 @@ export default async function DashboardPage({
 									<PatrimonyTab
 										accountsTotal={accountsTotal}
 										investmentsTotal={investmentsTotalDOP}
-										investmentsTotalUSD={investmentsTotalUSD}
 										certificatesTotal={certificatesTotal}
+										brokerCashTotal={dashboardSummary?.broker_cash_total ?? 0}
+										loansReceivableTotal={dashboardSummary?.loans_receivable_total ?? 0}
+										loansReceivableCount={dashboardSummary?.loans_receivable_count ?? 0}
+										loansDefaultedTotal={dashboardSummary?.loans_defaulted_total ?? 0}
+										netWorth={dashboardSummary?.net_worth}
+										creditCardDebt={dashboardSummary?.credit_card_debt ?? 0}
+										creditCardsCount={dashboardSummary?.credit_cards_count ?? 0}
 										accountsCount={accountsCount}
 										investmentsCount={investmentsCount}
 										certificatesCount={certificatesCount}
@@ -457,6 +464,10 @@ export default async function DashboardPage({
 											accounts: t('accountsBalance'),
 											investments: t('investmentsValue'),
 											certificates: t('certificatesValue'),
+											brokerCash: t('brokerCash'),
+											loansReceivable: t('loansReceivable'),
+											loansDefaulted: t('loansDefaulted'),
+											cardDebt: t('cardDebt'),
 											total: t('totalPatrimony'),
 											activeItems: t('activeItems'),
 											exchangeRate: t('exchangeRate'),

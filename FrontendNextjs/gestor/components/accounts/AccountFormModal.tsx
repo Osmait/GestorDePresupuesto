@@ -5,8 +5,10 @@ import { useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
+import { moneyMessages, moneySchema } from '@/lib/money-input'
 
 type AccountFormModalProps = {
 	open: boolean
@@ -35,13 +37,14 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
 					.string()
 					.trim()
 					.min(2, tAcc('minChars', { count: 2 })),
-				initial_balance: z.coerce.number().min(0, tAcc('balanceMin')),
+				initial_balance: moneySchema(moneyMessages(t)).pipe(z.number().min(0, tAcc('balanceMin'))),
 			}),
-		[tAcc],
+		[t, tAcc],
 	)
 	type AccountFormValues = z.infer<typeof accountSchema>
+	type AccountFormInput = z.input<typeof accountSchema>
 
-	const form = useForm<AccountFormValues>({
+	const form = useForm<AccountFormInput, unknown, AccountFormValues>({
 		resolver: zodResolver(accountSchema),
 		defaultValues: { name: '', bank: '', initial_balance: 0 },
 	})
@@ -106,7 +109,7 @@ export function AccountFormModal({ open, setOpen, createAccount, isLoading, erro
 							<FormItem>
 								<FormLabel>{t('initialBalance')}</FormLabel>
 								<FormControl>
-									<Input type='number' inputMode='decimal' {...field} min={0} step={0.01} />
+									<MoneyInput {...field} />
 								</FormControl>
 								<FormMessage />
 							</FormItem>

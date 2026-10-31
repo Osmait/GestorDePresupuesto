@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"context"
+	stderrors "errors"
 	"runtime/debug"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 )
 
@@ -109,7 +111,15 @@ func handleErrors(c *gin.Context, errors []*gin.Error, config ErrorHandlerConfig
 
 	// Convert to AppError if possible
 	var appErr *apperrors.AppError
-	if apperrors.IsAppError(lastError.Err) {
+	if apperrors.IsDatabaseTimeout(lastError.Err) || stderrors.Is(lastError.Err, txhelper.ErrDatabaseBusy) {
+		// statement/idle-in-transaction timeout, request deadline or an
+		// exhausted pool: transient, the client may retry.
+		c.Header("Retry-After", "1")
+		appErr = apperrors.NewAppError(apperrors.ErrorTypeUnavailable, "SERVICE_BUSY", "The service is busy, please retry").
+			WithCause(lastError.Err).
+			WithContext(ctx).
+			WithOperation(c.Request.Method + " " + c.Request.URL.Path)
+	} else if apperrors.IsAppError(lastError.Err) {
 		appErr, _ = apperrors.AsAppError(lastError.Err)
 	} else if errorhttp.IsErrNotFound(lastError.Err) {
 		appErr = apperrors.NewNotFoundError("Resource", "requested resource not found").

@@ -51,6 +51,20 @@ export interface LoanDetails {
 	payments: LoanPayment[]
 }
 
+/** Totals of the loans in one currency, in that currency. */
+export interface LoanCurrencyTotal {
+	total_principal: number
+	total_pending: number
+	total_collected: number
+	total_interest_earned: number
+	defaulted_pending: number
+}
+
+/**
+ * Loan totals in DOP (USD loans converted at usd_to_dop_rate). Pending covers
+ * active loans only; defaulted ones are in defaulted_pending, cancelled ones
+ * in neither.
+ */
 export interface LoanSummary {
 	total_principal: number
 	total_pending: number
@@ -58,6 +72,10 @@ export interface LoanSummary {
 	total_interest_earned: number
 	overdue_loans: number
 	active_loans: number
+	defaulted_pending?: number
+	defaulted_loans?: number
+	usd_to_dop_rate?: number
+	by_currency?: Record<string, LoanCurrencyTotal>
 }
 
 export interface CreateLoanDTO {

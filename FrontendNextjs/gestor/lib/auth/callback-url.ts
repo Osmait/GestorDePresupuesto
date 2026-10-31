@@ -1,12 +1,36 @@
 const DEFAULT_AFTER_LOGIN = '/app'
 
-/** Only same-origin relative paths are accepted, to avoid open redirects. */
+/** Placeholder origin used only to resolve the value; any other origin means it left the app. */
+const PARSE_BASE = 'http://localhost'
+
+/**
+ * Control characters and backslashes are rejected outright: the URL parser
+ * strips tab/newline and reads `\` as `/`, so `/\t/evil.com` or `/\\evil.com`
+ * would resolve to another host.
+ */
+// biome-ignore lint/suspicious/noControlCharactersInRegex: matching control characters is the point
+const UNSAFE_CHARS = /[\x00-\x1f\x7f\\]/
+
+/**
+ * Only same-origin relative paths are accepted, to avoid open redirects. The
+ * value is resolved with the URL parser (the same way the browser will) and
+ * the normalized path + query + hash is returned, never the raw input.
+ */
 export function getSafeCallbackUrl(value: string | null | undefined): string {
-	if (!value || !value.startsWith('/') || value.startsWith('//') || value.startsWith('/\\')) {
+	if (!value?.startsWith('/') || UNSAFE_CHARS.test(value)) return DEFAULT_AFTER_LOGIN
+
+	let url: URL
+	try {
+		url = new URL(value, PARSE_BASE)
+	} catch {
 		return DEFAULT_AFTER_LOGIN
 	}
-	if (value.startsWith('/login') || value.startsWith('/register')) return DEFAULT_AFTER_LOGIN
-	return value
+	if (url.origin !== PARSE_BASE) return DEFAULT_AFTER_LOGIN
+
+	// Dot segments can collapse into a protocol-relative path (`/.//evil.com` -> `//evil.com`).
+	if (url.pathname.startsWith('//')) return DEFAULT_AFTER_LOGIN
+	if (url.pathname.startsWith('/login') || url.pathname.startsWith('/register')) return DEFAULT_AFTER_LOGIN
+	return `${url.pathname}${url.search}${url.hash}`
 }
 
 const AUTH_PAGES = ['/login', '/register']

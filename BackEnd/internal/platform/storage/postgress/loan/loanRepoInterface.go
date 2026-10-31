@@ -15,6 +15,9 @@ type LoanRepositoryInterface interface {
 	FindById(ctx context.Context, id string, userId string) (*loan.Loan, error)
 	FindByIdForUpdate(ctx context.Context, id string, userId string) (*loan.Loan, error)
 	FindInstallmentsByLoan(ctx context.Context, loanId string, userId string) ([]*loan.Installment, error)
+	// FindInstallmentsByLoans is FindInstallmentsByLoan for several loans in
+	// one query, keyed by loan id (loans without installments are absent).
+	FindInstallmentsByLoans(ctx context.Context, loanIds []string, userId string) (map[string][]*loan.Installment, error)
 	FindPaymentsByLoan(ctx context.Context, loanId string, userId string) ([]*loan.Payment, error)
 	SavePayment(ctx context.Context, payment *loan.Payment, userId string) error
 	UpdateLoanTotals(ctx context.Context, entity *loan.Loan) error

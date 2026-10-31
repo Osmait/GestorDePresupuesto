@@ -85,6 +85,34 @@ func TestCreateUser(t *testing.T) {
 	mockRepo.AssertExpectations(t)
 }
 
+// The public registration ignores a requested role: anyone could otherwise
+// sign up as ADMIN.
+func TestCreateUser_IgnoresRequestedRole(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	user1 := utils.GetNewRandomUser()
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
+	userRequest.Role = "ADMIN"
+
+	mockRepo.On("FindUserByEmail", context.Background(), userRequest.Email).Return(nil, errorhttp.ErrNotFound)
+	mockRepo.On("Save", context.Background(), mock.MatchedBy(func(u *user.User) bool {
+		return u.Role == "USER" && u.Email == userRequest.Email
+	})).Return(nil)
+
+	err := NewUserService(mockRepo).CreateUser(context.Background(), userRequest)
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+}
+
+func TestCreateUserWithRole_RejectsUnknownRole(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	user1 := utils.GetNewRandomUser()
+	userRequest := dto.NewUserRequest(user1.Name, user1.LastName, user1.Password, user1.Email)
+
+	err := NewUserService(mockRepo).CreateUserWithRole(context.Background(), userRequest, "ROOT")
+	assert.Error(t, err)
+	mockRepo.AssertNotCalled(t, "Save", mock.Anything, mock.Anything)
+}
+
 func TestCreateUserWithRole(t *testing.T) {
 	mockRepo := &MockUserRepostory{}
 	user1 := utils.GetNewRandomUser()
@@ -99,7 +127,7 @@ func TestCreateUserWithRole(t *testing.T) {
 	})).Return(nil)
 
 	userServie := NewUserService(mockRepo)
-	err := userServie.CreateUser(context.Background(), userRequest)
+	err := userServie.CreateUserWithRole(context.Background(), userRequest, userRequest.Role)
 	assert.NoError(t, err)
 	mockRepo.AssertExpectations(t)
 }

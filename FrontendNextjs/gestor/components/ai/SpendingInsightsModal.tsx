@@ -14,6 +14,7 @@ import { StatCard } from '@/components/shared/StatCard'
 import { Progress } from '@/components/ui/progress'
 import { useAnalyzeSpendingMutation } from '@/hooks/queries/useAIQuery'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { getAppTodayDate } from '@/lib/app-time'
 import { cn } from '@/lib/utils'
 import { CategoryBreakdown, Pattern, Recommendation, SpendingAnalysisResponse, SpendingInsights } from '@/types/ai'
 
@@ -29,7 +30,8 @@ export function SpendingInsightsModal({ open, onOpenChange }: SpendingInsightsMo
 	const t = useTranslations('ai.insights')
 	const tCommon = useTranslations('ai.common')
 	const [dateRange, setDateRange] = useState<DateRange | undefined>(() => {
-		const to = new Date()
+		// Today in the app's time zone, as a local calendar date for the picker.
+		const to = getAppTodayDate()
 		const from = subMonths(to, 3)
 		return { from, to }
 	})

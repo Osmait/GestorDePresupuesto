@@ -213,6 +213,64 @@ func (r *InvestmentRepository) AddFunding(ctx context.Context, movement *investm
 	})
 }
 
+// AdjustFundingForInvestment moves delta between userId's wallet in currency
+// and investment investmentID: a positive delta is debited from the wallet
+// (an atomic conditional decrement, so it fails with ErrInsufficientFunding
+// instead of going negative), a negative one is credited back. The movement
+// is recorded as an "adjustment" referencing the investment. A zero delta is
+// a no-op.
+func (r *InvestmentRepository) AdjustFundingForInvestment(ctx context.Context, userId, investmentID, currency string, delta money.Amount, description string) error {
+	if delta.IsZero() {
+		return nil
+	}
+	resolvedCurrency := strings.ToUpper(strings.TrimSpace(currency))
+	if resolvedCurrency == "" {
+		return errors.New("currency is required")
+	}
+
+	return txhelper.InTx(ctx, r.db, func(tx txhelper.Querier) error {
+		now := time.Now()
+		if delta.IsPositive() {
+			var remaining money.Amount
+			err := tx.QueryRowContext(ctx,
+				`UPDATE investment_funding_balances
+				 SET available_amount = available_amount - $1, updated_at = $2
+				 WHERE user_id = $3 AND currency = $4 AND available_amount >= $1
+				 RETURNING available_amount`,
+				delta, now, userId, resolvedCurrency,
+			).Scan(&remaining)
+			if err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return ErrInsufficientFunding
+				}
+				return fmt.Errorf("error updating funding balance: %w", err)
+			}
+		} else {
+			if _, err := tx.ExecContext(ctx,
+				`INSERT INTO investment_funding_balances (user_id, currency, available_amount, updated_at)
+				 VALUES ($1, $2, $3, $4)
+				 ON CONFLICT (user_id, currency)
+				 DO UPDATE SET
+				   available_amount = investment_funding_balances.available_amount + EXCLUDED.available_amount,
+				   updated_at = EXCLUDED.updated_at`,
+				userId, resolvedCurrency, delta.Neg(), now,
+			); err != nil {
+				return fmt.Errorf("error updating funding balance: %w", err)
+			}
+		}
+
+		movementID := fmt.Sprintf("%s-adjustment-%d", investmentID, now.UnixNano())
+		if _, err := tx.ExecContext(ctx,
+			`INSERT INTO investment_funding_movements (id, user_id, currency, amount, movement_type, description, reference_type, reference_id, created_at)
+			 VALUES ($1,$2,$3,$4,'adjustment',$5,'investment',$6,$7)`,
+			movementID, userId, resolvedCurrency, delta.Neg(), description, investmentID, now,
+		); err != nil {
+			return fmt.Errorf("error saving adjustment movement: %w", err)
+		}
+		return nil
+	})
+}
+
 func (r *InvestmentRepository) ConsumeFundingForInvestment(ctx context.Context, inv *investment.Investment, currency string, requiredAmount money.Amount) error {
 	if inv == nil {
 		return errors.New("investment is required")

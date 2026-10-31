@@ -10,6 +10,7 @@ import {
 	type ProxyCredentials,
 	proxyStreamToBackend,
 	proxyToBackend,
+	rejectCrossOriginWrite,
 } from '@/lib/server/backend-proxy'
 
 export const dynamic = 'force-dynamic'
@@ -59,6 +60,10 @@ const refreshPathHandler = auth(async (req, ctx) => {
  * go through `auth()`, which refreshes (deduped) and persists the new cookie.
  */
 async function handler(req: NextRequest, ctx: RouteContext): Promise<Response> {
+	// Before the session is read: a cross-site write must not even trigger a refresh.
+	const crossOrigin = rejectCrossOriginWrite(req)
+	if (crossOrigin) return crossOrigin
+
 	const { path = [] } = await ctx.params
 	// Long-lived streams (SSE) bypass auth(): a Set-Cookie on a streaming
 	// response can reach the browser minutes later and overwrite a newer,

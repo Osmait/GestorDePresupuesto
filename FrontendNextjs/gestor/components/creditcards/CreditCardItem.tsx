@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowLeftRight, DollarSign, MoreHorizontal, Pencil, RotateCcw, Trash2 } from 'lucide-react'
+import { ArrowLeftRight, DollarSign, MoreHorizontal, Pencil, RotateCcw, Scale, Trash2 } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useEffect, useRef, useState } from 'react'
 import { CreditCardAtroposVisual } from '@/components/creditcards/CreditCardAtroposVisual'
@@ -37,9 +37,19 @@ interface CreditCardItemProps {
 	onPay: (card: CreditCard) => void
 	onViewPayments: (card: CreditCard) => void
 	onReset: (card: CreditCard) => void
+	/** Reconcile the debt with the bank statement. */
+	onReconcile?: (card: CreditCard) => void
 }
 
-export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments, onReset }: CreditCardItemProps) {
+export function CreditCardItem({
+	card,
+	onEdit,
+	onDelete,
+	onPay,
+	onViewPayments,
+	onReset,
+	onReconcile,
+}: CreditCardItemProps) {
 	const t = useTranslations('creditCards.item')
 	const tCommon = useTranslations('common')
 	const [isFlipped, setIsFlipped] = useState(false)
@@ -138,6 +148,12 @@ export function CreditCardItem({ card, onEdit, onDelete, onPay, onViewPayments, 
 												<Pencil className='mr-2 h-4 w-4' aria-hidden='true' />
 												{t('edit')}
 											</DropdownMenuItem>
+											{onReconcile ? (
+												<DropdownMenuItem onSelect={() => onReconcile(card)}>
+													<Scale className='mr-2 h-4 w-4' aria-hidden='true' />
+													{t('reconcile')}
+												</DropdownMenuItem>
+											) : null}
 											<DropdownMenuItem onSelect={() => onReset(card)}>
 												<RotateCcw className='mr-2 h-4 w-4' aria-hidden='true' />
 												{t('resetBalance')}

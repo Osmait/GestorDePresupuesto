@@ -87,14 +87,19 @@ func (m *MockTransaction) BalanceByAccountAndCurrency(ctx context.Context, accou
 	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudget(ctx context.Context, budgetId string, userId string, usdToDop money.Amount) (money.Amount, error) {
-	args := m.Called(ctx, budgetId, userId, usdToDop)
+func (m *MockTransaction) FindCurrentCategorySpent(ctx context.Context, categoryId string, userId string, usdToDop money.Amount) (money.Amount, error) {
+	args := m.Called(ctx, categoryId, userId, usdToDop)
 	return args.Get(0).(money.Amount), args.Error(1)
 }
 
-func (m *MockTransaction) FindCurrentBudgets(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
+func (m *MockTransaction) FindCurrentSpentByCategory(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
 	args := m.Called(ctx, userId, usdToDop)
 	return args.Get(0).(map[string]money.Amount), args.Error(1)
+}
+
+// TypeOf reports every transaction as a plain expense (editable and deletable).
+func (m *MockTransaction) TypeOf(context.Context, string, string) (string, error) {
+	return "bill", nil
 }
 
 func (m *MockTransaction) Delete(ctx context.Context, id string, userId string) error {
@@ -147,7 +152,7 @@ func TestGetAllBudgets(t *testing.T) {
 	budgetsMap := map[string]money.Amount{"123": money.FromInt(1000)}
 
 	mockRepoBudget.On("FindAll", mock.Anything).Return(listBudget, nil)
-	mockRepoTransaction.On("FindCurrentBudgets", mock.Anything, mock.Anything, mock.Anything).Return(budgetsMap, nil)
+	mockRepoTransaction.On("FindCurrentSpentByCategory", mock.Anything, mock.Anything, mock.Anything).Return(budgetsMap, nil)
 	ctx := context.Background()
 	_, err := budgetService.FindAll(ctx, "123")
 	assert.NoError(t, err)

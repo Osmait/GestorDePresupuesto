@@ -1,3 +1,6 @@
+# Paste the access token from POST /auth/login here; never commit a real one.
+@token = <access-token>
+
 POST https://gestor-api.onrender.com/user
 content-type: application/json
 
@@ -10,4 +13,4 @@ content-type: application/json
 
 GET http://localhost:8080/profile
 content-type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjJab29YUTZpVlpnb1g3cE05SE9oMExZY2g1SiIsImV4cCI6MTcwNTQzMTk2Mn0.FQwynZSIGh-g0mGiRFh5cs2jAQEPAgv3FNBaIiVP51Q
+Authorization: Bearer {{token}}

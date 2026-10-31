@@ -2,7 +2,8 @@
 
 import { usePathname, useSearchParams } from 'next/navigation'
 import { useCallback, useMemo } from 'react'
-import { type AnalysisPeriod, parsePeriodParam, serializePeriod, startOfDay } from '@/lib/analysisReport'
+import { type AnalysisPeriod, parsePeriodParam, serializePeriod } from '@/lib/analysisReport'
+import { getAppTodayDate } from '@/lib/app-time'
 
 export interface AnalysisUrlState {
 	/** Local midnight of today: the report never looks past it. */
@@ -23,7 +24,8 @@ export function useAnalysisUrlState(): AnalysisUrlState {
 	const searchParams = useSearchParams()
 	const pathname = usePathname()
 	// Recomputed per render on purpose: cheap, and a tab left open past midnight moves on.
-	const today = startOfDay(new Date())
+	// Today in the app's time zone (Santo Domingo), as a local calendar date.
+	const today = getAppTodayDate()
 	const todayKey = today.getTime()
 	const periodParam = searchParams.get('period')
 	const period = useMemo(() => parsePeriodParam(periodParam, new Date(todayKey)), [periodParam, todayKey])

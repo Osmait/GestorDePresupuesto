@@ -110,17 +110,31 @@ func seedCard(t *testing.T, db *sql.DB, initialDebt money.Amount) cardFixture {
 	cards := creditcardRepo.NewCreditCardRepository(db)
 	require.NoError(t, cards.SaveCard(ctx, creditcard.NewCreditCard(cardAccount.Id, "Bank", "4242", 10, 20)))
 	balance := creditcard.NewCardBalance(newID(), cardAccount.Id, "DOP", money.FromInt(50_000))
-	balance.CurrentBalance = initialDebt.Neg()
 	require.NoError(t, cards.SaveBalance(ctx, balance))
+	// The card's debt is the ledger of its account (migration 000060).
+	if initialDebt.IsPositive() {
+		debt := transaction.NewTransaction(newID(), "Ajuste de saldo", "Deuda inicial", account.AdjustmentOut, cardAccount.Id, cat.Id, initialDebt)
+		debt.UserId = user.Id
+		debt.Currency = "DOP"
+		debt.CreatedAt = time.Now()
+		require.NoError(t, transactionRepo.NewTransactionRepository(db).Save(ctx, debt))
+	}
 
 	return cardFixture{userID: user.Id, accountID: bank.Id, categoryID: cat.Id, cardID: cardAccount.Id, balanceID: balance.Id}
 }
 
+// cardDebtBalance is the card's DOP balance (negative: debt).
+func cardDebtBalance(t *testing.T, db *sql.DB, fx cardFixture) money.Amount {
+	t.Helper()
+	balance, err := accountRepo.NewAccountRepository(db).BalanceByCurrency(context.Background(), fx.cardID, fx.userID, "DOP")
+	require.NoError(t, err)
+	return balance
+}
+
 // TestCreditCardPayment_ConcurrentPaymentsAreNotLost fires many payments at
-// the same card balance at once, each in its own request transaction. With the
-// old read-modify-write (read balance, add in Go, write it back) concurrent
-// requests overwrote each other; the atomic `current_balance + $1` update must
-// apply every single one.
+// the same card at once, each in its own request transaction. Every payment
+// writes its card_payment_received transaction on the card account, so every
+// single one must lower the debt.
 func TestCreditCardPayment_ConcurrentPaymentsAreNotLost(t *testing.T) {
 	db := SetUpTest()
 	fx := seedCard(t, db, money.FromInt(1000))
@@ -158,10 +172,8 @@ func TestCreditCardPayment_ConcurrentPaymentsAreNotLost(t *testing.T) {
 		require.NoError(t, err)
 	}
 
-	balance, err := cards.FindBalanceById(context.Background(), fx.balanceID, fx.userID)
-	require.NoError(t, err)
 	// -1000 + 25 * 12.34 = -691.50, exactly.
-	moneytest.Equal(t, "-691.50", balance.CurrentBalance)
+	moneytest.Equal(t, "-691.50", cardDebtBalance(t, db, fx))
 
 	payments, err := cards.FindPaymentsByCard(context.Background(), fx.cardID, fx.userID)
 	require.NoError(t, err)
@@ -191,9 +203,7 @@ func TestCreditCardPayment_FailureRollsBackEverything(t *testing.T) {
 	})
 	require.Error(t, err)
 
-	balance, err := cards.FindBalanceById(context.Background(), fx.balanceID, fx.userID)
-	require.NoError(t, err)
-	moneytest.Equal(t, -500, balance.CurrentBalance)
+	moneytest.Equal(t, -500, cardDebtBalance(t, db, fx))
 
 	payments, err := cards.FindPaymentsByCard(context.Background(), fx.cardID, fx.userID)
 	require.NoError(t, err)
@@ -207,16 +217,20 @@ func TestCreditCardResetBalance_DoesNotLosePaymentsCommittedConcurrently(t *test
 	db := SetUpTest()
 	fx := seedCard(t, db, money.FromInt(1000))
 	cards := creditcardRepo.NewCreditCardRepository(db)
+	ledger := &ledgerTransactionService{repo: transactionRepo.NewTransactionRepository(db), categoryID: fx.categoryID}
+	service := creditcardService.NewCreditCardService(cards, accountRepo.NewAccountRepository(db), ledger)
 
 	const workers = 10
 	var wg sync.WaitGroup
-	var previous money.Amount
+	var reset *creditcardDto.BalanceResetResponse
 	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 			assert.NoError(t, inRequestTx(context.Background(), db, func(ctx context.Context) error {
-				_, err := cards.AdjustBalance(ctx, fx.balanceID, fx.userID, money.FromInt(10))
+				_, err := service.CreatePayment(ctx, fx.cardID, fx.userID, &creditcardDto.CreatePaymentRequest{
+					FromAccountId: fx.accountID, Currency: "DOP", Amount: money.FromInt(10),
+				})
 				return err
 			}))
 		}()
@@ -226,22 +240,20 @@ func TestCreditCardResetBalance_DoesNotLosePaymentsCommittedConcurrently(t *test
 		defer wg.Done()
 		assert.NoError(t, inRequestTx(context.Background(), db, func(ctx context.Context) error {
 			var err error
-			previous, err = cards.ResetBalance(ctx, fx.balanceID, fx.userID)
+			reset, err = service.ResetCardBalance(ctx, fx.cardID, fx.userID, &creditcardDto.ResetBalanceRequest{BalanceId: fx.balanceID})
 			return err
 		}))
 	}()
 	wg.Wait()
 
-	balance, err := cards.FindBalanceById(context.Background(), fx.balanceID, fx.userID)
-	require.NoError(t, err)
+	require.NotNil(t, reset)
 	// previous + current must account for the initial debt and every payment.
-	moneytest.Equal(t, -900, previous.Add(balance.CurrentBalance))
+	moneytest.Equal(t, -900, reset.PreviousBalance.Add(cardDebtBalance(t, db, fx)))
 }
 
-// TestCreditCardResetBalance_ZeroesTheRealBalance resets a card whose charges
-// are transactions on the card account. The real balance (what the API
-// reports) is the stored balance plus those transactions; the reset must zero
-// that, not just the stored part, or every past charge becomes debt again.
+// TestCreditCardResetBalance_ZeroesTheRealBalance resets a card with an
+// initial debt, charges and a payment: the reset writes one adjustment that
+// brings the balance the API reports to zero.
 func TestCreditCardResetBalance_ZeroesTheRealBalance(t *testing.T) {
 	db := SetUpTest()
 	ctx := context.Background()
@@ -266,8 +278,12 @@ func TestCreditCardResetBalance_ZeroesTheRealBalance(t *testing.T) {
 
 	// Initial debt 1000, charges 500, payments 800: the card owes 700.
 	charge(500)
-	_, err := cards.AdjustBalance(ctx, fx.balanceID, fx.userID, money.FromInt(800))
-	require.NoError(t, err)
+	require.NoError(t, inRequestTx(ctx, db, func(ctx context.Context) error {
+		_, err := service.CreatePayment(ctx, fx.cardID, fx.userID, &creditcardDto.CreatePaymentRequest{
+			FromAccountId: fx.accountID, Currency: "DOP", Amount: money.FromInt(800),
+		})
+		return err
+	}))
 	moneytest.Equal(t, -700, realBalance())
 
 	var reset *creditcardDto.BalanceResetResponse

@@ -1,18 +1,19 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { format } from 'date-fns'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { getAppTodayString } from '@/lib/app-time'
 import { getSafeErrorDetail } from '@/lib/api-error'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyMessages, moneySchema } from '@/lib/money-input'
 import type { Account } from '@/types/account'
 import type { Loan, RegisterLoanPaymentDTO } from '@/types/loan'
 
@@ -26,22 +27,23 @@ function createPaymentSchema(
 ) {
 	return z.object({
 		destination_account_id: z.string().min(1, t('errors.destinationAccountRequired')),
-		amount: z.coerce
-			.number({ invalid_type_error: t('invalidPaymentAmountDetailed') })
-			.positive(t('invalidPaymentAmountDetailed'))
-			// loan_payments.amount is DECIMAL(15,2): the API rejects sub-cent amounts.
-			.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals'))
-			.superRefine((value, ctx) => {
-				if (value > pending) {
-					ctx.addIssue({
-						code: z.ZodIssueCode.custom,
-						message: t('paymentExceedsPendingDetailed', {
-							entered: formatAmount(value),
-							pending: formatAmount(pending),
-						}),
-					})
-				}
-			}),
+		// loan_payments.amount is DECIMAL(15,2): moneySchema rejects sub-cent amounts.
+		amount: moneySchema(moneyMessages(tForms, { required: t('invalidPaymentAmountDetailed') })).pipe(
+			z
+				.number()
+				.positive(t('invalidPaymentAmountDetailed'))
+				.superRefine((value, ctx) => {
+					if (value > pending) {
+						ctx.addIssue({
+							code: 'custom',
+							message: t('paymentExceedsPendingDetailed', {
+								entered: formatAmount(value),
+								pending: formatAmount(pending),
+							}),
+						})
+					}
+				}),
+		),
 		payment_date: z.string().min(1, t('errors.paymentDateRequired')),
 		notes: z.string().optional().default(''),
 	})
@@ -49,11 +51,13 @@ function createPaymentSchema(
 
 type LoanPaymentValues = z.infer<ReturnType<typeof createPaymentSchema>>
 
-function emptyValues(destinationAccountId = ''): LoanPaymentValues {
+type LoanPaymentInput = z.input<ReturnType<typeof createPaymentSchema>>
+
+function emptyValues(destinationAccountId = ''): LoanPaymentInput {
 	return {
 		destination_account_id: destinationAccountId,
-		amount: '' as unknown as number,
-		payment_date: format(new Date(), 'yyyy-MM-dd'),
+		amount: '',
+		payment_date: getAppTodayString(),
 		notes: '',
 	}
 }
@@ -84,7 +88,7 @@ export function LoanPaymentDialog({ open, onOpenChange, loan, accounts, onSubmit
 	const [submitError, setSubmitError] = useState<string | null>(null)
 	const defaultAccountId = accounts[0]?.id ?? ''
 
-	const form = useForm<LoanPaymentValues>({
+	const form = useForm<LoanPaymentInput, unknown, LoanPaymentValues>({
 		resolver: zodResolver(schema),
 		defaultValues: emptyValues(defaultAccountId),
 	})
@@ -165,7 +169,7 @@ export function LoanPaymentDialog({ open, onOpenChange, loan, accounts, onSubmit
 								<FormItem>
 									<FormLabel>{t('amount')}</FormLabel>
 									<FormControl>
-										<Input type='number' min={0.01} step='0.01' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormDescription className='tabular-nums'>
 										{t('pendingAmountLabel', { amount: formatCurrency(pending, currency) })}

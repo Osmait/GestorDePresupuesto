@@ -10,10 +10,10 @@ import * as z from 'zod'
 import { Amount } from '@/components/shared/Amount'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
-import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -21,7 +21,7 @@ import { useGetCertificate, useUpdateCertificatePaymentMutation } from '@/hooks/
 import { useFormatPercent } from '@/hooks/useFormatPercent'
 import { getSafeErrorDetail } from '@/lib/api-error'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyMessages, moneySchema } from '@/lib/money-input'
 import { CertificatePayment } from '@/types/certificate'
 
 // The chart lives in a secondary tab of the dialog: load Nivo only when it is shown.
@@ -30,20 +30,30 @@ const CertificateChart = dynamic(() => import('./CertificateChart').then((mod) =
 	loading: () => <Skeleton className='h-[300px] w-full' />,
 })
 
-function createEditPaymentSchema(t: (key: string) => string, tForms: (key: string) => string) {
-	// certificate_payments money columns are DECIMAL(15,2): the API rejects sub-cent amounts.
-	const cents = (schema: z.ZodNumber) => schema.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals'))
+type Translator = (key: string, values?: Record<string, string | number>) => string
+
+function createEditPaymentSchema(t: Translator, tForms: Translator) {
+	// certificate_payments money columns are DECIMAL(15,2) and the rates DECIMAL(5,2):
+	// moneySchema rejects sub-cent values.
+	const amount = (required: string) => moneySchema(moneyMessages(tForms, { required }))
+	const rate = (required: string) => moneySchema(moneyMessages(tForms, { required, number: true }))
 	return z.object({
-		gross_interest: cents(z.coerce.number().min(0, t('errors.nonNegative'))),
-		tax_withheld: cents(z.coerce.number().min(0, t('errors.nonNegative'))),
-		net_interest: cents(z.coerce.number().min(0, t('errors.nonNegative'))),
-		applied_rate: z.coerce.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
-		applied_tax_rate: z.coerce.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
-		applied_capital: cents(z.coerce.number().min(0.01, t('errors.positive'))),
+		gross_interest: amount(t('errors.nonNegative')).pipe(z.number().min(0, t('errors.nonNegative'))),
+		tax_withheld: amount(t('errors.nonNegative')).pipe(z.number().min(0, t('errors.nonNegative'))),
+		net_interest: amount(t('errors.nonNegative')).pipe(z.number().min(0, t('errors.nonNegative'))),
+		applied_rate: rate(t('errors.rateRange')).pipe(
+			z.number().min(0.01, t('errors.rateRange')).max(100, t('errors.rateRange')),
+		),
+		applied_tax_rate: rate(t('errors.taxRange')).pipe(
+			z.number().min(0, t('errors.taxRange')).max(100, t('errors.taxRange')),
+		),
+		applied_capital: amount(t('errors.positive')).pipe(z.number().min(0.01, t('errors.positive'))),
 	})
 }
 
 type EditPaymentFormData = z.infer<ReturnType<typeof createEditPaymentSchema>>
+
+type EditPaymentFormInput = z.input<ReturnType<typeof createEditPaymentSchema>>
 
 const EDIT_FIELDS = [
 	{ name: 'gross_interest', labelKey: 'grossInterest' },
@@ -73,7 +83,7 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 	const updatePaymentMutation = useUpdateCertificatePaymentMutation()
 	const currency = certificate?.currency || 'DOP'
 
-	const form = useForm<EditPaymentFormData>({
+	const form = useForm<EditPaymentFormInput, unknown, EditPaymentFormData>({
 		resolver: zodResolver(editPaymentSchema),
 	})
 
@@ -243,7 +253,7 @@ export function CertificatePaymentHistory({ certificateId, open, onOpenChange }:
 									<FormItem>
 										<FormLabel>{t(item.labelKey)}</FormLabel>
 										<FormControl>
-											<Input type='number' step='0.01' inputMode='decimal' {...field} />
+											<MoneyInput {...field} />
 										</FormControl>
 										<FormMessage />
 									</FormItem>

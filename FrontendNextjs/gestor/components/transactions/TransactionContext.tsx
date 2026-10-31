@@ -9,39 +9,9 @@ import {
 	useGetTransactions,
 	useUpdateTransactionMutation,
 } from '@/hooks/queries/useTransactionsQuery'
+import { formatCalendarDate, getAppMonthRange } from '@/lib/app-time'
+import { moneyInputToNumber } from '@/lib/money-input'
 import { TransactionFilters, TransactionSummary } from '@/types/transaction'
-
-const SANTO_DOMINGO_TZ = 'America/Santo_Domingo'
-
-function getDatePartsInTimeZone(date: Date, timeZone: string): { year: number; month: number; day: number } {
-	// 'en-US' is only used to read numeric year/month/day parts (never displayed),
-	// so it is intentionally independent of the UI locale.
-	const parts = new Intl.DateTimeFormat('en-US', {
-		timeZone,
-		year: 'numeric',
-		month: '2-digit',
-		day: '2-digit',
-	}).formatToParts(date)
-
-	const year = Number(parts.find((part) => part.type === 'year')?.value || '0')
-	const month = Number(parts.find((part) => part.type === 'month')?.value || '1')
-	const day = Number(parts.find((part) => part.type === 'day')?.value || '1')
-
-	return { year, month, day }
-}
-
-function formatDateInTimeZone(date: Date, timeZone: string): string {
-	const { year, month, day } = getDatePartsInTimeZone(date, timeZone)
-	return `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
-}
-
-function getCurrentMonthRangeInSantoDomingo(): DateRange {
-	const now = new Date()
-	const { year, month } = getDatePartsInTimeZone(now, SANTO_DOMINGO_TZ)
-	const from = new Date(year, month - 1, 1)
-	const to = new Date(year, month - 1 + 1, 0)
-	return { from, to }
-}
 
 function parseDateFromParam(value: string | null): Date | undefined {
 	if (!value) return undefined
@@ -53,7 +23,8 @@ function parseDateFromParam(value: string | null): Date | undefined {
 function buildInitialFiltersFromURL(searchParams: URLSearchParams): TransactionFiltersState {
 	const from = parseDateFromParam(searchParams.get('dateFrom'))
 	const to = parseDateFromParam(searchParams.get('dateTo'))
-	const defaultRange = getCurrentMonthRangeInSantoDomingo()
+	// Default: the current month in Santo Domingo, not in the browser's zone.
+	const defaultRange = getAppMonthRange()
 
 	return {
 		dateRange: { from: from || defaultRange.from, to: to || defaultRange.to },
@@ -107,15 +78,18 @@ function buildApiFilters(filters: TransactionFiltersState): TransactionFilters {
 	}
 
 	if (filters.dateRange.from && filters.dateRange.to) {
-		apiFilters.date_from = formatDateInTimeZone(filters.dateRange.from, SANTO_DOMINGO_TZ)
-		apiFilters.date_to = formatDateInTimeZone(filters.dateRange.to, SANTO_DOMINGO_TZ)
+		apiFilters.date_from = formatCalendarDate(filters.dateRange.from)
+		apiFilters.date_to = formatCalendarDate(filters.dateRange.to)
 	}
 	if (filters.type !== 'all') apiFilters.type = filters.type === 'INCOME' ? 'income' : 'bill'
 	if (filters.account !== 'all') apiFilters.account_id = filters.account
 	if (filters.category !== 'all') apiFilters.category_id = filters.category
 	if (filters.budget !== 'all') apiFilters.budget_id = filters.budget
-	if (filters.minAmount) apiFilters.amount_min = Number(filters.minAmount)
-	if (filters.maxAmount) apiFilters.amount_max = Number(filters.maxAmount)
+	// Amount filters are typed text ("1,500" or "1500,50"); an unparseable one is ignored.
+	const minAmount = moneyInputToNumber(filters.minAmount)
+	const maxAmount = moneyInputToNumber(filters.maxAmount)
+	if (Number.isFinite(minAmount)) apiFilters.amount_min = minAmount
+	if (Number.isFinite(maxAmount)) apiFilters.amount_max = maxAmount
 	if (filters.search) apiFilters.search = filters.search
 
 	return apiFilters
@@ -129,8 +103,8 @@ function buildURLWithFilters(filters: TransactionFiltersState): string {
 	const params = new URLSearchParams(window.location.search)
 	for (const key of FILTER_URL_KEYS) params.delete(key)
 
-	if (filters.dateRange.from) params.set('dateFrom', formatDateInTimeZone(filters.dateRange.from, SANTO_DOMINGO_TZ))
-	if (filters.dateRange.to) params.set('dateTo', formatDateInTimeZone(filters.dateRange.to, SANTO_DOMINGO_TZ))
+	if (filters.dateRange.from) params.set('dateFrom', formatCalendarDate(filters.dateRange.from))
+	if (filters.dateRange.to) params.set('dateTo', formatCalendarDate(filters.dateRange.to))
 	if (filters.type && filters.type !== 'all') params.set('type', filters.type)
 	if (filters.account && filters.account !== 'all') params.set('account', filters.account)
 	if (filters.category && filters.category !== 'all') params.set('category', filters.category)
@@ -273,7 +247,7 @@ export function TransactionProvider({
 
 	const clearFilters = useCallback(() => {
 		setFilters({
-			dateRange: getCurrentMonthRangeInSantoDomingo(),
+			dateRange: getAppMonthRange(),
 			type: 'all',
 			account: 'all',
 			category: 'all',

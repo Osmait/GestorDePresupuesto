@@ -5,7 +5,8 @@
 #
 # - <gestor-dir>: path to FrontendNextjs/gestor of the checkout to build
 # - <label>:      name used for output files (e.g. branch, main)
-# - analyze:      pass "analyze" to set ANALYZE=true (needs @next/bundle-analyzer
+# - analyze:      pass "analyze" to set ANALYZE=true and build with --webpack (the
+#                 analyzer is a webpack plugin; needs @next/bundle-analyzer
 #                 and the next.config.js wrapper; reports land in .next/analyze)
 # - out-dir:      where to copy build-output.txt / analyzer html / stats
 #                 (default: $PERF_OUT or ./perf-results)
@@ -19,7 +20,7 @@ cd "$dir"
 rm -rf .next
 export NEXT_TELEMETRY_DISABLED=1
 if [ "$mode" = analyze ]; then
-  ANALYZE=true npx next build 2>&1 | tee "$out/bundles/build-output-$label-analyze.txt"
+  ANALYZE=true npx next build --webpack 2>&1 | tee "$out/bundles/build-output-$label-analyze.txt"
   for f in client nodejs edge; do
     [ -f ".next/analyze/$f.html" ] && cp ".next/analyze/$f.html" "$out/bundles/analyzer-$label-$f.html"
   done

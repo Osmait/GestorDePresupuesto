@@ -8,6 +8,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/likepattern"
+
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
@@ -18,12 +20,32 @@ import (
 
 type TransactionRepository struct {
 	db *sql.DB
+	// now is the clock of the "current month" queries (time.Now by default).
+	now func() time.Time
 }
 
-func NewTransactionRepository(db *sql.DB) *TransactionRepository {
-	return &TransactionRepository{
-		db: db,
+// Option configures a TransactionRepository.
+type Option func(*TransactionRepository)
+
+// WithClock sets the clock that decides the current month of the budget
+// queries (tests pin it to a month boundary).
+func WithClock(now func() time.Time) Option {
+	return func(repo *TransactionRepository) {
+		if now != nil {
+			repo.now = now
+		}
 	}
+}
+
+func NewTransactionRepository(db *sql.DB, opts ...Option) *TransactionRepository {
+	repo := &TransactionRepository{
+		db:  db,
+		now: time.Now,
+	}
+	for _, opt := range opts {
+		opt(repo)
+	}
+	return repo
 }
 
 func (repo *TransactionRepository) Save(ctx context.Context, transaction *transaction.Transaction) error {
@@ -200,41 +222,43 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 	return transactions, nil
 }
 
-// currentMonthPredicate selects the transactions of the current calendar
-// month in the session time zone. It is the sargable form of
-// date_trunc('month', created_at) = date_trunc('month', CURRENT_DATE): both
-// bounds are computed once per statement (date_trunc on timestamptz and the
-// one-month step use the session time zone, exactly like the old filter), so
-// the (user_id, created_at) / (budget_id, created_at) indexes can range-scan
-// instead of evaluating date_trunc on every row of the user/budget.
-const currentMonthPredicate = "created_at >= date_trunc('month', CURRENT_DATE) AND created_at < date_trunc('month', CURRENT_DATE) + interval '1 month'"
+// currentMonthPredicate selects the transactions of the calendar month of
+// the instant $n (the repository clock, see currentMonthAt) in the app time
+// zone (app_timezone(), migration 000062), whatever the session TimeZone:
+// [00:00 local of the 1st, 00:00 local of the next 1st). Both bounds are
+// computed once per statement (they only depend on a parameter), so the
+// (user_id, category_id, created_at) index can range-scan instead of
+// evaluating date_trunc on every row of the user/category.
+func currentMonthPredicate(n int) string {
+	month := fmt.Sprintf("date_trunc('month', $%d::timestamptz AT TIME ZONE app_timezone())", n)
+	return "created_at >= (" + month + " AT TIME ZONE app_timezone())" +
+		" AND created_at < ((" + month + " + interval '1 month') AT TIME ZONE app_timezone())"
+}
 
-func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string, userId string, usdToDop money.Amount) (money.Amount, error) {
+// The budget "spent this month" of a category is the sum of the user's bills
+// in that category (USD converted at usdToDop) in the current month of the
+// app time zone. It is computed from category_id and the date, never from the
+// budget_id stamped on each bill when it was written: a budget created
+// mid-month, recreated, or re-pointed to another category sees the bills of
+// its category that already exist. Every budget of a category reports the
+// same spending. The predicate is sargable on the
+// idx_transactions_user_category_created_at (user_id, category_id,
+// created_at) index (migration 000016).
+
+// FindCurrentCategorySpent returns what userId spent this month in
+// categoryID.
+func (repo *TransactionRepository) FindCurrentCategorySpent(ctx context.Context, categoryID string, userId string, usdToDop money.Amount) (money.Amount, error) {
 	if !usdToDop.IsPositive() {
 		usdToDop = money.FromInt(60)
 	}
-	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
-		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND user_id = $3 AND type_transation = 'bill' AND "+currentMonthPredicate, budgetID, usdToDop, userId)
+	var spent money.Amount
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx,
+		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions WHERE user_id = $3 AND category_id = $1 AND type_transation = 'bill' AND "+currentMonthPredicate(4),
+		categoryID, usdToDop, userId, repo.now()).Scan(&spent)
 	if err != nil {
 		return money.Zero, err
 	}
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close database rows")
-		}
-	}()
-	var currentBudget money.Amount
-	for rows.Next() {
-		if err = rows.Scan(&currentBudget); err == nil {
-			return currentBudget, nil
-		}
-	}
-	if err = rows.Err(); err != nil {
-		log.Error().Err(err).Msg("error iterating over budget rows")
-		return money.Zero, err
-	}
-	return money.Zero, nil
+	return spent, nil
 }
 
 // BalanceByAccountAndCurrency returns the net total of the user's transactions
@@ -251,15 +275,18 @@ func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Conte
 	return total, nil
 }
 
-func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
+// FindCurrentSpentByCategory returns, per category id, what userId spent
+// this month (see FindCurrentCategorySpent). Categories without bills this
+// month are absent.
+func (repo *TransactionRepository) FindCurrentSpentByCategory(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
 	if !usdToDop.IsPositive() {
 		usdToDop = money.FromInt(60)
 	}
-	query := `SELECT budget_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions
-		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill'
-		AND ` + currentMonthPredicate + `
-		GROUP BY budget_id`
-	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, usdToDop)
+	query := `SELECT category_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions
+		WHERE user_id = $1 AND category_id IS NOT NULL AND type_transation = 'bill'
+		AND ` + currentMonthPredicate(3) + `
+		GROUP BY category_id`
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, usdToDop, repo.now())
 	if err != nil {
 		return nil, err
 	}
@@ -269,18 +296,29 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 		}
 	}()
 
-	budgets := make(map[string]money.Amount)
+	spent := make(map[string]money.Amount)
 	for rows.Next() {
-		var budgetId string
+		var categoryId string
 		var total money.Amount
-		if err = rows.Scan(&budgetId, &total); err == nil {
-			budgets[budgetId] = total
+		if err = rows.Scan(&categoryId, &total); err != nil {
+			return nil, err
 		}
+		spent[categoryId] = total
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	return budgets, nil
+	return spent, nil
+}
+
+func (repo *TransactionRepository) TypeOf(ctx context.Context, id string, userId string) (string, error) {
+	var t string
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx,
+		"SELECT type_transation FROM transactions WHERE id = $1 AND user_id = $2", id, userId).Scan(&t)
+	if err != nil {
+		return "", ownership.NotFoundIfNoRows(err)
+	}
+	return t, nil
 }
 
 func (repo *TransactionRepository) Delete(ctx context.Context, id string, userId string) error {
@@ -319,14 +357,21 @@ func (repo *TransactionRepository) Update(ctx context.Context, id string, t *tra
 		return err
 	}
 
+	// A zero CreatedAt keeps the stored date; otherwise the transaction moves
+	// to that date (the ledger and monthly rollup triggers follow the move).
 	query := `UPDATE transactions SET transaction_name = $1, transaction_description = $2, amount = $3,
-		type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, currency = $8
+		type_transation = $4, account_id = $5, category_id = $6, budget_id = $7, currency = $8,
+		created_at = COALESCE($11, created_at)
 		WHERE id = $9 AND user_id = $10`
 	currency := t.Currency
 	if currency == "" {
 		currency = "DOP"
 	}
-	result, err := q.ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id, t.UserId)
+	var createdAt any
+	if !t.CreatedAt.IsZero() {
+		createdAt = t.CreatedAt
+	}
+	result, err := q.ExecContext(ctx, query, t.Name, t.Description, t.Amount, t.TypeTransation, t.AccountId, t.CategoryId, t.BudgetId, currency, id, t.UserId, createdAt)
 	if err != nil {
 		return err
 	}
@@ -378,6 +423,61 @@ func (repo *TransactionRepository) FindAllWithFilters(ctx context.Context, userI
 	return repo.scanTransactions(rows)
 }
 
+// SummarizeWithFilters aggregates the transactions matching filter (same
+// WHERE as the list and the count, pagination ignored) by type, currency and
+// category, so the summary never loads every matching row into memory.
+func (repo *TransactionRepository) SummarizeWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]dto.SummaryGroup, error) {
+	query, args, err := repo.buildTransactionQueryMode(userId, filter, queryModeSummary)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to summarize transactions: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("failed to close database rows")
+		}
+	}()
+
+	var groups []dto.SummaryGroup
+	for rows.Next() {
+		var g dto.SummaryGroup
+		if err := rows.Scan(&g.TypeTransation, &g.Currency, &g.CategoryId, &g.Total, &g.Count, &g.Max); err != nil {
+			return nil, fmt.Errorf("failed to scan transaction summary row: %w", err)
+		}
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over transaction summary rows: %w", err)
+	}
+	return groups, nil
+}
+
+// FindCategorizedHistory returns up to limit of userId's most recent
+// transactions that have a category, created at or after since.
+func (repo *TransactionRepository) FindCategorizedHistory(ctx context.Context, userId string, since time.Time, limit int) ([]*transaction.Transaction, error) {
+	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at
+		FROM transactions
+		WHERE user_id = $1 AND created_at >= $2 AND category_id IS NOT NULL AND category_id <> ''
+		ORDER BY created_at DESC, id DESC
+		LIMIT $3`
+
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, since, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query transaction history: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("failed to close database rows")
+		}
+	}()
+
+	return repo.scanTransactions(rows)
+}
+
 // CountWithFilters counts transactions with applied filters
 func (repo *TransactionRepository) CountWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) (int64, error) {
 	query, args, err := repo.buildTransactionQuery(userId, filter, true)
@@ -410,9 +510,27 @@ var transactionSortColumns = map[string]string{
 // user id: every transaction query must be scoped to its owner.
 var errMissingUserScope = errors.New("transaction query requires a user id")
 
+type queryMode int
+
+const (
+	queryModeList queryMode = iota
+	queryModeCount
+	queryModeSummary
+)
+
 // buildTransactionQuery constructs the SQL query with filters, sorting, and
 // pagination. The query is always scoped to userId.
 func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *dto.TransactionFilter, isCount bool) (string, []interface{}, error) {
+	if isCount {
+		return repo.buildTransactionQueryMode(userId, filter, queryModeCount)
+	}
+	return repo.buildTransactionQueryMode(userId, filter, queryModeList)
+}
+
+// buildTransactionQueryMode builds the list, count or summary query; all
+// three share the same WHERE clause.
+func (repo *TransactionRepository) buildTransactionQueryMode(userId string, filter *dto.TransactionFilter, mode queryMode) (string, []interface{}, error) {
+	isCount := mode != queryModeList
 	if userId == "" {
 		return "", nil, errMissingUserScope
 	}
@@ -425,9 +543,13 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	argIndex := 1
 
 	// SELECT clause
-	if isCount {
+	switch mode {
+	case queryModeSummary:
+		queryBuilder.WriteString("SELECT type_transation, COALESCE(currency, 'DOP'), COALESCE(category_id, ''), " +
+			"COALESCE(SUM(amount), 0), COUNT(*), COALESCE(MAX(amount), 0) FROM transactions")
+	case queryModeCount:
 		queryBuilder.WriteString("SELECT COUNT(*) FROM transactions")
-	} else {
+	default:
 		queryBuilder.WriteString("SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at FROM transactions")
 	}
 
@@ -486,7 +608,8 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	}
 
 	if !filter.CalculatedDateTo.IsZero() {
-		whereConditions = append(whereConditions, fmt.Sprintf("created_at <= $%d", argIndex))
+		// exclusive upper bound (see TransactionFilter.CalculatedDateTo)
+		whereConditions = append(whereConditions, fmt.Sprintf("created_at < $%d", argIndex))
 		args = append(args, filter.CalculatedDateTo)
 		argIndex++
 	}
@@ -507,7 +630,7 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	// Search filter (name and description)
 	if filter.Search != "" {
 		whereConditions = append(whereConditions, fmt.Sprintf("(transaction_name ILIKE $%d OR transaction_description ILIKE $%d)", argIndex, argIndex+1))
-		searchTerm := "%" + filter.Search + "%"
+		searchTerm := likepattern.Contains(filter.Search)
 		args = append(args, searchTerm, searchTerm)
 		argIndex += 2
 	}
@@ -518,7 +641,10 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 		queryBuilder.WriteString(strings.Join(whereConditions, " AND "))
 	}
 
-	// For count queries, we don't need ORDER BY, LIMIT, or OFFSET
+	// For count and summary queries, we don't need ORDER BY, LIMIT, or OFFSET
+	if mode == queryModeSummary {
+		queryBuilder.WriteString(" GROUP BY 1, 2, 3")
+	}
 	if isCount {
 		return queryBuilder.String(), args, nil
 	}
@@ -587,13 +713,15 @@ func (repo *TransactionRepository) scanTransactions(rows *sql.Rows) ([]*transact
 	return transactions, nil
 }
 
-func (repo *TransactionRepository) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateTo time.Time) ([]*transaction.Transaction, error) {
+// FindByUserAndDateRange returns the user's transactions in the half-open
+// range of instants [dateFrom, dateToExclusive).
+func (repo *TransactionRepository) FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateToExclusive time.Time) ([]*transaction.Transaction, error) {
 	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at
 		FROM transactions
-		WHERE user_id = $1 AND created_at >= $2 AND created_at <= $3
+		WHERE user_id = $1 AND created_at >= $2 AND created_at < $3
 		ORDER BY created_at DESC`
 
-	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, dateFrom, dateTo)
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, dateFrom, dateToExclusive)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query transactions: %w", err)
 	}

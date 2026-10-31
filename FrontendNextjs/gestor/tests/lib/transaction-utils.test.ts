@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { getSignedAmount, getTransactionTypeKey, isInflowTransaction } from '@/lib/transaction-utils'
+import {
+	getSignedAmount,
+	getTransactionTypeKey,
+	isAdjustmentTransaction,
+	isDeletableTransaction,
+	isEditableTransaction,
+	isInflowTransaction,
+} from '@/lib/transaction-utils'
 import { TypeTransaction } from '@/types/transaction'
 
 describe('transaction-utils', () => {
@@ -21,5 +28,50 @@ describe('transaction-utils', () => {
 		expect(getTransactionTypeKey('bill')).toBe('types.bill')
 		expect(getTransactionTypeKey('income')).toBe('types.income')
 		expect(getTransactionTypeKey('something-new')).toBe('types.unknown')
+	})
+
+	it('signs balance adjustments by direction and maps them to their own keys', () => {
+		expect(isInflowTransaction(TypeTransaction.ADJUSTMENT_IN)).toBe(true)
+		expect(isInflowTransaction(TypeTransaction.ADJUSTMENT_OUT)).toBe(false)
+		expect(getSignedAmount({ amount: 50.5, type_transation: TypeTransaction.ADJUSTMENT_IN })).toBe(50.5)
+		expect(getSignedAmount({ amount: 50.5, type_transation: TypeTransaction.ADJUSTMENT_OUT })).toBe(-50.5)
+		expect(getTransactionTypeKey('adjustment_in')).toBe('types.adjustment_in')
+		expect(getTransactionTypeKey('adjustment_out')).toBe('types.adjustment_out')
+	})
+
+	it('flags only the adjustment types as adjustments', () => {
+		expect(isAdjustmentTransaction(TypeTransaction.ADJUSTMENT_IN)).toBe(true)
+		expect(isAdjustmentTransaction(TypeTransaction.ADJUSTMENT_OUT)).toBe(true)
+		expect(isAdjustmentTransaction(TypeTransaction.BILL)).toBe(false)
+		expect(isAdjustmentTransaction(undefined)).toBe(false)
+	})
+
+	it('treats a card payment received as an inflow on the card, neither editable nor deletable alone', () => {
+		expect(isInflowTransaction(TypeTransaction.CARD_PAYMENT_RECEIVED)).toBe(true)
+		expect(isInflowTransaction(TypeTransaction.CARD_PAYMENT)).toBe(false)
+		expect(getTransactionTypeKey('card_payment_received')).toBe('types.card_payment_received')
+		expect(getTransactionTypeKey('card_payment')).toBe('types.card_payment')
+		expect(isEditableTransaction(TypeTransaction.CARD_PAYMENT_RECEIVED)).toBe(false)
+		expect(isDeletableTransaction(TypeTransaction.CARD_PAYMENT_RECEIVED)).toBe(false)
+		expect(isEditableTransaction(TypeTransaction.ADJUSTMENT_IN)).toBe(false)
+		expect(isDeletableTransaction(TypeTransaction.ADJUSTMENT_IN)).toBe(true)
+		expect(isEditableTransaction(TypeTransaction.BILL)).toBe(true)
+		expect(isDeletableTransaction(TypeTransaction.BILL)).toBe(true)
+	})
+
+	it('leaves card payments, loans and broker movements to their own screens', () => {
+		for (const type of [
+			TypeTransaction.CARD_PAYMENT,
+			TypeTransaction.LOAN_DISBURSEMENT,
+			TypeTransaction.LOAN_COLLECTION,
+			TypeTransaction.INVESTMENT_FUNDING,
+			TypeTransaction.INVESTMENT_PURCHASE,
+			'loan_cancellation_refund',
+		]) {
+			expect(isEditableTransaction(type)).toBe(false)
+			expect(isDeletableTransaction(type)).toBe(false)
+		}
+		expect(isEditableTransaction(TypeTransaction.INCOME)).toBe(true)
+		expect(isEditableTransaction(undefined)).toBe(false)
 	})
 })

@@ -8,9 +8,22 @@ import (
 type contextKey string
 
 const (
-	userIDKey contextKey = "mcp_user_id"
-	dbTxKey   contextKey = "mcp_db_tx"
+	userIDKey   contextKey = "mcp_user_id"
+	dbTxKey     contextKey = "mcp_db_tx"
+	readOnlyKey contextKey = "mcp_read_only"
 )
+
+// WithReadOnly marks the request as coming from a read-only grant (an OAuth
+// token with only the mcp:read scope).
+func WithReadOnly(ctx context.Context, readOnly bool) context.Context {
+	return context.WithValue(ctx, readOnlyKey, readOnly)
+}
+
+// IsReadOnly reports whether the request may only call read tools.
+func IsReadOnly(ctx context.Context) bool {
+	v, _ := ctx.Value(readOnlyKey).(bool)
+	return v
+}
 
 func WithUserID(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, userIDKey, userID)

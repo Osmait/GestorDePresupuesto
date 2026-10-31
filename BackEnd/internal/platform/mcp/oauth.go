@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 
 	authDomain "github.com/osmait/gestorDePresupuesto/internal/domain/auth"
 	"github.com/osmait/gestorDePresupuesto/internal/services/auth"
@@ -17,7 +17,7 @@ import (
 // DefaultAppURL is the SBFinance web app linked from the OAuth login page.
 const DefaultAppURL = "https://presupuesto.saulburgos.com"
 
-// maxTokenRequestBody bounds the token endpoint form (mcpkit uses 1 MB).
+// maxTokenRequestBody bounds the token endpoint form (omniskill uses 1 MB).
 const maxTokenRequestBody = 64 << 10
 
 // Authenticator validates the credentials typed on the OAuth login page.
@@ -46,7 +46,7 @@ func (a AuthServiceAuthenticator) Authenticate(ctx context.Context, email, passw
 
 // clientSecretHasher is implemented by storages that keep client secrets
 // hashed (mcpoauth.Storage): GetClient then returns the hash, so the token
-// endpoint must hash the presented secret before mcpkit compares them.
+// endpoint must hash the presented secret before omniskill compares them.
 type clientSecretHasher interface {
 	HashClientSecret(secret string) string
 }
@@ -68,8 +68,8 @@ type OAuthConfig struct {
 
 // OAuthProvider is the MCP OAuth 2.1 authorization server.
 //
-// The token, registration and metadata endpoints are mcpkit's. The
-// authorization endpoint (login page) is our own: mcpkit's Authenticator has
+// The token, registration and metadata endpoints are omniskill's. The
+// authorization endpoint (login page) is our own: omniskill's Authenticator has
 // no access to the request, so it could not pass the client IP to the login
 // lockout, localize the page, set a CSP nonce or offer a "deny" button.
 type OAuthProvider struct {
@@ -100,7 +100,7 @@ func NewOAuthProvider(cfg OAuthConfig) (*OAuthProvider, error) {
 		Issuer:                  cfg.Issuer,
 		Storage:                 storage,
 		AuthorizationCodeExpiry: codeExpiry,
-		// mcpkit's own authorization handler is never mounted (see
+		// omniskill's own authorization handler is never mounted (see
 		// OAuthProvider); if it ever were, it must not log anybody in.
 		Authenticator: func(string, string) bool { return false },
 	})
@@ -121,7 +121,7 @@ func NewOAuthProvider(cfg OAuthConfig) (*OAuthProvider, error) {
 	}, nil
 }
 
-// Server returns the underlying mcpkit server.
+// Server returns the underlying omniskill server.
 func (p *OAuthProvider) Server() *oauth2.Server { return p.server }
 
 // AuthorizeHandler serves GET/POST /oauth/authorize. The client IP passed to
@@ -140,11 +140,49 @@ func (p *OAuthProvider) ServeAuthorize(w http.ResponseWriter, r *http.Request, c
 	p.authorize.serve(w, r, clientIP)
 }
 
-// TokenHandler serves POST /oauth/token (mcpkit). When the storage keeps
-// client secrets hashed, the presented secret is hashed first so mcpkit
-// compares hash with hash.
+// TokenHandler serves POST /oauth/token (omniskill). When the storage keeps
+// client secrets hashed, the presented secret is hashed first so omniskill
+// compares hash with hash. A refresh keeps the scope of the original grant.
 func (p *OAuthProvider) TokenHandler() http.Handler {
-	next := p.server.TokenHandler()
+	return p.withHashedClientSecret(keepRefreshScope(p.server.TokenHandler()))
+}
+
+// keepRefreshScope drops the scope parameter of a refresh_token request, so
+// omniskill keeps the scope of the token being refreshed. omniskill grants
+// whatever scope a refresh asks for, which would let a read-only (mcp:read)
+// grant, or anyone holding its refresh token, upgrade itself to write access.
+// Narrowing on refresh (RFC 6749 §6) is not supported; nothing needs it.
+func keepRefreshScope(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			r.Body = http.MaxBytesReader(w, r.Body, maxTokenRequestBody)
+			if err := r.ParseForm(); err != nil {
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusBadRequest)
+				_, _ = w.Write([]byte(`{"error":"invalid_request","error_description":"Failed to parse form"}`))
+				return
+			}
+			if r.Form.Get("grant_type") == "refresh_token" {
+				r.Form.Del("scope")
+				r.PostForm.Del("scope")
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// RevocationHandler serves POST /oauth/revoke (RFC 7009, omniskill). The
+// authorization server metadata advertises it as revocation_endpoint, so it
+// must be mounted. Client authentication is optional (public clients); when
+// a secret is presented it is hashed like on the token endpoint.
+func (p *OAuthProvider) RevocationHandler() http.Handler {
+	return p.withHashedClientSecret(p.server.RevocationHandler())
+}
+
+// withHashedClientSecret bounds the request body and, when the storage keeps
+// client secrets hashed, replaces the presented client secret with its hash
+// before next (omniskill) compares it with the stored one.
+func (p *OAuthProvider) withHashedClientSecret(next http.Handler) http.Handler {
 	hasher, ok := p.storage.(clientSecretHasher)
 	if !ok {
 		return next
@@ -165,7 +203,7 @@ func (p *OAuthProvider) TokenHandler() http.Handler {
 }
 
 // hashPresentedClientSecret replaces the client secret of a parsed token
-// request (HTTP Basic or form) with its hash. mcpkit calls ParseForm again,
+// request (HTTP Basic or form) with its hash. omniskill calls ParseForm again,
 // which is a no-op once r.Form/r.PostForm are set.
 func hashPresentedClientSecret(r *http.Request, hasher clientSecretHasher) {
 	if id, secret, ok := r.BasicAuth(); ok && secret != "" {
@@ -180,15 +218,31 @@ func hashPresentedClientSecret(r *http.Request, hasher clientSecretHasher) {
 	}
 }
 
-// RegistrationHandler serves dynamic client registration (mcpkit).
+// RegistrationHandler serves dynamic client registration (omniskill).
 func (p *OAuthProvider) RegistrationHandler() http.Handler { return p.server.RegistrationHandler() }
 
-// MetadataHandler serves the authorization server metadata (mcpkit).
+// MetadataHandler serves the authorization server metadata (omniskill).
 func (p *OAuthProvider) MetadataHandler() http.Handler { return p.server.MetadataHandler() }
 
 // ProtectedResourceMetadataHandler serves the protected resource metadata.
 func (p *OAuthProvider) ProtectedResourceMetadataHandler(resourcePath string) http.Handler {
 	return p.server.ProtectedResourceMetadataHandler(resourcePath)
+}
+
+// tokenUserStorage is implemented by the persistent storage (mcpoauth).
+type tokenUserStorage interface {
+	UserIDForAccessToken(accessToken string) (string, error)
+}
+
+// TokenUserID returns the user an access token was issued to, as stored with
+// the token. Storages that cannot tell (the in-memory one) fail, so the MCP
+// endpoints reject the token instead of trusting its subject.
+func (p *OAuthProvider) TokenUserID(_ context.Context, accessToken string) (string, error) {
+	s, ok := p.storage.(tokenUserStorage)
+	if !ok {
+		return "", errors.New("oauth: token storage cannot resolve users")
+	}
+	return s.UserIDForAccessToken(accessToken)
 }
 
 // TokenVerifier resolves an access token for MCPAuthMiddleware.

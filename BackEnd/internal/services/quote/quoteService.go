@@ -3,13 +3,19 @@ package quote
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
+	"net/url"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
+	"github.com/rs/zerolog/log"
+	"golang.org/x/sync/singleflight"
 )
 
 // quoteRequestTimeout bounds each upstream quote call. GetQuote tries up to
@@ -17,12 +23,97 @@ import (
 // server WriteTimeout.
 const quoteRequestTimeout = 8 * time.Second
 
+const (
+	// quoteTTL is how long a fetched quote is served from memory.
+	quoteTTL = 5 * time.Minute
+	// quoteFailureTTL is how long a failed lookup is remembered: the
+	// upstreams are not asked again for that symbol meanwhile.
+	quoteFailureTTL = 90 * time.Second
+	// quoteFetchTimeout bounds one shared lookup (all upstreams tried in
+	// turn). It runs detached from the callers, who stop waiting when their
+	// own context ends; the result still fills the cache.
+	quoteFetchTimeout = 20 * time.Second
+	// maxConcurrentQuoteFetches bounds upstream lookups in flight across
+	// all symbols.
+	maxConcurrentQuoteFetches = 4
+	// maxCachedQuotes bounds the cache; past it, it is reset.
+	maxCachedQuotes = 5000
+)
+
+// ErrQuoteUnavailable is returned when no upstream has a quote for the
+// symbol (also served from the failure cache for quoteFailureTTL).
+var ErrQuoteUnavailable = errors.New("quote not found")
+
+// QuoteService looks up market quotes. Lookups are cached per symbol
+// (quoteTTL, failures for quoteFailureTTL), concurrent lookups of a symbol
+// share one upstream fetch (singleflight) and at most
+// maxConcurrentQuoteFetches fetches run at once.
 type QuoteService struct {
 	client *http.Client
+
+	// fetch looks a symbol up upstream (fetchUpstream; replaced in tests).
+	fetch func(ctx context.Context, symbol string) (Quote, error)
+	now   func() time.Time
+
+	mu    sync.Mutex
+	cache map[string]cachedQuote
+
+	group singleflight.Group
+	slots chan struct{}
+}
+
+// Quote is a market quote.
+type Quote struct {
+	Price    money.Amount
+	Currency string
+	Name     string
+}
+
+type cachedQuote struct {
+	quote   Quote
+	err     error
+	expires time.Time
 }
 
 func NewQuoteService() *QuoteService {
-	return &QuoteService{client: telemetry.NewHTTPClient(quoteRequestTimeout)}
+	return newQuoteService(telemetry.NewHTTPClient(quoteRequestTimeout), nil)
+}
+
+func newQuoteService(client *http.Client, fetch func(ctx context.Context, symbol string) (Quote, error)) *QuoteService {
+	s := &QuoteService{
+		client: client,
+		now:    time.Now,
+		cache:  make(map[string]cachedQuote),
+		slots:  make(chan struct{}, maxConcurrentQuoteFetches),
+	}
+	s.fetch = fetch
+	if s.fetch == nil {
+		s.fetch = s.fetchUpstream
+	}
+	return s
+}
+
+func (s *QuoteService) cached(symbol string) (cachedQuote, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	e, ok := s.cache[symbol]
+	if !ok || !s.now().Before(e.expires) {
+		return cachedQuote{}, false
+	}
+	return e, true
+}
+
+func (s *QuoteService) store(symbol string, q Quote, err error) {
+	ttl := quoteTTL
+	if err != nil {
+		ttl = quoteFailureTTL
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if len(s.cache) >= maxCachedQuotes {
+		s.cache = make(map[string]cachedQuote)
+	}
+	s.cache[symbol] = cachedQuote{quote: q, err: err, expires: s.now().Add(ttl)}
 }
 
 func (s *QuoteService) httpClient() *http.Client {
@@ -58,11 +149,82 @@ func (s *QuoteService) GetQuote(symbol string) (money.Amount, string, string, er
 	return s.GetQuoteContext(context.Background(), symbol)
 }
 
-// GetQuoteContext fetches a quote; ctx cancels the upstream calls and parents
-// their client spans.
+// validSymbol is a stock/ETF ticker (AAPL, BRK.B) or a crypto pair (BTC-USD).
+var validSymbol = regexp.MustCompile(`^[A-Z0-9][A-Z0-9.\-]{0,14}$`)
+
+// ErrInvalidSymbol is returned for a symbol that is not a ticker.
+var ErrInvalidSymbol = errors.New("invalid symbol")
+
+// GetQuoteContext returns the quote of symbol, from the cache when it is
+// fresh (or a recent failure). Otherwise it joins (or starts) the shared
+// upstream lookup and waits for it until ctx ends; the lookup itself keeps
+// running, bounded by quoteFetchTimeout, and fills the cache for later calls.
 func (s *QuoteService) GetQuoteContext(ctx context.Context, symbol string) (money.Amount, string, string, error) {
 	// Clean symbol
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
+	// The symbol goes into the upstream URLs: only ticker characters, so it
+	// cannot add query parameters or path segments.
+	if !validSymbol.MatchString(symbol) {
+		return money.Zero, "", "", ErrInvalidSymbol
+	}
+	if s.cache == nil { // zero value (tests constructing QuoteService{})
+		return s.fetchDirect(ctx, symbol)
+	}
+
+	if e, ok := s.cached(symbol); ok {
+		return e.quote.Price, e.quote.Currency, e.quote.Name, e.err
+	}
+
+	// The shared lookup runs detached from this caller's cancellation (its
+	// trace span is kept) so one caller giving up does not fail the others.
+	detached := context.WithoutCancel(ctx)
+	ch := s.group.DoChan(symbol, func() (any, error) {
+		if e, ok := s.cached(symbol); ok { // refreshed while we waited
+			return e.quote, e.err
+		}
+		fetchCtx, cancel := context.WithTimeout(detached, quoteFetchTimeout)
+		defer cancel()
+		select {
+		case s.slots <- struct{}{}:
+			defer func() { <-s.slots }()
+		case <-fetchCtx.Done():
+			return Quote{}, fetchCtx.Err() // not cached: transient
+		}
+		q, err := s.fetch(fetchCtx, symbol)
+		if err != nil {
+			// Logged once per symbol per failure window (the failure is
+			// cached, so the upstreams are not asked again meanwhile).
+			log.Ctx(detached).Warn().Err(err).Str("symbol", symbol).Dur("retry_in", quoteFailureTTL).Msg("quote lookup failed")
+		}
+		s.store(symbol, q, err)
+		return q, err
+	})
+
+	select {
+	case res := <-ch:
+		q, _ := res.Val.(Quote)
+		return q.Price, q.Currency, q.Name, res.Err
+	case <-ctx.Done():
+		return money.Zero, "", "", ctx.Err()
+	}
+}
+
+func (s *QuoteService) fetchDirect(ctx context.Context, symbol string) (money.Amount, string, string, error) {
+	q, err := s.fetchUpstream(ctx, symbol)
+	return q.Price, q.Currency, q.Name, err
+}
+
+// fetchUpstream tries the upstreams in turn: Nasdaq stocks, Nasdaq ETFs,
+// then Binance.
+func (s *QuoteService) fetchUpstream(ctx context.Context, symbol string) (Quote, error) {
+	price, currency, name, err := s.fetchAll(ctx, symbol)
+	if err != nil {
+		return Quote{}, err
+	}
+	return Quote{Price: price, Currency: currency, Name: name}, nil
+}
+
+func (s *QuoteService) fetchAll(ctx context.Context, symbol string) (money.Amount, string, string, error) {
 
 	// Try Nasdaq first (Stocks)
 	price, currency, name, err := s.fetchNasdaq(ctx, symbol, "stocks")
@@ -88,12 +250,12 @@ func (s *QuoteService) GetQuoteContext(ctx context.Context, symbol string) (mone
 		return price, currency, name, nil
 	}
 
-	return money.Zero, "", "", fmt.Errorf("quote not found")
+	return money.Zero, "", "", fmt.Errorf("%w: %s", ErrQuoteUnavailable, err)
 }
 
 func (s *QuoteService) fetchNasdaq(ctx context.Context, symbol, assetClass string) (money.Amount, string, string, error) {
 	client := s.httpClient()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.nasdaq.com/api/quote/"+symbol+"/info?assetclass="+assetClass, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.nasdaq.com/api/quote/"+url.PathEscape(symbol)+"/info?assetclass="+url.QueryEscape(assetClass), nil)
 	if err != nil {
 		return money.Zero, "", "", err
 	}
@@ -143,7 +305,7 @@ func (s *QuoteService) fetchNasdaq(ctx context.Context, symbol, assetClass strin
 
 func (s *QuoteService) fetchBinance(ctx context.Context, symbol string) (money.Amount, string, string, error) {
 	client := s.httpClient()
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.binance.com/api/v3/ticker/price?symbol="+symbol, nil)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.binance.com/api/v3/ticker/price?symbol="+url.QueryEscape(symbol), nil)
 	if err != nil {
 		return money.Zero, "", "", err
 	}

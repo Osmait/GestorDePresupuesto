@@ -1,19 +1,20 @@
 'use client'
 
 import { zodResolver } from '@hookform/resolvers/zod'
-import { format } from 'date-fns'
 import { useTranslations } from 'next-intl'
 import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { getAppTodayString } from '@/lib/app-time'
 import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
 import { useAppLocale } from '@/lib/i18n/date-locale'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyMessages, moneySchema } from '@/lib/money-input'
 import type { Account } from '@/types/account'
 import type { CreateLoanDTO } from '@/types/loan'
 
@@ -23,14 +24,16 @@ function createLoanSchema(t: Translate, tForms: Translate) {
 	return z.object({
 		borrower_name: z.string().trim().min(1, t('errors.borrowerRequired')),
 		borrower_contact: z.string().optional().default(''),
-		// loans.principal_amount is DECIMAL(15,2): the API rejects sub-cent amounts.
-		principal_amount: z.coerce
-			.number({ invalid_type_error: t('errors.principalPositive') })
-			.positive(t('errors.principalPositive'))
-			.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals')),
-		annual_rate: z.coerce.number({ invalid_type_error: t('errors.rateMin') }).min(0, t('errors.rateMin')),
+		// loans.principal_amount is DECIMAL(15,2): moneySchema rejects sub-cent amounts.
+		principal_amount: moneySchema(moneyMessages(tForms, { required: t('errors.principalPositive') })).pipe(
+			z.number().positive(t('errors.principalPositive')),
+		),
+		// loans.annual_rate is DECIMAL(7,4).
+		annual_rate: moneySchema(moneyMessages(tForms, { required: t('errors.rateMin'), decimals: 4, number: true }), {
+			decimals: 4,
+		}).pipe(z.number().min(0, t('errors.rateMin'))),
 		term_months: z.coerce
-			.number({ invalid_type_error: t('errors.termRange') })
+			.number<number>({ error: t('errors.termRange') })
 			.int(t('errors.termRange'))
 			.min(1, t('errors.termRange'))
 			.max(120, t('errors.termRange')),
@@ -42,6 +45,8 @@ function createLoanSchema(t: Translate, tForms: Translate) {
 
 type LoanFormValues = z.infer<ReturnType<typeof createLoanSchema>>
 
+type LoanFormInput = z.input<ReturnType<typeof createLoanSchema>>
+
 function emptyValues(sourceAccountId = ''): LoanFormValues {
 	return {
 		borrower_name: '',
@@ -49,7 +54,7 @@ function emptyValues(sourceAccountId = ''): LoanFormValues {
 		principal_amount: 0,
 		annual_rate: 0,
 		term_months: 12,
-		start_date: format(new Date(), 'yyyy-MM-dd'),
+		start_date: getAppTodayString(),
 		source_account_id: sourceAccountId,
 		notes: '',
 	}
@@ -78,7 +83,7 @@ export function LoanFormDialog({ open, onOpenChange, accounts, onSubmit }: LoanF
 	const [submitError, setSubmitError] = useState<string | null>(null)
 	const defaultAccountId = accounts[0]?.id ?? ''
 
-	const form = useForm<LoanFormValues>({
+	const form = useForm<LoanFormInput, unknown, LoanFormValues>({
 		resolver: zodResolver(schema),
 		defaultValues: emptyValues(defaultAccountId),
 	})
@@ -174,7 +179,7 @@ export function LoanFormDialog({ open, onOpenChange, accounts, onSubmit }: LoanF
 								<FormItem>
 									<FormLabel>{t('principal')}</FormLabel>
 									<FormControl>
-										<Input type='number' min={0} step='0.01' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -187,7 +192,7 @@ export function LoanFormDialog({ open, onOpenChange, accounts, onSubmit }: LoanF
 								<FormItem>
 									<FormLabel>{t('annualRate')}</FormLabel>
 									<FormControl>
-										<Input type='number' min={0} step='0.01' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>

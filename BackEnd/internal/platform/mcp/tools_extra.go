@@ -8,19 +8,23 @@ import (
 
 	"github.com/mark3labs/mcp-go/mcp"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	accountDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/account"
 	categoryDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/category"
 	creditcardDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/creditcard"
 	loanDTO "github.com/osmait/gestorDePresupuesto/internal/platform/dto/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
+	accountService "github.com/osmait/gestorDePresupuesto/internal/services/account"
 	"github.com/osmait/gestorDePresupuesto/internal/services/analytics"
 )
 
 // registerExtraTools registers the extended MCP tools (accounts, categories,
 // credit cards, loans, analytics by period). Called from registerTools.
 func (s *MCPServer) registerExtraTools() {
+	s.registerPlanningTools()
+
 	// --- Accounts ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("create_account",
 			mcp.WithDescription("Create a new bank account for the authenticated user"),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Account name")),
@@ -29,7 +33,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleCreateAccount,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("update_account",
 			mcp.WithDescription("Update an account's name and bank"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
@@ -38,16 +42,33 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleUpdateAccount,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("delete_account",
 			mcp.WithDescription("Delete an account owned by the authenticated user"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
 		),
 		s.handleDeleteAccount,
 	)
+	s.addTool(
+		mcp.NewTool("reconcile_account",
+			mcp.WithDescription("Reconcile an account with the balance its bank shows right now. If the app balance differs, one balance adjustment transaction (neutral in income/expense reports) moves the account to the bank balance. For a credit card pass the statement debt as a negative balance (owes 1000 -> -1000)."),
+			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID (bank account or credit card)")),
+			mcp.WithNumber("bank_balance", mcp.Required(), mcp.Description("Balance the bank shows now (negative if overdrawn, or a card's debt as a negative number)")),
+			mcp.WithString("currency", mcp.Description("DOP or USD (default: the account's currency)")),
+			mcp.WithString("notes", mcp.Description("Optional note, e.g. where the balance comes from")),
+		),
+		s.handleReconcileAccount,
+	)
+	s.addTool(
+		mcp.NewTool("list_account_reconciliations",
+			mcp.WithDescription("List the latest reconciliations of an account (newest first)"),
+			mcp.WithString("id", mcp.Required(), mcp.Description("Account ID")),
+		),
+		s.handleListAccountReconciliations,
+	)
 
 	// --- Categories ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("create_category",
 			mcp.WithDescription("Create a new transaction category"),
 			mcp.WithString("name", mcp.Required(), mcp.Description("Category name")),
@@ -56,7 +77,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleCreateCategory,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("update_category",
 			mcp.WithDescription("Update an existing category"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Category ID")),
@@ -66,7 +87,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleUpdateCategory,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("delete_category",
 			mcp.WithDescription("Delete a category owned by the authenticated user"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Category ID")),
@@ -75,16 +96,16 @@ func (s *MCPServer) registerExtraTools() {
 	)
 
 	// --- Balance / analytics by period ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("balance_by_period",
 			mcp.WithDescription("Return income, expenses and net for a period (current month by default)"),
 			mcp.WithString("period", mcp.Description("Preset period"), mcp.Enum("this_week", "this_month", "last_month", "this_year", "custom")),
-			mcp.WithString("date_from", mcp.Description("Custom start date YYYY-MM-DD (required when period=custom)")),
-			mcp.WithString("date_to", mcp.Description("Custom end date YYYY-MM-DD (required when period=custom)")),
+			mcp.WithString("date_from", mcp.Description("Custom first day YYYY-MM-DD, a calendar day in the app time zone America/Santo_Domingo (required when period=custom)")),
+			mcp.WithString("date_to", mcp.Description("Custom last day YYYY-MM-DD, included whole (required when period=custom)")),
 		),
 		s.handleBalanceByPeriod,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("financial_summary",
 			mcp.WithDescription("Return a financial summary with current month, previous month and percentage change"),
 		),
@@ -92,19 +113,19 @@ func (s *MCPServer) registerExtraTools() {
 	)
 
 	// --- Credit cards ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("list_credit_cards",
 			mcp.WithDescription("List all credit cards with their current balances"),
 		),
 		s.handleListCreditCards,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("credit_card_summary",
 			mcp.WithDescription("Return aggregate credit card metrics: total debt, total limit and utilization per currency"),
 		),
 		s.handleCreditCardSummary,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("pay_credit_card",
 			mcp.WithDescription("Pay a credit card from a bank account"),
 			mcp.WithString("card_id", mcp.Required(), mcp.Description("Credit card (account) ID")),
@@ -118,7 +139,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handlePayCreditCard,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("reset_credit_card_balance",
 			mcp.WithDescription("Reset a credit card balance to zero for a given currency, storing the previous balance in history"),
 			mcp.WithString("card_id", mcp.Required(), mcp.Description("Credit card (account) ID")),
@@ -130,20 +151,20 @@ func (s *MCPServer) registerExtraTools() {
 	)
 
 	// --- Loans ---
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("list_loans",
 			mcp.WithDescription("List all loans for the authenticated user"),
 		),
 		s.handleListLoans,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("get_loan",
 			mcp.WithDescription("Get loan details including installments and payments"),
 			mcp.WithString("id", mcp.Required(), mcp.Description("Loan ID")),
 		),
 		s.handleGetLoan,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("create_loan",
 			mcp.WithDescription("Create a new loan issued from a source account"),
 			mcp.WithString("borrower_name", mcp.Required(), mcp.Description("Borrower name")),
@@ -159,7 +180,7 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleCreateLoan,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("register_loan_payment",
 			mcp.WithDescription("Register a payment received for a loan"),
 			mcp.WithString("loan_id", mcp.Required(), mcp.Description("Loan ID")),
@@ -170,9 +191,9 @@ func (s *MCPServer) registerExtraTools() {
 		),
 		s.handleRegisterLoanPayment,
 	)
-	s.server.AddTool(
+	s.addTool(
 		mcp.NewTool("loan_summary",
-			mcp.WithDescription("Return aggregated loan metrics for the authenticated user"),
+			mcp.WithDescription("Return aggregated loan metrics for the authenticated user, in DOP (USD loans converted) and per currency; pending covers active loans only, defaulted loans are reported apart"),
 		),
 		s.handleLoanSummary,
 	)
@@ -373,43 +394,32 @@ func (s *MCPServer) handleDeleteCategory(ctx context.Context, req mcp.CallToolRe
 
 // =============== ANALYTICS BY PERIOD ===============
 
-func resolvePeriodRange(period, dateFrom, dateTo string) (time.Time, time.Time, error) {
-	now := time.Now()
+// resolvePeriodRange returns the first and the last calendar day (both
+// inclusive, at 00:00 in loc) of a period, as analytics.DashboardFilters
+// takes them. Periods are calendar periods of the app time zone at now; a
+// custom range takes calendar days (YYYY-MM-DD).
+func resolvePeriodRange(period, dateFrom, dateTo string, now time.Time, loc *time.Location) (time.Time, time.Time, error) {
+	loc = apptime.OrDefault(loc)
 	switch period {
-	case "", "this_month":
-		from := time.Date(now.Year(), now.Month(), 1, 0, 0, 0, 0, now.Location())
-		to := from.AddDate(0, 1, 0).Add(-time.Nanosecond)
-		return from, to, nil
-	case "last_month":
-		prev := now.AddDate(0, -1, 0)
-		from := time.Date(prev.Year(), prev.Month(), 1, 0, 0, 0, 0, now.Location())
-		to := from.AddDate(0, 1, 0).Add(-time.Nanosecond)
-		return from, to, nil
-	case "this_week":
-		weekday := int(now.Weekday())
-		if weekday == 0 {
-			weekday = 7
+	case "", "this_month", "last_month", "this_week", "this_year":
+		if period == "" {
+			period = "this_month"
 		}
-		from := now.AddDate(0, 0, -(weekday - 1)).Truncate(24 * time.Hour)
-		to := from.AddDate(0, 0, 6).Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-		return from, to, nil
-	case "this_year":
-		from := time.Date(now.Year(), 1, 1, 0, 0, 0, 0, now.Location())
-		to := time.Date(now.Year()+1, 1, 1, 0, 0, 0, 0, now.Location()).Add(-time.Nanosecond)
-		return from, to, nil
+		r, _ := apptime.Period(period, now, loc)
+		return r.From, r.LastDay(loc), nil
 	case "custom":
 		if dateFrom == "" || dateTo == "" {
 			return time.Time{}, time.Time{}, fmt.Errorf("date_from and date_to are required when period=custom")
 		}
-		from, err := parseMCPDate(dateFrom)
+		fy, fm, fd, err := apptime.ParseCalendarDate(dateFrom)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("invalid date_from: %w", err)
 		}
-		to, err := parseMCPDate(dateTo)
+		ty, tm, td, err := apptime.ParseCalendarDate(dateTo)
 		if err != nil {
 			return time.Time{}, time.Time{}, fmt.Errorf("invalid date_to: %w", err)
 		}
-		return from, to.Add(23*time.Hour + 59*time.Minute + 59*time.Second), nil
+		return apptime.Date(fy, fm, fd, loc), apptime.Date(ty, tm, td, loc), nil
 	default:
 		return time.Time{}, time.Time{}, fmt.Errorf("invalid period: %s", period)
 	}
@@ -421,7 +431,7 @@ func (s *MCPServer) handleBalanceByPeriod(ctx context.Context, req mcp.CallToolR
 		return fail, nil
 	}
 	period := req.GetString("period", "this_month")
-	from, to, perr := resolvePeriodRange(period, req.GetString("date_from", ""), req.GetString("date_to", ""))
+	from, to, perr := resolvePeriodRange(period, req.GetString("date_from", ""), req.GetString("date_to", ""), time.Now(), s.loc)
 	if perr != nil {
 		return mcp.NewToolResultError(perr.Error()), nil
 	}
@@ -452,8 +462,9 @@ func (s *MCPServer) handleFinancialSummary(ctx context.Context, req mcp.CallTool
 		return fail, nil
 	}
 
-	currFrom, currTo, _ := resolvePeriodRange("this_month", "", "")
-	prevFrom, prevTo, _ := resolvePeriodRange("last_month", "", "")
+	now := time.Now()
+	currFrom, currTo, _ := resolvePeriodRange("this_month", "", "", now, s.loc)
+	prevFrom, prevTo, _ := resolvePeriodRange("last_month", "", "", now, s.loc)
 
 	return s.runRO(ctx, userID, func(txCtx context.Context) (interface{}, error) {
 		curr, err := s.services.Analytics.GetDashboardSummary(txCtx, userID, analytics.DashboardFilters{DateFrom: currFrom, DateTo: currTo})
@@ -606,6 +617,54 @@ func (s *MCPServer) handleResetCreditCardBalance(ctx context.Context, req mcp.Ca
 
 	return s.runRW(ctx, userID, func(txCtx context.Context) (interface{}, error) {
 		return s.services.CreditCard.ResetCardBalance(txCtx, cardID, userID, resetReq)
+	})
+}
+
+func (s *MCPServer) handleReconcileAccount(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID, fail := authUserID(ctx)
+	if fail != nil {
+		return fail, nil
+	}
+	id, err := req.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+	if _, ok := req.GetArguments()["bank_balance"]; !ok {
+		return mcp.NewToolResultError("bank_balance is required"), nil
+	}
+	bankBalance, argErr := amountArg(req, "bank_balance", money.StorageScale)
+	if argErr != nil {
+		return mcp.NewToolResultError(argErr.Error()), nil
+	}
+	in := &accountDTO.ReconcileRequest{
+		BankBalance: &bankBalance,
+		Currency:    req.GetString("currency", ""),
+		Notes:       req.GetString("notes", ""),
+	}
+	if err := in.Validate(); err != nil {
+		return mcp.NewToolResultError(err.Error()), nil
+	}
+
+	return s.runRW(ctx, userID, func(txCtx context.Context) (interface{}, error) {
+		return s.services.Account.Reconcile(txCtx, id, userID, accountService.ReconcileInput{
+			BankBalance: bankBalance,
+			Currency:    in.Currency,
+			Notes:       in.Notes,
+		})
+	})
+}
+
+func (s *MCPServer) handleListAccountReconciliations(ctx context.Context, req mcp.CallToolRequest) (*mcp.CallToolResult, error) {
+	userID, fail := authUserID(ctx)
+	if fail != nil {
+		return fail, nil
+	}
+	id, err := req.RequireString("id")
+	if err != nil {
+		return mcp.NewToolResultError("id is required"), nil
+	}
+	return s.runRO(ctx, userID, func(txCtx context.Context) (interface{}, error) {
+		return s.services.Account.Reconciliations(txCtx, id, userID)
 	})
 }
 

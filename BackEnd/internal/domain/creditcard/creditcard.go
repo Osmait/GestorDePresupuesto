@@ -6,6 +6,11 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 )
 
+// PaymentReceivedType is the transaction a card payment writes on the card
+// account (migration 000059): it lowers the debt. The paying account gets the
+// usual card_payment. Neutral in reports, like card_payment.
+const PaymentReceivedType = "card_payment_received"
+
 type PaymentStatus string
 
 const (
@@ -25,6 +30,11 @@ type CreditCard struct {
 	UpdatedAt      time.Time
 }
 
+// CardBalance is one currency of a card: its credit limit, and as
+// CurrentBalance the card's balance in that currency, which is the ledger
+// balance of the card account (charges negative, payments and adjustments
+// back). It is computed on read; card_balances.current_balance is always 0
+// since migration 000060.
 type CardBalance struct {
 	Id             string
 	CardId         string

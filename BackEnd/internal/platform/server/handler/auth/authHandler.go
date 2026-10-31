@@ -231,7 +231,8 @@ func DemoLogin(authService *auth.AuthService) gin.HandlerFunc {
 		token, err := authService.CreateDemoUser(ctx.Request.Context(), ip)
 		if err != nil {
 			log.Error().Err(err).Msg("demo user creation failed")
-			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			// The cause (database errors included) stays in the log.
+			ctx.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "could not create the demo user"})
 			return
 		}
 		ctx.JSON(http.StatusOK, token)

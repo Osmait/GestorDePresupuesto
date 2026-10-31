@@ -1,0 +1,125 @@
+version: 2
+
+updates:
+  # --- Frontend (Next.js) ---
+  - package-ecosystem: npm
+    directory: /FrontendNextjs/gestor
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      nextjs:
+        patterns:
+          - "next"
+          - "@next/*"
+      # The OTel JS packages are released in lockstep and pin each other's
+      # versions through peer ranges: bumped one by one (or split between a
+      # minor and a major PR) npm ci fails with ERESOLVE.
+      opentelemetry:
+        patterns:
+          - "@opentelemetry/*"
+          - "@vercel/otel"
+      frontend-minor-patch:
+        update-types:
+          - minor
+          - patch
+    ignore:
+      # @vercel/otel 2.x peers on the OTel 2.x line (api <1.10, SDK <3,
+      # experimental <0.300). Lift when @vercel/otel supports OTel 3.
+      - dependency-name: "@opentelemetry/api"
+        versions: [">=1.10.0"]
+      - dependency-name: "@opentelemetry/*"
+        versions: [">=0.300.0 <1.0.0", ">=3.0.0"]
+      # next-auth 5 beta peers on @simplewebauthn ^9.
+      - dependency-name: "@simplewebauthn/*"
+        update-types: ["version-update:semver-major"]
+      # Types follow the Node runtime (engines: node 24).
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # TypeScript 7 (native compiler) is deferred.
+      - dependency-name: "typescript"
+        versions: [">=7.0.0"]
+
+  # --- Playwright E2E suite ---
+  - package-ecosystem: npm
+    directory: /e2e-test
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "chore(deps)"
+    ignore:
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "typescript"
+        versions: [">=7.0.0"]
+    groups:
+      e2e-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- Root tooling (commitlint, husky) ---
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      # cli and config-conventional share a version and must move together.
+      commitlint:
+        patterns:
+          - "@commitlint/*"
+      tooling-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- Backend (Go) ---
+  - package-ecosystem: gomod
+    directory: /BackEnd
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore(deps)"
+    groups:
+      otel:
+        patterns:
+          - "go.opentelemetry.io/*"
+      backend-minor-patch:
+        update-types:
+          - minor
+          - patch
+
+  # --- GitHub Actions ---
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3
+    commit-message:
+      prefix: "ci(deps)"
+    groups:
+      actions:
+        patterns:
+          - "*"
+
+  # --- Backend Docker image (BackEnd/dockerfile) ---
+  - package-ecosystem: docker
+    directory: /BackEnd
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 2
+    commit-message:
+      prefix: "chore(deps)"

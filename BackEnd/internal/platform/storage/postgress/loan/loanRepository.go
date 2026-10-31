@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
@@ -207,6 +208,51 @@ func (r *LoanRepository) findById(ctx context.Context, id string, userId string,
 // loan_installments and loan_payments have no user_id column of their own.
 func ownedLoanClause(placeholder string) string {
 	return "loan_id IN (SELECT id FROM loans WHERE user_id = " + placeholder + ")"
+}
+
+// FindInstallmentsByLoans is FindInstallmentsByLoan for several loans in one
+// query, keyed by loan id; each loan's installments are ordered by number and
+// a loan without installments is absent from the map.
+func (r *LoanRepository) FindInstallmentsByLoans(ctx context.Context, loanIds []string, userId string) (map[string][]*loan.Installment, error) {
+	results := make(map[string][]*loan.Installment)
+	if len(loanIds) == 0 {
+		return results, nil
+	}
+	query := `
+		SELECT id, loan_id, installment_number, due_date, expected_amount,
+			paid_amount, status, paid_at, created_at, updated_at
+		FROM loan_installments
+		WHERE loan_id = ANY($1::varchar[]) AND ` + ownedLoanClause("$2") + `
+		ORDER BY loan_id, installment_number ASC
+	`
+
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, pq.Array(loanIds), userId)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	for rows.Next() {
+		item := &loan.Installment{}
+		err = rows.Scan(
+			&item.Id,
+			&item.LoanId,
+			&item.InstallmentNumber,
+			&item.DueDate,
+			&item.ExpectedAmount,
+			&item.PaidAmount,
+			&item.Status,
+			&item.PaidAt,
+			&item.CreatedAt,
+			&item.UpdatedAt,
+		)
+		if err != nil {
+			return nil, err
+		}
+		results[item.LoanId] = append(results[item.LoanId], item)
+	}
+
+	return results, rows.Err()
 }
 
 func (r *LoanRepository) FindInstallmentsByLoan(ctx context.Context, loanId string, userId string) ([]*loan.Installment, error) {

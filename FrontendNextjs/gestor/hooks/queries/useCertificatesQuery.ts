@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCertificateRepository } from '@/app/repository/certificateRepository'
+import { readOnlyMutation } from '@/components/common/react-query-provider'
 import {
 	CertificateSummary,
 	CertificateWithHistory,
@@ -113,6 +114,7 @@ export function useUpdateCertificatePaymentMutation() {
 
 export function useSimulateCertificateMutation() {
 	return useMutation({
+		...readOnlyMutation,
 		mutationFn: async ({ id, data }: { id: string; data: SimulatePaymentDTO }): Promise<SimulationResult> => {
 			const repo = await getCertificateRepository()
 			return repo.simulate(id, data)

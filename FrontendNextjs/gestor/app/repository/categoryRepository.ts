@@ -1,11 +1,17 @@
 import { BaseRepository } from '@/lib/base-repository'
+import { normalizeCategoryColor } from '@/lib/category-color'
 import { Category } from '@/types/category'
+
+/** Named colors from the API ('blue') become palette hex values (see normalizeCategoryColor). */
+function withPaletteColor(category: Category): Category {
+	return { ...category, color: normalizeCategoryColor(category.color) }
+}
 
 export class CategoryRepository extends BaseRepository {
 	async findAll(): Promise<Category[]> {
 		try {
 			const categories = await this.get<Category[]>('/category')
-			return categories ?? []
+			return (categories ?? []).map(withPaletteColor)
 		} catch (error) {
 			console.error('Error fetching categories:', error)
 			return []
@@ -41,7 +47,8 @@ export class CategoryRepository extends BaseRepository {
 
 	async findById(id: string): Promise<Category | null> {
 		try {
-			return await this.get<Category>(`/category/${id}`)
+			const category = await this.get<Category>(`/category/${id}`)
+			return category ? withPaletteColor(category) : null
 		} catch (error) {
 			console.error('Error fetching category by id:', error)
 			return null

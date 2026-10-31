@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Button } from '@/components/ui/button'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
@@ -18,6 +19,7 @@ import {
 } from '@/hooks/queries/useInvestmentsQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { getSafeErrorDetail } from '@/lib/api-error'
+import { moneyInputToNumber, moneyMessages, moneySchema } from '@/lib/money-input'
 import { getInvestmentRepository } from '@/lib/repositoryConfig'
 import { Investment, InvestmentType } from '@/types/investment'
 
@@ -27,27 +29,40 @@ interface InvestmentFormModalProps {
 	investmentToEdit?: Investment | null
 }
 
-type FormTranslator = (key: string) => string
+type FormTranslator = (key: string, values?: Record<string, string | number>) => string
 
-function createInvestmentSchema(t: FormTranslator) {
+/** Positions are priced and settled in one of these (each valued in its own currency). */
+const SETTLEMENT_CURRENCIES = ['USD', 'DOP'] as const
+
+/** investments.quantity is NUMERIC(38,18) (crypto units); the prices are NUMERIC(28,10). */
+const QUANTITY_DECIMALS = 18
+const PRICE_DECIMALS = 10
+
+function createInvestmentSchema(t: FormTranslator, tForms: FormTranslator) {
+	const quantity = moneyMessages(tForms, { decimals: QUANTITY_DECIMALS, number: true, required: t('errors.minZero') })
+	const price = moneyMessages(tForms, { decimals: PRICE_DECIMALS, required: t('errors.minZero') })
 	return z.object({
 		name: z.string().min(1, t('errors.nameRequired')),
 		symbol: z
 			.string()
 			.min(1, t('errors.symbolRequired'))
 			.transform((v) => v.toUpperCase()),
-		type: z.nativeEnum(InvestmentType),
-		quantity: z.coerce.number().min(0, t('errors.minZero')),
-		purchase_price: z.coerce.number().min(0, t('errors.minZero')),
-		current_price: z.coerce.number().min(0, t('errors.minZero')),
-		settlement_currency: z
-			.string()
-			.min(1, t('errors.currencyRequired'))
-			.transform((v) => v.toUpperCase()),
+		type: z.enum(InvestmentType),
+		// Purchases only: quantity and unit price must be greater than 0 (the API rejects the rest).
+		quantity: moneySchema(quantity, { decimals: QUANTITY_DECIMALS }).pipe(
+			z.number().positive(t('errors.greaterThanZero')),
+		),
+		purchase_price: moneySchema(price, { decimals: PRICE_DECIMALS }).pipe(
+			z.number().positive(t('errors.greaterThanZero')),
+		),
+		current_price: moneySchema(price, { decimals: PRICE_DECIMALS }).pipe(z.number().min(0, t('errors.minZero'))),
+		settlement_currency: z.enum(SETTLEMENT_CURRENCIES, t('errors.currencyRequired')),
 	})
 }
 
 type InvestmentFormValues = z.infer<ReturnType<typeof createInvestmentSchema>>
+
+type InvestmentFormInput = z.input<ReturnType<typeof createInvestmentSchema>>
 
 const defaultValues: InvestmentFormValues = {
 	name: '',
@@ -63,14 +78,15 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 	const t = useTranslations('investments.form')
 	const tTypes = useTranslations('investments.typeSingular')
 	const formatCurrency = useFormatCurrency()
-	const investmentSchema = useMemo(() => createInvestmentSchema(t), [t])
+	const tForms = useTranslations('forms')
+	const investmentSchema = useMemo(() => createInvestmentSchema(t, tForms), [t, tForms])
 	const [error, setError] = useState<string | null>(null)
 	const [fetchLoading, setFetchLoading] = useState(false)
 	const createMutation = useCreateInvestmentMutation()
 	const updateMutation = useUpdateInvestmentMutation()
 	const { data: balances = [] } = useGetInvestmentFundingBalances()
 
-	const form = useForm<InvestmentFormValues>({
+	const form = useForm<InvestmentFormInput, unknown, InvestmentFormValues>({
 		resolver: zodResolver(investmentSchema),
 		defaultValues,
 	})
@@ -85,7 +101,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 				quantity: investmentToEdit.quantity,
 				purchase_price: investmentToEdit.purchase_price,
 				current_price: investmentToEdit.current_price,
-				settlement_currency: investmentToEdit.settlement_currency || 'USD',
+				settlement_currency: investmentToEdit.settlement_currency?.toUpperCase() === 'DOP' ? 'DOP' : 'USD',
 			})
 			return
 		}
@@ -94,16 +110,18 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 
 	const watchedValues = form.watch()
 	const settlementCurrency = (watchedValues.settlement_currency || 'USD').toUpperCase()
-	const requiredAmount = Math.max(watchedValues.quantity, 0) * Math.max(watchedValues.purchase_price, 0)
+	const typedQuantity = moneyInputToNumber(watchedValues.quantity, { decimals: QUANTITY_DECIMALS })
+	const typedPurchasePrice = moneyInputToNumber(watchedValues.purchase_price, { decimals: PRICE_DECIMALS })
+	const requiredAmount =
+		Number.isFinite(typedQuantity) && Number.isFinite(typedPurchasePrice)
+			? Math.max(typedQuantity, 0) * Math.max(typedPurchasePrice, 0)
+			: 0
 	const availableBalance = useMemo(() => {
 		const match = balances.find((balance) => balance.currency === settlementCurrency)
 		return match?.available || 0
 	}, [balances, settlementCurrency])
 
-	// Free-text currency field: only format as money once it looks like an ISO 4217 code
-	// (formatCurrency would otherwise fall back to DOP while the user is still typing).
-	const isIsoCode = /^[A-Z]{3}$/.test(settlementCurrency)
-	const formatSettlement = (amount: number) => (isIsoCode ? formatCurrency(amount, settlementCurrency) : '—')
+	const formatSettlement = (amount: number) => formatCurrency(amount, settlementCurrency)
 
 	const handleFetchPrice = async () => {
 		const symbol = form.getValues('symbol')
@@ -118,7 +136,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 				if ((!currentName || currentName === '') && quote.name) {
 					form.setValue('name', quote.name)
 				}
-				if (currentPurchasePrice === 0) {
+				if (!(moneyInputToNumber(currentPurchasePrice, { decimals: PRICE_DECIMALS }) > 0)) {
 					form.setValue('purchase_price', quote.regular_market_price)
 				}
 				setError(null)
@@ -263,9 +281,22 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 							render={({ field }) => (
 								<FormItem>
 									<FormLabel>{t('purchaseCurrency')}</FormLabel>
-									<FormControl>
-										<Input {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} maxLength={10} />
-									</FormControl>
+									{/* The cost was paid from the wallet in this currency: it cannot change on edit. */}
+									<Select value={field.value} onValueChange={field.onChange} disabled={Boolean(investmentToEdit)}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{SETTLEMENT_CURRENCIES.map((code) => (
+												<SelectItem key={code} value={code}>
+													{code}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									{investmentToEdit ? <p className='text-xs text-muted-foreground'>{t('currencyLocked')}</p> : null}
 									<FormMessage />
 								</FormItem>
 							)}
@@ -278,7 +309,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								<FormItem>
 									<FormLabel>{t('quantity')}</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -292,7 +323,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								<FormItem>
 									<FormLabel>{t('purchasePrice')}</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -306,7 +337,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 								<FormItem className='sm:col-span-2'>
 									<FormLabel>{t('currentPrice')}</FormLabel>
 									<FormControl>
-										<Input type='number' step='any' inputMode='decimal' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>

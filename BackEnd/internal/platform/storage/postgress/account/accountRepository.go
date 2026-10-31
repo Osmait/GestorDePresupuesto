@@ -4,6 +4,9 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/likepattern"
+
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
@@ -62,8 +65,8 @@ func (repo *AccountRepository) Delete(ctx context.Context, id string, userId str
 
 // The balance reads below use account_balances (migration 000052): per
 // (user, account, currency) the net total of the account's transactions
-// (income, loan_collection and loan_cancellation_refund add, every other type
-// subtracts; a NULL currency counts as DOP). Triggers on transactions keep it
+// (income, loan_collection, loan_cancellation_refund and adjustment_in add,
+// every other type subtracts; a NULL currency counts as DOP). Triggers on transactions keep it
 // current inside the writing transaction. The total is striped over up to 32
 // rows (one per writing connection slot, so concurrent writers do not queue on
 // a single row) and summed on read: an index range scan of a few rows instead
@@ -93,6 +96,46 @@ func (repo *AccountRepository) BalanceByCurrency(ctx context.Context, id string,
 		return money.Zero, err
 	}
 	return total, nil
+}
+
+// BalancesByCurrency is BalanceByCurrency for several accounts in one query,
+// as account id -> currency -> net total. An account or currency without
+// transactions is absent from the map: read it as zero, as BalanceByCurrency
+// returns.
+func (repo *AccountRepository) BalancesByCurrency(ctx context.Context, ids []string, userId string) (map[string]map[string]money.Amount, error) {
+	balances := make(map[string]map[string]money.Amount)
+	if len(ids) == 0 {
+		return balances, nil
+	}
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
+		`SELECT account_id, currency, SUM(balance) FROM account_balances
+		 WHERE user_id = $1 AND account_id = ANY($2::varchar[])
+		 GROUP BY account_id, currency`, userId, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	for rows.Next() {
+		var accountId, currency string
+		var total money.Amount
+		if err = rows.Scan(&accountId, &currency, &total); err != nil {
+			return nil, err
+		}
+		if balances[accountId] == nil {
+			balances[accountId] = make(map[string]money.Amount)
+		}
+		balances[accountId][currency] = total
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return balances, nil
 }
 
 // Balances returns Balance for every account of userId that has transactions.
@@ -168,7 +211,7 @@ func (repo *AccountRepository) FindByIdAndUserIdForUpdate(ctx context.Context, i
 }
 
 func (repo *AccountRepository) Search(ctx context.Context, userId string, query string) ([]*account.Account, error) {
-	searchTerm := "%" + query + "%"
+	searchTerm := likepattern.Contains(query)
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, "SELECT id, name_account, bank, balance, user_id, account_type, currency, created_at FROM account WHERE user_id = $1 AND (name_account ILIKE $2 OR bank ILIKE $2)", userId, searchTerm)
 	if err != nil {
 		return nil, err

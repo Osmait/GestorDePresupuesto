@@ -6,6 +6,7 @@ import { useTranslations } from 'next-intl'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { readableCategoryColor } from '@/lib/category-color'
 import { CHART_TOOLTIP_CLASS, useChartTheme } from './chart-theme'
 
 interface DashboardPieChartProps {
@@ -22,11 +23,15 @@ interface DashboardPieChartProps {
 }
 
 /** Expenses by category: donut with the total in the middle plus a legend of the top six. */
-const DashboardPieChart = ({ data, t }: DashboardPieChartProps) => {
-	const { theme } = useChartTheme(12)
+const DashboardPieChart = ({ data: rawData, t }: DashboardPieChartProps) => {
+	const { theme, isDark } = useChartTheme(12)
 	const tCharts = useTranslations('charts')
 	const formatCurrency = useFormatCurrency()
 	const formatPercent = useFormatPercent()
+
+	// User colors, adjusted (if needed) to stand out from the card in the current theme.
+	const mode = isDark ? 'dark' : 'light'
+	const data = rawData.map((item: any) => ({ ...item, color: readableCategoryColor(item.color, mode) }))
 
 	if (data.length === 0) {
 		return <EmptyState compact icon={PieChart} title={t.noExpenses} description={t.expensesHint} />

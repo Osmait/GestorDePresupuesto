@@ -1,6 +1,5 @@
 'use client'
 
-import { format } from 'date-fns'
 import { LineChart, PieChart } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
@@ -9,16 +8,19 @@ import { useChartTheme } from '@/components/charts/chart-theme'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useGetInvestments } from '@/hooks/queries/useInvestmentsQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { formatDateInTimeZone, getAppTodayString } from '@/lib/app-time'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { portfolioMetrics } from '@/lib/valuation'
 import { InvestmentType } from '@/types/investment'
 import { InvestmentSummaryCards } from './InvestmentSummaryCards'
 
 /** Fixed series order per type, so a type keeps its color across renders and pages. */
 const TYPE_ORDER: readonly string[] = [InvestmentType.STOCK, InvestmentType.CRYPTO, InvestmentType.FIXED_INCOME]
 const KNOWN_TYPES = new Set<string>(TYPE_ORDER)
-// Portfolio totals are aggregated without FX conversion; positions are settled in USD by default.
+// The portfolio is reported in USD: USD positions as is, DOP positions converted at the rate.
 const PORTFOLIO_CURRENCY = 'USD'
 
 // Client-only chart chunks: the summary cards render without waiting for Nivo.
@@ -40,27 +42,26 @@ export function InvestmentDashboard() {
 	const { data: investments, isLoading } = useGetInvestments()
 	const { colors } = useChartTheme()
 
+	const { data: exchangeRate } = useExchangeRateQuery()
+	const usdToDop = exchangeRate?.usd_to_dop
+
 	const metrics = useMemo(() => {
-		if (!investments) return { totalValue: 0, totalCost: 0, totalProfit: 0, roi: 0, allocation: [], history: [] }
+		if (!investments)
+			return {
+				totalValue: 0,
+				totalCost: 0,
+				totalProfit: 0,
+				roi: 0,
+				allocation: [],
+				history: [],
+				convertedDop: false,
+				excluded: false,
+			}
 
-		let totalValue = 0
-		let totalCost = 0
-		const allocationMap = new Map<string, number>()
+		// Each position in its own currency; DOP converted to the USD portfolio currency.
+		const portfolio = portfolioMetrics(investments, usdToDop)
 
-		investments.forEach((inv) => {
-			const value = inv.quantity * inv.current_price
-			const cost = inv.quantity * inv.purchase_price
-			totalValue += value
-			totalCost += cost
-
-			const currentTypeTotal = allocationMap.get(inv.type) || 0
-			allocationMap.set(inv.type, currentTypeTotal + value)
-		})
-
-		const totalProfit = totalValue - totalCost
-		const roi = totalCost > 0 ? (totalProfit / totalCost) * 100 : 0
-
-		const allocation = Array.from(allocationMap.entries())
+		const allocation = Array.from(portfolio.allocation.entries())
 			.sort(([a], [b]) => orderOf(a) - orderOf(b))
 			.map(([id, value]) => ({
 				id,
@@ -71,17 +72,16 @@ export function InvestmentDashboard() {
 		const history: { x: string; y: number }[] = []
 
 		// Sort investments by date
-		const sortedInvestments = [...investments].sort(
-			(a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+		const sortedCosts = [...portfolio.costs].sort(
+			(a, b) => new Date(a.investment.created_at).getTime() - new Date(b.investment.created_at).getTime(),
 		)
 
 		let runningTotal = 0
-		sortedInvestments.forEach((inv) => {
-			const cost = inv.quantity * inv.purchase_price
+		sortedCosts.forEach(({ investment: inv, cost }) => {
 			runningTotal += cost
 
-			// Group by the user's local calendar day (YYYY-MM-DD).
-			const date = format(new Date(inv.created_at), 'yyyy-MM-dd')
+			// Group by the calendar day (YYYY-MM-DD) in the app's time zone.
+			const date = formatDateInTimeZone(new Date(inv.created_at))
 
 			// If multiple investments on same day, update last entry, else push new
 			const lastEntry = history[history.length - 1]
@@ -94,14 +94,23 @@ export function InvestmentDashboard() {
 
 		// A single day draws no line: add today's point.
 		if (history.length === 1) {
-			const today = format(new Date(), 'yyyy-MM-dd')
+			const today = getAppTodayString()
 			if (history[0].x !== today) {
 				history.push({ x: today, y: runningTotal })
 			}
 		}
 
-		return { totalValue, totalCost, totalProfit, roi, allocation, history }
-	}, [investments, t])
+		return {
+			totalValue: portfolio.totalValue,
+			totalCost: portfolio.totalCost,
+			totalProfit: portfolio.totalProfit,
+			roi: portfolio.roi,
+			allocation,
+			history,
+			convertedDop: portfolio.convertedDop,
+			excluded: portfolio.excluded,
+		}
+	}, [investments, t, usdToDop])
 
 	const allocationData = useMemo(
 		() =>
@@ -129,7 +138,7 @@ export function InvestmentDashboard() {
 
 	return (
 		<div className='space-y-4'>
-			<InvestmentSummaryCards metrics={metrics} loading={isLoading} />
+			<InvestmentSummaryCards metrics={metrics} loading={isLoading} usdToDop={usdToDop} />
 
 			<div className='grid gap-4 lg:grid-cols-2'>
 				<Card>

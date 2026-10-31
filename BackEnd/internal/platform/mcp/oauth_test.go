@@ -15,7 +15,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/crypto/bcrypt"
@@ -99,6 +99,7 @@ func newOAuthFixture(t *testing.T, authenticator Authenticator, ipCfg config.Ser
 	engine.GET("/oauth/authorize", p.AuthorizeHandler())
 	engine.POST("/oauth/authorize", p.AuthorizeHandler())
 	engine.POST("/oauth/token", gin.WrapH(p.TokenHandler()))
+	engine.POST("/oauth/revoke", gin.WrapH(p.RevocationHandler()))
 	engine.POST("/oauth/register", gin.WrapH(p.RegistrationHandler()))
 	return &oauthFixture{provider: p, storage: storage, auth: authenticator, engine: engine}
 }
@@ -446,8 +447,15 @@ func exchangeCode(t *testing.T, f *oauthFixture, code, verifier string) (*httpte
 
 func authorizeCode(t *testing.T, f *oauthFixture, challenge string) string {
 	t.Helper()
+	return authorizeCodeWithScope(t, f, challenge, "mcp")
+}
+
+func authorizeCodeWithScope(t *testing.T, f *oauthFixture, challenge, scope string) string {
+	t.Helper()
 	// GET renders the page; the POST sends back exactly its hidden fields.
-	page := f.do(getAuthorize(authorizeQuery(challenge), ""))
+	q := authorizeQuery(challenge)
+	q.Set("scope", scope)
+	page := f.do(getAuthorize(q, ""))
 	require.Equal(t, http.StatusOK, page.Code)
 	body := page.Body.String()
 	form := url.Values{}
@@ -505,6 +513,41 @@ func TestAuthorizeFlow_EndToEndWithPKCE(t *testing.T) {
 		assert.Error(t, err)
 		_, err = f.provider.TokenVerifier()(refreshed.AccessToken)
 		assert.NoError(t, err)
+	})
+
+	t.Run("refresh keeps the granted scope", func(t *testing.T) {
+		verifier, challenge := newPKCE(t)
+		_, tokens := exchangeCode(t, f, authorizeCodeWithScope(t, f, challenge, "mcp:read"), verifier)
+		require.NotEmpty(t, tokens.RefreshToken)
+
+		// A read-only grant must not upgrade itself to write access.
+		refresh := f.do(postForm("/oauth/token", url.Values{
+			"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken},
+			"client_id": {testClientID}, "scope": {"mcp:write"},
+		}, ""))
+		require.Equal(t, http.StatusOK, refresh.Code, refresh.Body.String())
+		var refreshed tokenResponse
+		require.NoError(t, json.Unmarshal(refresh.Body.Bytes(), &refreshed))
+		info, err := f.provider.TokenVerifier()(refreshed.AccessToken)
+		require.NoError(t, err)
+		assert.Equal(t, "mcp:read", info.Scope)
+	})
+
+	t.Run("revoked refresh token cannot be used", func(t *testing.T) {
+		verifier, challenge := newPKCE(t)
+		_, tokens := exchangeCode(t, f, authorizeCode(t, f, challenge), verifier)
+		require.NotEmpty(t, tokens.RefreshToken)
+
+		rec := f.do(postForm("/oauth/revoke", url.Values{
+			"token": {tokens.RefreshToken}, "token_type_hint": {"refresh_token"}, "client_id": {testClientID},
+		}, ""))
+		require.Equal(t, http.StatusOK, rec.Code, rec.Body.String())
+		_, err := f.provider.TokenVerifier()(tokens.AccessToken)
+		assert.Error(t, err, "revoking the refresh token revokes its access token")
+		refresh := f.do(postForm("/oauth/token", url.Values{
+			"grant_type": {"refresh_token"}, "refresh_token": {tokens.RefreshToken}, "client_id": {testClientID},
+		}, ""))
+		assert.Equal(t, http.StatusBadRequest, refresh.Code)
 	})
 
 	t.Run("wrong verifier is rejected", func(t *testing.T) {

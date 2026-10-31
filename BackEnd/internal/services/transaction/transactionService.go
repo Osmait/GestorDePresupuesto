@@ -8,8 +8,10 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/services/errorhttp"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
@@ -29,6 +31,14 @@ const (
 	LOAN_CANCELLATION_REFUND = "loan_cancellation_refund"
 )
 
+// ErrManagedTransaction rejects editing or deleting a transaction the app
+// manages itself (see transaction.IsEditable / IsDeletable).
+var ErrManagedTransaction = fmt.Errorf("%w: this transaction is managed by the app (card payment, loan, broker funding or balance adjustment); use its own screen, reconcile the account or delete the adjustment instead", errorhttp.ErrBadRequest)
+
+// The method parameters named `transaction` shadow the domain package.
+func isEditable(t string) bool  { return transaction.IsEditable(t) }
+func isDeletable(t string) bool { return transaction.IsDeletable(t) }
+
 type AICacheInvalidator interface {
 	InvalidateUserAnalysis(userID string)
 	InvalidateUserExtractions(userID string)
@@ -41,10 +51,24 @@ type TransactionService struct {
 	cache                 cache.CacheRepository
 	aiCache               AICacheInvalidator
 	usdToDopRateFn        func(context.Context) (money.Amount, error)
+	loc                   *time.Location
 }
 
-func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator, usdToDopRateFn func(context.Context) (money.Amount, error)) *TransactionService {
-	return &TransactionService{
+// Option configures a TransactionService.
+type Option func(*TransactionService)
+
+// WithLocation sets the app time zone that calendar days and months of
+// transaction filters are cut in (default apptime.Default()).
+func WithLocation(loc *time.Location) Option {
+	return func(s *TransactionService) {
+		if loc != nil {
+			s.loc = loc
+		}
+	}
+}
+
+func NewTransactionService(transactionRepository transactionRepo.TransactionRepositoryInterface, budgetReposiotry budgetRepo.BudgetRepoInterface, notificationService *notification.NotificationService, cache cache.CacheRepository, aiCache AICacheInvalidator, usdToDopRateFn func(context.Context) (money.Amount, error), opts ...Option) *TransactionService {
+	s := &TransactionService{
 		transactionRepository: transactionRepository,
 		budgetRepository:      budgetReposiotry,
 		notificationService:   notificationService,
@@ -52,6 +76,19 @@ func NewTransactionService(transactionRepository transactionRepo.TransactionRepo
 		aiCache:               aiCache,
 		usdToDopRateFn:        usdToDopRateFn,
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// Location returns the app time zone (apptime.Default() when none was
+// configured, or on a nil service).
+func (s *TransactionService) Location() *time.Location {
+	if s == nil {
+		return apptime.Default()
+	}
+	return apptime.OrDefault(s.loc)
 }
 
 // listCachePrefix is the cache invalidation group of userId's transaction
@@ -73,6 +110,20 @@ func (s TransactionService) invalidateLists(ctx context.Context, userId string) 
 func (s TransactionService) CreateTransaction(ctx context.Context, name, description string, amount money.Amount, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) error {
 	_, err := s.CreateTransactionWithID(ctx, name, description, amount, typeTransaction, accountId, userId, categoryId, budgetId, currency, createdAt)
 	return err
+}
+
+// ErrNotUserType rejects creating, through a user-facing entry point (REST,
+// MCP, AI import), a type the app writes itself as part of a larger operation.
+var ErrNotUserType = fmt.Errorf("%w: only income and bill transactions can be created directly; use the card payment, loan, investment or reconcile flows for the others", errorhttp.ErrBadRequest)
+
+// CreateUserTransaction creates a transaction on behalf of the user. Unlike
+// CreateTransactionWithID, which services also use to write their managed
+// rows, it only accepts the user's own types (see transaction.IsUserType).
+func (s TransactionService) CreateUserTransaction(ctx context.Context, name, description string, amount money.Amount, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) (string, error) {
+	if !transaction.IsUserType(typeTransaction) {
+		return "", ErrNotUserType
+	}
+	return s.CreateTransactionWithID(ctx, name, description, amount, typeTransaction, accountId, userId, categoryId, budgetId, currency, createdAt)
 }
 
 func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, description string, amount money.Amount, typeTransaction string, accountId string, userId string, categoryId string, budgetId string, currency string, createdAt time.Time) (string, error) {
@@ -131,13 +182,20 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 		// pressure) and raced the commit (the new bill could be missing).
 		// Only the notification (DB insert + SSE push) is sent asynchronously,
 		// after the commit.
-		s.checkBudgetThreshold(ctx, budget.Id, budget.Amount, userId, amount, resolvedCurrency)
+		s.checkBudgetThreshold(ctx, budget.CategoryId, budget.Amount, userId, amount, resolvedCurrency, transaction.CreatedAt)
 	}
 
 	return id, nil
 }
 
-func (s TransactionService) checkBudgetThreshold(ctx context.Context, budgetID string, budgetAmount money.Amount, userId string, amount money.Amount, resolvedCurrency string) {
+// checkBudgetThreshold alerts when the new bill makes the category's
+// spending this month (the budget's spending, see FindCurrentCategorySpent)
+// cross 70% or 100% of the budget. A bill dated outside the current local
+// month does not change this month's spending and is not checked.
+func (s TransactionService) checkBudgetThreshold(ctx context.Context, categoryID string, budgetAmount money.Amount, userId string, amount money.Amount, resolvedCurrency string, createdAt time.Time) {
+	if loc := s.Location(); !apptime.StartOfMonth(createdAt, loc).Equal(apptime.StartOfMonth(time.Now(), loc)) {
+		return
+	}
 	usdToDop := money.FromInt(60)
 	if s.usdToDopRateFn != nil {
 		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate.IsPositive() {
@@ -145,7 +203,7 @@ func (s TransactionService) checkBudgetThreshold(ctx context.Context, budgetID s
 		}
 	}
 
-	currentSpent, err := s.transactionRepository.FindCurrentBudget(ctx, budgetID, userId, usdToDop)
+	currentSpent, err := s.transactionRepository.FindCurrentCategorySpent(ctx, categoryID, userId, usdToDop)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get current budget details for alert")
 		return
@@ -294,18 +352,13 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 			}
 		}
 
-		// Get all transactions for summary calculation (without pagination)
-		allTransactionsFilter := *filter
-		allTransactionsFilter.Limit = 0 // Remove pagination for summary
-		allTransactionsFilter.Offset = 0
-
-		allTransactions, err := s.transactionRepository.FindAllOfAllAccountsWithFilters(ctx, userId, &allTransactionsFilter)
+		// Aggregated in SQL over every matching row (pagination ignored)
+		// instead of loading them all.
+		groups, err := s.transactionRepository.SummarizeWithFilters(ctx, userId, filter)
 		if err != nil {
 			return nil, err
 		}
-
-		allTransactionResponses := s.convertToResponseList(allTransactions)
-		summary := dto.CalculateSummary(allTransactionResponses, totalCount, usdToDop)
+		summary := dto.CalculateSummaryFromGroups(groups, totalCount, usdToDop)
 
 		response := dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,
@@ -359,18 +412,12 @@ func (s TransactionService) FindAllWithFilters(
 			}
 		}
 
-		// Get all transactions for summary calculation (without pagination)
-		allTransactionsFilter := *filter
-		allTransactionsFilter.Limit = 0 // Remove pagination for summary
-		allTransactionsFilter.Offset = 0
-
-		allTransactions, err := s.transactionRepository.FindAllWithFilters(ctx, userId, &allTransactionsFilter)
+		// Aggregated in SQL (filter.AccountId scopes it to the account).
+		groups, err := s.transactionRepository.SummarizeWithFilters(ctx, userId, filter)
 		if err != nil {
 			return nil, err
 		}
-
-		allTransactionResponses := s.convertToResponseList(allTransactions)
-		summary := dto.CalculateSummary(allTransactionResponses, totalCount, usdToDop)
+		summary := dto.CalculateSummaryFromGroups(groups, totalCount, usdToDop)
 
 		return dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,
@@ -408,8 +455,17 @@ func (s TransactionService) convertToResponseList(transactions []*transaction.Tr
 	return transactionResponseList
 }
 
-// UpdateTransaction modifies an existing transaction.
+// UpdateTransaction modifies an existing transaction. Transactions the app
+// manages (balance adjustments, card payments received) cannot be edited, nor
+// can a transaction be turned into one.
 func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, transaction *transaction.Transaction) error {
+	current, err := s.transactionRepository.TypeOf(ctx, id, transaction.UserId)
+	if err != nil {
+		return err
+	}
+	if !isEditable(current) || !isEditable(transaction.TypeTransation) {
+		return ErrManagedTransaction
+	}
 	transaction.Amount = transaction.Amount.Abs()
 
 	resolvedCurrency, err := s.transactionRepository.ResolveAndValidateCurrencyForAccount(ctx, transaction.UserId, transaction.AccountId, transaction.Currency)
@@ -436,9 +492,17 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 	return nil
 }
 
-// DeleteTransaction removes a transaction by its ID and User ID.
+// DeleteTransaction removes a transaction by its ID and User ID. A card
+// payment received cannot be deleted on its own (see transaction.IsDeletable).
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {
-	err := s.transactionRepository.Delete(ctx, id, userId)
+	current, err := s.transactionRepository.TypeOf(ctx, id, userId)
+	if err != nil {
+		return err
+	}
+	if !isDeletable(current) {
+		return ErrManagedTransaction
+	}
+	err = s.transactionRepository.Delete(ctx, id, userId)
 	if err == nil {
 		s.invalidateLists(ctx, userId)
 

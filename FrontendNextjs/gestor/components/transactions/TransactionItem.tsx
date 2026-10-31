@@ -9,7 +9,12 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
-import { getSignedAmount, isInflowTransaction } from '@/lib/transaction-utils'
+import {
+	getSignedAmount,
+	isDeletableTransaction,
+	isEditableTransaction,
+	isInflowTransaction,
+} from '@/lib/transaction-utils'
 import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { TransactionActionsContext } from './TransactionContext'
@@ -41,7 +46,9 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 	const [deleteDialogMounted, setDeleteDialogMounted] = useState(false)
 
 	const isIncome = isInflowTransaction(transaction.type_transation)
-	const canEdit = Boolean(onEdit || (setEditingTransaction && setModalOpen))
+	const canEdit =
+		isEditableTransaction(transaction.type_transation) && Boolean(onEdit || (setEditingTransaction && setModalOpen))
+	const canDelete = isDeletableTransaction(transaction.type_transation)
 
 	const getCategoryIcon = (icon?: string) => {
 		if (!icon) return '🏷️'
@@ -155,58 +162,62 @@ function TransactionItem({ transaction, category, onTransactionDeleted, onEdit, 
 								signed
 								className='text-right text-base font-semibold sm:text-lg'
 							/>
-							<DropdownMenu
-								open={menuOpen}
-								onOpenChange={(open) => {
-									if (open) setMenuMounted(true)
-									setMenuOpen(open)
-								}}
-							>
-								<DropdownMenuTrigger asChild>
-									<Button
-										variant='ghost'
-										size='icon'
-										className='shrink-0'
-										aria-label={tCommon('actions.rowMenu', { name: transaction.name })}
-										onClick={stopPropagation}
-									>
-										<MoreHorizontal className='h-4 w-4' aria-hidden='true' />
-									</Button>
-								</DropdownMenuTrigger>
-								{/* Content is portaled, but React events still bubble to the Card: stop them here. */}
-								{menuMounted && (
-									<DropdownMenuContent align='end' onClick={stopPropagation}>
-										{canEdit ? (
-											<DropdownMenuItem
-												className='flex items-center gap-2 cursor-pointer'
-												onClick={(event) => {
-													event.stopPropagation()
-													if (onEdit) {
-														onEdit(transaction)
-													} else if (setEditingTransaction && setModalOpen) {
-														setEditingTransaction(transaction)
-														setModalOpen(true)
-													}
-												}}
-											>
-												<Edit className='h-4 w-4' aria-hidden='true' />
-												{t('edit')}
-											</DropdownMenuItem>
-										) : null}
-										<DropdownMenuItem
-											className='flex cursor-pointer items-center gap-2 text-destructive focus:text-destructive'
-											onClick={(event) => {
-												event.stopPropagation()
-												setDeleteDialogMounted(true)
-												setShowDeleteDialog(true)
-											}}
+							{canEdit || canDelete ? (
+								<DropdownMenu
+									open={menuOpen}
+									onOpenChange={(open) => {
+										if (open) setMenuMounted(true)
+										setMenuOpen(open)
+									}}
+								>
+									<DropdownMenuTrigger asChild>
+										<Button
+											variant='ghost'
+											size='icon'
+											className='shrink-0'
+											aria-label={tCommon('actions.rowMenu', { name: transaction.name })}
+											onClick={stopPropagation}
 										>
-											<Trash2 className='h-4 w-4' aria-hidden='true' />
-											{t('delete')}
-										</DropdownMenuItem>
-									</DropdownMenuContent>
-								)}
-							</DropdownMenu>
+											<MoreHorizontal className='h-4 w-4' aria-hidden='true' />
+										</Button>
+									</DropdownMenuTrigger>
+									{/* Content is portaled, but React events still bubble to the Card: stop them here. */}
+									{menuMounted && (
+										<DropdownMenuContent align='end' onClick={stopPropagation}>
+											{canEdit ? (
+												<DropdownMenuItem
+													className='flex items-center gap-2 cursor-pointer'
+													onClick={(event) => {
+														event.stopPropagation()
+														if (onEdit) {
+															onEdit(transaction)
+														} else if (setEditingTransaction && setModalOpen) {
+															setEditingTransaction(transaction)
+															setModalOpen(true)
+														}
+													}}
+												>
+													<Edit className='h-4 w-4' aria-hidden='true' />
+													{t('edit')}
+												</DropdownMenuItem>
+											) : null}
+											{canDelete ? (
+												<DropdownMenuItem
+													className='flex cursor-pointer items-center gap-2 text-destructive focus:text-destructive'
+													onClick={(event) => {
+														event.stopPropagation()
+														setDeleteDialogMounted(true)
+														setShowDeleteDialog(true)
+													}}
+												>
+													<Trash2 className='h-4 w-4' aria-hidden='true' />
+													{t('delete')}
+												</DropdownMenuItem>
+											) : null}
+										</DropdownMenuContent>
+									)}
+								</DropdownMenu>
+							) : null}
 						</div>
 					</div>
 				</CardContent>

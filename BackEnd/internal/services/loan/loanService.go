@@ -12,6 +12,7 @@ import (
 	categoryDomain "github.com/osmait/gestorDePresupuesto/internal/domain/category"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/loan"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	loanRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/loan"
@@ -52,15 +53,51 @@ type LoanService struct {
 	transactionService TransactionServiceInterface
 	accountRepository  AccountRepositoryInterface
 	categoryRepository CategoryRepositoryInterface
+	loc                *time.Location
+	usdToDopRateFn     func(context.Context) (money.Amount, error)
 }
 
-func NewLoanService(repository loanRepo.LoanRepositoryInterface, transactionService TransactionServiceInterface, accountRepository AccountRepositoryInterface, categoryRepository CategoryRepositoryInterface) *LoanService {
-	return &LoanService{
+// Option configures a LoanService.
+type Option func(*LoanService)
+
+// WithLocation sets the app time zone that "today" and overdue installments
+// are evaluated in (default apptime.Default()).
+func WithLocation(loc *time.Location) Option {
+	return func(s *LoanService) {
+		if loc != nil {
+			s.loc = loc
+		}
+	}
+}
+
+// WithUsdToDopRate sets the USD->DOP rate the summary converts USD loans
+// with (money.FallbackUsdToDopRate when unset or unavailable).
+func WithUsdToDopRate(fn func(context.Context) (money.Amount, error)) Option {
+	return func(s *LoanService) {
+		s.usdToDopRateFn = fn
+	}
+}
+
+func NewLoanService(repository loanRepo.LoanRepositoryInterface, transactionService TransactionServiceInterface, accountRepository AccountRepositoryInterface, categoryRepository CategoryRepositoryInterface, opts ...Option) *LoanService {
+	s := &LoanService{
 		repository:         repository,
 		transactionService: transactionService,
 		accountRepository:  accountRepository,
 		categoryRepository: categoryRepository,
+		loc:                apptime.Default(),
 	}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// isOverdue reports whether an installment due on due's calendar day (a DATE:
+// 00:00 or 12:00 UTC of the day) is past due at now: its due day is before
+// today in the app time zone. It is not overdue on the due day itself.
+func isOverdue(due, now time.Time, loc *time.Location) bool {
+	y, m, d := due.UTC().Date()
+	return apptime.NoonUTC(y, m, d).Before(apptime.TodayNoonUTC(now, loc))
 }
 
 func (s *LoanService) CreateLoan(ctx context.Context, req *dto.CreateLoanRequest, userId string) (*dto.LoanResponse, error) {
@@ -109,7 +146,7 @@ func (s *LoanService) CreateLoan(ctx context.Context, req *dto.CreateLoanRequest
 		InterestMode:    loan.InterestMode(req.InterestMode),
 		AnnualRate:      req.AnnualRate,
 		TermMonths:      req.TermMonths,
-		StartDate:       req.ParsedStartDate(),
+		StartDate:       req.ParsedStartDate(now, s.loc),
 		SourceAccountId: req.SourceAccountId,
 		Notes:           req.Notes,
 		TotalInterest:   totalInterest,
@@ -268,7 +305,7 @@ func (s *LoanService) RegisterPayment(ctx context.Context, loanId string, userId
 		Amount:               paymentAmount,
 		PrincipalComponent:   principalComponent,
 		InterestComponent:    interestComponent,
-		PaymentDate:          req.ParsedPaymentDate(),
+		PaymentDate:          req.ParsedPaymentDate(time.Now()),
 		Notes:                req.Notes,
 		CreatedAt:            time.Now(),
 	}
@@ -390,7 +427,26 @@ func (s *LoanService) CancelLoan(ctx context.Context, loanId string, userId stri
 	return s.repository.UpdateLoanStatus(ctx, loanId, userId, loan.LoanStatusCancelled)
 }
 
+// UpdateStatus only moves a loan between active and defaulted. Paid is set by
+// the payment that settles the loan and cancelled by CancelLoan, which also
+// refunds the pending principal; allowing either here (or leaving cancelled)
+// would skip or repeat that bookkeeping.
 func (s *LoanService) UpdateStatus(ctx context.Context, loanId string, userId string, status loan.LoanStatus) error {
+	entity, err := s.repository.FindByIdForUpdate(ctx, loanId, userId)
+	if err != nil {
+		if isNotFound(err) {
+			return ErrLoanNotFound
+		}
+		return err
+	}
+	if entity.Status == status {
+		return nil
+	}
+	allowed := (entity.Status == loan.LoanStatusActive && status == loan.LoanStatusDefaulted) ||
+		(entity.Status == loan.LoanStatusDefaulted && status == loan.LoanStatusActive)
+	if !allowed {
+		return fmt.Errorf("%w: cannot change a %s loan to %s", errorhttp.ErrBadRequest, entity.Status, status)
+	}
 	if err := s.repository.UpdateLoanStatus(ctx, loanId, userId, status); err != nil {
 		if isNotFound(err) {
 			return ErrLoanNotFound
@@ -400,44 +456,108 @@ func (s *LoanService) UpdateStatus(ctx context.Context, loanId string, userId st
 	return nil
 }
 
+func (s *LoanService) summaryRate(ctx context.Context) money.Amount {
+	if s.usdToDopRateFn != nil {
+		if rate, err := s.usdToDopRateFn(ctx); err == nil && rate.IsPositive() {
+			return rate
+		}
+	}
+	return money.FallbackUsdToDopRate
+}
+
+// GetSummary totals the user's loans (see dto.LoanSummaryResponse for what
+// each total covers), in DOP and per currency.
 func (s *LoanService) GetSummary(ctx context.Context, userId string) (*dto.LoanSummaryResponse, error) {
 	loans, err := s.repository.FindAllByUser(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
 
-	now := time.Now()
-	summary := &dto.LoanSummaryResponse{}
+	summary := summarizeLoans(loans, s.summaryRate(ctx))
 
+	var activeIds []string
 	for _, item := range loans {
-		summary.TotalPrincipal = summary.TotalPrincipal.Add(item.PrincipalAmount)
-		summary.TotalCollected = summary.TotalCollected.Add(item.PaidPrincipal.Add(item.PaidInterest))
-		summary.TotalInterestEarned = summary.TotalInterestEarned.Add(item.PaidInterest)
-
-		pending := item.TotalAmount.Sub(item.PaidPrincipal.Add(item.PaidInterest))
-		if pending.IsPositive() {
-			summary.TotalPending = summary.TotalPending.Add(pending)
-		}
-
 		if item.Status == loan.LoanStatusActive {
-			summary.ActiveLoans++
+			activeIds = append(activeIds, item.Id)
+		}
+	}
+	if len(activeIds) == 0 {
+		return summary, nil
+	}
+	installmentsByLoan, err := s.repository.FindInstallmentsByLoans(ctx, activeIds, userId)
+	if err != nil {
+		return nil, err
+	}
 
-			installments, _ := s.repository.FindInstallmentsByLoan(ctx, item.Id, userId)
-			for _, installment := range installments {
-				if installment.Status != loan.InstallmentStatusPaid && installment.DueDate.Before(now) {
-					summary.OverdueLoans++
-					break
-				}
+	now := time.Now()
+	for _, id := range activeIds {
+		for _, installment := range installmentsByLoan[id] {
+			if installment.Status != loan.InstallmentStatusPaid && isOverdue(installment.DueDate, now, s.loc) {
+				summary.OverdueLoans++
+				break
 			}
 		}
+	}
+
+	return summary, nil
+}
+
+// summarizeLoans computes the amounts and counts of the summary (all but
+// OverdueLoans): per currency in the loan's own currency, and in DOP with USD
+// converted at usdToDop. A loan in an unsupported currency is only in
+// ByCurrency.
+func summarizeLoans(loans []*loan.Loan, usdToDop money.Amount) *dto.LoanSummaryResponse {
+	summary := &dto.LoanSummaryResponse{UsdToDopRate: usdToDop, ByCurrency: make(map[string]*dto.LoanCurrencyTotal)}
+
+	for _, item := range loans {
+		currency := item.CurrencyCode()
+		totals, ok := summary.ByCurrency[currency]
+		if !ok {
+			totals = &dto.LoanCurrencyTotal{}
+			summary.ByCurrency[currency] = totals
+		}
+
+		if item.Status != loan.LoanStatusCancelled {
+			totals.TotalPrincipal = totals.TotalPrincipal.Add(item.PrincipalAmount)
+		}
+		totals.TotalCollected = totals.TotalCollected.Add(item.PaidPrincipal.Add(item.PaidInterest))
+		totals.TotalInterestEarned = totals.TotalInterestEarned.Add(item.PaidInterest)
+
+		switch item.Status {
+		case loan.LoanStatusActive:
+			summary.ActiveLoans++
+			totals.TotalPending = totals.TotalPending.Add(item.Pending())
+		case loan.LoanStatusDefaulted:
+			summary.DefaultedLoans++
+			totals.DefaultedPending = totals.DefaultedPending.Add(item.Pending())
+		}
+	}
+
+	for currency, totals := range summary.ByCurrency {
+		totals.TotalPrincipal = totals.TotalPrincipal.RoundCents()
+		totals.TotalPending = totals.TotalPending.RoundCents()
+		totals.TotalCollected = totals.TotalCollected.RoundCents()
+		totals.TotalInterestEarned = totals.TotalInterestEarned.RoundCents()
+		totals.DefaultedPending = totals.DefaultedPending.RoundCents()
+
+		toDOP := func(amount money.Amount) money.Amount {
+			dop, _ := money.ToDOP(amount, currency, usdToDop)
+			return dop
+		}
+		summary.TotalPrincipal = summary.TotalPrincipal.Add(toDOP(totals.TotalPrincipal))
+		summary.TotalPending = summary.TotalPending.Add(toDOP(totals.TotalPending))
+		summary.TotalCollected = summary.TotalCollected.Add(toDOP(totals.TotalCollected))
+		summary.TotalInterestEarned = summary.TotalInterestEarned.Add(toDOP(totals.TotalInterestEarned))
+		summary.DefaultedPending = summary.DefaultedPending.Add(toDOP(totals.DefaultedPending))
 	}
 
 	summary.TotalPrincipal = summary.TotalPrincipal.RoundCents()
 	summary.TotalCollected = summary.TotalCollected.RoundCents()
 	summary.TotalPending = summary.TotalPending.RoundCents()
 	summary.TotalInterestEarned = summary.TotalInterestEarned.RoundCents()
+	summary.DefaultedPending = summary.DefaultedPending.RoundCents()
 
-	return summary, nil
+	return summary
 }
 
 func (s *LoanService) syncInstallments(ctx context.Context, entity *loan.Loan) error {
@@ -453,7 +573,7 @@ func (s *LoanService) syncInstallments(ctx context.Context, entity *loan.Loan) e
 		installment.PaidAt = nil
 
 		if !remaining.IsPositive() {
-			if installment.DueDate.Before(now) {
+			if isOverdue(installment.DueDate, now, s.loc) {
 				installment.Status = loan.InstallmentStatusOverdue
 			} else {
 				installment.Status = loan.InstallmentStatusPending
@@ -491,7 +611,9 @@ func buildInstallments(entity *loan.Loan) []*loan.Installment {
 
 	for i := 1; i <= entity.TermMonths; i++ {
 		installmentId, _ := ksuid.NewRandom()
-		dueDate := entity.StartDate.AddDate(0, i, 0)
+		// Same day of month as the start date, clamped to the month's last
+		// day (Jan 31 -> Feb 28 -> Mar 31; AddDate would give Mar 3).
+		dueDate := apptime.AddMonthsClamped(entity.StartDate, i)
 		expected := baseAmount
 		if i == entity.TermMonths {
 			expected = entity.TotalAmount.Sub(running)

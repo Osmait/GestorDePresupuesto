@@ -1,4 +1,5 @@
 import { isFundingAccount } from '@/lib/accounts'
+import { getAppToday } from '@/lib/app-time'
 import type { Account } from '@/types/account'
 import { MonthlyPlanItem } from '@/types/monthlyPlan'
 
@@ -28,16 +29,17 @@ export function signedDop(item: Pick<MonthlyPlanItem, 'type' | 'amount_dop'>): n
 // Calendar
 // ---------------------------------------------------------------------------
 
-/** A calendar date in the user's local time zone. `month` is 0-based like `Date`. */
+/** A calendar date (in the app's time zone). `month` is 0-based like `Date`. */
 export interface PlanDate {
 	year: number
 	month: number
 	day: number
 }
 
-/** Today's date as the browser (the user) sees it. */
+/** Today's date in the app's time zone (Santo Domingo), whatever the browser's zone. */
 export function localToday(now: Date = new Date()): PlanDate {
-	return { year: now.getFullYear(), month: now.getMonth(), day: now.getDate() }
+	const { year, month, day } = getAppToday(now)
+	return { year, month: month - 1, day }
 }
 
 /** Number of days of a month (28–31). `month` is 0-based. */

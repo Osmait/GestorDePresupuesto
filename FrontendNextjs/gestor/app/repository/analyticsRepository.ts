@@ -1,11 +1,12 @@
 import { BaseRepository } from '@/lib/base-repository'
+import { normalizeCategoryColor } from '@/lib/category-color'
 import { AnalyticsQueryFilters, CategoryExpense, DashboardSummary, MonthlySummary } from '@/types/analytics'
 
 export class AnalyticsRepository extends BaseRepository {
 	async getCategoryExpenses(): Promise<CategoryExpense[]> {
 		try {
 			const data = await this.get<CategoryExpense[]>('/analytics/category-expenses')
-			return data
+			return (data ?? []).map((item) => ({ ...item, color: normalizeCategoryColor(item.color) }))
 		} catch (error) {
 			console.error('Error fetching category expenses:', error)
 			return []

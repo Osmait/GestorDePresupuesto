@@ -39,13 +39,47 @@ beforeAll(() => {
 describe('CreditCardFormModal', () => {
 	const mockOnClose = vi.fn()
 	const mockOnSubmit = vi.fn().mockResolvedValue(undefined)
+	const mockOnUpdate = vi.fn().mockResolvedValue(undefined)
 
 	beforeEach(() => {
 		vi.clearAllMocks()
 	})
 
 	function renderModal(card?: CreditCard | null) {
-		return renderWithIntl(<CreditCardFormModal open={true} onClose={mockOnClose} onSubmit={mockOnSubmit} card={card} />)
+		return renderWithIntl(
+			<CreditCardFormModal
+				open={true}
+				onClose={mockOnClose}
+				onSubmit={mockOnSubmit}
+				onUpdate={mockOnUpdate}
+				card={card}
+			/>,
+		)
+	}
+
+	function balance(id: string, currency: string, creditLimit: number, currentBalance: number) {
+		return {
+			id,
+			currency,
+			current_balance: currentBalance,
+			credit_limit: creditLimit,
+			available_credit: creditLimit + currentBalance,
+			utilization_percent: 0,
+			created_at: '',
+			updated_at: '',
+		}
+	}
+
+	const editedCard: CreditCard = {
+		id: 'card1',
+		name: 'My Visa',
+		bank: 'Banco Popular',
+		last_four_digits: '4321',
+		cut_day: 15,
+		due_day: 5,
+		balances: [balance('bal-dop', 'DOP', 100000, -5000), balance('bal-usd', 'USD', 2000, -150.25)],
+		created_at: '',
+		updated_at: '',
 	}
 
 	it('renders create mode', () => {
@@ -152,6 +186,59 @@ describe('CreditCardFormModal', () => {
 		expect(digitsInput).toHaveValue('1234')
 	})
 
+	it('rejects fewer than 4 last digits (the API requires exactly 4 or none)', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
+		await user.type(screen.getByPlaceholderText('1234'), '123')
+		await user.click(screen.getByText('Create'))
+
+		expect(await screen.findByText('Enter all 4 digits or leave it empty')).toBeInTheDocument()
+		expect(mockOnSubmit).not.toHaveBeenCalled()
+	})
+
+	it('rejects a one-character name or bank (the API requires 2 to 100)', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'A')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), ' B ')
+		await user.click(screen.getByText('Create'))
+
+		expect(await screen.findAllByText('Use between 2 and 100 characters')).toHaveLength(2)
+		expect(mockOnSubmit).not.toHaveBeenCalled()
+	})
+
+	it('rejects a negative initial debt', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
+		const debtInput = screen.getByRole('textbox', { name: 'Initial Debt DOP' })
+		await user.clear(debtInput)
+		await user.type(debtInput, '-50')
+		await user.click(screen.getByText('Create'))
+
+		expect(await screen.findByRole('alert')).toBeInTheDocument()
+		expect(mockOnSubmit).not.toHaveBeenCalled()
+	})
+
+	it('submits without last digits when the field is left empty', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
+		await user.click(screen.getByText('Create'))
+
+		await waitFor(() =>
+			expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ last_four_digits: undefined })),
+		)
+	})
+
 	it('cut day field has correct constraints', () => {
 		renderModal()
 
@@ -246,7 +333,7 @@ describe('CreditCardFormModal', () => {
 
 		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
 		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
-		const limitInput = screen.getByRole('spinbutton', { name: 'Credit Limit DOP' })
+		const limitInput = screen.getByRole('textbox', { name: 'Credit Limit DOP' })
 		await user.clear(limitInput)
 		await user.type(limitInput, '1000.005')
 		await user.click(screen.getByText('Create'))
@@ -268,5 +355,90 @@ describe('CreditCardFormModal', () => {
 		expect(alert).toHaveTextContent('Card limit too high')
 		expect(mockOnClose).not.toHaveBeenCalled()
 		expect(screen.getByRole('dialog')).toBeInTheDocument()
+	})
+
+	it('submits a decimal comma limit as a number ("1500,50" is 1500.5)', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
+		const limitInput = screen.getByRole('textbox', { name: 'Credit Limit DOP' })
+		await user.clear(limitInput)
+		await user.type(limitInput, '1500,50')
+		await user.type(screen.getByRole('textbox', { name: 'Initial Debt DOP' }), ',25')
+		await user.click(screen.getByText('Create'))
+
+		await waitFor(() =>
+			expect(mockOnSubmit).toHaveBeenCalledWith(
+				expect.objectContaining({ balances: [{ currency: 'DOP', credit_limit: 1500.5, initial_debt: 0.25 }] }),
+			),
+		)
+	})
+
+	describe('edit mode', () => {
+		it('shows the debt read-only with a hint to reconcile, and no add/remove currency', () => {
+			renderModal(editedCard)
+
+			expect(screen.queryByRole('textbox', { name: /Initial Debt/ })).not.toBeInTheDocument()
+			expect(screen.getAllByText('Current debt')).toHaveLength(2)
+			expect(screen.getByText('RD$5,000.00')).toBeInTheDocument()
+			expect(screen.getAllByText('To change the debt, use "Reconcile" on the card.')).toHaveLength(2)
+			expect(screen.queryByText('Add Currency')).not.toBeInTheDocument()
+			expect(screen.queryByRole('button', { name: 'Remove currency' })).not.toBeInTheDocument()
+			expect(screen.getByRole('textbox', { name: 'Credit Limit DOP' })).toHaveValue('100000')
+		})
+
+		it('sends only the changed credit limits through the balance update', async () => {
+			const user = userEvent.setup()
+			renderModal(editedCard)
+
+			const usdLimit = screen.getByRole('textbox', { name: 'Credit Limit USD' })
+			await user.clear(usdLimit)
+			await user.type(usdLimit, '2,500.75')
+			await user.click(screen.getByRole('button', { name: 'Update' }))
+
+			await waitFor(() =>
+				expect(mockOnUpdate).toHaveBeenCalledWith({
+					card: {
+						name: 'My Visa',
+						bank: 'Banco Popular',
+						last_four_digits: '4321',
+						cut_day: 15,
+						due_day: 5,
+					},
+					creditLimits: [{ balanceId: 'bal-usd', credit_limit: 2500.75 }],
+				}),
+			)
+			expect(mockOnSubmit).not.toHaveBeenCalled()
+			expect(mockOnClose).toHaveBeenCalled()
+		})
+
+		it('sends no limit change when only the card fields change', async () => {
+			const user = userEvent.setup()
+			renderModal(editedCard)
+
+			const name = screen.getByDisplayValue('My Visa')
+			await user.clear(name)
+			await user.type(name, 'Visa Oro')
+			await user.click(screen.getByRole('button', { name: 'Update' }))
+
+			await waitFor(() =>
+				expect(mockOnUpdate).toHaveBeenCalledWith(
+					expect.objectContaining({ card: expect.objectContaining({ name: 'Visa Oro' }), creditLimits: [] }),
+				),
+			)
+		})
+
+		it('rejects an empty credit limit', async () => {
+			const user = userEvent.setup()
+			renderModal(editedCard)
+
+			await user.clear(screen.getByRole('textbox', { name: 'Credit Limit DOP' }))
+			await user.click(screen.getByRole('button', { name: 'Update' }))
+
+			expect(await screen.findByText('Enter a credit limit greater than 0 for each currency.')).toBeInTheDocument()
+			expect(mockOnUpdate).not.toHaveBeenCalled()
+		})
 	})
 })

@@ -1,11 +1,14 @@
 package ai
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/services/ai/tasks"
@@ -35,17 +38,22 @@ func (h *Handler) AnalyzeSpending(c *gin.Context) {
 		return
 	}
 
-	dateFrom, err := time.Parse("2006-01-02", req.DateFrom)
+	// date_from / date_to are calendar days of the app time zone: the range
+	// is [00:00 local of date_from, 00:00 local of the day after date_to).
+	loc := h.location()
+	parsedFrom, err := time.Parse("2006-01-02", req.DateFrom)
 	if err != nil {
 		_ = c.Error(apperrors.NewValidationError("INVALID_DATE_FROM", "Invalid date_from format, use YYYY-MM-DD"))
 		return
 	}
 
-	dateTo, err := time.Parse("2006-01-02", req.DateTo)
+	parsedTo, err := time.Parse("2006-01-02", req.DateTo)
 	if err != nil {
 		_ = c.Error(apperrors.NewValidationError("INVALID_DATE_TO", "Invalid date_to format, use YYYY-MM-DD"))
 		return
 	}
+	dateFrom := apptime.Date(parsedFrom.Year(), parsedFrom.Month(), parsedFrom.Day(), loc)
+	dateTo := apptime.Date(parsedTo.Year(), parsedTo.Month(), parsedTo.Day(), loc)
 
 	if dateFrom.After(dateTo) {
 		_ = c.Error(apperrors.NewValidationError("INVALID_DATE_RANGE", "date_from must be before date_to"))
@@ -64,14 +72,19 @@ func (h *Handler) AnalyzeSpending(c *gin.Context) {
 		}
 	}
 
-	dateToEnd := dateTo.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
-
-	transactions, err := h.transactionRepository.FindByUserAndDateRange(
-		c.Request.Context(),
-		userID,
-		dateFrom,
-		dateToEnd,
-	)
+	// Read in a short transaction of its own: the provider call below must
+	// not hold a pooled connection (see routes.AIProviderRoutes).
+	var transactions []*transaction.Transaction
+	err = h.inTx(c, func(ctx context.Context) error {
+		var findErr error
+		transactions, findErr = h.transactionRepository.FindByUserAndDateRange(
+			ctx,
+			userID,
+			dateFrom,
+			dateTo.AddDate(0, 0, 1),
+		)
+		return findErr
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to fetch transactions for analysis")
 		_ = c.Error(apperrors.NewInternalError("Failed to fetch transactions", err))
@@ -90,7 +103,7 @@ func (h *Handler) AnalyzeSpending(c *gin.Context) {
 		return
 	}
 
-	input := tasks.PrepareAnalyzerInput(transactions, dateFrom, dateTo)
+	input := tasks.PrepareAnalyzerInput(transactions, dateFrom, dateTo, loc)
 	if req.Language != "" {
 		input.Language = req.Language
 	} else {

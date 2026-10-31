@@ -7,6 +7,7 @@ import { useAccountContext } from '@/components/accounts/AccountContext'
 import { AccountSummaryCard } from '@/components/accounts/AccountSummaryCard'
 import { AccountsPageSkeleton } from '@/components/accounts/AccountsPageSkeleton'
 import { AccountUpdateModal } from '@/components/accounts/AccountUpdateModal'
+import { ReconcileAccountModal } from '@/components/accounts/ReconcileAccountModal'
 import { AnimatedTabs } from '@/components/common/animated-tabs'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ErrorState } from '@/components/shared/ErrorState'
@@ -24,11 +25,18 @@ export default function AccountsClient() {
 	const { accounts, isLoading, updateAccount, deleteAccount, error, refetch, setCreateOpen } = useAccountContext()
 	const [updateModalOpen, setUpdateModalOpen] = useState(false)
 	const [selectedAccount, setSelectedAccount] = useState<Account | null>(null)
+	const [reconcileOpen, setReconcileOpen] = useState(false)
+	const [reconcileAccount, setReconcileAccount] = useState<Account | null>(null)
 	const list = Array.isArray(accounts) ? accounts : []
 
 	const handleEditAccount = (account: Account) => {
 		setSelectedAccount(account)
 		setUpdateModalOpen(true)
+	}
+
+	const handleReconcileAccount = (account: Account) => {
+		setReconcileAccount(account)
+		setReconcileOpen(true)
 	}
 
 	if (isLoading) {
@@ -86,6 +94,7 @@ export default function AccountsClient() {
 						account={account}
 						onAccountDeleted={() => deleteAccount(account.id!)}
 						onAccountEdit={handleEditAccount}
+						onAccountReconcile={handleReconcileAccount}
 					/>
 				))}
 			</div>
@@ -125,6 +134,8 @@ export default function AccountsClient() {
 				account={selectedAccount}
 				updateAccount={updateAccount}
 			/>
+
+			<ReconcileAccountModal open={reconcileOpen} setOpen={setReconcileOpen} account={reconcileAccount} />
 		</div>
 	)
 }

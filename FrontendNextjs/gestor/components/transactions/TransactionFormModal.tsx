@@ -9,6 +9,7 @@ import { toast } from 'sonner'
 import * as z from 'zod'
 import { DEFAULT_CATEGORY_COLOR } from '@/components/shared/ColorSwatchPicker'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Button } from '@/components/ui/button'
 import { Calendar } from '@/components/ui/calendar'
@@ -21,20 +22,25 @@ import { useSuggestCategoryMutation } from '@/hooks/queries/useAIQuery'
 import { useGetBudgets } from '@/hooks/queries/useBudgetsQuery'
 import { useCreateCategoryMutation, useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
+import { useUniqueCategoryName } from '@/hooks/useUniqueCategoryName'
+import { APP_TIME_ZONE, getAppTodayDate, instantToCalendarDate, pickedDayToInstant } from '@/lib/app-time'
 import { onSessionExpired } from '@/lib/client-session'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { moneyInputToNumber, moneyMessages, moneySchema } from '@/lib/money-input'
 import { getCreditCardRepository } from '@/lib/repositoryConfig'
 import { cn } from '@/lib/utils'
 import { AICategorySuggestion } from '@/types/ai'
 import { TypeTransaction } from '@/types/transaction'
 import { useTransactionContext } from './TransactionContext'
 
-function createTransactionSchema(t: (key: string) => string) {
+function createTransactionSchema(t: (key: string, values?: Record<string, string | number>) => string) {
 	return z.object({
 		name: z.string().min(2, t('nameRequired')),
 		description: z.string().optional(),
-		amount: z.coerce.number().min(0.01, t('amountRequired')),
-		type_transaction: z.nativeEnum(TypeTransaction, { errorMap: () => ({ message: t('selectType') }) }),
+		amount: moneySchema(moneyMessages(t, { required: t('amountRequired') })).pipe(
+			z.number().min(0.01, t('amountRequired')),
+		),
+		type_transaction: z.enum(TypeTransaction, { error: () => t('selectType') }),
 		account_id: z.string().min(1, t('accountRequired')),
 		category_id: z.string().min(1, t('categoryRequired')),
 		budget_id: z.string().optional(),
@@ -43,6 +49,7 @@ function createTransactionSchema(t: (key: string) => string) {
 	})
 }
 type TransactionFormValues = z.infer<ReturnType<typeof createTransactionSchema>>
+type TransactionFormInput = z.input<ReturnType<typeof createTransactionSchema>>
 
 /**
  * Unsent form input is kept in sessionStorage when the session expires mid-edit
@@ -53,7 +60,7 @@ export function transactionDraftKey(userId: string, transactionId?: string | nul
 	return `gestor:draft:transaction-form:${userId}:${transactionId || 'new'}`
 }
 
-export function saveTransactionDraft(key: string, values: Partial<TransactionFormValues>): boolean {
+export function saveTransactionDraft(key: string, values: Partial<TransactionFormInput>): boolean {
 	try {
 		const createdAt = values.created_at instanceof Date ? values.created_at.toISOString() : undefined
 		window.sessionStorage.setItem(key, JSON.stringify({ ...values, created_at: createdAt }))
@@ -63,15 +70,15 @@ export function saveTransactionDraft(key: string, values: Partial<TransactionFor
 	}
 }
 
-export function loadTransactionDraft(key: string): Partial<TransactionFormValues> | null {
+export function loadTransactionDraft(key: string): Partial<TransactionFormInput> | null {
 	try {
 		const raw = window.sessionStorage.getItem(key)
 		if (!raw) return null
-		const parsed = JSON.parse(raw) as Partial<Record<keyof TransactionFormValues, unknown>>
+		const parsed = JSON.parse(raw) as Partial<Record<keyof TransactionFormInput, unknown>>
 		if (!parsed || typeof parsed !== 'object') return null
 		const createdAt = typeof parsed.created_at === 'string' ? new Date(parsed.created_at) : undefined
 		return {
-			...(parsed as Partial<TransactionFormValues>),
+			...(parsed as Partial<TransactionFormInput>),
 			created_at: createdAt && !Number.isNaN(createdAt.getTime()) ? createdAt : new Date(),
 		}
 	} catch {
@@ -103,24 +110,6 @@ type TransactionFormModalProps = {
 	) => Promise<void>
 }
 
-function ensureUniqueCategoryName(baseName: string, existingNames: string[]): string {
-	const normalized = new Set(existingNames.map((name) => name.trim().toLowerCase()))
-	const cleanBase = baseName.trim() || 'Nueva categoría'
-
-	if (!normalized.has(cleanBase.toLowerCase())) {
-		return cleanBase
-	}
-
-	let candidate = `${cleanBase} - IA`
-	let index = 2
-	while (normalized.has(candidate.toLowerCase())) {
-		candidate = `${cleanBase} - IA ${index}`
-		index++
-	}
-
-	return candidate
-}
-
 function isSameSuggestion(a: AICategorySuggestion | null, b: AICategorySuggestion | null) {
 	if (!a || !b) {
 		return false
@@ -149,6 +138,7 @@ function getSubmitErrorKey(error: unknown): 'currencyMustMatchAccount' | 'cardCu
 export default function TransactionFormModal({ open, setOpen, createTransaction }: TransactionFormModalProps) {
 	const t = useTranslations('forms')
 	const tTx = useTranslations('transactions')
+	const uniqueCategoryName = useUniqueCategoryName()
 	const tSession = useTranslations('auth.session')
 	const locale = useAppLocale()
 	const transactionSchema = useMemo(() => createTransactionSchema(t), [t])
@@ -170,6 +160,11 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 	}, [suggestCategoryMutation.mutateAsync])
 
 	const isEditing = !!editingTransaction
+	// Editing without changing the day keeps the transaction's time.
+	const originalCreatedAt = useMemo(
+		() => (editingTransaction?.created_at ? new Date(editingTransaction.created_at) : undefined),
+		[editingTransaction?.created_at],
+	)
 	const [cardCurrencies, setCardCurrencies] = useState<string[]>([])
 	const [cardCurrenciesLoaded, setCardCurrenciesLoaded] = useState(false)
 	const [categorySuggestion, setCategorySuggestion] = useState<AICategorySuggestion | null>(null)
@@ -177,7 +172,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 	const [submitError, setSubmitError] = useState<string | null>(null)
 	const draftKey = userId ? transactionDraftKey(userId, editingTransaction?.id) : null
 
-	const form = useForm<TransactionFormValues>({
+	const form = useForm<TransactionFormInput, unknown, TransactionFormValues>({
 		resolver: zodResolver(transactionSchema),
 		defaultValues: {
 			name: '',
@@ -195,7 +190,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 	const selectedAccountId = form.watch('account_id')
 	const typedName = form.watch('name')
 	const typedDescription = form.watch('description')
-	const typedAmount = form.watch('amount')
+	const typedAmount = moneyInputToNumber(form.watch('amount'))
 	const typedType = form.watch('type_transaction')
 	const selectedCategoryId = form.watch('category_id')
 	const isCategorySuggestionsEnabled = isEnabled('ai_category_suggestions')
@@ -328,14 +323,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 			return
 		}
 
-		if (
-			!typedName ||
-			typedName.trim().length < 3 ||
-			!selectedAccountId ||
-			!typedAmount ||
-			typedAmount <= 0 ||
-			selectedCategoryId
-		) {
+		if (!typedName || typedName.trim().length < 3 || !selectedAccountId || !(typedAmount > 0) || selectedCategoryId) {
 			lastSuggestionInputRef.current = ''
 			setCategorySuggestion(null)
 			return
@@ -344,7 +332,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 		const timeout = setTimeout(async () => {
 			const normalizedName = typedName.trim().toLowerCase()
 			const normalizedDescription = (typedDescription || '').trim().toLowerCase()
-			const numericAmount = Number(typedAmount)
+			const numericAmount = typedAmount
 			if (!Number.isFinite(numericAmount) || numericAmount <= 0) {
 				lastSuggestionInputRef.current = ''
 				setCategorySuggestion(null)
@@ -472,7 +460,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 			return
 		}
 
-		const suggestedName = ensureUniqueCategoryName(
+		const suggestedName = uniqueCategoryName(
 			categorySuggestion.new_category_name || categorySuggestion.category_name,
 			categories.map((category) => category.name),
 		)
@@ -568,7 +556,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 								<FormItem>
 									<FormLabel>{t('amount')}</FormLabel>
 									<FormControl>
-										<Input type='number' inputMode='decimal' {...field} min={0.01} step={0.01} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>
@@ -705,7 +693,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 												size='sm'
 												onClick={createCategoryFromSuggestion}
 												disabled={createCategoryMutation.isPending}
-												title={ensureUniqueCategoryName(
+												title={uniqueCategoryName(
 													categorySuggestion.new_category_name || categorySuggestion.category_name,
 													categories.map((category) => category.name),
 												)}
@@ -736,7 +724,7 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 												)}
 											>
 												{field.value ? (
-													formatLocalDate(field.value, locale, { dateStyle: 'long' })
+													formatLocalDate(field.value, locale, { dateStyle: 'long', timeZone: APP_TIME_ZONE })
 												) : (
 													<span>{t('selectDate')}</span>
 												)}
@@ -747,10 +735,15 @@ export default function TransactionFormModal({ open, setOpen, createTransaction 
 									<PopoverContent className='w-auto p-0' align='start'>
 										<Calendar
 											mode='single'
-											selected={field.value}
-											onSelect={field.onChange}
-											disabled={(date) => date > new Date() || date < new Date('1900-01-01')}
-											initialFocus
+											// The calendar works with days; the field holds an instant.
+											// Days are those of the app's time zone (Santo Domingo).
+											selected={field.value ? instantToCalendarDate(field.value) : undefined}
+											onSelect={(day) => {
+												if (!day) return
+												field.onChange(pickedDayToInstant(day, originalCreatedAt))
+											}}
+											disabled={(date) => date > getAppTodayDate() || date < new Date('1900-01-01')}
+											autoFocus
 										/>
 									</PopoverContent>
 								</Popover>

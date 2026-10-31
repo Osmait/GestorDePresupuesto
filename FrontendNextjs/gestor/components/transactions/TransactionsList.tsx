@@ -1,7 +1,7 @@
 'use client'
 
-import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { CreditCard, Plus, Receipt, TrendingDown, TrendingUp } from 'lucide-react'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'motion/react'
 import { useSearchParams } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -18,6 +18,7 @@ import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { getSignedAmount, getTransactionTypeKey } from '@/lib/transaction-utils'
+import { cn } from '@/lib/utils'
 import { Category } from '@/types/category'
 import { Transaction, TypeTransaction } from '@/types/transaction'
 import { useTransactionActions, useTransactionContext } from './TransactionContext'
@@ -257,10 +258,10 @@ function TransactionsListView() {
 			{renderTransactionList(filteredTransactions)}
 
 			<Dialog open={Boolean(selectedTransaction)} onOpenChange={(open) => !open && setSelectedTransaction(null)}>
-				<DialogContent>
+				<DialogContent className='max-h-[90dvh] w-[95vw] overflow-y-auto sm:w-full'>
 					<DialogHeader>
 						<DialogTitle>{selectedTransaction?.name}</DialogTitle>
-						<DialogDescription className={selectedTransaction?.description?.trim() ? undefined : 'italic'}>
+						<DialogDescription className={cn('break-words', !selectedTransaction?.description?.trim() && 'italic')}>
 							{selectedTransaction?.description?.trim() || t('noDescription')}
 						</DialogDescription>
 					</DialogHeader>

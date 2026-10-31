@@ -3,8 +3,8 @@ package server
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
-	"log"
 	"net"
 	"net/http"
 	"os"
@@ -19,6 +19,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	mcpPkg "github.com/osmait/gestorDePresupuesto/internal/platform/mcp"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
+	aiHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/ai"
 	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
@@ -46,6 +47,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/services/user"
 	"github.com/osmait/gestorDePresupuesto/internal/version"
+	"github.com/rs/zerolog/log"
 
 	_ "github.com/osmait/gestorDePresupuesto/docs"
 
@@ -82,11 +84,16 @@ type Server struct {
 	mcpServer           *mcpPkg.MCPServer
 	oauthServer         *mcpPkg.OAuthProvider
 	shutdownTimeout     *time.Duration
-	db                  *sql.DB
-	config              *config.Config
-	rateLimiter         *middleware.RateLimitService
-	featureFlags        *middleware.FeatureFlags
-	telemetry           *telemetry.Telemetry
+	// streamsCtx is cancelled when the HTTP server starts shutting down, so
+	// long-lived streams (SSE) end instead of holding Shutdown until its
+	// deadline.
+	streamsCtx    context.Context
+	cancelStreams context.CancelFunc
+	db            *sql.DB
+	config        *config.Config
+	rateLimiter   *middleware.RateLimitService
+	featureFlags  *middleware.FeatureFlags
+	telemetry     *telemetry.Telemetry
 }
 
 // Option customizes a Server built by New.
@@ -135,6 +142,11 @@ func New(ctx context.Context,
 	oauthSrv *mcpPkg.OAuthProvider,
 	opts ...Option,
 ) (context.Context, *Server) {
+	// Debug mode logs every route and request detail; never in production,
+	// whatever GIN_MODE says.
+	if cfg.IsProduction() {
+		gin.SetMode(gin.ReleaseMode)
+	}
 	srv := Server{
 		Engine:              gin.New(),
 		httpAddr:            fmt.Sprintf("%s:%d", host, port),
@@ -168,6 +180,7 @@ func New(ctx context.Context,
 		config:              cfg,
 		telemetry:           telemetry.Disabled(),
 	}
+	srv.streamsCtx, srv.cancelStreams = context.WithCancel(context.Background())
 	for _, opt := range opts {
 		opt(&srv)
 	}
@@ -175,6 +188,12 @@ func New(ctx context.Context,
 	srv.registerRoutes()
 	return serverContext(ctx), &srv
 }
+
+// defaultMaxBody caps every JSON request body except the AI uploads.
+const defaultMaxBody = 1 << 20
+
+// maxSSEStreamsPerUser caps one user's open notification streams.
+const maxSSEStreamsPerUser = 5
 
 func (s *Server) registerRoutes() {
 	// Client IP resolution: only trust the frontend server's X-Client-IP
@@ -184,17 +203,17 @@ func (s *Server) registerRoutes() {
 	// and runs before anything calls c.ClientIP() (rate limiting, login
 	// lockout, demo users).
 	if err := middleware.ConfigureClientIP(s.Engine, s.config.Server); err != nil {
-		log.Printf("[security] %v — falling back to trusting no proxies", err)
+		log.Warn().Err(err).Msg("[security] invalid proxy configuration; falling back to trusting no proxies")
 		_ = s.Engine.SetTrustedProxies(nil)
 		s.Engine.TrustedPlatform = ""
 	}
 	if s.config.IsProduction() {
 		if len(s.config.Server.TrustedProxies) == 0 && s.config.Server.TrustedPlatformHeader == "" {
-			log.Printf("[security] WARNING: no TRUSTED_PROXIES / TRUSTED_PLATFORM_HEADER configured; " +
+			log.Warn().Msg("[security] no TRUSTED_PROXIES / TRUSTED_PLATFORM_HEADER configured; " +
 				"behind a reverse proxy every client will share the proxy's IP for rate limiting")
 		}
 		if s.config.Server.ProxySharedSecret == "" {
-			log.Printf("[security] WARNING: PROXY_SHARED_SECRET not configured; requests relayed by the " +
+			log.Warn().Msg("[security] PROXY_SHARED_SECRET not configured; requests relayed by the " +
 				"frontend server (Next.js proxy, Server Components, next-auth) all share its IP for " +
 				"rate limiting and login lockout. Set the same value on the backend and the frontend")
 		}
@@ -231,7 +250,7 @@ func (s *Server) registerRoutes() {
 
 	// CORS: explicit allow-list from CORS_ALLOWED_ORIGINS.
 	if s.config.IsProduction() && onlyLocalOrigins(s.config.CORS.AllowedOrigins) {
-		log.Printf("[security] WARNING: CORS_ALLOWED_ORIGINS only lists localhost origins; " +
+		log.Warn().Msg("[security] CORS_ALLOWED_ORIGINS only lists localhost origins; " +
 			"browser calls from the production frontend will be blocked")
 	}
 	s.Engine.Use(middleware.CORS(s.config.CORS))
@@ -245,6 +264,12 @@ func (s *Server) registerRoutes() {
 	// Error handling middleware (must be first)
 	s.Engine.Use(middleware.ErrorHandler(middleware.DefaultErrorHandlerConfig()))
 
+	// Cap and fully read request bodies before anything takes a database
+	// connection (see BodyLimit). AI uploads carry up to MaxFiles base64
+	// files of MaxFileSize each.
+	aiBody := int64(s.config.AI.MaxFiles)*s.config.AI.MaxFileSize*4/3 + defaultMaxBody
+	s.Engine.Use(middleware.BodyLimit(defaultMaxBody, map[string]int64{"/ai/": aiBody}))
+
 	// Locale for backend-generated names (Accept-Language: es|en, default es).
 	s.Engine.Use(i18n.Middleware())
 
@@ -253,8 +278,11 @@ func (s *Server) registerRoutes() {
 	s.rateLimiter = middleware.NewRateLimitService(s.config)
 	s.Engine.Use(s.rateLimiter.Middleware())
 
-	// Swagger documentation route (before authentication)
-	s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	// Swagger documentation route (before authentication). In production it
+	// maps the whole API for anyone, so it is opt-in (ENABLE_SWAGGER_DOCS).
+	if !s.config.IsProduction() || s.config.FeatureFlags.EnableSwaggerDocs {
+		s.Engine.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	}
 
 	// Health routes (before authentication). /health/detailed only returns
 	// internals to callers presenting METRICS_TOKEN.
@@ -262,7 +290,6 @@ func (s *Server) registerRoutes() {
 
 	// Prometheus scrape endpoint on the public port: only with a bearer token.
 	s.registerMetricsRoute()
-	routes.QuoteRoutes(s.Engine, s.quoteService)
 	routes.ExchangeRoutes(s.Engine, s.exchangeService)
 
 	// OAuth 2.1 endpoints — public, must be registered BEFORE any auth
@@ -275,14 +302,16 @@ func (s *Server) registerRoutes() {
 		s.Engine.GET("/oauth/authorize", s.oauthServer.AuthorizeHandler())
 		s.Engine.POST("/oauth/authorize", s.oauthServer.AuthorizeHandler())
 		s.Engine.POST("/oauth/token", func(c *gin.Context) {
-			log.Printf("[OAuth] POST /oauth/token from %s, Content-Type: %s", c.ClientIP(), c.GetHeader("Content-Type"))
 			s.oauthServer.TokenHandler().ServeHTTP(c.Writer, c.Request)
-			log.Printf("[OAuth] POST /oauth/token responded with status %d", c.Writer.Status())
+			log.Ctx(c.Request.Context()).Debug().Str("client_ip", c.ClientIP()).
+				Str("content_type", c.GetHeader("Content-Type")).Int("status", c.Writer.Status()).
+				Msg("oauth token request")
 		})
+		s.Engine.POST("/oauth/revoke", gin.WrapH(s.oauthServer.RevocationHandler()))
 		s.Engine.POST("/oauth/register", func(c *gin.Context) {
-			log.Printf("[OAuth] POST /oauth/register from %s", c.ClientIP())
 			s.oauthServer.RegistrationHandler().ServeHTTP(c.Writer, c.Request)
-			log.Printf("[OAuth] POST /oauth/register responded with status %d", c.Writer.Status())
+			log.Ctx(c.Request.Context()).Debug().Str("client_ip", c.ClientIP()).
+				Int("status", c.Writer.Status()).Msg("oauth client registration")
 		})
 	}
 
@@ -296,15 +325,8 @@ func (s *Server) registerRoutes() {
 		}
 		mcpGroup := s.Engine.Group("/mcp")
 		if s.oauthServer != nil {
-			// Resolve OAuth subject (email) to internal user ID
-			userResolver := func(ctx context.Context, email string) (string, error) {
-				u, err := s.servicesUser.FindByEmail(ctx, email)
-				if err != nil {
-					return "", err
-				}
-				return u.Id, nil
-			}
-			mcpGroup.Use(mcpPkg.MCPAuthMiddleware(s.apiKeyService, s.oauthServer.TokenVerifier(), baseURL, userResolver))
+			// The user is the one stored with the token, not its email subject.
+			mcpGroup.Use(mcpPkg.MCPAuthMiddleware(s.apiKeyService, s.oauthServer.TokenVerifier(), baseURL, s.oauthServer.TokenUserID))
 		} else {
 			mcpGroup.Use(mcpPkg.APIKeyAuthMiddleware(s.apiKeyService))
 		}
@@ -313,19 +335,23 @@ func (s *Server) registerRoutes() {
 			mcpServer.WithStaticBasePath("/mcp"),
 			mcpServer.WithBaseURL(baseURL),
 		)
-		mcpGroup.GET("/sse", middleware.StreamingNoDeadline(), gin.WrapH(sseHandler.SSEHandler()))
+		mcpGroup.GET("/sse", middleware.StreamingNoDeadline(), middleware.EndOnShutdown(s.streamsCtx), gin.WrapH(sseHandler.SSEHandler()))
 		mcpGroup.POST("/message", gin.WrapH(sseHandler.MessageHandler()))
 
 		// Streamable HTTP transport (for Claude Web custom connectors)
 		streamHandler := mcpServer.NewStreamableHTTPServer(s.mcpServer.GetServer())
 		mcpGroup.POST("", gin.WrapH(streamHandler))
 		// GET opens the server->client SSE stream of the streamable transport.
-		mcpGroup.GET("", middleware.StreamingNoDeadline(), gin.WrapH(streamHandler))
+		mcpGroup.GET("", middleware.StreamingNoDeadline(), middleware.EndOnShutdown(s.streamsCtx), gin.WrapH(streamHandler))
 		mcpGroup.DELETE("", gin.WrapH(streamHandler))
 	}
 
 	// Authentication middleware for protected routes
 	s.Engine.Use(middleware.AuthMiddleware(s.servicesUser, s.config))
+
+	// Quotes call third-party APIs on every lookup: logged-in users only
+	// (the investments screen), and before RLS since they need no database.
+	routes.QuoteRoutes(s.Engine, s.quoteService)
 
 	// SSE subscribe endpoint is registered HERE — after AuthMiddleware but BEFORE
 	// RLSMiddleware. Rationale: the SSE handler is a long-lived connection that
@@ -335,13 +361,42 @@ func (s *Server) registerRoutes() {
 	// connection pool under concurrent users. The subscribe handler does not query
 	// the database itself, so it does not need an RLS transaction.
 	notificationH := notificationHandler.NewNotificationHandler(s.notificationService)
-	s.Engine.GET("/notifications", notificationH.Subscribe)
+	// Each SSE stream holds a goroutine and a socket for as long as it is
+	// open: a handful of tabs per user, not unbounded.
+	s.Engine.GET("/notifications", middleware.UserQuota(middleware.UserQuotaConfig{
+		Prefixes:    []string{"/notifications"},
+		MaxInFlight: maxSSEStreamsPerUser,
+	}), middleware.EndOnShutdown(s.streamsCtx), notificationH.Subscribe)
 
 	// The on-demand recurring processor runs every occurrence in its own
 	// scheduler transaction, so it must not also hold a request transaction
 	// (that would need two pooled connections per request). See
 	// routes.RecurringTransactionProcessRoute.
 	routes.RecurringTransactionProcessRoute(s.Engine, s.recurringService)
+
+	// Per-user limits on the AI endpoints that call the provider (the savings
+	// goals CRUD and reading/applying a reconciliation do not), before RLS so
+	// a rejected call takes no connection.
+	s.Engine.Use(middleware.UserQuota(middleware.UserQuotaConfig{
+		Prefixes:    []string{"/ai/extract/", "/ai/reconcile/preview", "/ai/analyze/", "/ai/goals/savings-plan"},
+		PerMinute:   s.config.AI.RequestsPerMinute,
+		PerDay:      s.config.AI.RequestsPerDay,
+		MaxInFlight: s.config.AI.MaxInFlight,
+	}))
+	// Category suggestions are asked while typing: their own, looser budget.
+	s.Engine.Use(middleware.UserQuota(middleware.UserQuotaConfig{
+		Prefixes:    []string{"/ai/suggest-category", "/ai/suggest-categories/"},
+		PerMinute:   60,
+		PerDay:      1000,
+		MaxInFlight: 3,
+	}))
+
+	// AI routes that call the provider: after auth, the body limit and the
+	// quotas above, but BEFORE RLSMiddleware, so a provider call (up to
+	// minutes with retries) holds no pooled connection. Their handlers read
+	// and write in short transactions of their own (txhelper.WithUserTx).
+	aiH := aiHandler.NewHandler(s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache, s.featureFlags)
+	routes.AIProviderRoutes(s.Engine, aiH, s.featureFlags, s.config.AI.MaxConcurrentCalls)
 
 	// RLS middleware: pins each DB-touching authenticated request to a transaction
 	// with set_config('app.current_user_id', userID, true). Every query that runs
@@ -350,7 +405,12 @@ func (s *Server) registerRoutes() {
 	// one deadlocks once concurrent requests exhaust the pool. The connection
 	// is acquired with a bounded wait (DB_TX_ACQUIRE_TIMEOUT) and the request
 	// fails fast with 503 when the pool stays exhausted.
-	s.Engine.Use(middleware.RLSMiddlewareWithTimeout(s.db, s.config.Database.TxAcquireTimeout))
+	// The request also gets a deadline (DB_REQUEST_TIMEOUT) and transaction-
+	// local statement / idle-in-transaction timeouts (txhelper.SessionLimits).
+	s.Engine.Use(middleware.RLSMiddlewareWithConfig(s.db, middleware.RLSConfig{
+		AcquireTimeout: s.config.Database.TxAcquireTimeout,
+		RequestTimeout: s.config.Database.RequestTimeout,
+	}))
 
 	// Notification management endpoints — these DO query the DB and need RLS.
 	s.Engine.POST("/notifications/test", notificationH.SendTestNotification)
@@ -376,7 +436,7 @@ func (s *Server) registerRoutes() {
 	routes.CreditCardRoutes(s.Engine, s.creditCardService, s.featureFlags)
 	routes.LoanRoutes(s.Engine, s.loanService, s.featureFlags)
 	routes.PasskeyRoutes(s.Engine, s.passkeyService, s.featureFlags)
-	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache, s.featureFlags)
+	routes.AIRoutes(s.Engine, aiH, s.featureFlags)
 	routes.APIKeyRoutes(s.Engine, s.apiKeyService)
 }
 
@@ -389,7 +449,7 @@ func (s *Server) registerMetricsRoute() {
 		return
 	}
 	if s.config.Metrics.Token == "" {
-		log.Printf("[metrics] METRICS_ENABLED but neither METRICS_TOKEN nor METRICS_PORT is set; /metrics is not exposed")
+		log.Warn().Msg("[metrics] METRICS_ENABLED but neither METRICS_TOKEN nor METRICS_PORT is set; /metrics is not exposed")
 		return
 	}
 	s.Engine.GET("/metrics", gin.WrapH(telemetry.BearerAuth(s.config.Metrics.Token, h)))
@@ -419,16 +479,24 @@ func (s *Server) metricsServer() *http.Server {
 	}
 }
 
+// Run serves HTTP until ctx is cancelled, then shuts down gracefully. A clean
+// shutdown returns nil even when the shutdown deadline is reached (the
+// remaining connections are closed and a warning is logged); only a failure
+// to listen is an error.
 func (s *Server) Run(ctx context.Context) error {
-	log.Println("Server running on", s.httpAddr)
-
 	srv := NewHTTPServer(s.httpAddr, s.Engine, s.config.Server)
+	// Shutdown waits for every in-flight handler, and SSE handlers only
+	// return when their request context ends: end them as soon as the
+	// shutdown starts.
+	if s.cancelStreams != nil {
+		srv.RegisterOnShutdown(s.cancelStreams)
+	}
 
 	if ms := s.metricsServer(); ms != nil {
-		log.Println("Metrics server running on", ms.Addr)
+		log.Info().Str("addr", ms.Addr).Msg("metrics server listening")
 		go func() {
 			if err := ms.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-				log.Printf("[metrics] server stopped: %v", err)
+				log.Error().Err(err).Msg("[metrics] server stopped")
 			}
 		}()
 		defer func() {
@@ -442,17 +510,46 @@ func (s *Server) Run(ctx context.Context) error {
 		s.rateLimiter.StartCleanup(ctx, 0)
 	}
 
+	listenErr := make(chan error, 1)
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatal("server shut down", err)
+		log.Info().Str("addr", s.httpAddr).Msg("server listening")
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			listenErr <- err
 		}
 	}()
 
-	<-ctx.Done()
-	ctxShutDown, cancel := context.WithTimeout(context.Background(), *s.shutdownTimeout)
-	defer cancel()
+	select {
+	case err := <-listenErr:
+		return fmt.Errorf("server failed to listen: %w", err)
+	case <-ctx.Done():
+	}
+	shutdownGracefully(srv, s.shutdownTimeoutOrDefault())
+	return nil
+}
 
-	return srv.Shutdown(ctxShutDown)
+// defaultShutdownTimeout is used when no SHUTDOWN_TIMEOUT is configured.
+const defaultShutdownTimeout = 30 * time.Second
+
+func (s *Server) shutdownTimeoutOrDefault() time.Duration {
+	if s.shutdownTimeout != nil && *s.shutdownTimeout > 0 {
+		return *s.shutdownTimeout
+	}
+	return defaultShutdownTimeout
+}
+
+// shutdownGracefully stops accepting connections and waits up to timeout for
+// in-flight requests. Past the deadline the remaining connections are closed:
+// that is logged as a warning, not returned as an error, so a deploy does not
+// exit non-zero because a client kept a request open.
+func shutdownGracefully(srv *http.Server, timeout time.Duration) {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Warn().Err(err).Dur("timeout", timeout).Msg("graceful shutdown deadline reached; closing remaining connections")
+		_ = srv.Close()
+		return
+	}
+	log.Info().Msg("http server stopped")
 }
 
 func onlyLocalOrigins(origins []string) bool {

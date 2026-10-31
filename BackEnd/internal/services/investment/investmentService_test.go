@@ -82,6 +82,11 @@ func (m *MockInvestmentRepository) ConsumeFundingForInvestment(ctx context.Conte
 	return args.Error(0)
 }
 
+func (m *MockInvestmentRepository) AdjustFundingForInvestment(ctx context.Context, userId, investmentID, currency string, delta money.Amount, description string) error {
+	args := m.Called(ctx, userId, investmentID, currency, delta, description)
+	return args.Error(0)
+}
+
 func TestCreateInvestment(t *testing.T) {
 	mockRepo := &MockInvestmentRepository{}
 	investmentService := NewInvestmentService(mockRepo, nil, nil, nil, nil)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	txhelper "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
@@ -221,6 +222,44 @@ func (r *CertificateRepository) FindLastPayment(ctx context.Context, certificate
 		return nil, err
 	}
 	return p, nil
+}
+
+// FindLastPayments is FindLastPayment for several certificates in one query,
+// keyed by certificate id; a certificate without payments is absent from the
+// map.
+func (r *CertificateRepository) FindLastPayments(ctx context.Context, certificateIds []string, userId string) (map[string]*certificate.CertificatePayment, error) {
+	payments := make(map[string]*certificate.CertificatePayment)
+	if len(certificateIds) == 0 {
+		return payments, nil
+	}
+	query := `SELECT DISTINCT ON (certificate_id) id, certificate_id, user_id, payment_date, period_start, period_end,
+		gross_interest, tax_withheld, net_interest, applied_rate, applied_tax_rate, applied_capital, payout_account_id,
+		transaction_id, created_at, updated_at
+		FROM certificate_payments WHERE certificate_id = ANY($1::varchar[]) AND user_id = $2
+		ORDER BY certificate_id, payment_date DESC`
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, pq.Array(certificateIds), userId)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err = rows.Close(); err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	for rows.Next() {
+		p := &certificate.CertificatePayment{}
+		if err = rows.Scan(&p.Id, &p.CertificateId, &p.UserId, &p.PaymentDate, &p.PeriodStart, &p.PeriodEnd,
+			&p.GrossInterest, &p.TaxWithheld, &p.NetInterest, &p.AppliedRate, &p.AppliedTaxRate,
+			&p.AppliedCapital, &p.PayoutAccountId, &p.TransactionId, &p.CreatedAt, &p.UpdatedAt); err != nil {
+			return nil, err
+		}
+		payments[p.CertificateId] = p
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return payments, nil
 }
 
 func (r *CertificateRepository) FindAllPayments(ctx context.Context, userId string) ([]*certificate.CertificatePayment, error) {

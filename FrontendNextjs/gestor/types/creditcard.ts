@@ -77,6 +77,21 @@ export interface UpdateBalanceDTO {
 	credit_limit?: number
 }
 
+/** A credit limit changed in the edit form, saved with PUT /credit-cards/:id/balances/:balanceId. */
+export interface CreditLimitChange {
+	balanceId: string
+	credit_limit: number
+}
+
+/**
+ * What the edit form saves. PUT /credit-cards/:id only takes the card fields; limits go
+ * through the balance endpoint and the debt only changes by reconciling the card.
+ */
+export interface UpdateCreditCardInput {
+	card: UpdateCreditCardDTO
+	creditLimits: CreditLimitChange[]
+}
+
 export interface CreatePaymentDTO {
 	from_account_id: string
 	currency: string

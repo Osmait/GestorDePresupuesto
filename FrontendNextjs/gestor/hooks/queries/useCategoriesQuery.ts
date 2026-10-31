@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getCategoryRepository } from '@/lib/repositoryConfig'
+import { invalidateFinancialData, nonFinancialMutation } from './invalidateFinancialData'
 
 export const CATEGORY_KEYS = {
 	all: ['categories'] as const,
@@ -24,6 +25,8 @@ export function useCreateCategoryMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
+		// A new category is not referenced by anything yet.
+		...nonFinancialMutation,
 		mutationFn: async (data: { name: string; icon: string; color: string }) => {
 			const repo = await getCategoryRepository()
 			return repo.create(data.name, data.icon, data.color)
@@ -43,8 +46,11 @@ export function useDeleteCategoryMutation() {
 			const repo = await getCategoryRepository()
 			return repo.delete(id)
 		},
+		// Recurring rules and plan items drop the deleted category (ON DELETE SET NULL).
 		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
+			void invalidateFinancialData(queryClient)
+			queryClient.invalidateQueries({ queryKey: ['recurring-transactions'] })
+			queryClient.invalidateQueries({ queryKey: ['monthly-plan'] })
 		},
 	})
 }
@@ -58,8 +64,7 @@ export function useUpdateCategoryMutation() {
 			const repo = await getCategoryRepository()
 			return repo.update(data.id, data.name, data.icon, data.color)
 		},
-		onSuccess: () => {
-			queryClient.invalidateQueries({ queryKey: CATEGORY_KEYS.lists() })
-		},
+		// Transactions, budgets and the analytics breakdown show the category's name and color.
+		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }

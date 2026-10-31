@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatNumber } from '@/hooks/useFormatNumber'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { getCreditCardRepository } from '@/lib/repositoryConfig'
 import { CardPayment, CreditCard } from '@/types/creditcard'
@@ -27,6 +28,7 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 	const t = useTranslations('creditCards.history')
 	const locale = useAppLocale()
 	const formatCurrency = useFormatCurrency()
+	const formatNumber = useFormatNumber()
 	const [loading, setLoading] = useState(false)
 	const [payments, setPayments] = useState<CardPayment[]>([])
 	const [loadFailed, setLoadFailed] = useState(false)
@@ -106,7 +108,10 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 		payment.source_amount && payment.source_currency
 			? formatCurrency(payment.source_amount, payment.source_currency)
 			: formatCurrency(payment.amount, payment.currency)
-	const rate = (payment: CardPayment) => (payment.exchange_rate ? payment.exchange_rate.toFixed(4) : '-')
+	const rate = (payment: CardPayment) =>
+		payment.exchange_rate
+			? formatNumber(payment.exchange_rate, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+			: '-'
 	const interest = (payment: CardPayment) =>
 		payment.includes_interest && payment.interest_amount > 0
 			? formatCurrency(payment.interest_amount, payment.currency)
@@ -123,7 +128,7 @@ export function CreditCardPaymentHistory({ open, onClose, card }: CreditCardPaym
 
 				<div className='flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4'>
 					<Select value={currencyFilter} onValueChange={setCurrencyFilter}>
-						<SelectTrigger className='w-full sm:w-40'>
+						<SelectTrigger className='w-full sm:w-40' aria-label={t('currencyFilter')}>
 							<SelectValue placeholder={t('allCurrencies')} />
 						</SelectTrigger>
 						<SelectContent>

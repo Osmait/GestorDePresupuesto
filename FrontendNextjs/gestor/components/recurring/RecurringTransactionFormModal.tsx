@@ -6,6 +6,7 @@ import { useEffect, useMemo } from 'react'
 import { useForm } from 'react-hook-form'
 import * as z from 'zod'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -15,26 +16,33 @@ import {
 	useCreateRecurringTransactionMutation,
 	useUpdateRecurringTransactionMutation,
 } from '@/hooks/queries/useRecurringTransactionsQuery'
-import { hasAtMostDecimals } from '@/lib/money-validation'
+import { moneyMessages, moneySchema } from '@/lib/money-input'
 import { useRecurringTransactionContext } from './RecurringTransactionContext'
 
-function createRecurringSchema(t: (key: string) => string, tForms: (key: string) => string) {
+function createRecurringSchema(
+	t: (key: string) => string,
+	tForms: (key: string, values?: Record<string, string | number>) => string,
+) {
 	return z.object({
 		name: z.string().min(1, t('validation.nameRequired')),
 		description: z.string().optional(),
 		// recurring_transactions.amount is NUMERIC(15,2): the API rejects sub-cent amounts.
-		amount: z.coerce
-			.number()
-			.min(0.01, t('validation.amountPositive'))
-			.refine((value) => hasAtMostDecimals(value), tForms('maxTwoDecimals')),
-		type: z.enum(['income', 'bill'], { required_error: t('validation.typeRequired') }),
+		amount: moneySchema(moneyMessages(tForms, { required: t('validation.amountPositive') })).pipe(
+			z.number().min(0.01, t('validation.amountPositive')),
+		),
+		type: z.enum(['income', 'bill'], {
+			// Only a missing value gets the custom message (Zod 3 `required_error` semantics).
+			error: (issue) => (issue.input === undefined ? t('validation.typeRequired') : undefined),
+		}),
 		account_id: z.string().min(1, t('validation.accountRequired')),
 		category_id: z.string().min(1, t('validation.categoryRequired')),
-		day_of_month: z.coerce.number().min(1, t('validation.dayRange')).max(31, t('validation.dayRange')),
+		day_of_month: z.coerce.number<number>().min(1, t('validation.dayRange')).max(31, t('validation.dayRange')),
 	})
 }
 
 type RecurringFormValues = z.infer<ReturnType<typeof createRecurringSchema>>
+
+type RecurringFormInput = z.input<ReturnType<typeof createRecurringSchema>>
 
 export function RecurringTransactionFormModal() {
 	const t = useTranslations('recurring')
@@ -52,7 +60,7 @@ export function RecurringTransactionFormModal() {
 	// The API error is not shown raw: one actionable message instead.
 	const hasError = Boolean(createMutation.error || updateMutation.error)
 
-	const form = useForm<RecurringFormValues>({
+	const form = useForm<RecurringFormInput, unknown, RecurringFormValues>({
 		resolver: zodResolver(recurringSchema),
 		defaultValues: {
 			name: '',
@@ -149,7 +157,7 @@ export function RecurringTransactionFormModal() {
 								<FormItem>
 									<FormLabel>{t('fieldAmount')}</FormLabel>
 									<FormControl>
-										<Input type='number' step='0.01' {...field} />
+										<MoneyInput {...field} />
 									</FormControl>
 									<FormMessage />
 								</FormItem>

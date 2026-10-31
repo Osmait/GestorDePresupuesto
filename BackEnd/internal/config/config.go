@@ -42,8 +42,10 @@ type ServerConfig struct {
 	WriteTimeout    time.Duration `json:"write_timeout"`
 	IdleTimeout     time.Duration `json:"idle_timeout"`
 	MaxHeaderBytes  int           `json:"max_header_bytes"`
-	// Timezone is the IANA zone used for calendar-day logic such as
-	// recurring transaction scheduling (APP_TIMEZONE).
+	// Timezone is the IANA app time zone (APP_TIMEZONE): calendar days and
+	// months (transaction filters, budgets, analytics, "today", recurring
+	// scheduling) are cut in it. It must match the database's app_timezone()
+	// (migration 000062); a mismatch is logged at startup.
 	Timezone string `json:"timezone"`
 	// ReadHeaderTimeout bounds how long the server waits for request headers
 	// (slowloris protection).
@@ -82,6 +84,16 @@ type DatabaseConfig struct {
 	// 503 instead of queueing indefinitely. 0 disables the bound.
 	TxAcquireTimeout time.Duration `json:"tx_acquire_timeout"`
 	SSLMode          string        `json:"ssl_mode"`
+	// StatementTimeout is the transaction-local statement_timeout of every
+	// per-user transaction (DB_STATEMENT_TIMEOUT). 0 disables it.
+	StatementTimeout time.Duration `json:"statement_timeout"`
+	// IdleInTxTimeout is the transaction-local
+	// idle_in_transaction_session_timeout (DB_IDLE_IN_TX_TIMEOUT). 0
+	// disables it.
+	IdleInTxTimeout time.Duration `json:"idle_in_tx_timeout"`
+	// RequestTimeout is the deadline of an authenticated request holding the
+	// RLS transaction (DB_REQUEST_TIMEOUT). 0 disables it.
+	RequestTimeout time.Duration `json:"request_timeout"`
 }
 
 // CacheConfig holds the TTLs of the small in-process caches that keep
@@ -282,6 +294,14 @@ type AIConfig struct {
 	MaxFileSize    int64         `json:"max_file_size"`
 	MaxFiles       int           `json:"max_files"`
 	EnableMetrics  bool          `json:"enable_metrics"`
+	// Per-user limits on /ai/* (each call goes to the paid provider).
+	RequestsPerMinute int `json:"requests_per_minute"`
+	RequestsPerDay    int `json:"requests_per_day"`
+	MaxInFlight       int `json:"max_in_flight"`
+	// MaxConcurrentCalls caps provider calls in flight across all users
+	// (AI_MAX_CONCURRENT_CALLS); beyond it requests fail fast with 503.
+	// <= 0 disables the cap.
+	MaxConcurrentCalls int `json:"max_concurrent_calls"`
 }
 
 // MCPConfig holds Model Context Protocol server configuration
@@ -370,6 +390,12 @@ func LoadConfig() (*Config, error) {
 			// RLS transaction; this bounds the wait for it.
 			TxAcquireTimeout: getEnvDuration("DB_TX_ACQUIRE_TIMEOUT", 5*time.Second),
 			SSLMode:          getEnvString("DB_SSL_MODE", "disable"),
+			// Bound how long a request can hold its pooled connection. The
+			// AI routes that call the provider run outside the request
+			// transaction, so these can stay short.
+			StatementTimeout: getEnvDuration("DB_STATEMENT_TIMEOUT", 15*time.Second),
+			IdleInTxTimeout:  getEnvDuration("DB_IDLE_IN_TX_TIMEOUT", 30*time.Second),
+			RequestTimeout:   getEnvDuration("DB_REQUEST_TIMEOUT", 60*time.Second),
 		},
 
 		Cache: CacheConfig{
@@ -378,8 +404,10 @@ func LoadConfig() (*Config, error) {
 		},
 
 		JWT: JWTConfig{
-			Secret:            getJWTSecret(),
-			Expiration:        getDuration(getEnvString("JWT_EXPIRATION", "24h")),
+			Secret: getJWTSecret(),
+			// Access tokens cannot be revoked (logout only revokes refresh
+			// tokens), so they are short-lived; clients refresh them.
+			Expiration:        getDuration(getEnvString("JWT_EXPIRATION", "15m")),
 			RefreshExpiration: getDuration(getEnvString("JWT_REFRESH_EXPIRATION", "168h")), // 7 days
 			Issuer:            getEnvString("JWT_ISSUER", "gestor-de-presupuesto"),
 			Audience:          getEnvString("JWT_AUDIENCE", "gestor-de-presupuesto-api"),
@@ -535,6 +563,12 @@ func LoadConfig() (*Config, error) {
 			MaxFileSize:    int64(getEnvInt("AI_MAX_FILE_SIZE_MB", 10)) * 1024 * 1024,
 			MaxFiles:       getEnvInt("AI_MAX_FILES", 5),
 			EnableMetrics:  getEnvBool("AI_ENABLE_METRICS", true),
+
+			RequestsPerMinute: getEnvInt("AI_REQUESTS_PER_MINUTE", 10),
+			RequestsPerDay:    getEnvInt("AI_REQUESTS_PER_DAY", 200),
+			MaxInFlight:       getEnvInt("AI_MAX_IN_FLIGHT", 2),
+
+			MaxConcurrentCalls: getEnvInt("AI_MAX_CONCURRENT_CALLS", 4),
 		},
 
 		MCP: MCPConfig{
@@ -904,6 +938,13 @@ func (c *Config) validateEnvironmentSpecific() error {
 			}
 		}
 
+		// Not fatal (a wrong value would take production down), but loud:
+		// these modes may send credentials and data unencrypted.
+		switch c.Database.SSLMode {
+		case "", "disable", "allow", "prefer":
+			fmt.Fprintf(os.Stderr, "WARNING: DB_SSL_MODE=%q in production; use require or verify-full\n", c.Database.SSLMode)
+		}
+
 		// if !c.Security.EnableTLS {
 		// 	return fmt.Errorf("TLS must be enabled in production")
 		// }
@@ -972,9 +1013,18 @@ func NewConfigSQLite(dbName string) *Config {
 // columns. JSON/text held in a []byte must be passed as a string (see
 // passkeyRepository.jsonText); money.Amount, time.Time, numbers, strings and
 // pq.Array values are unaffected (sent as text either way).
+//
+// User and password are URL-escaped: a password with @, :, / or % would
+// otherwise break (or redirect) the connection string.
 func (c *Config) GetPostgresUrl() string {
-	return fmt.Sprintf("postgres://%s:%s@%s:%d/%s?sslmode=%s&binary_parameters=yes",
-		c.Database.User, c.Database.Password, c.Database.Host, c.Database.Port, c.Database.Name, c.Database.SSLMode)
+	u := url.URL{
+		Scheme:   "postgres",
+		User:     url.UserPassword(c.Database.User, c.Database.Password),
+		Host:     net.JoinHostPort(c.Database.Host, strconv.FormatUint(uint64(c.Database.Port), 10)),
+		Path:     "/" + c.Database.Name,
+		RawQuery: "sslmode=" + url.QueryEscape(c.Database.SSLMode) + "&binary_parameters=yes",
+	}
+	return u.String()
 }
 
 // GetSQLiteUrl returns the SQLite connection string

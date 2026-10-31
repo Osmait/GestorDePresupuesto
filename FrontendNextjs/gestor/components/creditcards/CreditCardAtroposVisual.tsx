@@ -1,13 +1,19 @@
 'use client'
 
-import Atropos from 'atropos/react'
-import { type Ref, useEffect, useState } from 'react'
-import 'atropos/css'
 import { ArrowLeftRight, CreditCard as CardIcon } from 'lucide-react'
 import { useTranslations } from 'next-intl'
+import { lazy, type Ref, Suspense } from 'react'
 import { Button } from '@/components/ui/button'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { CreditCard } from '@/types/creditcard'
+
+// Atropos (JS + CSS) is only fetched where the tilt runs.
+const CreditCardTilt = lazy(() => import('./CreditCardTilt'))
+
+/** Desktop pointers that hover, on a large screen, without reduced motion. */
+const TILT_QUERY =
+	'(hover: hover) and (pointer: fine) and (min-width: 1024px) and (prefers-reduced-motion: no-preference)'
 
 interface CreditCardAtroposVisualProps {
 	card: CreditCard
@@ -24,14 +30,7 @@ export function CreditCardAtroposVisual({
 }: CreditCardAtroposVisualProps) {
 	const t = useTranslations('creditCards.item')
 	const formatCurrency = useFormatCurrency()
-	const [motionEnabled, setMotionEnabled] = useState(false)
-
-	useEffect(() => {
-		const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-		const hoverCapable = window.matchMedia('(hover: hover)').matches
-		const desktopScreen = window.matchMedia('(min-width: 1024px)').matches
-		setMotionEnabled(!reducedMotion && hoverCapable && desktopScreen)
-	}, [])
+	const motionEnabled = useMediaQuery(TILT_QUERY)
 
 	const visualContent = (
 		<div className='relative h-full cursor-pointer overflow-hidden rounded-lg border bg-card p-4 text-card-foreground shadow-sm'>
@@ -118,22 +117,15 @@ export function CreditCardAtroposVisual({
 		</div>
 	)
 
+	const plain = <div className='h-full w-full'>{visualContent}</div>
+
 	if (!motionEnabled) {
-		return <div className='h-full w-full'>{visualContent}</div>
+		return plain
 	}
 
 	return (
-		<Atropos
-			onClick={onFlip}
-			activeOffset={16}
-			shadowScale={0.98}
-			rotateXMax={5}
-			rotateYMax={6}
-			duration={220}
-			highlight={false}
-			className='h-full w-full'
-		>
-			{visualContent}
-		</Atropos>
+		<Suspense fallback={plain}>
+			<CreditCardTilt onClick={onFlip}>{visualContent}</CreditCardTilt>
+		</Suspense>
 	)
 }

@@ -36,10 +36,10 @@ func (f *fakeTxRepo) ResolveAndValidateCurrencyForAccount(_ context.Context, _, 
 func (f *fakeTxRepo) FindAll(context.Context, string, string, string, string) ([]*domain.Transaction, error) {
 	return f.page, nil
 }
-func (f *fakeTxRepo) FindCurrentBudget(context.Context, string, string, money.Amount) (money.Amount, error) {
+func (f *fakeTxRepo) FindCurrentCategorySpent(context.Context, string, string, money.Amount) (money.Amount, error) {
 	return money.Zero, nil
 }
-func (f *fakeTxRepo) FindCurrentBudgets(context.Context, string, money.Amount) (map[string]money.Amount, error) {
+func (f *fakeTxRepo) FindCurrentSpentByCategory(context.Context, string, money.Amount) (map[string]money.Amount, error) {
 	return nil, nil
 }
 func (f *fakeTxRepo) FindAllOfAllAccounts(context.Context, string) ([]*domain.Transaction, error) {
@@ -49,6 +49,7 @@ func (f *fakeTxRepo) BalanceByAccountAndCurrency(context.Context, string, string
 	return money.Zero, nil
 }
 func (f *fakeTxRepo) Delete(context.Context, string, string) error              { return nil }
+func (f *fakeTxRepo) TypeOf(context.Context, string, string) (string, error)    { return "bill", nil }
 func (f *fakeTxRepo) Update(context.Context, string, *domain.Transaction) error { return nil }
 func (f *fakeTxRepo) FindAllOfAllAccountsWithFilters(_ context.Context, _ string, fl *dto.TransactionFilter) ([]*domain.Transaction, error) {
 	if fl.Limit > 0 && fl.Limit < len(f.page) {

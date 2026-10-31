@@ -118,21 +118,28 @@ func (f *FeatureFlags) Enabled(ctx context.Context, userID, featureKey string) (
 	}
 
 	var enabled bool
-	err := txhelper.FromContext(ctx, f.db).QueryRowContext(
-		ctx,
-		`SELECT COALESCE(g.enabled, o.enabled, f.default_enabled)
-		 FROM feature_flags f
-		 LEFT JOIN feature_flag_global_overrides g
-		   ON g.feature_key = f.key
-		 LEFT JOIN feature_flag_user_overrides o
-		   ON o.feature_key = f.key AND o.user_id = $1
-		 WHERE f.key = $2`,
-		userID,
-		featureKey,
-	).Scan(&enabled)
-	if errors.Is(err, sql.ErrNoRows) {
-		enabled, err = false, nil
-	}
+	// Under RLSMiddleware this runs on the request transaction. Routes
+	// registered before it (the AI provider routes) have none: the lookup
+	// then gets its own short transaction scoped to the user, so the user's
+	// override stays visible under FORCE ROW LEVEL SECURITY.
+	err := txhelper.WithUserTx(ctx, f.db, userID, false, func(ctx context.Context) error {
+		err := txhelper.FromContext(ctx, f.db).QueryRowContext(
+			ctx,
+			`SELECT COALESCE(g.enabled, o.enabled, f.default_enabled)
+			 FROM feature_flags f
+			 LEFT JOIN feature_flag_global_overrides g
+			   ON g.feature_key = f.key
+			 LEFT JOIN feature_flag_user_overrides o
+			   ON o.feature_key = f.key AND o.user_id = $1
+			 WHERE f.key = $2`,
+			userID,
+			featureKey,
+		).Scan(&enabled)
+		if errors.Is(err, sql.ErrNoRows) {
+			enabled, err = false, nil
+		}
+		return err
+	})
 	if err != nil {
 		return false, err
 	}

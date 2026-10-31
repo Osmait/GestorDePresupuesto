@@ -7,7 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
 	"github.com/osmait/gestorDePresupuesto/internal/services/apikey"
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 )
 
 // extractBearerToken returns the token value from the Authorization header,
@@ -47,9 +47,30 @@ func APIKeyAuthMiddleware(apiKeySvc *apikey.APIKeyService) gin.HandlerFunc {
 	}
 }
 
-// UserResolver looks up a user ID by email. Used to map OAuth subject (email)
-// to the internal user ID needed by RLS and services.
-type UserResolver func(ctx context.Context, email string) (string, error)
+// Scopes a client may request. A grant is read-only only when it asks for
+// mcp:read and not mcp:write; any other scope (none, "mcp", ...) keeps full
+// access, so existing connections are unchanged.
+const (
+	ScopeRead  = "mcp:read"
+	ScopeWrite = "mcp:write"
+)
+
+func isReadOnlyScope(scope string) bool {
+	read, write := false, false
+	for _, s := range strings.Fields(scope) {
+		switch s {
+		case ScopeRead:
+			read = true
+		case ScopeWrite:
+			write = true
+		}
+	}
+	return read && !write
+}
+
+// TokenUserResolver returns the id of the user an OAuth access token was
+// issued to (stored with the token).
+type TokenUserResolver func(ctx context.Context, accessToken string) (string, error)
 
 // MCPAuthMiddleware validates MCP requests using OAuth tokens first, then
 // falling back to API key authentication. This allows both Claude Web
@@ -57,8 +78,10 @@ type UserResolver func(ctx context.Context, email string) (string, error)
 //
 // resourceURL is the base URL of the MCP resource (used in WWW-Authenticate header).
 // tokenVerifier may be nil; when nil, only API key auth is attempted.
-// userResolver maps the OAuth subject (email) to the internal user ID.
-func MCPAuthMiddleware(apiKeySvc *apikey.APIKeyService, tokenVerifier func(string) (*oauth2.TokenInfo, error), resourceURL string, userResolver UserResolver) gin.HandlerFunc {
+// tokenUser maps a verified OAuth token to its user. The token subject is an
+// email, which can change (and be given to someone else): resolving it on
+// every request would hand one user's token another user's data.
+func MCPAuthMiddleware(apiKeySvc *apikey.APIKeyService, tokenVerifier func(string) (*oauth2.TokenInfo, error), resourceURL string, tokenUser TokenUserResolver) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		token := extractBearerToken(c)
 		if token == "" {
@@ -71,15 +94,18 @@ func MCPAuthMiddleware(apiKeySvc *apikey.APIKeyService, tokenVerifier func(strin
 		// the OAuth 2.1 flow without needing an API key.
 		if tokenVerifier != nil {
 			if tokenInfo, err := tokenVerifier(token); err == nil {
-				// tokenInfo.Subject is the email; resolve to internal user ID
-				userID := tokenInfo.Subject
-				if userResolver != nil {
-					if resolved, resolveErr := userResolver(c.Request.Context(), tokenInfo.Subject); resolveErr == nil {
-						userID = resolved
-					}
+				var userID string
+				if tokenUser != nil {
+					userID, err = tokenUser(c.Request.Context(), token)
+				}
+				if tokenUser == nil || err != nil || userID == "" {
+					c.Header("WWW-Authenticate", `Bearer resource_metadata="`+resourceURL+`/.well-known/oauth-protected-resource"`)
+					c.AbortWithStatusJSON(401, gin.H{"error": "invalid authentication"})
+					return
 				}
 				c.Set("X-User-Id", userID)
 				ctx := mcpcontext.WithUserID(c.Request.Context(), userID)
+				ctx = mcpcontext.WithReadOnly(ctx, isReadOnlyScope(tokenInfo.Scope))
 				c.Request = c.Request.WithContext(ctx)
 				c.Next()
 				return

@@ -2,7 +2,7 @@
 // authorization codes and tokens) in PostgreSQL, so a redeploy does not
 // disconnect Claude.
 //
-// Storage implements github.com/plexusone/mcpkit/oauth2.Storage. Every secret
+// Storage implements github.com/plexusone/omniskill/mcp/oauth2.Storage. Every secret
 // (authorization codes, access and refresh tokens, client secrets) is stored
 // as the hex SHA-256 of its value and looked up by that hash; the plain value
 // never reaches the database.
@@ -19,7 +19,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/plexusone/mcpkit/oauth2"
+	"github.com/plexusone/omniskill/mcp/oauth2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -64,7 +64,7 @@ func HashSecret(value string) string {
 
 // HashClientSecret implements the optional client-secret hashing hook used by
 // the MCP token endpoint: GetClient returns the stored hash as ClientSecret,
-// so the incoming secret has to be hashed the same way before mcpkit compares
+// so the incoming secret has to be hashed the same way before omniskill compares
 // them. Without the hook the comparison fails, i.e. it fails closed.
 func (s *Storage) HashClientSecret(secret string) string {
 	return HashSecret(secret)
@@ -246,7 +246,7 @@ func (s *Storage) DeleteAuthorizationCode(code string) error {
 
 // MarkAuthorizationCodeUsed consumes a code atomically: only one of several
 // concurrent token exchanges for the same code gets a nil error, every other
-// one gets ErrCodeUsed (or ErrCodeExpired / ErrCodeNotFound) and mcpkit then
+// one gets ErrCodeUsed (or ErrCodeExpired / ErrCodeNotFound) and omniskill then
 // refuses to issue a token.
 func (s *Storage) MarkAuthorizationCodeUsed(code string) error {
 	ctx, cancel := s.ctx()
@@ -287,8 +287,11 @@ func (s *Storage) MarkAuthorizationCodeUsed(code string) error {
 // ---------------------------------------------------------------------------
 
 // CreateToken stores an access token (and its refresh token) by hash. The
-// subject (email) is resolved to the user id so that deleting the user
-// revokes the token. Fully expired tokens are purged opportunistically.
+// subject is resolved to the user id so that deleting the user revokes the
+// token: on the code exchange it is the email the user just logged in with,
+// on a refresh it is the user id of the consumed token (see GetTokenByRefresh),
+// so a refreshed token never follows the email to another account. Fully
+// expired tokens are purged opportunistically.
 func (s *Storage) CreateToken(token *oauth2.TokenInfo) error {
 	if token == nil || token.AccessToken == "" {
 		return errors.New("empty access token")
@@ -326,7 +329,8 @@ func (s *Storage) CreateToken(token *oauth2.TokenInfo) error {
 		(access_token_hash, refresh_token_hash, client_id, user_id, subject, scope,
 		 token_type, expires_at, refresh_expires_at, purge_after, created_at)
 		VALUES ($1, $2, $3,
-			(SELECT id FROM users WHERE email = $4 AND deleted_at IS NULL LIMIT 1),
+			(SELECT id FROM users WHERE deleted_at IS NULL
+				AND CASE WHEN strpos($4, '@') > 0 THEN email = $4 ELSE id = $4 END LIMIT 1),
 			$4, $5, $6, $7, $8, $9, $10)`,
 		HashSecret(token.AccessToken), refreshHash, token.ClientID, token.Subject, token.Scope,
 		tokenType, token.ExpiresAt, refreshExpires, purgeAfter, createdAt)
@@ -364,11 +368,33 @@ func (s *Storage) GetToken(accessToken string) (*oauth2.TokenInfo, error) {
 	return t, nil
 }
 
+// UserIDForAccessToken returns the id of the user an access token was issued
+// to, if the token is unexpired and the user still exists. The id is the one
+// stored when the token was issued, never re-derived from the (mutable) email.
+func (s *Storage) UserIDForAccessToken(accessToken string) (string, error) {
+	ctx, cancel := s.ctx()
+	defer cancel()
+
+	var userID sql.NullString
+	err := s.db.QueryRowContext(ctx, `SELECT t.user_id
+		FROM mcp_oauth_tokens t
+		JOIN users u ON u.id = t.user_id AND u.deleted_at IS NULL
+		WHERE t.access_token_hash = $1 AND t.expires_at > $2`, HashSecret(accessToken), s.now()).Scan(&userID)
+	if errors.Is(err, sql.ErrNoRows) || (err == nil && !userID.Valid) {
+		return "", oauth2.ErrTokenNotFound
+	}
+	if err != nil {
+		return "", fmt.Errorf("select oauth token user: %w", err)
+	}
+	return userID.String, nil
+}
+
 // GetTokenByRefresh consumes a refresh token: the row is deleted in the same
 // statement that reads it, so concurrent refreshes with the same token yield
-// one new token pair at most (refresh token rotation). mcpkit deletes the old
+// one new token pair at most (refresh token rotation). omniskill deletes the old
 // access token right after this call anyway; AccessToken is left empty
-// because only its hash is known.
+// because only its hash is known. Subject is the stored user id, not the email,
+// because omniskill copies it into the new token (see CreateToken).
 func (s *Storage) GetTokenByRefresh(refreshToken string) (*oauth2.TokenInfo, error) {
 	ctx, cancel := s.ctx()
 	defer cancel()
@@ -381,7 +407,7 @@ func (s *Storage) GetTokenByRefresh(refreshToken string) (*oauth2.TokenInfo, err
 			RETURNING client_id, user_id, subject, scope, token_type, expires_at,
 				refresh_expires_at, created_at
 		)
-		SELECT c.client_id, c.subject, c.scope, c.token_type, c.expires_at,
+		SELECT c.client_id, COALESCE(c.user_id, c.subject), c.scope, c.token_type, c.expires_at,
 			c.refresh_expires_at, c.created_at,
 			EXISTS (SELECT 1 FROM users u WHERE u.id = c.user_id AND u.deleted_at IS NULL)
 		FROM consumed c`, HashSecret(refreshToken)).

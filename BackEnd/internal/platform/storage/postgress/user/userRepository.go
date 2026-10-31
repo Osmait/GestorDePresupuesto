@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/likepattern"
+
 	"github.com/rs/zerolog/log"
 
 	domainUser "github.com/osmait/gestorDePresupuesto/internal/domain/user"
@@ -148,8 +150,16 @@ func (u *UserRepository) Update(ctx context.Context, user *domainUser.User) erro
 	return err
 }
 
+// SoftDelete marks the user deleted and ends their access: API keys are
+// deactivated and refresh tokens revoked, in one statement.
 func (u *UserRepository) SoftDelete(ctx context.Context, id string) error {
-	_, err := txhelper.FromContext(ctx, u.db).ExecContext(ctx, "UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL", id)
+	_, err := txhelper.FromContext(ctx, u.db).ExecContext(ctx, `WITH deleted AS (
+			UPDATE users SET deleted_at = NOW() WHERE id = $1 AND deleted_at IS NULL RETURNING id
+		), keys AS (
+			UPDATE user_api_keys SET is_active = false WHERE user_id IN (SELECT id FROM deleted)
+		)
+		UPDATE refresh_tokens SET revoked_at = NOW()
+		WHERE user_id IN (SELECT id FROM deleted) AND revoked_at IS NULL`, id)
 	return err
 }
 
@@ -288,7 +298,7 @@ func (u *UserRepository) FindAllFiltered(ctx context.Context, query string, limi
 	query = strings.TrimSpace(query)
 	if query != "" {
 		extraClause = fmt.Sprintf(" AND (LOWER(name) LIKE LOWER($%d) OR LOWER(last_name) LIKE LOWER($%d) OR LOWER(email) LIKE LOWER($%d))", argIndex, argIndex, argIndex)
-		args = append(args, "%"+query+"%")
+		args = append(args, likepattern.Contains(query))
 		argIndex++
 	}
 

@@ -25,7 +25,7 @@ export function BudgetList() {
 		useBudgetContext()
 	const { data: categories = [] } = useGetCategories()
 	const list = budgets ?? []
-	const { data: transactionCounts } = useBudgetTransactionCounts(list.map((budget) => budget.id))
+	const { data: transactionCounts } = useBudgetTransactionCounts(list)
 
 	const handleEdit = (budget: Budget) => {
 		setEditingBudget(budget)

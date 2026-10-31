@@ -21,6 +21,9 @@ type CertificateRepositoryInterface interface {
 	SavePayment(ctx context.Context, payment *certificate.CertificatePayment) error
 	FindPaymentsByCertificate(ctx context.Context, certificateId string, userId string) ([]*certificate.CertificatePayment, error)
 	FindLastPayment(ctx context.Context, certificateId string, userId string) (*certificate.CertificatePayment, error)
+	// FindLastPayments is FindLastPayment for several certificates in one
+	// query, keyed by certificate id (certificates without payments are absent).
+	FindLastPayments(ctx context.Context, certificateIds []string, userId string) (map[string]*certificate.CertificatePayment, error)
 	FindAllPayments(ctx context.Context, userId string) ([]*certificate.CertificatePayment, error)
 	FindPaymentById(ctx context.Context, paymentId string, userId string) (*certificate.CertificatePayment, error)
 	UpdatePayment(ctx context.Context, payment *certificate.CertificatePayment) error

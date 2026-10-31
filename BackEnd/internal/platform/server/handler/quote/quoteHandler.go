@@ -1,10 +1,12 @@
 package quote
 
 import (
+	"errors"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/services/quote"
+	"github.com/rs/zerolog/log"
 )
 
 type QuoteHandler struct {
@@ -24,10 +26,15 @@ func (h *QuoteHandler) GetQuote(ctx *gin.Context) {
 
 	price, currency, name, err := h.quoteService.GetQuoteContext(ctx.Request.Context(), symbol)
 	if err != nil {
-		if err.Error() == "quote not found" {
+		switch {
+		case errors.Is(err, quote.ErrInvalidSymbol):
+			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid symbol"})
+		case errors.Is(err, quote.ErrQuoteUnavailable):
 			ctx.JSON(http.StatusNotFound, gin.H{"error": "quote not found"})
-		} else {
-			ctx.JSON(http.StatusInternalServerError, gin.H{"error": "failed to fetch quote: " + err.Error()})
+		default:
+			// Upstream details stay in the logs.
+			log.Warn().Err(err).Str("symbol", symbol).Msg("quote lookup failed")
+			ctx.JSON(http.StatusBadGateway, gin.H{"error": "failed to fetch quote"})
 		}
 		return
 	}

@@ -53,7 +53,7 @@ func (h *RecurringTransactionHandler) Create(ctx *gin.Context) {
 	}
 	var req dto.RecurringTransactionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	if err := req.Validate(); err != nil {
@@ -134,7 +134,7 @@ func (h *RecurringTransactionHandler) Update(ctx *gin.Context) {
 	}
 	var req dto.RecurringTransactionRequest
 	if err := ctx.ShouldBindJSON(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
 		return
 	}
 	if err := req.Validate(); err != nil {

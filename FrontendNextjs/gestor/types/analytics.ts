@@ -22,6 +22,18 @@ export interface DashboardSummary {
 	accounts_total: number
 	investments_total: number
 	certificates_total: number
+	/** Credit card debt in DOP (USD converted at usd_to_dop_rate); net worth subtracts it. */
+	credit_card_debt?: number
+	credit_cards_count?: number
+	/** Broker wallet (funded, not spent on positions), in DOP. */
+	broker_cash_total?: number
+	/** Outstanding principal of active loans, in DOP. */
+	loans_receivable_total?: number
+	loans_receivable_count?: number
+	/** Outstanding principal of defaulted loans, in DOP: shown, not added to net worth. */
+	loans_defaulted_total?: number
+	/** accounts + investments + broker cash + certificates + loans receivable - card debt, in DOP. */
+	net_worth?: number
 	accounts_count: number
 	investments_count: number
 	certificates_count: number

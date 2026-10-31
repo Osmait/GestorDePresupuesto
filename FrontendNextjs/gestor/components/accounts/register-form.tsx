@@ -28,7 +28,10 @@ function buildRegisterSchema(t: (key: string, values?: Record<string, string | n
 		.object({
 			name: z.string().min(2, t('nameMin')).max(50, t('nameMax')).regex(NAME_PATTERN, t('nameLetters')),
 			lastName: z.string().min(2, t('lastNameMin')).max(50, t('lastNameMax')).regex(NAME_PATTERN, t('lastNameLetters')),
-			email: z.string().min(1, t('emailRequired')).email(t('emailInvalid')).toLowerCase(),
+			email: z
+				.string()
+				.min(1, t('emailRequired'))
+				.pipe(z.email(t('emailInvalid')).toLowerCase()),
 			password: z
 				.string()
 				.min(PASSWORD_MIN_LENGTH, t('passwordMinLength', { min: PASSWORD_MIN_LENGTH }))
@@ -41,10 +44,14 @@ function buildRegisterSchema(t: (key: string, values?: Record<string, string | n
 		.refine((data) => data.password === data.confirmPassword, {
 			path: ['confirmPassword'],
 			message: t('passwordsMismatch'),
+			// Only once every field is valid (Zod 3 semantics; Zod 4 runs it alongside field errors).
+			when: (payload) => payload.issues.length === 0,
 		})
 }
 
 type RegisterFormValues = z.infer<ReturnType<typeof buildRegisterSchema>>
+
+type RegisterFormInput = z.input<ReturnType<typeof buildRegisterSchema>>
 
 interface RegisterFormProps {
 	onToggleForm?: () => void
@@ -72,7 +79,7 @@ export function RegisterForm({ onToggleForm, showToggle = true }: RegisterFormPr
 		}
 	}, [])
 
-	const form = useForm<RegisterFormValues>({
+	const form = useForm<RegisterFormInput, unknown, RegisterFormValues>({
 		resolver: zodResolver(registerSchema),
 		defaultValues: {
 			name: '',

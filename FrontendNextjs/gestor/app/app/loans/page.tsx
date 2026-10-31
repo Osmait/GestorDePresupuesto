@@ -41,25 +41,43 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ACCOUNT_KEYS, useGetAccounts } from '@/hooks/queries/useAccountsQuery'
-import { TRANSACTION_KEYS } from '@/hooks/queries/useTransactionsQuery'
+import { useGetAccounts } from '@/hooks/queries/useAccountsQuery'
+import {
+	loanDetailsQueryOptions,
+	useCancelLoanMutation,
+	useCreateLoanMutation,
+	useGetLoanDetails,
+	useGetLoanSummary,
+	useGetLoans,
+	useRegisterLoanPaymentMutation,
+} from '@/hooks/queries/useLoansQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatNumber } from '@/hooks/useFormatNumber'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
-import { getLoanRepository } from '@/lib/repositoryConfig'
 import {
 	CreateLoanDTO,
 	Loan,
-	LoanDetails,
 	LoanInstallmentStatus,
-	LoanPayment,
 	LoanStatus,
 	LoanSummary,
 	RegisterLoanPaymentDTO,
 } from '@/types/loan'
 
-// The summary endpoint aggregates without a currency; amounts are reported in DOP.
+// The summary totals are in DOP: the API converts USD loans at usd_to_dop_rate.
 const SUMMARY_CURRENCY = 'DOP'
+
+/** The non-DOP part of a total (e.g. "US$1,000.00"), listed under the DOP figure. */
+function foreignParts(
+	summary: LoanSummary | null,
+	field: 'total_principal' | 'total_pending' | 'total_collected',
+	format: (value: number, currency: string) => string,
+): string {
+	return Object.entries(summary?.by_currency ?? {})
+		.filter(([currency, totals]) => currency !== SUMMARY_CURRENCY && totals[field] > 0)
+		.map(([currency, totals]) => format(totals[field], currency))
+		.join(' + ')
+}
 
 export default function LoansPage() {
 	const t = useTranslations('loans')
@@ -78,6 +96,22 @@ export default function LoansPage() {
 
 function LoansKpis({ summary, loading = false }: { summary: LoanSummary | null; loading?: boolean }) {
 	const t = useTranslations('loans')
+	const formatCurrency = useFormatCurrency()
+	const formatNumber = useFormatNumber()
+	const rate = summary?.usd_to_dop_rate
+		? formatNumber(summary.usd_to_dop_rate, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+		: ''
+	const converted = (field: 'total_principal' | 'total_pending' | 'total_collected') => {
+		const amounts = foreignParts(summary, field, formatCurrency)
+		return amounts ? t('pendingByCurrency', { amounts, rate }) : undefined
+	}
+	const defaulted = summary?.defaulted_pending ?? 0
+	const pendingHint = [
+		converted('total_pending'),
+		defaulted > 0 ? t('defaultedPending', { amount: formatCurrency(defaulted, SUMMARY_CURRENCY) }) : undefined,
+	]
+		.filter(Boolean)
+		.join(' · ')
 	return (
 		<StatGrid columns={4}>
 			<StatCard
@@ -85,19 +119,23 @@ function LoansKpis({ summary, loading = false }: { summary: LoanSummary | null; 
 				icon={Landmark}
 				loading={loading}
 				value={<Amount value={summary?.total_principal || 0} currency={SUMMARY_CURRENCY} />}
-				hint={t('activeLoansCount', { count: summary?.active_loans || 0 })}
+				hint={[t('activeLoansCount', { count: summary?.active_loans || 0 }), converted('total_principal')]
+					.filter(Boolean)
+					.join(' · ')}
 			/>
 			<StatCard
 				label={t('totalPending')}
 				icon={Wallet}
 				loading={loading}
 				value={<Amount value={summary?.total_pending || 0} currency={SUMMARY_CURRENCY} />}
+				hint={pendingHint || undefined}
 			/>
 			<StatCard
 				label={t('totalCollected')}
 				icon={Banknote}
 				loading={loading}
 				value={<Amount value={summary?.total_collected || 0} currency={SUMMARY_CURRENCY} />}
+				hint={converted('total_collected')}
 			/>
 			<StatCard
 				label={t('totalInterestEarned')}
@@ -136,15 +174,11 @@ function LoansContent() {
 	const locale = useAppLocale()
 	const formatCurrency = useFormatCurrency()
 	const queryClient = useQueryClient()
-	const [hasLoaded, setHasLoaded] = useState(false)
-	const [loadFailed, setLoadFailed] = useState(false)
-	const [loans, setLoans] = useState<Loan[]>([])
-	const [summary, setSummary] = useState<LoanSummary | null>(null)
 	const [createOpen, setCreateOpen] = useState(false)
 	const [detailsOpen, setDetailsOpen] = useState(false)
 	const [paymentOpen, setPaymentOpen] = useState(false)
 	const [selectedLoan, setSelectedLoan] = useState<Loan | null>(null)
-	const [selectedLoanDetails, setSelectedLoanDetails] = useState<LoanDetails | null>(null)
+	const [detailsLoanId, setDetailsLoanId] = useState('')
 	const [loanToCancel, setLoanToCancel] = useState<Loan | null>(null)
 	const router = useRouter()
 	const pathname = usePathname()
@@ -156,39 +190,34 @@ function LoansContent() {
 
 	const accountOptions = useMemo(() => accounts.filter((account) => account.type !== 'credit_card'), [accounts])
 
-	const loadData = useCallback(async () => {
-		try {
-			setLoadFailed(false)
-			const [loanData, summaryData] = await Promise.all([
-				getLoanRepository().findAll(),
-				getLoanRepository().getSummary(),
-			])
-			setLoans(loanData || [])
-			setSummary(summaryData || null)
-		} catch (error) {
-			console.error('Error loading loans', error)
-			setLoadFailed(true)
-		} finally {
-			setHasLoaded(true)
-		}
-	}, [])
+	const loansQuery = useGetLoans()
+	const summaryQuery = useGetLoanSummary()
+	const loans = useMemo(() => loansQuery.data ?? [], [loansQuery.data])
+	const summary = summaryQuery.data ?? null
+	// Details refetch with every loan write (the mutations invalidate ['loans']).
+	const { data: details } = useGetLoanDetails(detailsLoanId)
+	const createLoan = useCreateLoanMutation()
+	const registerPayment = useRegisterLoanPaymentMutation()
+	const cancelLoan = useCancelLoanMutation()
 
+	const reloadLoans = () => {
+		void loansQuery.refetch()
+		void summaryQuery.refetch()
+	}
+
+	// The dialog opens once the details are in, so a failure is a toast instead of an empty dialog.
 	const openDetails = useCallback(
 		async (loanId: string) => {
 			try {
-				const details = await getLoanRepository().findById(loanId)
-				setSelectedLoanDetails(details)
+				await queryClient.fetchQuery(loanDetailsQueryOptions(loanId))
+				setDetailsLoanId(loanId)
 				setDetailsOpen(true)
 			} catch (_error) {
 				toast.error(t('loadDetailsError'))
 			}
 		},
-		[t],
+		[queryClient, t],
 	)
-
-	useEffect(() => {
-		void loadData()
-	}, [loadData])
 
 	useEffect(() => {
 		const selectedId = selectedLoanIdParam
@@ -232,49 +261,30 @@ function LoansContent() {
 		}
 	}
 
-	const refreshAfterMoneyMovement = async () => {
-		await Promise.all([
-			queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.lists() }),
-			queryClient.invalidateQueries({ queryKey: TRANSACTION_KEYS.simple() }),
-			queryClient.invalidateQueries({ queryKey: ACCOUNT_KEYS.lists() }),
-		])
-		await loadData()
-	}
-
 	// Errors propagate to LoanFormDialog, which shows them inline and keeps the input.
 	const handleCreate = async (data: CreateLoanDTO) => {
-		await getLoanRepository().create(data)
+		await createLoan.mutateAsync(data)
 		toast.success(t('created'))
 		setCreateOpen(false)
-		await refreshAfterMoneyMovement()
 	}
 
 	// Errors propagate to LoanPaymentDialog, which shows them inline and keeps the input.
 	const handleRegisterPayment = async (data: RegisterLoanPaymentDTO) => {
 		if (!selectedLoan) return
-		const payment: LoanPayment = await getLoanRepository().registerPayment(selectedLoan.id, data)
+		await registerPayment.mutateAsync({ loanId: selectedLoan.id, data })
 		toast.success(t('paymentRegistered'))
 		setPaymentOpen(false)
-		await refreshAfterMoneyMovement()
-		if (selectedLoanDetails) {
-			const refreshed = await getLoanRepository().findById(selectedLoan.id)
-			setSelectedLoanDetails({
-				...refreshed,
-				payments: [payment, ...refreshed.payments],
-			})
-		}
 	}
 
 	const handleCancelLoan = async () => {
 		if (!loanToCancel) return
 		try {
-			await getLoanRepository().cancelLoan(loanToCancel.id)
+			await cancelLoan.mutateAsync(loanToCancel.id)
 		} catch (error) {
 			toast.error(t('cancelLoanError'))
 			throw error
 		}
 		toast.success(t('loanCancelled'))
-		await refreshAfterMoneyMovement()
 	}
 
 	const loanStatusLabel = (status: LoanStatus) => t(`statuses.${status}`)
@@ -352,20 +362,19 @@ function LoansContent() {
 		/>
 	)
 
-	if (!hasLoaded) {
+	if (loansQuery.isPending || summaryQuery.isPending) {
 		return <LoansSkeleton />
 	}
 
-	if (loadFailed) {
+	if (loansQuery.isError || summaryQuery.isError) {
 		return (
 			<PageShell>
 				{header}
-				<ErrorState title={t('loadError')} onRetry={() => void loadData()} />
+				<ErrorState title={t('loadError')} onRetry={reloadLoans} />
 			</PageShell>
 		)
 	}
 
-	const details = selectedLoanDetails
 	const detailsCurrency = details?.loan.currency
 
 	return (

@@ -1,18 +1,22 @@
 'use client'
 
-import { AnimatePresence, domAnimation, LazyMotion, m } from 'framer-motion'
 import { AlertTriangle, Calendar, Check, FileSearch, Pencil, Plus, Trash2, X } from 'lucide-react'
+import { AnimatePresence, domAnimation, LazyMotion, m } from 'motion/react'
 import { useTranslations } from 'next-intl'
 import { type ReactNode, useId, useState } from 'react'
 import { Amount } from '@/components/shared/Amount'
 import { EmptyState } from '@/components/shared/EmptyState'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Button } from '@/components/ui/button'
 import { Checkbox } from '@/components/ui/checkbox'
 import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useUniqueCategoryName } from '@/hooks/useUniqueCategoryName'
+import { calendarDateParts, calendarDateToNoonUTC, getAppTodayDate, parseCalendarDate } from '@/lib/app-time'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
+import { moneyInputToNumber, toMoneyInputText } from '@/lib/money-input'
 import { cn } from '@/lib/utils'
 import { AICategorySuggestion, AIPotentialDuplicate } from '@/types/ai'
 import { Category } from '@/types/category'
@@ -30,24 +34,6 @@ interface TransactionPreviewProps {
 	onCreateCategory?: () => void
 	onApplyCategorySuggestion?: (transactionId: string) => void
 	onCreateCategoryFromSuggestion?: (transactionId: string, categoryName: string) => void
-}
-
-function buildUniqueCategoryName(baseName: string, existingNames: string[]): string {
-	const normalizedExisting = new Set(existingNames.map((name) => name.trim().toLowerCase()))
-	const cleanBase = baseName.trim() || 'Nueva categoría'
-
-	if (!normalizedExisting.has(cleanBase.toLowerCase())) {
-		return cleanBase
-	}
-
-	let candidate = `${cleanBase} - IA`
-	let suffix = 2
-	while (normalizedExisting.has(candidate.toLowerCase())) {
-		candidate = `${cleanBase} - IA ${suffix}`
-		suffix++
-	}
-
-	return candidate
 }
 
 type ChipTone = 'destructive' | 'warning' | 'success' | 'muted'
@@ -91,19 +77,26 @@ function TransactionPreviewView({
 }: TransactionPreviewProps) {
 	const t = useTranslations('ai.preview')
 	const tCommon = useTranslations('ai.common')
+	const uniqueCategoryName = useUniqueCategoryName()
+	const tForms = useTranslations('forms')
 	const locale = useAppLocale()
 	const idPrefix = useId()
 	const [editingIndex, setEditingIndex] = useState<number | null>(null)
 	const [editForm, setEditForm] = useState<Transaction | null>(null)
+	// The amount is edited as text (decimal comma or point) and parsed on save.
+	const [amountText, setAmountText] = useState('')
+	const editAmount = moneyInputToNumber(amountText)
+	const editAmountValid = editAmount > 0
 
 	const startEdit = (index: number, transaction: Transaction) => {
 		setEditingIndex(index)
 		setEditForm({ ...transaction })
+		setAmountText(toMoneyInputText(transaction.amount))
 	}
 
 	const saveEdit = () => {
-		if (editingIndex !== null && editForm) {
-			onEdit(editingIndex, editForm)
+		if (editingIndex !== null && editForm && editAmountValid) {
+			onEdit(editingIndex, { ...editForm, amount: editAmount })
 			setEditingIndex(null)
 			setEditForm(null)
 		}
@@ -195,7 +188,7 @@ function TransactionPreviewView({
 						const duplicateInfo = potentialDuplicatesByTransactionId?.[transaction.id]
 						const categorySuggestion = categorySuggestionsByTransactionId?.[transaction.id]
 						const createSuggestedName = categorySuggestion
-							? buildUniqueCategoryName(
+							? uniqueCategoryName(
 									categorySuggestion.new_category_name || categorySuggestion.category_name,
 									categories.map((category) => category.name),
 								)
@@ -231,18 +224,18 @@ function TransactionPreviewView({
 											</div>
 											<div className='space-y-1.5 sm:col-span-2'>
 												<Label htmlFor={`${rowId}-amount`}>{t('amount')}</Label>
-												<Input
+												<MoneyInput
 													id={`${rowId}-amount`}
-													type='number'
-													inputMode='decimal'
-													value={editForm.amount}
-													onChange={(e) =>
-														setEditForm({
-															...editForm,
-															amount: parseFloat(e.target.value) || 0,
-														})
-													}
+													value={amountText}
+													onChange={(e) => setAmountText(e.target.value)}
+													aria-invalid={!editAmountValid}
+													aria-describedby={editAmountValid ? undefined : `${rowId}-amount-error`}
 												/>
+												{editAmountValid ? null : (
+													<p id={`${rowId}-amount-error`} className='text-xs font-medium text-destructive'>
+														{tForms('invalidAmount')}
+													</p>
+												)}
 											</div>
 											<div className='space-y-1.5'>
 												<Label htmlFor={`${rowId}-currency`}>{t('currency')}</Label>
@@ -274,11 +267,13 @@ function TransactionPreviewView({
 											<fieldset className='min-w-0'>
 												<legend className='mb-1.5 text-sm font-medium leading-none'>{t('date')}</legend>
 												<DatePicker
-													value={editForm.created_at ? new Date(editForm.created_at) : new Date()}
+													// Calendar days: a statement date is a day, not an instant.
+													value={editForm.created_at ? parseCalendarDate(editForm.created_at) : getAppTodayDate()}
 													onChange={(date) =>
 														setEditForm({
 															...editForm,
-															created_at: date?.toISOString() || '',
+															// That day at 12:00 UTC: the same day in UTC and Santo Domingo.
+															created_at: date ? calendarDateToNoonUTC(calendarDateParts(date)).toISOString() : '',
 														})
 													}
 													placeholder={t('date')}
@@ -320,7 +315,7 @@ function TransactionPreviewView({
 												<X className='mr-1 h-4 w-4' aria-hidden='true' />
 												{tCommon('cancel')}
 											</Button>
-											<Button type='button' size='sm' onClick={saveEdit}>
+											<Button type='button' size='sm' onClick={saveEdit} disabled={!editAmountValid}>
 												<Check className='mr-1 h-4 w-4' aria-hidden='true' />
 												{tCommon('save')}
 											</Button>

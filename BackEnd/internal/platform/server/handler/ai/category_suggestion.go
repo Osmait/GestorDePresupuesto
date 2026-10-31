@@ -49,7 +49,10 @@ func (h *Handler) SuggestCategory(c *gin.Context) {
 		CreatedAt:      time.Now(),
 	}
 
-	suggestion := h.suggestCategoryForTransaction(c.Request.Context(), userID, txn, categoryData)
+	var suggestion *dto.CategorySuggestion
+	if history, ok := h.loadSuggestionHistory(c.Request.Context(), userID); ok {
+		suggestion = suggestCategoryForTransaction(txn, categoryData, history)
+	}
 	c.JSON(http.StatusOK, dto.SuggestCategoryResponse{Success: true, Data: suggestion})
 }
 
@@ -73,6 +76,8 @@ func (h *Handler) SuggestCategoriesBatch(c *gin.Context) {
 		categoryData[i] = tasks.CategoryData{ID: cat.Id, Name: cat.Name}
 	}
 
+	// The history is loaded once for the whole batch (up to 100 items).
+	history, historyOK := h.loadSuggestionHistory(c.Request.Context(), userID)
 	items := make([]dto.CategorySuggestionItem, 0, len(req.Transactions))
 	for idx, item := range req.Transactions {
 		txn := &transaction.Transaction{
@@ -85,7 +90,10 @@ func (h *Handler) SuggestCategoriesBatch(c *gin.Context) {
 			Currency:       item.Currency,
 			CreatedAt:      time.Now(),
 		}
-		suggestion := h.suggestCategoryForTransaction(c.Request.Context(), userID, txn, categoryData)
+		var suggestion *dto.CategorySuggestion
+		if historyOK {
+			suggestion = suggestCategoryForTransaction(txn, categoryData, history)
+		}
 		items = append(items, dto.CategorySuggestionItem{Index: idx, Suggestion: suggestion})
 	}
 
@@ -99,11 +107,18 @@ func (h *Handler) suggestCategoriesForTransactions(
 	categories []tasks.CategoryData,
 ) []dto.CategorySuggestion {
 	suggestions := make([]dto.CategorySuggestion, 0)
+	if len(transactions) == 0 || len(categories) == 0 {
+		return suggestions
+	}
+	history, ok := h.loadSuggestionHistory(ctx, userID)
+	if !ok {
+		return suggestions
+	}
 	for _, txn := range transactions {
 		if txn == nil {
 			continue
 		}
-		suggestion := h.suggestCategoryForTransaction(ctx, userID, txn, categories)
+		suggestion := suggestCategoryForTransaction(txn, categories, history)
 		if suggestion != nil {
 			suggestions = append(suggestions, *suggestion)
 		}
@@ -111,19 +126,36 @@ func (h *Handler) suggestCategoriesForTransactions(
 	return suggestions
 }
 
-func (h *Handler) suggestCategoryForTransaction(
-	ctx context.Context,
-	userID string,
-	txn *transaction.Transaction,
-	categories []tasks.CategoryData,
-) *dto.CategorySuggestion {
-	if txn == nil || txn.Name == "" || len(categories) == 0 {
-		return nil
-	}
+const (
+	// suggestionHistoryMonths and suggestionHistoryLimit bound the history
+	// category suggestions learn from: recent habits matter most, and
+	// loading the whole ledger (once per item, before) shipped tens of MB
+	// per batch for an active user.
+	suggestionHistoryMonths = 12
+	suggestionHistoryLimit  = 2000
+)
 
-	history, err := h.transactionRepository.FindAllOfAllAccounts(ctx, userID)
+// loadSuggestionHistory loads the bounded, categorized history used by
+// category suggestions, once per request. ok is false when it could not be
+// loaded (no suggestion is made then, as before).
+func (h *Handler) loadSuggestionHistory(ctx context.Context, userID string) ([]*transaction.Transaction, bool) {
+	since := time.Now().AddDate(0, -suggestionHistoryMonths, 0)
+	history, err := h.transactionRepository.FindCategorizedHistory(ctx, userID, since, suggestionHistoryLimit)
 	if err != nil {
 		log.Warn().Err(err).Str("user_id", userID).Msg("failed to load history for category suggestion")
+		return nil, false
+	}
+	return history, true
+}
+
+// suggestCategoryForTransaction scores the categories of similar
+// transactions in history (falling back to category names).
+func suggestCategoryForTransaction(
+	txn *transaction.Transaction,
+	categories []tasks.CategoryData,
+	history []*transaction.Transaction,
+) *dto.CategorySuggestion {
+	if txn == nil || txn.Name == "" || len(categories) == 0 {
 		return nil
 	}
 

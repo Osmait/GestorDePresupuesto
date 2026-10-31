@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { ConfirmDialog } from '@/components/shared/ConfirmDialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { FormDialog } from '@/components/shared/FormDialog'
+import { MoneyInput } from '@/components/shared/MoneyInput'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -22,6 +23,7 @@ import {
 } from '@/hooks/queries/useAIQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { moneyInputToNumber } from '@/lib/money-input'
 import type { AISavingsGoal } from '@/types/ai'
 
 interface SavingsPlanModalProps {
@@ -66,7 +68,7 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 	}, [open, listGoals.mutateAsync])
 
 	const handleCalculate = async () => {
-		const amount = Number(targetAmount)
+		const amount = moneyInputToNumber(targetAmount)
 		if (!Number.isFinite(amount) || amount <= 0) {
 			toast.error(t('invalidAmount'))
 			return
@@ -80,13 +82,14 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 	}
 
 	const handleCreateGoal = async () => {
-		const amount = Number(targetAmount)
-		const saved = Number(currentSaved)
+		const amount = moneyInputToNumber(targetAmount)
+		// An empty "already saved" field means nothing saved yet.
+		const saved = currentSaved.trim() ? moneyInputToNumber(currentSaved) : 0
 		if (!goalName.trim()) {
 			toast.error(t('invalidName'))
 			return
 		}
-		if (!Number.isFinite(amount) || amount <= 0) {
+		if (!Number.isFinite(amount) || amount <= 0 || !Number.isFinite(saved) || saved < 0) {
 			toast.error(t('invalidAmount'))
 			return
 		}
@@ -96,7 +99,7 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 			target_amount: amount,
 			target_date: targetDate || undefined,
 			account_id: accountId && accountId !== '__all__' ? accountId : undefined,
-			current_saved: Number.isFinite(saved) && saved >= 0 ? saved : 0,
+			current_saved: saved,
 		})
 
 		if ('success' in response && response.success) {
@@ -173,28 +176,20 @@ export function SavingsPlanModal({ open, onOpenChange }: SavingsPlanModalProps) 
 					<div className='grid grid-cols-1 gap-4 sm:grid-cols-2'>
 						<div className='space-y-2'>
 							<Label htmlFor={`${fieldId}-target`}>{t('targetAmount')}</Label>
-							<Input
+							<MoneyInput
 								id={`${fieldId}-target`}
-								type='number'
-								inputMode='decimal'
 								value={targetAmount}
 								onChange={(e) => setTargetAmount(e.target.value)}
-								min={1}
-								step={0.01}
-								placeholder='10000'
+								placeholder='10,000'
 							/>
 						</div>
 
 						<div className='space-y-2'>
 							<Label htmlFor={`${fieldId}-saved`}>{t('currentSaved')}</Label>
-							<Input
+							<MoneyInput
 								id={`${fieldId}-saved`}
-								type='number'
-								inputMode='decimal'
 								value={currentSaved}
 								onChange={(e) => setCurrentSaved(e.target.value)}
-								min={0}
-								step={0.01}
 								placeholder='0'
 							/>
 						</div>
