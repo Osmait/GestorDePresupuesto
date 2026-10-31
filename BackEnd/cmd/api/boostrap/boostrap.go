@@ -465,10 +465,10 @@ func initializeServices(repos *repositories, cfg *config.Config, appLocation *ti
 
 	transactionService := transaction.NewTransactionService(repos.transactionRepository, repos.budgetRepository, notificationService, transactionCache, aiCacheInvalidator, usdToDopRateFn, transaction.WithLocation(appLocation))
 
-	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService, repos.accountRepository, certificate.WithLocation(appLocation))
+	certificateService := certificate.NewCertificateService(repos.certificateRepository, transactionService, repos.accountRepository, certificate.WithLocation(appLocation), certificate.WithUsdToDopRate(usdToDopRateFn))
 
 	creditCardService := creditcard.NewCreditCardService(repos.creditCardRepository, repos.accountRepository, transactionService, creditcard.WithLocation(appLocation))
-	loanService := loan.NewLoanService(repos.loanRepository, transactionService, repos.accountRepository, repos.categoryRepository, loan.WithLocation(appLocation))
+	loanService := loan.NewLoanService(repos.loanRepository, transactionService, repos.accountRepository, repos.categoryRepository, loan.WithLocation(appLocation), loan.WithUsdToDopRate(usdToDopRateFn))
 
 	userService := user.NewUserService(repos.userRepository)
 	// Short-TTL cache for the auth middleware's per-request user lookup
@@ -497,7 +497,7 @@ func initializeServices(repos *repositories, cfg *config.Config, appLocation *ti
 		budgetService:       budget.NewBudgetServices(repos.budgetRepository, repos.transactionRepository, usdToDopRateFn),
 		categoryService:     category.NewCategoryServices(repos.categoryRepository),
 		investmentService:   investment.NewInvestmentService(repos.investmentRepository, quoteService, transactionService, repos.accountRepository, repos.categoryRepository),
-		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn, analytics.WithLocation(appLocation)),
+		analyticsService:    analytics.NewAnalyticsService(repos.analyticsRepository, repos.accountRepository, repos.investmentRepository, repos.certificateRepository, usdToDopRateFn, analytics.WithLocation(appLocation), analytics.WithLoans(repos.loanRepository)),
 		recurringService:    recurring_transaction.NewRecurringTransactionService(repos.recurringRepository, transactionService, notificationService, recurring_transaction.WithLocation(appLocation)),
 		monthlyPlanService:  monthly_plan.NewMonthlyPlanService(repos.monthlyPlanRepository, usdToDopRateFn),
 		searchService:       search.NewSearchService(repos.transactionRepository, repos.categoryRepository, repos.accountRepository, repos.budgetRepository, repos.loanRepository, repos.certificateRepository),

@@ -60,14 +60,19 @@ func (b *BudgetServices) FindAll(ctx context.Context, userId string) ([]*dto.Bud
 		}
 	}
 
-	currentBudgets, err := b.transactionRepo.FindCurrentBudgets(ctx, userId, usdToDop)
+	// Spending is by category and current local month, not by the budget_id
+	// stamped on the bills: a budget sees its category's bills of the month
+	// even if they were written before it existed (or before it was
+	// re-pointed to the category). Budgets sharing a category show the same
+	// spending.
+	spentByCategory, err := b.transactionRepo.FindCurrentSpentByCategory(ctx, userId, usdToDop)
 	if err != nil {
 		return nil, err
 	}
 
 	budgetResponses := make([]*dto.BudgetResponse, 0)
 	for _, budget := range budgets {
-		currentAmount := currentBudgets[budget.Id].RoundCents()
+		currentAmount := spentByCategory[budget.CategoryId].RoundCents()
 		budgetResponse := dto.NewBudgetReponse(budget.Id, budget.CategoryId, budget.UserId, budget.Amount, currentAmount, budget.CreatedAt)
 		budgetResponses = append(budgetResponses, budgetResponse)
 	}

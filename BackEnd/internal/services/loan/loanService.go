@@ -54,6 +54,7 @@ type LoanService struct {
 	accountRepository  AccountRepositoryInterface
 	categoryRepository CategoryRepositoryInterface
 	loc                *time.Location
+	usdToDopRateFn     func(context.Context) (money.Amount, error)
 }
 
 // Option configures a LoanService.
@@ -66,6 +67,14 @@ func WithLocation(loc *time.Location) Option {
 		if loc != nil {
 			s.loc = loc
 		}
+	}
+}
+
+// WithUsdToDopRate sets the USD->DOP rate the summary converts USD loans
+// with (money.FallbackUsdToDopRate when unset or unavailable).
+func WithUsdToDopRate(fn func(context.Context) (money.Amount, error)) Option {
+	return func(s *LoanService) {
+		s.usdToDopRateFn = fn
 	}
 }
 
@@ -447,44 +456,98 @@ func (s *LoanService) UpdateStatus(ctx context.Context, loanId string, userId st
 	return nil
 }
 
+func (s *LoanService) summaryRate(ctx context.Context) money.Amount {
+	if s.usdToDopRateFn != nil {
+		if rate, err := s.usdToDopRateFn(ctx); err == nil && rate.IsPositive() {
+			return rate
+		}
+	}
+	return money.FallbackUsdToDopRate
+}
+
+// GetSummary totals the user's loans (see dto.LoanSummaryResponse for what
+// each total covers), in DOP and per currency.
 func (s *LoanService) GetSummary(ctx context.Context, userId string) (*dto.LoanSummaryResponse, error) {
 	loans, err := s.repository.FindAllByUser(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
 
+	summary := summarizeLoans(loans, s.summaryRate(ctx))
+
 	now := time.Now()
-	summary := &dto.LoanSummaryResponse{}
-
 	for _, item := range loans {
-		summary.TotalPrincipal = summary.TotalPrincipal.Add(item.PrincipalAmount)
-		summary.TotalCollected = summary.TotalCollected.Add(item.PaidPrincipal.Add(item.PaidInterest))
-		summary.TotalInterestEarned = summary.TotalInterestEarned.Add(item.PaidInterest)
-
-		pending := item.TotalAmount.Sub(item.PaidPrincipal.Add(item.PaidInterest))
-		if pending.IsPositive() {
-			summary.TotalPending = summary.TotalPending.Add(pending)
+		if item.Status != loan.LoanStatusActive {
+			continue
 		}
-
-		if item.Status == loan.LoanStatusActive {
-			summary.ActiveLoans++
-
-			installments, _ := s.repository.FindInstallmentsByLoan(ctx, item.Id, userId)
-			for _, installment := range installments {
-				if installment.Status != loan.InstallmentStatusPaid && isOverdue(installment.DueDate, now, s.loc) {
-					summary.OverdueLoans++
-					break
-				}
+		installments, _ := s.repository.FindInstallmentsByLoan(ctx, item.Id, userId)
+		for _, installment := range installments {
+			if installment.Status != loan.InstallmentStatusPaid && isOverdue(installment.DueDate, now, s.loc) {
+				summary.OverdueLoans++
+				break
 			}
 		}
+	}
+
+	return summary, nil
+}
+
+// summarizeLoans computes the amounts and counts of the summary (all but
+// OverdueLoans): per currency in the loan's own currency, and in DOP with USD
+// converted at usdToDop. A loan in an unsupported currency is only in
+// ByCurrency.
+func summarizeLoans(loans []*loan.Loan, usdToDop money.Amount) *dto.LoanSummaryResponse {
+	summary := &dto.LoanSummaryResponse{UsdToDopRate: usdToDop, ByCurrency: make(map[string]*dto.LoanCurrencyTotal)}
+
+	for _, item := range loans {
+		currency := item.CurrencyCode()
+		totals, ok := summary.ByCurrency[currency]
+		if !ok {
+			totals = &dto.LoanCurrencyTotal{}
+			summary.ByCurrency[currency] = totals
+		}
+
+		if item.Status != loan.LoanStatusCancelled {
+			totals.TotalPrincipal = totals.TotalPrincipal.Add(item.PrincipalAmount)
+		}
+		totals.TotalCollected = totals.TotalCollected.Add(item.PaidPrincipal.Add(item.PaidInterest))
+		totals.TotalInterestEarned = totals.TotalInterestEarned.Add(item.PaidInterest)
+
+		switch item.Status {
+		case loan.LoanStatusActive:
+			summary.ActiveLoans++
+			totals.TotalPending = totals.TotalPending.Add(item.Pending())
+		case loan.LoanStatusDefaulted:
+			summary.DefaultedLoans++
+			totals.DefaultedPending = totals.DefaultedPending.Add(item.Pending())
+		}
+	}
+
+	for currency, totals := range summary.ByCurrency {
+		totals.TotalPrincipal = totals.TotalPrincipal.RoundCents()
+		totals.TotalPending = totals.TotalPending.RoundCents()
+		totals.TotalCollected = totals.TotalCollected.RoundCents()
+		totals.TotalInterestEarned = totals.TotalInterestEarned.RoundCents()
+		totals.DefaultedPending = totals.DefaultedPending.RoundCents()
+
+		toDOP := func(amount money.Amount) money.Amount {
+			dop, _ := money.ToDOP(amount, currency, usdToDop)
+			return dop
+		}
+		summary.TotalPrincipal = summary.TotalPrincipal.Add(toDOP(totals.TotalPrincipal))
+		summary.TotalPending = summary.TotalPending.Add(toDOP(totals.TotalPending))
+		summary.TotalCollected = summary.TotalCollected.Add(toDOP(totals.TotalCollected))
+		summary.TotalInterestEarned = summary.TotalInterestEarned.Add(toDOP(totals.TotalInterestEarned))
+		summary.DefaultedPending = summary.DefaultedPending.Add(toDOP(totals.DefaultedPending))
 	}
 
 	summary.TotalPrincipal = summary.TotalPrincipal.RoundCents()
 	summary.TotalCollected = summary.TotalCollected.RoundCents()
 	summary.TotalPending = summary.TotalPending.RoundCents()
 	summary.TotalInterestEarned = summary.TotalInterestEarned.RoundCents()
+	summary.DefaultedPending = summary.DefaultedPending.RoundCents()
 
-	return summary, nil
+	return summary
 }
 
 func (s *LoanService) syncInstallments(ctx context.Context, entity *loan.Loan) error {

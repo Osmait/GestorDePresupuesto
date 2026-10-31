@@ -236,7 +236,9 @@ func TestOwnInvestmentUpdate_IgnoresOwnershipFields(t *testing.T) {
 	owner := seedOwnedFixture(t)
 	other := seedOwnedFixture(t)
 
-	body := `{"id":"` + other.investmentID + `","user_id":"` + other.user.ID + `","name":"Apple Inc","quantity":3}`
+	// A lower quantity: a higher one would need broker funds (the wallet
+	// follows the cost of an edit, see InvestmentService.Update).
+	body := `{"id":"` + other.investmentID + `","user_id":"` + other.user.ID + `","name":"Apple Inc","quantity":0.5}`
 	w := doRequest(t, http.MethodPut, "/investments/"+owner.investmentID, owner.user.Token, body)
 	require.Equal(t, http.StatusOK, w.Code, w.Body.String())
 
@@ -245,11 +247,39 @@ func TestOwnInvestmentUpdate_IgnoresOwnershipFields(t *testing.T) {
 	require.NoError(t, testDB.QueryRow("SELECT name, user_id, quantity FROM investments WHERE id = $1", owner.investmentID).Scan(&name, &userID, &quantity))
 	assert.Equal(t, "Apple Inc", name)
 	assert.Equal(t, owner.user.ID, userID)
-	moneytest.Equal(t, 3.0, quantity)
+	moneytest.Equal(t, 0.5, quantity)
 
 	var otherName string
 	require.NoError(t, testDB.QueryRow("SELECT name FROM investments WHERE id = $1", other.investmentID).Scan(&otherName))
 	assert.Equal(t, "Apple", otherName, "the investment named in the body must not be touched")
+}
+
+// TestInvestmentQuantityRules: a negative quantity is never a purchase, and an
+// edit that raises the cost needs broker funds (the wallet follows the cost).
+func TestInvestmentQuantityRules(t *testing.T) {
+	owner := seedOwnedFixture(t)
+
+	tests := []struct {
+		name   string
+		method string
+		path   string
+		body   string
+	}{
+		{"negative quantity purchase", http.MethodPost, "/investments", `{"type":"stock","name":"Apple","symbol":"AAPL","quantity":-4,"purchase_price":150,"current_price":150,"settlement_currency":"USD"}`},
+		{"unsupported settlement currency", http.MethodPost, "/investments", `{"type":"stock","name":"Apple","symbol":"AAPL","quantity":4,"purchase_price":150,"current_price":150,"settlement_currency":"EUR"}`},
+		{"negative quantity edit", http.MethodPut, "/investments/" + owner.investmentID, `{"quantity":-1}`},
+		{"higher cost without funds", http.MethodPut, "/investments/" + owner.investmentID, `{"quantity":3}`},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			w := doRequest(t, tt.method, tt.path, owner.user.Token, tt.body)
+			require.Equal(t, http.StatusBadRequest, w.Code, w.Body.String())
+		})
+	}
+
+	var quantity money.Amount
+	require.NoError(t, testDB.QueryRow("SELECT quantity FROM investments WHERE id = $1", owner.investmentID).Scan(&quantity))
+	moneytest.Equal(t, 1, quantity, "rejected edits change nothing")
 }
 
 // TestTransactionSortBy covers every public sort_by value, including "name",

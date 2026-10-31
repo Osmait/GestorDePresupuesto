@@ -33,6 +33,7 @@ import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useFeatureFlags } from '@/hooks/useFeatureFlags'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
+import { cardDebtTotals, usableRate } from '@/lib/valuation'
 import { CreateCreditCardDTO, CreatePaymentDTO, CreditCard, UpdateCreditCardInput } from '@/types/creditcard'
 
 /** Header + KPI + card skeletons, shared by the feature-flag and the cards loading states. */
@@ -182,7 +183,8 @@ function CreditCardsContent() {
 	}
 
 	const cardsList = cards || []
-	const usdToDopRate = exchangeRateData?.usd_to_dop || 0
+	// null when the rate is missing: USD amounts are then shown apart, never as 0.
+	const usdToDopRate = usableRate(exchangeRateData?.usd_to_dop)
 	const summaryDebtDOP = summary?.total_debt?.DOP || 0
 	const summaryDebtUSD = summary?.total_debt?.USD || 0
 	const summaryLimitDOP = summary?.total_credit_limit?.DOP || 0
@@ -206,8 +208,6 @@ function CreditCardsContent() {
 	)
 	const totalDebtDOP = summary ? summaryDebtDOP : localTotalDebtDOP
 	const totalDebtUSD = summary ? summaryDebtUSD : localTotalDebtUSD
-	const totalDebtUSDInDOP = totalDebtUSD * usdToDopRate
-	const totalDebt = totalDebtDOP + totalDebtUSDInDOP
 
 	const localTotalLimitDOP = cardsList.reduce(
 		(sum, card) =>
@@ -221,8 +221,14 @@ function CreditCardsContent() {
 	)
 	const totalLimitDOP = summary ? summaryLimitDOP : localTotalLimitDOP
 	const totalLimitUSD = summary ? summaryLimitUSD : localTotalLimitUSD
-	const totalLimit = totalLimitDOP + totalLimitUSD * usdToDopRate
-	const avgUtilization = totalLimit > 0 ? (totalDebt / totalLimit) * 100 : 0
+	const { totalDebt, usdIncluded, utilization } = cardDebtTotals({
+		debtDop: totalDebtDOP,
+		debtUsd: totalDebtUSD,
+		limitDop: totalLimitDOP,
+		limitUsd: totalLimitUSD,
+		rate: usdToDopRate,
+	})
+	const avgUtilization = utilization ?? 0
 	const utilizationStatus =
 		avgUtilization > 60
 			? t('utilizationStatus.highRisk')
@@ -265,8 +271,9 @@ function CreditCardsContent() {
 				<StatCard
 					label={t('kpis.totalDebt')}
 					icon={Wallet}
+					tone={usdIncluded ? undefined : 'warning'}
 					value={<Amount value={totalDebt} currency='DOP' />}
-					hint={t('activeCards', { count: cardsList.length })}
+					hint={usdIncluded ? t('activeCards', { count: cardsList.length }) : t('kpis.rateUnavailable')}
 				/>
 				<StatCard label={t('kpis.debtDop')} icon={Banknote} value={<Amount value={totalDebtDOP} currency='DOP' />} />
 				<StatCard
@@ -274,20 +281,26 @@ function CreditCardsContent() {
 					icon={DollarSign}
 					value={<Amount value={totalDebtUSD} currency='USD' />}
 					hint={
-						usdToDopRate > 0
+						usdToDopRate !== null
 							? t('kpis.usdInDop', {
-									amount: formatCurrency(totalDebtUSDInDOP, 'DOP'),
+									amount: formatCurrency(totalDebtUSD * usdToDopRate, 'DOP'),
 									rate: usdToDopRate.toFixed(2),
 								})
-							: undefined
+							: totalDebtUSD > 0
+								? t('kpis.rateUnavailable')
+								: undefined
 					}
 				/>
 				<StatCard
 					label={t('creditHealth')}
 					icon={Gauge}
-					tone={utilizationTone}
-					value={formatPercent(avgUtilization)}
-					hint={t('kpis.utilizationHint', { status: utilizationStatus })}
+					tone={utilization === null ? undefined : utilizationTone}
+					value={utilization === null ? '—' : formatPercent(avgUtilization)}
+					hint={
+						utilization === null && !usdIncluded
+							? t('kpis.rateUnavailable')
+							: t('kpis.utilizationHint', { status: utilizationStatus })
+					}
 				/>
 			</StatGrid>
 

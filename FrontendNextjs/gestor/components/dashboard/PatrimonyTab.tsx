@@ -1,12 +1,12 @@
 'use client'
 
-import { CreditCard, FileCheck, Landmark, PieChart, PiggyBank, TrendingUp } from 'lucide-react'
+import { Briefcase, CreditCard, FileCheck, HandCoins, Landmark, PieChart, PiggyBank, TrendingUp } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useChartTheme } from '@/components/charts/chart-theme'
 import { Amount } from '@/components/shared/Amount'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { StatCard } from '@/components/shared/StatCard'
-import { StatGrid } from '@/components/shared/StatGrid'
+import { StatGrid, type StatGridColumns } from '@/components/shared/StatGrid'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
 import { useFormatPercent } from '@/hooks/useFormatPercent'
@@ -22,6 +22,15 @@ interface PatrimonyTabProps {
 	investmentsTotal: number
 	investmentsTotalUSD?: number
 	certificatesTotal: number
+	/** Broker wallet cash (funded, not invested), in DOP. */
+	brokerCashTotal?: number
+	/** Outstanding principal of active loans, in DOP. */
+	loansReceivableTotal?: number
+	loansReceivableCount?: number
+	/** Outstanding principal of defaulted loans, in DOP: shown apart, not added. */
+	loansDefaultedTotal?: number
+	/** Net worth from the API; computed from the components when absent (older API). */
+	netWorth?: number
 	/** What is owed on credit cards, in DOP; subtracted from the total. */
 	creditCardDebt?: number
 	creditCardsCount?: number
@@ -36,6 +45,9 @@ interface PatrimonyTabProps {
 		accounts: string
 		investments: string
 		certificates: string
+		brokerCash?: string
+		loansReceivable?: string
+		loansDefaulted?: string
 		cardDebt: string
 		total: string
 		activeItems: string
@@ -45,12 +57,20 @@ interface PatrimonyTabProps {
 	}
 }
 
-/** Net worth split by accounts, investments and certificates (all DOP, from the dashboard summary). */
+/**
+ * Net worth split by component (all DOP, from the dashboard summary): accounts,
+ * investments, broker cash, certificates and loans receivable, minus card debt.
+ */
 export function PatrimonyTab({
 	accountsTotal,
 	investmentsTotal,
 	investmentsTotalUSD,
 	certificatesTotal,
+	brokerCashTotal = 0,
+	loansReceivableTotal = 0,
+	loansReceivableCount = 0,
+	loansDefaultedTotal = 0,
+	netWorth,
 	creditCardDebt = 0,
 	creditCardsCount = 0,
 	accountsCount,
@@ -65,20 +85,31 @@ export function PatrimonyTab({
 	const formatDOP = (value: number) => formatCurrency(value, 'DOP')
 	// Net worth: what the user has minus what they owe on cards. The
 	// distribution chart splits only what they have (the assets).
-	const totalAssets = accountsTotal + investmentsTotal + certificatesTotal
-	const totalPatrimony = totalAssets - creditCardDebt
+	// Moving money between them (funding the broker, lending) leaves the total unchanged.
+	const totalAssets = accountsTotal + investmentsTotal + brokerCashTotal + certificatesTotal + loansReceivableTotal
+	const totalPatrimony = netWorth ?? totalAssets - creditCardDebt
 	const countHint = (count: number) => `${count} ${labels.activeItems}`
+	const showBrokerCash = brokerCashTotal !== 0
+	const showLoans = loansReceivableTotal !== 0 || loansDefaultedTotal > 0
+	const cardCount = 4 + (showBrokerCash ? 1 : 0) + (showLoans ? 1 : 0) + (creditCardsCount > 0 ? 1 : 0)
+	const columns: StatGridColumns = cardCount === 5 ? 5 : cardCount === 6 ? 3 : 4
 
-	// Series colors in fixed entity order (accounts, investments, certificates).
+	// Series colors in fixed entity order (accounts, investments, certificates, broker cash, loans).
 	const pieData = [
 		{ label: labels.accounts, value: accountsTotal, color: colors.series[0] },
 		{ label: labels.investments, value: investmentsTotal, color: colors.series[1] },
 		{ label: labels.certificates, value: certificatesTotal, color: colors.series[2] },
+		{ label: labels.brokerCash ?? 'Broker', value: brokerCashTotal, color: colors.series[3 % colors.series.length] },
+		{
+			label: labels.loansReceivable ?? 'Loans',
+			value: loansReceivableTotal,
+			color: colors.series[4 % colors.series.length],
+		},
 	].filter((d) => d.value > 0)
 
 	return (
 		<div className='space-y-6'>
-			<StatGrid columns={creditCardsCount > 0 ? 5 : 4}>
+			<StatGrid columns={columns}>
 				<StatCard
 					label={labels.total}
 					icon={PiggyBank}
@@ -111,12 +142,35 @@ export function PatrimonyTab({
 						)
 					}
 				/>
+				{showBrokerCash ? (
+					<StatCard
+						label={labels.brokerCash ?? 'Broker'}
+						icon={Briefcase}
+						value={<Amount value={brokerCashTotal} currency='DOP' />}
+					/>
+				) : null}
 				<StatCard
 					label={labels.certificates}
 					icon={FileCheck}
 					value={<Amount value={certificatesTotal} currency='DOP' />}
 					hint={countHint(certificatesCount)}
 				/>
+				{showLoans ? (
+					<StatCard
+						label={labels.loansReceivable ?? 'Loans'}
+						icon={HandCoins}
+						value={<Amount value={loansReceivableTotal} currency='DOP' />}
+						hint={
+							loansDefaultedTotal > 0 ? (
+								<>
+									{labels.loansDefaulted ?? 'Defaulted'}: <Amount value={loansDefaultedTotal} currency='DOP' />
+								</>
+							) : (
+								countHint(loansReceivableCount)
+							)
+						}
+					/>
+				) : null}
 				{creditCardsCount > 0 ? (
 					<StatCard
 						label={labels.cardDebt}

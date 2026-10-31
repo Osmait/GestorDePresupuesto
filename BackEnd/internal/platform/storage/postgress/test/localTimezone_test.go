@@ -150,16 +150,16 @@ func TestLocalTimezone_OctoberContainsTheLocalOctoberBills(t *testing.T) {
 			time.Date(2026, 10, 31, 22, 0, 0, 0, loc), // already November in UTC
 		} {
 			repo := transactionRepo.NewTransactionRepository(db, transactionRepo.WithClock(func() time.Time { return now }))
-			all, err := repo.FindCurrentBudgets(ctx, userID, rate)
+			all, err := repo.FindCurrentSpentByCategory(ctx, userID, rate)
 			require.NoError(t, err)
-			moneytest.Equal(t, 100, all[budgetID], now.String())
-			one, err := repo.FindCurrentBudget(ctx, budgetID, userID, rate)
+			moneytest.Equal(t, 100, all[categoryID], now.String())
+			one, err := repo.FindCurrentCategorySpent(ctx, categoryID, userID, rate)
 			require.NoError(t, err)
 			moneytest.Equal(t, 100, one, now.String())
 		}
 		// in local September only the September bill counts
 		repo := transactionRepo.NewTransactionRepository(db, transactionRepo.WithClock(func() time.Time { return time.Date(2026, 9, 30, 23, 59, 0, 0, loc) }))
-		one, err := repo.FindCurrentBudget(ctx, budgetID, userID, rate)
+		one, err := repo.FindCurrentCategorySpent(ctx, categoryID, userID, rate)
 		require.NoError(t, err)
 		moneytest.Equal(t, 7, one)
 	})

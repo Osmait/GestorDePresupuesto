@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useGetAccount, useGetAccountReconciliations } from '@/hooks/queries/useAccountsQuery'
 import { useGetCategories } from '@/hooks/queries/useCategoriesQuery'
+import { useGetCreditCard } from '@/hooks/queries/useCreditCardsQuery'
 import { useDeleteTransactionMutation, useGetTransactions } from '@/hooks/queries/useTransactionsQuery'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { DEFAULT_CURRENCY } from '@/lib/utils'
@@ -51,6 +52,11 @@ export default function AccountDetailsPage() {
 	const deleteTransaction = useDeleteTransactionMutation()
 
 	const { data: categories = [] } = useGetCategories()
+	// A credit card holds a balance per currency (the account balance is its primary one).
+	const { data: card } = useGetCreditCard(account?.type === 'credit_card' ? id : '')
+	const balancesByCurrency = card?.balances
+		? Object.fromEntries(card.balances.map((balance) => [balance.currency, balance.current_balance]))
+		: undefined
 
 	const transactions = transactionData?.transactions || []
 
@@ -118,6 +124,7 @@ export default function AccountDetailsPage() {
 				categories={categories}
 				currentBalance={currentBalance}
 				currency={currency}
+				balancesByCurrency={balancesByCurrency}
 			/>
 
 			<div className='grid gap-6 md:grid-cols-3'>

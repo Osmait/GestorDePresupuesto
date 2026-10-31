@@ -31,6 +31,9 @@ interface InvestmentFormModalProps {
 
 type FormTranslator = (key: string, values?: Record<string, string | number>) => string
 
+/** Positions are priced and settled in one of these (each valued in its own currency). */
+const SETTLEMENT_CURRENCIES = ['USD', 'DOP'] as const
+
 /** investments.quantity is NUMERIC(38,18) (crypto units); the prices are NUMERIC(28,10). */
 const QUANTITY_DECIMALS = 18
 const PRICE_DECIMALS = 10
@@ -45,13 +48,15 @@ function createInvestmentSchema(t: FormTranslator, tForms: FormTranslator) {
 			.min(1, t('errors.symbolRequired'))
 			.transform((v) => v.toUpperCase()),
 		type: z.enum(InvestmentType),
-		quantity: moneySchema(quantity, { decimals: QUANTITY_DECIMALS }).pipe(z.number().min(0, t('errors.minZero'))),
-		purchase_price: moneySchema(price, { decimals: PRICE_DECIMALS }).pipe(z.number().min(0, t('errors.minZero'))),
+		// Purchases only: quantity and unit price must be greater than 0 (the API rejects the rest).
+		quantity: moneySchema(quantity, { decimals: QUANTITY_DECIMALS }).pipe(
+			z.number().positive(t('errors.greaterThanZero')),
+		),
+		purchase_price: moneySchema(price, { decimals: PRICE_DECIMALS }).pipe(
+			z.number().positive(t('errors.greaterThanZero')),
+		),
 		current_price: moneySchema(price, { decimals: PRICE_DECIMALS }).pipe(z.number().min(0, t('errors.minZero'))),
-		settlement_currency: z
-			.string()
-			.min(1, t('errors.currencyRequired'))
-			.transform((v) => v.toUpperCase()),
+		settlement_currency: z.enum(SETTLEMENT_CURRENCIES, t('errors.currencyRequired')),
 	})
 }
 
@@ -96,7 +101,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 				quantity: investmentToEdit.quantity,
 				purchase_price: investmentToEdit.purchase_price,
 				current_price: investmentToEdit.current_price,
-				settlement_currency: investmentToEdit.settlement_currency || 'USD',
+				settlement_currency: investmentToEdit.settlement_currency?.toUpperCase() === 'DOP' ? 'DOP' : 'USD',
 			})
 			return
 		}
@@ -116,10 +121,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 		return match?.available || 0
 	}, [balances, settlementCurrency])
 
-	// Free-text currency field: only format as money once it looks like an ISO 4217 code
-	// (formatCurrency would otherwise fall back to DOP while the user is still typing).
-	const isIsoCode = /^[A-Z]{3}$/.test(settlementCurrency)
-	const formatSettlement = (amount: number) => (isIsoCode ? formatCurrency(amount, settlementCurrency) : '—')
+	const formatSettlement = (amount: number) => formatCurrency(amount, settlementCurrency)
 
 	const handleFetchPrice = async () => {
 		const symbol = form.getValues('symbol')
@@ -279,9 +281,22 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 							render={({ field }) => (
 								<FormItem>
 									<FormLabel>{t('purchaseCurrency')}</FormLabel>
-									<FormControl>
-										<Input {...field} onChange={(e) => field.onChange(e.target.value.toUpperCase())} maxLength={10} />
-									</FormControl>
+									{/* The cost was paid from the wallet in this currency: it cannot change on edit. */}
+									<Select value={field.value} onValueChange={field.onChange} disabled={Boolean(investmentToEdit)}>
+										<FormControl>
+											<SelectTrigger>
+												<SelectValue />
+											</SelectTrigger>
+										</FormControl>
+										<SelectContent>
+											{SETTLEMENT_CURRENCIES.map((code) => (
+												<SelectItem key={code} value={code}>
+													{code}
+												</SelectItem>
+											))}
+										</SelectContent>
+									</Select>
+									{investmentToEdit ? <p className='text-xs text-muted-foreground'>{t('currencyLocked')}</p> : null}
 									<FormMessage />
 								</FormItem>
 							)}

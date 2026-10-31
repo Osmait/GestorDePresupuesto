@@ -182,13 +182,20 @@ func (s TransactionService) CreateTransactionWithID(ctx context.Context, name, d
 		// pressure) and raced the commit (the new bill could be missing).
 		// Only the notification (DB insert + SSE push) is sent asynchronously,
 		// after the commit.
-		s.checkBudgetThreshold(ctx, budget.Id, budget.Amount, userId, amount, resolvedCurrency)
+		s.checkBudgetThreshold(ctx, budget.CategoryId, budget.Amount, userId, amount, resolvedCurrency, transaction.CreatedAt)
 	}
 
 	return id, nil
 }
 
-func (s TransactionService) checkBudgetThreshold(ctx context.Context, budgetID string, budgetAmount money.Amount, userId string, amount money.Amount, resolvedCurrency string) {
+// checkBudgetThreshold alerts when the new bill makes the category's
+// spending this month (the budget's spending, see FindCurrentCategorySpent)
+// cross 70% or 100% of the budget. A bill dated outside the current local
+// month does not change this month's spending and is not checked.
+func (s TransactionService) checkBudgetThreshold(ctx context.Context, categoryID string, budgetAmount money.Amount, userId string, amount money.Amount, resolvedCurrency string, createdAt time.Time) {
+	if loc := s.Location(); !apptime.StartOfMonth(createdAt, loc).Equal(apptime.StartOfMonth(time.Now(), loc)) {
+		return
+	}
 	usdToDop := money.FromInt(60)
 	if s.usdToDopRateFn != nil {
 		if rate, rateErr := s.usdToDopRateFn(ctx); rateErr == nil && rate.IsPositive() {
@@ -196,7 +203,7 @@ func (s TransactionService) checkBudgetThreshold(ctx context.Context, budgetID s
 		}
 	}
 
-	currentSpent, err := s.transactionRepository.FindCurrentBudget(ctx, budgetID, userId, usdToDop)
+	currentSpent, err := s.transactionRepository.FindCurrentCategorySpent(ctx, categoryID, userId, usdToDop)
 	if err != nil {
 		log.Error().Err(err).Msg("failed to get current budget details for alert")
 		return

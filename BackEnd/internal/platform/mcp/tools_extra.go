@@ -193,7 +193,7 @@ func (s *MCPServer) registerExtraTools() {
 	)
 	s.addTool(
 		mcp.NewTool("loan_summary",
-			mcp.WithDescription("Return aggregated loan metrics for the authenticated user"),
+			mcp.WithDescription("Return aggregated loan metrics for the authenticated user, in DOP (USD loans converted) and per currency; pending covers active loans only, defaulted loans are reported apart"),
 		),
 		s.handleLoanSummary,
 	)

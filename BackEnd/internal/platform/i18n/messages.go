@@ -31,8 +31,9 @@ const (
 	LoanRefundName              Key = "tx.loan_refund.name" // %s: borrower
 	LoanRefundDescription       Key = "tx.loan_refund.description"
 
-	CertificateInterestName        Key = "tx.certificate_interest.name"        // %s: bank
-	CertificateInterestDescription Key = "tx.certificate_interest.description" // %s start, %s end
+	CertificateInterestName        Key = "tx.certificate_interest.name"           // %s: bank
+	CertificateInterestDescription Key = "tx.certificate_interest.description"    // %s start, %s end
+	CertificateInterestFXDesc      Key = "tx.certificate_interest.description_fx" // %s start, %s end, %s amount, %s from, %s to, %s rate
 
 	BalanceAdjustmentName        Key = "tx.balance_adjustment.name"
 	BalanceAdjustmentDescription Key = "tx.balance_adjustment.description"
@@ -73,6 +74,7 @@ var messages = map[Key]map[Locale]string{
 
 	CertificateInterestName:        {ES: "%s - Pago de intereses", EN: "%s - Interest payment"},
 	CertificateInterestDescription: {ES: "Pago de intereses del certificado del %s al %s", EN: "Certificate interest payment for period %s to %s"},
+	CertificateInterestFXDesc:      {ES: "Pago de intereses del certificado del %s al %s (%s %s convertidos a %s a la tasa %s)", EN: "Certificate interest payment for period %s to %s (%s %s converted to %s at rate %s)"},
 
 	BalanceAdjustmentName:        {ES: "Ajuste de saldo", EN: "Balance adjustment"},
 	BalanceAdjustmentDescription: {ES: "Cuadre con el saldo del banco", EN: "Reconciled with the bank balance"},

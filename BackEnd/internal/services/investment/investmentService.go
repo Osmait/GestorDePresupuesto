@@ -83,29 +83,39 @@ func NewInvestmentService(
 	}
 }
 
-// Create records a new investment for a user.
+// Create records a purchase for a user: quantity units at purchasePrice, both
+// strictly positive, priced in settlementCurrency (DOP or USD; USD when
+// empty). Its cost, quantity * price rounded to cents, is debited from the
+// broker wallet in that currency (merged into an existing position of the
+// same symbol, type and currency). Selling is not supported: a negative
+// quantity is rejected instead of being turned into a purchase.
 func (s *InvestmentService) Create(ctx context.Context, id, userId string, investmentType investment.InvestmentType, name, symbol string, quantity, purchasePrice, currentPrice money.Amount, settlementCurrency string) error {
 	if id == "" {
 		id = ksuid.New().String()
 	}
 
-	settlementCurrency = strings.ToUpper(strings.TrimSpace(settlementCurrency))
-	if settlementCurrency == "" {
-		settlementCurrency = "USD"
+	if err := validateQuantityAndPrice(quantity, purchasePrice); err != nil {
+		return err
 	}
-
-	// Cost of the purchase: quantity * unit price computed exactly, rounded
-	// half-even to cents (it is debited from the funding wallet).
-	requiredAmount := quantity.Mul(purchasePrice).Abs().RoundCents()
-	if !requiredAmount.IsPositive() {
-		return fmt.Errorf("%w: investment amount must be greater than 0", errorhttp.ErrBadRequest)
+	if currentPrice.IsNegative() {
+		return fmt.Errorf("%w: current_price cannot be negative", errorhttp.ErrBadRequest)
+	}
+	settlementCurrency, err := resolveSettlementCurrency(settlementCurrency)
+	if err != nil {
+		return err
 	}
 
 	inv := investment.NewInvestment(id, userId, investmentType, name, symbol, quantity, purchasePrice, currentPrice)
 	inv.SettlementCurrency = settlementCurrency
+	// Cost of the purchase: quantity * unit price computed exactly, rounded
+	// half-even to cents (it is debited from the funding wallet).
+	requiredAmount := inv.Cost()
+	if !requiredAmount.IsPositive() {
+		return fmt.Errorf("%w: investment amount must be greater than 0", errorhttp.ErrBadRequest)
+	}
 	inv.SourceAmount = requiredAmount
 
-	err := s.repo.ConsumeFundingForInvestment(ctx, inv, settlementCurrency, requiredAmount)
+	err = s.repo.ConsumeFundingForInvestment(ctx, inv, settlementCurrency, requiredAmount)
 	if err != nil {
 		if errors.Is(err, investmentRepo.ErrInsufficientFunding) {
 			return fmt.Errorf("%w: insufficient broker funding in %s", errorhttp.ErrBadRequest, settlementCurrency)
@@ -114,6 +124,29 @@ func (s *InvestmentService) Create(ctx context.Context, id, userId string, inves
 	}
 
 	return nil
+}
+
+// validateQuantityAndPrice rejects a purchase whose quantity or unit price is
+// not strictly positive.
+func validateQuantityAndPrice(quantity, purchasePrice money.Amount) error {
+	if !quantity.IsPositive() {
+		return fmt.Errorf("%w: quantity must be greater than 0", errorhttp.ErrBadRequest)
+	}
+	if !purchasePrice.IsPositive() {
+		return fmt.Errorf("%w: purchase_price must be greater than 0", errorhttp.ErrBadRequest)
+	}
+	return nil
+}
+
+// resolveSettlementCurrency normalizes a settlement currency (USD when empty)
+// and rejects anything but DOP and USD: positions are valued in their own
+// currency and converted to DOP only from USD.
+func resolveSettlementCurrency(currency string) (string, error) {
+	resolved := investment.NormalizeSettlementCurrency(currency)
+	if !money.IsSupportedCurrency(resolved) {
+		return "", fmt.Errorf("%w: settlement_currency must be DOP or USD", errorhttp.ErrBadRequest)
+	}
+	return resolved, nil
 }
 
 func (s *InvestmentService) FundBroker(ctx context.Context, userID string, req FundingRequest) error {
@@ -148,9 +181,9 @@ func (s *InvestmentService) FundBroker(ctx context.Context, userID string, req F
 		sourceCurrency = "DOP"
 	}
 
-	targetCurrency := strings.ToUpper(strings.TrimSpace(req.TargetCurrency))
-	if targetCurrency == "" {
-		targetCurrency = sourceCurrency
+	targetCurrency := money.NormalizeCurrency(req.TargetCurrency, sourceCurrency)
+	if !money.IsSupportedCurrency(targetCurrency) {
+		return fmt.Errorf("%w: target_currency must be DOP or USD", errorhttp.ErrBadRequest)
 	}
 
 	feeAmount := req.FeeAmount.Abs()
@@ -241,6 +274,27 @@ func (s *InvestmentService) GetFundingBalances(ctx context.Context, userID strin
 	return s.repo.GetFundingBalances(ctx, userID)
 }
 
+// quoteMaxAge is how long a refreshed quote is kept before fetching it again.
+const quoteMaxAge = 5 * time.Minute
+
+// positionsToRefresh returns the positions whose current price is refreshed
+// from a market quote: USD positions whose price is unset or older than
+// quoteMaxAge. Quotes are USD prices, so a DOP position is never refreshed:
+// it keeps the price the user entered (a USD quote written into it would be
+// read as DOP, and its value and P&L would be nonsense).
+func positionsToRefresh(investments []*investment.Investment, now time.Time) []*investment.Investment {
+	var stale []*investment.Investment
+	for _, inv := range investments {
+		if !inv.QuotedInUSD() {
+			continue
+		}
+		if now.Sub(inv.UpdatedAt) > quoteMaxAge || inv.CurrentPrice.IsZero() {
+			stale = append(stale, inv)
+		}
+	}
+	return stale
+}
+
 // FindAll retrieves all investments for a user, automatically updating quotes if stale.
 func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*investment.Investment, error) {
 	investments, err := s.repo.FindAll(ctx, userId)
@@ -258,13 +312,7 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 		inv   *investment.Investment
 		price money.Amount
 	}
-	var stale []*investment.Investment
-	for _, inv := range investments {
-		// Update if older than 5 minutes or price is 0 (initial)
-		if time.Since(inv.UpdatedAt) > 5*time.Minute || inv.CurrentPrice.IsZero() {
-			stale = append(stale, inv)
-		}
-	}
+	stale := positionsToRefresh(investments, time.Now())
 	if len(stale) == 0 || s.quoteService == nil {
 		return investments, nil
 	}
@@ -316,9 +364,26 @@ collect:
 // Update applies the editable fields in `input` to the investment `id` owned by
 // userId. An investment that does not exist or belongs to another user yields
 // errorhttp.ErrNotFound.
+//
+// Quantity and purchase price can be edited (the form edits them to fix a
+// typo) and must stay strictly positive; the broker wallet follows the cost
+// (quantity * purchase price, in cents): a higher cost is debited from the
+// wallet in the position's currency, with the funds check of a purchase, and a
+// lower one is credited back, never more than the position took from it
+// (source_amount; legacy positions that were never funded refund nothing).
+// The settlement currency cannot be changed: the cost sits in that wallet.
 func (s *InvestmentService) Update(ctx context.Context, id string, userId string, input UpdateInput) (*investment.Investment, error) {
 	if strings.TrimSpace(id) == "" || userId == "" {
 		return nil, errorhttp.ErrNotFound
+	}
+	if input.Quantity != nil && !input.Quantity.IsPositive() {
+		return nil, fmt.Errorf("%w: quantity must be greater than 0", errorhttp.ErrBadRequest)
+	}
+	if input.PurchasePrice != nil && !input.PurchasePrice.IsPositive() {
+		return nil, fmt.Errorf("%w: purchase_price must be greater than 0", errorhttp.ErrBadRequest)
+	}
+	if input.CurrentPrice != nil && input.CurrentPrice.IsNegative() {
+		return nil, fmt.Errorf("%w: current_price cannot be negative", errorhttp.ErrBadRequest)
 	}
 
 	// Locked until the request transaction ends: the full row is written back
@@ -327,6 +392,19 @@ func (s *InvestmentService) Update(ctx context.Context, id string, userId string
 	if err != nil {
 		return nil, err
 	}
+
+	if input.SettlementCurrency != nil {
+		currency, err := resolveSettlementCurrency(*input.SettlementCurrency)
+		if err != nil {
+			return nil, err
+		}
+		if currency != inv.Currency() {
+			return nil, fmt.Errorf("%w: settlement_currency cannot be changed (the position was paid from the %s wallet)", errorhttp.ErrBadRequest, inv.Currency())
+		}
+		inv.SettlementCurrency = currency
+	}
+
+	oldCost := inv.Cost()
 
 	if input.Type != nil {
 		inv.Type = *input.Type
@@ -346,19 +424,48 @@ func (s *InvestmentService) Update(ctx context.Context, id string, userId string
 	if input.CurrentPrice != nil {
 		inv.CurrentPrice = *input.CurrentPrice
 	}
-	if input.SettlementCurrency != nil {
-		inv.SettlementCurrency = strings.ToUpper(strings.TrimSpace(*input.SettlementCurrency))
-	}
 
 	// Ownership is fixed by the lookup above, never by the caller.
 	inv.ID = id
 	inv.UserID = userId
 	inv.UpdatedAt = time.Now()
 
+	if err := s.adjustWalletForCost(ctx, inv, inv.Cost().Sub(oldCost)); err != nil {
+		return nil, err
+	}
+
 	if err := s.repo.Update(ctx, inv); err != nil {
 		return nil, err
 	}
 	return inv, nil
+}
+
+// walletDelta is what an edit that changes a position's cost by costDelta
+// moves out of the wallet (positive: debit, negative: credit). A credit is
+// capped at sourceAmount, what the position took from the wallet.
+func walletDelta(costDelta, sourceAmount money.Amount) money.Amount {
+	if costDelta.IsNegative() {
+		return money.Max(costDelta, money.Max(sourceAmount, money.Zero).Neg())
+	}
+	return costDelta
+}
+
+// adjustWalletForCost moves the wallet by walletDelta(costDelta) and keeps
+// the position's source_amount (what it took from the wallet) in step.
+func (s *InvestmentService) adjustWalletForCost(ctx context.Context, inv *investment.Investment, costDelta money.Amount) error {
+	delta := walletDelta(costDelta, inv.SourceAmount)
+	if delta.IsZero() {
+		return nil
+	}
+	description := "Investment edit - " + strings.ToUpper(strings.TrimSpace(inv.Symbol))
+	if err := s.repo.AdjustFundingForInvestment(ctx, inv.UserID, inv.ID, inv.Currency(), delta, description); err != nil {
+		if errors.Is(err, investmentRepo.ErrInsufficientFunding) {
+			return fmt.Errorf("%w: insufficient broker funding in %s for the higher cost", errorhttp.ErrBadRequest, inv.Currency())
+		}
+		return err
+	}
+	inv.SourceAmount = inv.SourceAmount.Add(delta)
+	return nil
 }
 
 // Delete removes the investment `id` owned by userId.

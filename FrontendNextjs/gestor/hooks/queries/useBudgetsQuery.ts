@@ -1,11 +1,12 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { getAppMonthRangeStrings } from '@/lib/app-time'
 import { getBudgetRepository, getTransactionRepository } from '@/lib/repositoryConfig'
 
 export const BUDGET_KEYS = {
 	all: ['budgets'] as const,
 	lists: () => [...BUDGET_KEYS.all, 'list'] as const,
 	// Under the budgets root: invalidated with every financial mutation (invalidateFinancialData).
-	transactionCounts: (budgetIds: string[]) => [...BUDGET_KEYS.all, 'transaction-counts', budgetIds] as const,
+	transactionCounts: (budgetKeys: string[]) => [...BUDGET_KEYS.all, 'transaction-counts', budgetKeys] as const,
 }
 
 /** Budgets feed the budget list and the analytics "budget vs actual" view. */
@@ -30,20 +31,34 @@ export function useGetBudgets() {
 }
 
 /**
- * Number of expenses linked to each budget, as `{ [budgetId]: count }`: one
- * single-row request per budget (the count comes from the pagination) instead
- * of downloading every transaction of the user.
+ * Number of expenses behind each budget's spending, as `{ [budgetId]: count }`:
+ * the bills of its category this month (app time zone), the same ones the API
+ * sums into the budget's spent amount (not the budget_id stamped on each bill,
+ * which misses bills written before the budget existed). One single-row
+ * request per category (the count comes from the pagination) instead of
+ * downloading every transaction of the user.
  */
-export function useBudgetTransactionCounts(budgetIds: string[]) {
-	const ids = [...budgetIds].sort()
+export function useBudgetTransactionCounts(budgets: { id: string; category_id: string }[]) {
+	const sorted = [...budgets].sort((a, b) => a.id.localeCompare(b.id))
+	const { from, to } = getAppMonthRangeStrings()
+	const keys = sorted.map((budget) => `${budget.id}:${budget.category_id}`)
 	return useQuery({
-		queryKey: BUDGET_KEYS.transactionCounts(ids),
+		queryKey: [...BUDGET_KEYS.transactionCounts(keys), from],
 		queryFn: async () => {
 			const repo = await getTransactionRepository()
-			const counts = await Promise.all(ids.map((id) => repo.count({ budget_id: id, type: 'bill' })))
-			return Object.fromEntries(ids.map((id, index) => [id, counts[index]])) as Record<string, number>
+			const categoryIds = [...new Set(sorted.map((budget) => budget.category_id))]
+			const counts = await Promise.all(
+				categoryIds.map((categoryId) =>
+					repo.count({ category_id: categoryId, type: 'bill', date_from: from, date_to: to }),
+				),
+			)
+			const byCategory = new Map(categoryIds.map((categoryId, index) => [categoryId, counts[index]]))
+			return Object.fromEntries(sorted.map((budget) => [budget.id, byCategory.get(budget.category_id) ?? 0])) as Record<
+				string,
+				number
+			>
 		},
-		enabled: ids.length > 0,
+		enabled: sorted.length > 0,
 	})
 }
 

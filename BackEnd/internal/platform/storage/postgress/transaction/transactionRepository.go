@@ -227,40 +227,38 @@ func (repo *TransactionRepository) FindAll(ctx context.Context, date1 string, da
 // zone (app_timezone(), migration 000062), whatever the session TimeZone:
 // [00:00 local of the 1st, 00:00 local of the next 1st). Both bounds are
 // computed once per statement (they only depend on a parameter), so the
-// (user_id, created_at) / (budget_id, created_at) indexes can range-scan
-// instead of evaluating date_trunc on every row of the user/budget.
+// (user_id, category_id, created_at) index can range-scan instead of
+// evaluating date_trunc on every row of the user/category.
 func currentMonthPredicate(n int) string {
 	month := fmt.Sprintf("date_trunc('month', $%d::timestamptz AT TIME ZONE app_timezone())", n)
 	return "created_at >= (" + month + " AT TIME ZONE app_timezone())" +
 		" AND created_at < ((" + month + " + interval '1 month') AT TIME ZONE app_timezone())"
 }
 
-func (repo *TransactionRepository) FindCurrentBudget(ctx context.Context, budgetID string, userId string, usdToDop money.Amount) (money.Amount, error) {
+// The budget "spent this month" of a category is the sum of the user's bills
+// in that category (USD converted at usdToDop) in the current month of the
+// app time zone. It is computed from category_id and the date, never from the
+// budget_id stamped on each bill when it was written: a budget created
+// mid-month, recreated, or re-pointed to another category sees the bills of
+// its category that already exist. Every budget of a category reports the
+// same spending. The predicate is sargable on the
+// idx_transactions_user_category_created_at (user_id, category_id,
+// created_at) index (migration 000016).
+
+// FindCurrentCategorySpent returns what userId spent this month in
+// categoryID.
+func (repo *TransactionRepository) FindCurrentCategorySpent(ctx context.Context, categoryID string, userId string, usdToDop money.Amount) (money.Amount, error) {
 	if !usdToDop.IsPositive() {
 		usdToDop = money.FromInt(60)
 	}
-	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
-		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) as currentBudget FROM transactions WHERE budget_id = $1 AND user_id = $3 AND type_transation = 'bill' AND "+currentMonthPredicate(4), budgetID, usdToDop, userId, repo.now())
+	var spent money.Amount
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx,
+		"SELECT COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions WHERE user_id = $3 AND category_id = $1 AND type_transation = 'bill' AND "+currentMonthPredicate(4),
+		categoryID, usdToDop, userId, repo.now()).Scan(&spent)
 	if err != nil {
 		return money.Zero, err
 	}
-	defer func() {
-		err = rows.Close()
-		if err != nil {
-			log.Error().Err(err).Msg("failed to close database rows")
-		}
-	}()
-	var currentBudget money.Amount
-	for rows.Next() {
-		if err = rows.Scan(&currentBudget); err == nil {
-			return currentBudget, nil
-		}
-	}
-	if err = rows.Err(); err != nil {
-		log.Error().Err(err).Msg("error iterating over budget rows")
-		return money.Zero, err
-	}
-	return money.Zero, nil
+	return spent, nil
 }
 
 // BalanceByAccountAndCurrency returns the net total of the user's transactions
@@ -277,14 +275,17 @@ func (repo *TransactionRepository) BalanceByAccountAndCurrency(ctx context.Conte
 	return total, nil
 }
 
-func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
+// FindCurrentSpentByCategory returns, per category id, what userId spent
+// this month (see FindCurrentCategorySpent). Categories without bills this
+// month are absent.
+func (repo *TransactionRepository) FindCurrentSpentByCategory(ctx context.Context, userId string, usdToDop money.Amount) (map[string]money.Amount, error) {
 	if !usdToDop.IsPositive() {
 		usdToDop = money.FromInt(60)
 	}
-	query := `SELECT budget_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions
-		WHERE user_id = $1 AND budget_id IS NOT NULL AND type_transation = 'bill'
+	query := `SELECT category_id, COALESCE(SUM(CASE WHEN currency = 'USD' THEN amount * $2 ELSE amount END), 0) FROM transactions
+		WHERE user_id = $1 AND category_id IS NOT NULL AND type_transation = 'bill'
 		AND ` + currentMonthPredicate(3) + `
-		GROUP BY budget_id`
+		GROUP BY category_id`
 	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, usdToDop, repo.now())
 	if err != nil {
 		return nil, err
@@ -295,18 +296,19 @@ func (repo *TransactionRepository) FindCurrentBudgets(ctx context.Context, userI
 		}
 	}()
 
-	budgets := make(map[string]money.Amount)
+	spent := make(map[string]money.Amount)
 	for rows.Next() {
-		var budgetId string
+		var categoryId string
 		var total money.Amount
-		if err = rows.Scan(&budgetId, &total); err == nil {
-			budgets[budgetId] = total
+		if err = rows.Scan(&categoryId, &total); err != nil {
+			return nil, err
 		}
+		spent[categoryId] = total
 	}
 	if err = rows.Err(); err != nil {
 		return nil, err
 	}
-	return budgets, nil
+	return spent, nil
 }
 
 func (repo *TransactionRepository) TypeOf(ctx context.Context, id string, userId string) (string, error) {

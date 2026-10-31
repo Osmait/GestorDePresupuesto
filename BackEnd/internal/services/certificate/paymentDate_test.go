@@ -28,6 +28,13 @@ func TestCalculateNextPaymentDate(t *testing.T) {
 		{"created on Oct 4 at 21:00 local (Oct 5 in UTC)", time.Date(2026, 10, 4, 21, 0, 0, 0, loc), 5, noon(2026, 10, 5)},
 		{"cut day 31 in November", noon(2026, 10, 31), 31, noon(2026, 11, 30)},
 		{"December to January", noon(2026, 12, 15), 10, noon(2027, 1, 10)},
+		// A payment on a clamped cut day must still move on (it used to
+		// return itself, so the payment loop never ended).
+		{"cut day 31 from the clamped Nov 30", noon(2026, 11, 30), 31, noon(2026, 12, 31)},
+		{"cut day 31 from the clamped Sep 30", noon(2026, 9, 30), 31, noon(2026, 10, 31)},
+		{"cut day 30 from the clamped Feb 28", noon(2027, 2, 28), 30, noon(2027, 3, 30)},
+		{"cut day 29 from Feb 28 in a leap year", noon(2028, 2, 28), 29, noon(2028, 2, 29)},
+		{"cut day 31 from the 15th of a short month", noon(2026, 9, 15), 31, noon(2026, 9, 30)},
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
@@ -36,6 +43,18 @@ func TestCalculateNextPaymentDate(t *testing.T) {
 				t.Errorf("next payment = %s, want %s", got.UTC(), tc.want)
 			}
 		})
+	}
+
+	// Every cut day advances through a whole leap and non-leap year.
+	for cutDay := 1; cutDay <= 31; cutDay++ {
+		from := noon(2027, 1, 1)
+		for i := 0; i < 26; i++ {
+			next := s.calculateNextPaymentDate(from, cutDay)
+			if !next.After(from) {
+				t.Fatalf("cut day %d: next payment %s does not advance from %s", cutDay, next, from)
+			}
+			from = next
+		}
 	}
 
 	maturity := time.Date(2026, 11, 5, 0, 0, 0, 0, time.UTC) // stored at 00:00 UTC

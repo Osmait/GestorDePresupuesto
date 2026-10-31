@@ -3,7 +3,7 @@
 import { ArrowDownRight, ArrowUpRight, BarChart3, PieChart, Wallet } from 'lucide-react'
 import dynamic from 'next/dynamic'
 import { useTranslations } from 'next-intl'
-import { type ReactNode, useMemo } from 'react'
+import { type ReactNode, useMemo, useState } from 'react'
 import { useChartTheme } from '@/components/charts/chart-theme'
 import { Amount } from '@/components/shared/Amount'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -15,15 +15,23 @@ import { getAppTodayDate } from '@/lib/app-time'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { isInflowTransaction } from '@/lib/transaction-utils'
 import { cn, DEFAULT_CURRENCY } from '@/lib/utils'
+import { accountCurrencies, transactionCurrency } from '@/lib/valuation'
 import { Category } from '@/types/category'
 import { Transaction } from '@/types/transaction'
 
 interface AccountAnalyticsProps {
 	transactions: Transaction[]
 	categories: Category[]
+	/** Balance of the account in its own currency (`currency`). */
 	currentBalance: number
-	/** Currency of the account; all its transactions are shown in it. */
+	/** Currency of the account. */
 	currency?: string
+	/**
+	 * Balances in other currencies (a credit card holds DOP and USD). A currency
+	 * the account has transactions in but no balance here shows its income and
+	 * expenses, and "balance unavailable" instead of a made-up history.
+	 */
+	balancesByCurrency?: Record<string, number>
 }
 
 const TOP_CATEGORIES_COUNT = 5
@@ -45,15 +53,34 @@ const AreaTrendChart = dynamic(() => import('@/components/charts/AreaTrendChart'
 })
 
 export function AccountAnalytics({
-	transactions,
+	transactions: allTransactions,
 	categories,
-	currentBalance,
-	currency = DEFAULT_CURRENCY,
+	currentBalance: accountBalance,
+	currency: accountCurrency = DEFAULT_CURRENCY,
+	balancesByCurrency,
 }: AccountAnalyticsProps) {
 	const t = useTranslations('analysis')
 	const locale = useAppLocale()
 	const formatCurrency = useFormatCurrency()
 	const { colors } = useChartTheme()
+
+	// Amounts of different currencies are never added: the analytics show one
+	// currency at a time (the account's by default) and a switcher when the
+	// account has transactions in several (credit cards).
+	const primaryCurrency = accountCurrency.toUpperCase()
+	const currencies = useMemo(
+		() => accountCurrencies(allTransactions, primaryCurrency),
+		[allTransactions, primaryCurrency],
+	)
+	const [selected, setSelected] = useState(primaryCurrency)
+	const currency = currencies.includes(selected) ? selected : primaryCurrency
+	const transactions = useMemo(
+		() => allTransactions.filter((tx) => transactionCurrency(tx, primaryCurrency) === currency),
+		[allTransactions, primaryCurrency, currency],
+	)
+	const knownBalance = currency === primaryCurrency ? accountBalance : balancesByCurrency?.[currency]
+	const balanceKnown = typeof knownBalance === 'number' && Number.isFinite(knownBalance)
+	const currentBalance = balanceKnown ? knownBalance : 0
 	const formatInCurrency = (value: number) => formatCurrency(value, currency)
 
 	const stats = useMemo(() => {
@@ -157,8 +184,37 @@ export function AccountAnalytics({
 
 	return (
 		<div className='space-y-6'>
+			{currencies.length > 1 ? (
+				<fieldset className='flex flex-wrap items-center gap-2'>
+					<legend className='sr-only'>{t('currencyLabel')}</legend>
+					<span aria-hidden='true' className='text-sm text-muted-foreground'>
+						{t('currencyLabel')}
+					</span>
+					{currencies.map((code) => (
+						<button
+							key={code}
+							type='button'
+							aria-pressed={code === currency}
+							onClick={() => setSelected(code)}
+							className={cn(
+								'h-8 rounded-md border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+								code === currency
+									? 'border-primary bg-primary text-primary-foreground'
+									: 'border-input bg-background hover:bg-accent hover:text-accent-foreground',
+							)}
+						>
+							{code}
+						</button>
+					))}
+				</fieldset>
+			) : null}
 			<StatGrid columns={3}>
-				<StatCard label={t('balance')} icon={Wallet} value={<Amount value={currentBalance} currency={currency} />} />
+				<StatCard
+					label={t('balance')}
+					icon={Wallet}
+					value={balanceKnown ? <Amount value={currentBalance} currency={currency} /> : '—'}
+					hint={balanceKnown ? undefined : t('balanceUnavailable', { currency })}
+				/>
 				<StatCard
 					label={t('totalIncome')}
 					icon={ArrowUpRight}
@@ -225,13 +281,17 @@ export function AccountAnalytics({
 				</ChartCard>
 
 				<ChartCard title={t('balanceHistory')} className='lg:col-span-2' contentClassName='h-[250px]'>
-					<AreaTrendChart
-						points={stats.balanceHistory}
-						color={colors.series[0]}
-						seriesLabel={t('balance')}
-						formatValue={formatInCurrency}
-						ariaLabel={t('balanceHistory')}
-					/>
+					{balanceKnown ? (
+						<AreaTrendChart
+							points={stats.balanceHistory}
+							color={colors.series[0]}
+							seriesLabel={t('balance')}
+							formatValue={formatInCurrency}
+							ariaLabel={t('balanceHistory')}
+						/>
+					) : (
+						<EmptyState compact icon={Wallet} title={t('balanceUnavailable', { currency })} />
+					)}
 				</ChartCard>
 			</div>
 		</div>

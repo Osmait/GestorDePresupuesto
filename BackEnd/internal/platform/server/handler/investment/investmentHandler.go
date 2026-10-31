@@ -31,7 +31,7 @@ type UpdateInvestmentRequest struct {
 	Type               *investment.InvestmentType `json:"type"`
 	Name               *string                    `json:"name"`
 	Symbol             *string                    `json:"symbol"`
-	Quantity           *money.Amount              `json:"quantity"`
+	Quantity           *money.Amount              `json:"quantity" binding:"omitempty,gt=0"`
 	PurchasePrice      *money.Amount              `json:"purchase_price" binding:"omitempty,gt=0"`
 	CurrentPrice       *money.Amount              `json:"current_price" binding:"omitempty,gte=0"`
 	SettlementCurrency *string                    `json:"settlement_currency"`
@@ -42,7 +42,7 @@ func (h *InvestmentHandler) Create(ctx *gin.Context) {
 		Type               investment.InvestmentType `json:"type" binding:"required"`
 		Name               string                    `json:"name" binding:"required"`
 		Symbol             string                    `json:"symbol" binding:"required"`
-		Quantity           money.Amount              `json:"quantity" binding:"required"`
+		Quantity           money.Amount              `json:"quantity" binding:"required,gt=0"`
 		PurchasePrice      money.Amount              `json:"purchase_price" binding:"required,gt=0"`
 		CurrentPrice       money.Amount              `json:"current_price" binding:"required,gt=0"`
 		SettlementCurrency string                    `json:"settlement_currency"`

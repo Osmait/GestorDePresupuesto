@@ -8,9 +8,7 @@ import (
 
 	"github.com/rs/zerolog/log"
 
-	accountDomain "github.com/osmait/gestorDePresupuesto/internal/domain/account"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/analytics"
-	certificateDomain "github.com/osmait/gestorDePresupuesto/internal/domain/certificate"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	accountRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/account"
@@ -58,6 +56,7 @@ type AnalyticsService struct {
 	accountRepository     accountRepo.AccountRepositoryInterface
 	investmentRepository  investmentRepo.InvestmentRepoInterface
 	certificateRepository certificateRepo.CertificateRepositoryInterface
+	loanRepository        LoanLister
 	usdToDopRateFn        func(context.Context) (money.Amount, error)
 	loc                   *time.Location
 }
@@ -213,82 +212,28 @@ func (s *AnalyticsService) GetDashboardSummary(ctx context.Context, userID strin
 		monthlySummaries = append(monthlySummaries, toMonthlySummary(monthlySummaryRepo))
 	}
 
-	accountsTotal := money.Zero
-	accountsCount := 0
-	creditCardDebt := money.Zero
-	creditCardsCount := 0
-	if s.accountRepository != nil {
-		accounts, accErr := s.accountRepository.FindAll(ctx, userID)
-		if accErr == nil {
-			balances, balErr := s.accountRepository.Balances(ctx, userID)
-			if balErr == nil {
-				for _, acc := range accounts {
-					if acc.Type == accountDomain.AccountTypeCreditCard {
-						creditCardsCount++
-						creditCardDebt = creditCardDebt.Add(s.cardDebtDOP(ctx, acc.Id, userID, usdToDop))
-						continue
-					}
-					accountsCount++
-					accountsTotal = accountsTotal.Add(balances[acc.Id]).Add(acc.InitialBalance)
-				}
-			}
-		}
-	}
-
-	investmentsTotalUSD := money.Zero
-	investmentsCount := 0
-	if s.investmentRepository != nil {
-		investments, invErr := s.investmentRepository.FindAll(ctx, userID)
-		if invErr == nil {
-			investmentsCount = len(investments)
-			for _, inv := range investments {
-				investmentsTotalUSD = investmentsTotalUSD.Add(inv.Quantity.Mul(inv.CurrentPrice))
-			}
-		}
-	}
-	investmentsTotalDOP := investmentsTotalUSD.Mul(usdToDop).RoundCents()
-
-	certificatesTotal := money.Zero
-	certificatesCount := 0
-	if s.certificateRepository != nil {
-		certificates, certErr := s.certificateRepository.FindAll(ctx, userID)
-		if certErr == nil {
-			totalCapital := money.Zero
-			for _, cert := range certificates {
-				if cert.Status == certificateDomain.StatusActive {
-					totalCapital = totalCapital.Add(cert.BaseCapital)
-					certificatesCount++
-				}
-			}
-
-			payments, payErr := s.certificateRepository.FindAllPayments(ctx, userID)
-			if payErr == nil {
-				totalNet := money.Zero
-				for _, p := range payments {
-					totalNet = totalNet.Add(p.NetInterest)
-				}
-				certificatesTotal = totalCapital.Add(totalNet)
-			} else {
-				certificatesTotal = totalCapital
-			}
-		}
-	}
+	worth := computeNetWorth(s.netWorthInputs(ctx, userID, usdToDop), usdToDop)
 
 	return &analytics.DashboardSummary{
-		TotalIncome:       totalsRepo.TotalIncome.RoundCents(),
-		TotalExpenses:     totalsRepo.TotalBill.RoundCents(),
-		NetAmount:         totalsRepo.TotalIncome.Sub(totalsRepo.TotalBill).RoundCents(),
-		UsdToDopRate:      usdToDop,
-		AccountsTotal:     accountsTotal.RoundCents(),
-		InvestmentsTotal:  investmentsTotalDOP,
-		CertificatesTotal: certificatesTotal.RoundCents(),
-		CreditCardDebt:    creditCardDebt.RoundCents(),
-		CreditCardsCount:  creditCardsCount,
-		AccountsCount:     accountsCount,
-		InvestmentsCount:  investmentsCount,
-		CertificatesCount: certificatesCount,
-		CategoryExpenses:  categoryExpenses,
-		MonthlySummary:    monthlySummaries,
+		TotalIncome:          totalsRepo.TotalIncome.RoundCents(),
+		TotalExpenses:        totalsRepo.TotalBill.RoundCents(),
+		NetAmount:            totalsRepo.TotalIncome.Sub(totalsRepo.TotalBill).RoundCents(),
+		UsdToDopRate:         usdToDop,
+		AccountsTotal:        worth.accountsTotal,
+		InvestmentsTotal:     worth.investmentsTotal,
+		CertificatesTotal:    worth.certificatesTotal,
+		BrokerCashTotal:      worth.brokerCashTotal,
+		LoansReceivableTotal: worth.loansReceivableTotal,
+		LoansDefaultedTotal:  worth.loansDefaultedTotal,
+		CreditCardDebt:       worth.creditCardDebt,
+		NetWorth:             worth.netWorth,
+		CreditCardsCount:     worth.creditCardsCount,
+		AccountsCount:        worth.accountsCount,
+		InvestmentsCount:     worth.investmentsCount,
+		CertificatesCount:    worth.certificatesCount,
+		LoansReceivableCount: worth.loansReceivableCount,
+		CategoryExpenses:     categoryExpenses,
+		MonthlySummary:       monthlySummaries,
 	}, nil
 }
 
