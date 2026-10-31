@@ -3,7 +3,6 @@ package notification
 import (
 	"errors"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/services/notification"
+	"github.com/rs/zerolog/log"
 )
 
 // DefaultHeartbeatInterval is how often an idle SSE stream gets a `:ping`
@@ -47,7 +47,7 @@ func (h *NotificationHandler) Subscribe(ctx *gin.Context) {
 		// Log error but proceed? Or fail? The middleware should have handled it.
 		// If using query param for auth (EventSource limitation), we might need to manually check here if middleware failed.
 		// Assuming standard Bearer token via Polyfill on frontend.
-		log.Println("NotificationHandler: User ID not found in context")
+		log.Ctx(ctx.Request.Context()).Warn().Msg("notification subscribe without a user id")
 		ctx.AbortWithStatus(http.StatusUnauthorized)
 		return
 	}
@@ -58,10 +58,10 @@ func (h *NotificationHandler) Subscribe(ctx *gin.Context) {
 	// ReadTimeout/WriteTimeout, otherwise the stream is cut after a minute or two.
 	middleware.ClearConnDeadlines(ctx.Writer)
 
-	// Ensure the stream for this user exists
-	if !h.service.GetServer().StreamExists(userIDStr) {
-		h.service.GetServer().CreateStream(userIDStr)
-	}
+	// Register this connection: the user's stream exists while at least one
+	// of their connections is open and is removed with the last one.
+	release := h.service.Subscribe(userIDStr)
+	defer release()
 
 	// Serve the stream
 	// We need to rewrite the query param 'stream' to match our UserID if we want strict per-user streams
@@ -146,7 +146,7 @@ func (h *NotificationHandler) GetHistory(ctx *gin.Context) {
 	if !hasLimit && !hasCursor {
 		history, err := h.service.GetHistory(ctx.Request.Context(), userIDStr)
 		if err != nil {
-			log.Printf("Error getting notification history: %v", err)
+			log.Ctx(ctx.Request.Context()).Error().Err(err).Msg("failed to get notification history")
 			_ = ctx.Error(err)
 			return
 		}
@@ -170,7 +170,7 @@ func (h *NotificationHandler) GetHistory(ctx *gin.Context) {
 		return
 	}
 	if err != nil {
-		log.Printf("Error getting notification history: %v", err)
+		log.Ctx(ctx.Request.Context()).Error().Err(err).Msg("failed to get notification history")
 		_ = ctx.Error(err)
 		return
 	}
@@ -192,7 +192,7 @@ func (h *NotificationHandler) MarkAsRead(ctx *gin.Context) {
 	}
 
 	if err := h.service.MarkAsRead(ctx.Request.Context(), notificationID, userIDStr); err != nil {
-		log.Printf("Error marking notification as read: %v", err)
+		log.Ctx(ctx.Request.Context()).Error().Err(err).Msg("failed to mark notification as read")
 		_ = ctx.Error(err)
 		return
 	}
@@ -209,7 +209,7 @@ func (h *NotificationHandler) MarkAllAsRead(ctx *gin.Context) {
 	userIDStr := userID.(string)
 
 	if err := h.service.MarkAllAsRead(ctx.Request.Context(), userIDStr); err != nil {
-		log.Printf("Error marking all notifications as read: %v", err)
+		log.Ctx(ctx.Request.Context()).Error().Err(err).Msg("failed to mark all notifications as read")
 		_ = ctx.Error(err)
 		return
 	}
@@ -226,7 +226,7 @@ func (h *NotificationHandler) DeleteAll(ctx *gin.Context) {
 	userIDStr := userID.(string)
 
 	if err := h.service.DeleteAll(ctx.Request.Context(), userIDStr); err != nil {
-		log.Printf("Error deleting all notifications: %v", err)
+		log.Ctx(ctx.Request.Context()).Error().Err(err).Msg("failed to delete notifications")
 		_ = ctx.Error(err)
 		return
 	}
