@@ -210,6 +210,19 @@ func (s *CertificateService) FindAll(ctx context.Context, userId string) ([]*dto
 		return nil, err
 	}
 
+	// The last payment of every compound certificate (see GetEffectiveCapital),
+	// in one query.
+	var compoundIds []string
+	for _, cert := range certificates {
+		if cert.Status != certificate.StatusCancelled && cert.InterestType != certificate.InterestTypeSimple {
+			compoundIds = append(compoundIds, cert.Id)
+		}
+	}
+	lastPayments, err := s.repository.FindLastPayments(ctx, compoundIds, userId)
+	if err != nil {
+		return nil, err
+	}
+
 	var responses []*dto.CertificateResponse
 	calculator := &PaymentCalculator{}
 
@@ -218,7 +231,7 @@ func (s *CertificateService) FindAll(ctx context.Context, userId string) ([]*dto
 			continue
 		}
 
-		effectiveCapital, lastPayment := s.GetEffectiveCapital(ctx, cert)
+		effectiveCapital, lastPayment := effectiveCapitalWith(cert, lastPayments[cert.Id])
 		nextPaymentDate := s.CalculateNextPaymentDate(cert, lastPayment)
 		projected := s.GetProjectedPayment(cert, effectiveCapital, calculator)
 
@@ -566,6 +579,18 @@ func (s *CertificateService) processPendingPayments(ctx context.Context, userId 
 		return nil, err
 	}
 
+	// The last payment of every active certificate, in one query.
+	var activeIds []string
+	for _, cert := range certificates {
+		if cert.Status == certificate.StatusActive {
+			activeIds = append(activeIds, cert.Id)
+		}
+	}
+	lastPayments, err := s.repository.FindLastPayments(ctx, activeIds, userId)
+	if err != nil {
+		return nil, err
+	}
+
 	now := time.Now()
 	calculator := &PaymentCalculator{}
 	payoutErrors := make(map[string]string)
@@ -575,10 +600,7 @@ func (s *CertificateService) processPendingPayments(ctx context.Context, userId 
 			continue
 		}
 
-		lastPayment, err := s.repository.FindLastPayment(ctx, cert.Id, userId)
-		if err != nil && !errors.Is(err, sql.ErrNoRows) {
-			continue
-		}
+		lastPayment := lastPayments[cert.Id]
 
 		var startDate time.Time
 		if lastPayment != nil {
@@ -693,6 +715,15 @@ func (s *CertificateService) GetEffectiveCapital(ctx context.Context, cert *cert
 		return cert.BaseCapital, nil
 	}
 
+	return effectiveCapitalWith(cert, lastPayment)
+}
+
+// effectiveCapitalWith is GetEffectiveCapital given the certificate's last
+// payment (nil when it has none).
+func effectiveCapitalWith(cert *certificate.Certificate, lastPayment *certificate.CertificatePayment) (money.Amount, *certificate.CertificatePayment) {
+	if cert.InterestType == certificate.InterestTypeSimple || lastPayment == nil {
+		return cert.BaseCapital, nil
+	}
 	return cert.CurrentValue(lastPayment), lastPayment
 }
 

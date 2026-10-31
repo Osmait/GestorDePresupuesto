@@ -24,6 +24,9 @@ type CreditCardRepositoryInterface interface {
 	SaveBalance(ctx context.Context, balance *creditcard.CardBalance) error
 	FindBalanceById(ctx context.Context, id string, userId string) (*creditcard.CardBalance, error)
 	FindBalancesByCard(ctx context.Context, cardId string, userId string) ([]*creditcard.CardBalance, error)
+	// FindBalancesByCards is FindBalancesByCard for several cards in one
+	// query, keyed by card id (cards without balances are absent).
+	FindBalancesByCards(ctx context.Context, cardIds []string, userId string) (map[string][]*creditcard.CardBalance, error)
 	FindBalanceByCardAndCurrency(ctx context.Context, cardId string, userId string, currency string) (*creditcard.CardBalance, error)
 	UpdateCreditLimit(ctx context.Context, id string, userId string, creditLimit money.Amount) (*creditcard.CardBalance, error)
 	DeleteBalance(ctx context.Context, id string, userId string) error

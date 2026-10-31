@@ -24,6 +24,11 @@ type mockCreditCardRepo struct {
 	lastSavedPayment *creditcardDomain.CardPayment
 	deletedPaymentID string
 	categoryUserIDs  []string
+	// cards and balancesByCard back FindAllCards and FindBalancesByCards.
+	cards          []*creditcardDomain.CreditCard
+	balancesByCard map[string][]*creditcardDomain.CardBalance
+	// batchCalls counts FindBalancesByCards calls.
+	batchCalls int
 }
 
 func (m *mockCreditCardRepo) EnsurePaymentCategory(_ context.Context, userId string) (string, error) {
@@ -46,7 +51,7 @@ func (m *mockCreditCardRepo) FindCardById(_ context.Context, accountId string, _
 }
 
 func (m *mockCreditCardRepo) FindAllCards(context.Context, string) ([]*creditcardDomain.CreditCard, error) {
-	return nil, nil
+	return m.cards, nil
 }
 func (m *mockCreditCardRepo) UpdateCard(context.Context, *creditcardDomain.CreditCard, string) error {
 	return nil
@@ -63,6 +68,16 @@ func (m *mockCreditCardRepo) FindBalanceById(context.Context, string, string) (*
 }
 func (m *mockCreditCardRepo) FindBalancesByCard(context.Context, string, string) ([]*creditcardDomain.CardBalance, error) {
 	return nil, nil
+}
+func (m *mockCreditCardRepo) FindBalancesByCards(_ context.Context, cardIds []string, _ string) (map[string][]*creditcardDomain.CardBalance, error) {
+	m.batchCalls++
+	out := make(map[string][]*creditcardDomain.CardBalance)
+	for _, id := range cardIds {
+		if b, ok := m.balancesByCard[id]; ok {
+			out[id] = b
+		}
+	}
+	return out, nil
 }
 func (m *mockCreditCardRepo) FindBalanceByCardAndCurrency(_ context.Context, _ string, _ string, _ string) (*creditcardDomain.CardBalance, error) {
 	if m.balance == nil {
@@ -112,6 +127,26 @@ type mockAccountRepo struct {
 	movements   *money.Amount
 	lockedForID []string
 	renamedTo   []string
+	// all and ledgers back FindAll and BalancesByCurrency.
+	all     []*account.Account
+	ledgers map[string]map[string]money.Amount
+	// ledgerCalls counts BalancesByCurrency calls.
+	ledgerCalls int
+}
+
+func (m *mockAccountRepo) FindAll(context.Context, string) ([]*account.Account, error) {
+	return m.all, nil
+}
+
+func (m *mockAccountRepo) BalancesByCurrency(_ context.Context, ids []string, _ string) (map[string]map[string]money.Amount, error) {
+	m.ledgerCalls++
+	out := make(map[string]map[string]money.Amount)
+	for _, id := range ids {
+		if l, ok := m.ledgers[id]; ok {
+			out[id] = l
+		}
+	}
+	return out, nil
 }
 
 func (m *mockAccountRepo) FindByIdAndUserIdForUpdate(ctx context.Context, id string, userId string) (*account.Account, error) {
