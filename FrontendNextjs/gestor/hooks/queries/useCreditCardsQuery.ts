@@ -62,7 +62,9 @@ export function useCreateCreditCardMutation() {
 			const repo = await getCreditCardRepository()
 			return repo.create(data)
 		},
+		// The backend also creates the card's account and the initial-debt adjustment.
 		onSuccess: () => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.summary() })
 		},
@@ -103,7 +105,9 @@ export function useDeleteCreditCardMutation() {
 			const repo = await getCreditCardRepository()
 			return repo.delete(id)
 		},
+		// Deleting a card also deletes its account and that account's transactions.
 		onSuccess: () => {
+			void invalidateFinancialData(queryClient)
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.lists() })
 			queryClient.invalidateQueries({ queryKey: CREDIT_CARD_KEYS.summary() })
 		},

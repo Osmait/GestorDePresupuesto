@@ -1,6 +1,6 @@
 'use client'
 
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { aiRepository } from '@/app/repository/aiRepository'
 import { readOnlyMutation } from '@/components/common/react-query-provider'
 import {
@@ -24,6 +24,7 @@ import {
 	SpendingAnalysisRequest,
 	SpendingAnalysisResponse,
 } from '@/types/ai'
+import { invalidateFinancialData, nonFinancialMutation } from './invalidateFinancialData'
 
 export function useExtractTransactionsMutation() {
 	return useMutation<AIExtractResponse | AIError, Error, AIExtractRequest>({
@@ -76,13 +77,17 @@ export function useReconciliationPreviewMutation() {
 	})
 }
 
+/** Applying a reconciliation creates, links or ignores transactions, so balances change. */
 export function useReconciliationApplyMutation() {
+	const queryClient = useQueryClient()
 	return useMutation<
 		AIReconciliationApplyResponse | AIError,
 		Error,
 		{ sessionId: string; request: AIReconciliationApplyRequest }
 	>({
 		mutationFn: ({ sessionId, request }) => aiRepository.reconciliationApply(sessionId, request),
+		// Even a partial apply (some failed items) has written the rest.
+		onSuccess: () => invalidateFinancialData(queryClient),
 	})
 }
 
@@ -95,6 +100,7 @@ export function useSavingsPlanMutation() {
 
 export function useCreateSavingsGoalMutation() {
 	return useMutation<AISavingsGoalResponse | AIError, Error, AICreateSavingsGoalRequest>({
+		...nonFinancialMutation,
 		mutationFn: (request: AICreateSavingsGoalRequest) => aiRepository.createSavingsGoal(request),
 	})
 }
@@ -108,12 +114,14 @@ export function useListSavingsGoalsMutation() {
 
 export function useUpdateSavingsGoalMutation() {
 	return useMutation<AISavingsGoalResponse | AIError, Error, { goalId: string; request: AIUpdateSavingsGoalRequest }>({
+		...nonFinancialMutation,
 		mutationFn: ({ goalId, request }) => aiRepository.updateSavingsGoal(goalId, request),
 	})
 }
 
 export function useDeleteSavingsGoalMutation() {
 	return useMutation<{ success: boolean } | AIError, Error, string>({
+		...nonFinancialMutation,
 		mutationFn: (goalId: string) => aiRepository.deleteSavingsGoal(goalId),
 	})
 }
