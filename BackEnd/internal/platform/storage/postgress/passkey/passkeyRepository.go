@@ -44,15 +44,36 @@ func jsonText(b []byte) any {
 	return string(b)
 }
 
+// The passkey login ceremony (FinishLogin) runs before anyone is
+// authenticated: FindByCredentialId, FindByUserId and UpdateSignCount then
+// run in a system transaction (txhelper.WithAdminTx) so the passkeys policy
+// lets them through under a role subject to row level security. Inside an
+// authenticated request they run on the request transaction as before.
+
 func (r *PasskeyRepository) FindByCredentialId(ctx context.Context, credentialId []byte) (*passkey.Passkey, error) {
 	query := `SELECT id, user_id, credential_id, public_key, sign_count, COALESCE(aaguid, ''::bytea),
 			COALESCE(transports, '{}'::text[]), name, COALESCE(credential_json::text, ''), last_used_at, created_at
 		FROM passkeys WHERE credential_id = $1`
-	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, credentialId)
-	return scanPasskey(row)
+	var pk *passkey.Passkey
+	err := txhelper.WithAdminTx(ctx, r.db, func(ctx context.Context) error {
+		var scanErr error
+		pk, scanErr = scanPasskey(txhelper.FromContext(ctx, r.db).QueryRowContext(ctx, query, credentialId))
+		return scanErr
+	})
+	return pk, err
 }
 
 func (r *PasskeyRepository) FindByUserId(ctx context.Context, userId string) ([]*passkey.Passkey, error) {
+	var passkeys []*passkey.Passkey
+	err := txhelper.WithAdminTx(ctx, r.db, func(ctx context.Context) error {
+		var err error
+		passkeys, err = r.findByUserId(ctx, userId)
+		return err
+	})
+	return passkeys, err
+}
+
+func (r *PasskeyRepository) findByUserId(ctx context.Context, userId string) ([]*passkey.Passkey, error) {
 	query := `SELECT id, user_id, credential_id, public_key, sign_count, COALESCE(aaguid, ''::bytea),
 			COALESCE(transports, '{}'::text[]), name, COALESCE(credential_json::text, ''), last_used_at, created_at
 		FROM passkeys WHERE user_id = $1 ORDER BY created_at DESC`
@@ -90,18 +111,20 @@ func (r *PasskeyRepository) UpdateSignCount(ctx context.Context, id string, sign
 	query := `UPDATE passkeys
 		SET sign_count = $1, last_used_at = $2, credential_json = COALESCE($3::jsonb, credential_json)
 		WHERE id = $4`
-	result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, signCount, time.Now(), credJSON, id)
-	if err != nil {
-		return err
-	}
-	rowsAffected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
-	if rowsAffected == 0 {
-		return sql.ErrNoRows
-	}
-	return nil
+	return txhelper.WithAdminTx(ctx, r.db, func(ctx context.Context) error {
+		result, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query, signCount, time.Now(), credJSON, id)
+		if err != nil {
+			return err
+		}
+		rowsAffected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+		if rowsAffected == 0 {
+			return sql.ErrNoRows
+		}
+		return nil
+	})
 }
 
 func (r *PasskeyRepository) Delete(ctx context.Context, id string, userId string) error {

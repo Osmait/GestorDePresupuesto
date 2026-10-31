@@ -102,7 +102,29 @@ func WithUserTx(ctx context.Context, db *sql.DB, userID string, isAdmin bool, fn
 	if userID == "" {
 		return errors.New("txhelper: WithUserTx without a user")
 	}
+	return withScopedTx(ctx, db, userID, isAdmin, fn)
+}
 
+// WithAdminTx is WithUserTx for system work that is not done on behalf of
+// one user and must see every row: background jobs (demo cleanup) and the
+// lookups that identify the user before anyone is authenticated (API key,
+// passkey credential). The transaction gets app.is_admin = true and no
+// app.current_user_id, so the row level security policies let it through
+// even when the database role does not bypass RLS (NOBYPASSRLS, the
+// recommended production setup, see docs/SECURITY.md).
+//
+// When ctx already carries a transaction fn runs on it unchanged: a request
+// never gains admin visibility through this helper.
+func WithAdminTx(ctx context.Context, db *sql.DB, fn func(ctx context.Context) error) error {
+	if db == nil || FromContext(ctx, db) != Querier(db) {
+		return fn(ctx)
+	}
+	return withScopedTx(ctx, db, "", true, fn)
+}
+
+// withScopedTx runs fn in a new transaction with the RLS settings of userID /
+// isAdmin and commits it when fn succeeds.
+func withScopedTx(ctx context.Context, db *sql.DB, userID string, isAdmin bool, fn func(ctx context.Context) error) error {
 	conn, err := acquire(ctx, db, CurrentSessionLimits().AcquireTimeout)
 	if err != nil {
 		if ctx.Err() == nil {

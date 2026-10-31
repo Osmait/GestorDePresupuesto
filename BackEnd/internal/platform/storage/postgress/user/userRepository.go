@@ -31,11 +31,13 @@ func NewUserRepository(db *sql.DB) *UserRepository {
 
 // DeleteDemoUsersOlderThan deletes all demo users created before the specified time
 func (u *UserRepository) DeleteDemoUsersOlderThan(ctx context.Context, olderThan time.Time) error {
-	// InTx reuses the request transaction when called from an HTTP handler
-	// (DELETE /users/demos) instead of opening a second pooled connection
-	// while the request already holds one; the cleanup worker gets its own
-	// transaction.
-	return txhelper.InTx(ctx, u.db, func(tx txhelper.Querier) error {
+	// WithAdminTx reuses the request transaction when called from an HTTP
+	// handler (DELETE /users/demos, admin only) instead of opening a second
+	// pooled connection while the request already holds one; the cleanup
+	// worker gets its own transaction with app.is_admin = true, without which
+	// a role subject to row level security would delete nothing.
+	return txhelper.WithAdminTx(ctx, u.db, func(ctx context.Context) error {
+		tx := txhelper.FromContext(ctx, u.db)
 		var err error
 
 		// 1. Delete transactions

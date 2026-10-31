@@ -61,6 +61,8 @@ The application uses a comprehensive configuration system that supports:
 | `DB_CONN_MAX_IDLE_TIME` | `5m` | Connection maximum idle time |
 | `DB_TX_ACQUIRE_TIMEOUT` | `5s` | How long an authenticated request waits for a pooled connection to open its RLS transaction. When the pool stays exhausted that long the request fails fast with `503` + `Retry-After: 1` instead of queueing indefinitely. `0` disables the bound. |
 | `DB_SSL_MODE` | `disable` | SSL mode: `disable`, `require`, `verify-ca`, `verify-full` |
+| `DB_MIGRATION_USER` | | Optional role that runs the migrations at startup (e.g. the table owner) while `DB_USER` is a role subject to row level security. Empty: the migrations use `DB_USER`. See [SECURITY.md](SECURITY.md#database-role-and-row-level-security) |
+| `DB_MIGRATION_PASSWORD` | | Password of `DB_MIGRATION_USER` |
 | `DB_STATEMENT_TIMEOUT` | `15s` | `statement_timeout` set locally in every per-user transaction (requests, AI routes, MCP tools, recurring scheduler). A query past it is cancelled and the request fails with `503`. `0` disables it. |
 | `DB_IDLE_IN_TX_TIMEOUT` | `30s` | `idle_in_transaction_session_timeout` set locally in the same transactions, so a stuck handler cannot pin a connection. `0` disables it. |
 | `DB_REQUEST_TIMEOUT` | `60s` | Deadline of an authenticated request that holds the RLS transaction; on expiry the transaction is rolled back and the connection released. `0` disables it. |

@@ -42,16 +42,25 @@ func (r *APIKeyRepository) Save(ctx context.Context, key *apikey.APIKey) error {
 }
 
 // FindByKeyHash returns the key with that hash, only if its user still exists:
-// a deleted user's keys stop working (like their OAuth tokens).
+// a deleted user's keys stop working (like their OAuth tokens). It runs
+// before the user is known (API key authentication), so outside a request
+// transaction it uses a system transaction (txhelper.WithAdminTx) that the
+// user_api_keys policy lets through under a role subject to RLS.
 func (r *APIKeyRepository) FindByKeyHash(ctx context.Context, keyHash string) (*apikey.APIKey, error) {
-	row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx,
-		`SELECT k.id, k.user_id, k.name, k.key_hash, k.key_prefix, k.last_used_at, k.expires_at, k.created_at, k.is_active
-		 FROM user_api_keys k
-		 JOIN users u ON u.id = k.user_id AND u.deleted_at IS NULL
-		 WHERE k.key_hash = $1`,
-		keyHash,
-	)
-	return scanAPIKey(row)
+	var key *apikey.APIKey
+	err := txhelper.WithAdminTx(ctx, r.db, func(ctx context.Context) error {
+		row := txhelper.FromContext(ctx, r.db).QueryRowContext(ctx,
+			`SELECT k.id, k.user_id, k.name, k.key_hash, k.key_prefix, k.last_used_at, k.expires_at, k.created_at, k.is_active
+			 FROM user_api_keys k
+			 JOIN users u ON u.id = k.user_id AND u.deleted_at IS NULL
+			 WHERE k.key_hash = $1`,
+			keyHash,
+		)
+		var scanErr error
+		key, scanErr = scanAPIKey(row)
+		return scanErr
+	})
+	return key, err
 }
 
 func (r *APIKeyRepository) FindByUserID(ctx context.Context, userID string) ([]*apikey.APIKey, error) {
@@ -94,13 +103,17 @@ func (r *APIKeyRepository) FindByID(ctx context.Context, id string) (*apikey.API
 	return scanAPIKey(row)
 }
 
+// UpdateLastUsed stamps the key after a successful API key authentication
+// (a system transaction outside a request, like FindByKeyHash).
 func (r *APIKeyRepository) UpdateLastUsed(ctx context.Context, id string) error {
 	now := time.Now()
-	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx,
-		`UPDATE user_api_keys SET last_used_at = $1 WHERE id = $2`,
-		now, id,
-	)
-	return err
+	return txhelper.WithAdminTx(ctx, r.db, func(ctx context.Context) error {
+		_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx,
+			`UPDATE user_api_keys SET last_used_at = $1 WHERE id = $2`,
+			now, id,
+		)
+		return err
+	})
 }
 
 func (r *APIKeyRepository) Delete(ctx context.Context, id, userID string) error {

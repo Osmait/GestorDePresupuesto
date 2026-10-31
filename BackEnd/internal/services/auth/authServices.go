@@ -104,6 +104,24 @@ type AuthService struct {
 	config           *config.Config
 	loginLimiter     *loginAttemptLimiter
 	accountLimiter   *accountLoginLimiter
+	// userTx runs fn in a transaction scoped to userID (txhelper.WithUserTx);
+	// nil runs fn directly (tests without a database).
+	userTx func(ctx context.Context, userID string, fn func(ctx context.Context) error) error
+}
+
+// UseUserTransactions makes the unauthenticated flows that write a user's
+// rows (demo user creation) run them through run, a transaction scoped to
+// that user (txhelper.WithUserTx), so row level security accepts the writes
+// under a database role that does not bypass it.
+func (a *AuthService) UseUserTransactions(run func(ctx context.Context, userID string, fn func(ctx context.Context) error) error) {
+	a.userTx = run
+}
+
+func (a *AuthService) inUserTx(ctx context.Context, userID string, fn func(ctx context.Context) error) error {
+	if a.userTx == nil {
+		return fn(ctx)
+	}
+	return a.userTx(ctx, userID, fn)
 }
 
 func newLoginLimiterFromConfig(cfg *config.Config) *loginAttemptLimiter {
@@ -429,9 +447,29 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	user.Confirmed = true
 	user.IpAddress = ip
 
+	// The rows are written in one transaction scoped to the new user, so the
+	// row level security policies accept them even under a role that does
+	// not bypass RLS (this route runs before anyone is authenticated).
+	if err := a.inUserTx(ctx, userID, func(ctx context.Context) error { return a.seedDemoUser(ctx, user) }); err != nil {
+		return nil, err
+	}
+
+	// Logic for Token
+	token, err := utils.CreateAccessToken(user.Id, a.config.JWT)
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
+}
+
+// seedDemoUser saves the demo user and its account, categories, budget and
+// transactions.
+func (a *AuthService) seedDemoUser(ctx context.Context, user *userDomain.User) error {
+	userID := user.Id
 	if err := a.repo.Save(ctx, user); err != nil {
 		log.Error().Err(err).Msg("failed to save demo user")
-		return nil, err
+		return err
 	}
 
 	// 2. Create Account
@@ -440,7 +478,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	account.UserId = userID
 	if err := a.accountRepo.Save(ctx, account); err != nil {
 		log.Error().Err(err).Msg("failed to save demo account")
-		return nil, err
+		return err
 	}
 
 	// 3. Create Categories
@@ -450,7 +488,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	salaryCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, salaryCat); err != nil {
 		log.Error().Err(err).Msg("failed to save salary category")
-		return nil, err
+		return err
 	}
 
 	// Expense
@@ -459,7 +497,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	foodCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, foodCat); err != nil {
 		log.Error().Err(err).Msg("failed to save food category")
-		return nil, err
+		return err
 	}
 
 	transportCatID := uuid.New().String()
@@ -467,7 +505,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	transportCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, transportCat); err != nil {
 		log.Error().Err(err).Msg("failed to save transport category")
-		return nil, err
+		return err
 	}
 
 	// 4. Create Budget (Optional)
@@ -502,14 +540,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	tx3.UserId = userID
 	tx3.CreatedAt = now.AddDate(0, 0, -5)
 	_ = a.transactionRepo.Save(ctx, tx3)
-
-	// Logic for Token
-	token, err := utils.CreateAccessToken(user.Id, a.config.JWT)
-	if err != nil {
-		return nil, err
-	}
-
-	return token, nil
+	return nil
 }
 
 // CreateDemoUserWithTokens creates a demo user and returns both tokens

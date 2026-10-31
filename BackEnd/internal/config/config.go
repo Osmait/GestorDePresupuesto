@@ -69,16 +69,23 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database-related configuration
 type DatabaseConfig struct {
-	User            string        `json:"user" validate:"required"`
-	Password        string        `json:"-"` // Don't include password in JSON output
-	Host            string        `json:"host" validate:"required"`
-	Name            string        `json:"name" validate:"required"`
-	Port            uint          `json:"port" validate:"required,min=1,max=65535"`
-	Type            DatabaseType  `json:"type" validate:"required,oneof=postgres sqlite"`
-	MaxOpenConns    int           `json:"max_open_conns" validate:"min=1"`
-	MaxIdleConns    int           `json:"max_idle_conns" validate:"min=1"`
-	ConnMaxLifetime time.Duration `json:"conn_max_lifetime"`
-	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time"`
+	User     string `json:"user" validate:"required"`
+	Password string `json:"-"` // Don't include password in JSON output
+	// MigrationUser / MigrationPassword (DB_MIGRATION_USER,
+	// DB_MIGRATION_PASSWORD) are optional credentials used only to run the
+	// migrations, e.g. the table owner, while the application connects as a
+	// role subject to row level security (docs/SECURITY.md). Same host,
+	// database and SSL mode. Empty: the migrations use User/Password.
+	MigrationUser     string        `json:"migration_user,omitempty"`
+	MigrationPassword string        `json:"-"`
+	Host              string        `json:"host" validate:"required"`
+	Name              string        `json:"name" validate:"required"`
+	Port              uint          `json:"port" validate:"required,min=1,max=65535"`
+	Type              DatabaseType  `json:"type" validate:"required,oneof=postgres sqlite"`
+	MaxOpenConns      int           `json:"max_open_conns" validate:"min=1"`
+	MaxIdleConns      int           `json:"max_idle_conns" validate:"min=1"`
+	ConnMaxLifetime   time.Duration `json:"conn_max_lifetime"`
+	ConnMaxIdleTime   time.Duration `json:"conn_max_idle_time"`
 	// TxAcquireTimeout bounds how long an authenticated request waits for a
 	// pooled connection to open its RLS transaction (DB_TX_ACQUIRE_TIMEOUT).
 	// When the pool stays exhausted that long the request fails fast with
@@ -404,16 +411,18 @@ func LoadConfig() (*Config, error) {
 		},
 
 		Database: DatabaseConfig{
-			User:            getEnvString("DB_USER", "osmait"),
-			Password:        getEnvString("DB_PASSWORD", "admin123"),
-			Host:            getEnvString("DB_HOST", "localhost"),
-			Name:            getEnvString("DB_NAME", "my_store"),
-			Port:            uint(getEnvInt("DB_PORT", 5432)),
-			Type:            DatabaseType(getEnvString("DB_TYPE", "postgres")),
-			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNS", 25),
-			MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNS", 25),
-			ConnMaxLifetime: getDuration(getEnvString("DB_CONN_MAX_LIFETIME", "5m")),
-			ConnMaxIdleTime: getDuration(getEnvString("DB_CONN_MAX_IDLE_TIME", "5m")),
+			User:              getEnvString("DB_USER", "osmait"),
+			Password:          getEnvString("DB_PASSWORD", "admin123"),
+			MigrationUser:     getEnvString("DB_MIGRATION_USER", ""),
+			MigrationPassword: getEnvString("DB_MIGRATION_PASSWORD", ""),
+			Host:              getEnvString("DB_HOST", "localhost"),
+			Name:              getEnvString("DB_NAME", "my_store"),
+			Port:              uint(getEnvInt("DB_PORT", 5432)),
+			Type:              DatabaseType(getEnvString("DB_TYPE", "postgres")),
+			MaxOpenConns:      getEnvInt("DB_MAX_OPEN_CONNS", 25),
+			MaxIdleConns:      getEnvInt("DB_MAX_IDLE_CONNS", 25),
+			ConnMaxLifetime:   getDuration(getEnvString("DB_CONN_MAX_LIFETIME", "5m")),
+			ConnMaxIdleTime:   getDuration(getEnvString("DB_CONN_MAX_IDLE_TIME", "5m")),
 			// Each authenticated request holds exactly one connection for its
 			// RLS transaction; this bounds the wait for it.
 			TxAcquireTimeout: getEnvDuration("DB_TX_ACQUIRE_TIMEOUT", 5*time.Second),
@@ -1095,6 +1104,18 @@ func (c *Config) GetPostgresUrl() string {
 		RawQuery: "sslmode=" + url.QueryEscape(c.Database.SSLMode) + "&binary_parameters=yes",
 	}
 	return u.String()
+}
+
+// GetMigrationPostgresUrl is the connection string the migrations run with:
+// GetPostgresUrl with DB_MIGRATION_USER / DB_MIGRATION_PASSWORD when set.
+func (c *Config) GetMigrationPostgresUrl() string {
+	if c.Database.MigrationUser == "" {
+		return c.GetPostgresUrl()
+	}
+	migrator := *c
+	migrator.Database.User = c.Database.MigrationUser
+	migrator.Database.Password = c.Database.MigrationPassword
+	return migrator.GetPostgresUrl()
 }
 
 // GetSQLiteUrl returns the SQLite connection string
