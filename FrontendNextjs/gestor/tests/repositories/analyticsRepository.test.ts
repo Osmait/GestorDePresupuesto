@@ -18,10 +18,19 @@ describe('AnalyticsRepository', () => {
 
 	describe('getCategoryExpenses', () => {
 		it('fetches category expenses', async () => {
-			const mockData = [{ id: 'c1', label: 'Food', value: 500 }]
+			const mockData = [{ id: 'c1', label: 'Food', value: 500, color: '#EF4444' }]
 			mockFetch.mockResolvedValue({ ok: true, json: () => Promise.resolve(mockData) })
 			const result = await repo.getCategoryExpenses()
 			expect(result).toEqual(mockData)
+		})
+
+		it('maps CSS color names (seeded sign-up categories) to the palette', async () => {
+			mockFetch.mockResolvedValue({
+				ok: true,
+				json: () => Promise.resolve([{ id: 'c1', label: 'Transporte', value: 500, color: 'blue' }]),
+			})
+			const [expense] = await repo.getCategoryExpenses()
+			expect(expense.color).toBe('#3B82F6')
 		})
 
 		it('returns empty array on error', async () => {

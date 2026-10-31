@@ -3,35 +3,11 @@
 import { Check, Pipette } from 'lucide-react'
 import { useTranslations } from 'next-intl'
 import { useId } from 'react'
+import { CATEGORY_COLORS } from '@/lib/category-color'
 import { cn } from '@/lib/utils'
 import type { PickerOption } from './EmojiPicker'
 
-/** Default category colors (user data, so raw hex is fine here); `key` names the label under `common.picker.colors`. */
-export const CATEGORY_COLORS = [
-	{ value: '#EF4444', key: 'red' },
-	{ value: '#F97316', key: 'orange' },
-	{ value: '#F59E0B', key: 'amber' },
-	{ value: '#EAB308', key: 'yellow' },
-	{ value: '#84CC16', key: 'lime' },
-	{ value: '#22C55E', key: 'green' },
-	{ value: '#10B981', key: 'emerald' },
-	{ value: '#14B8A6', key: 'teal' },
-	{ value: '#06B6D4', key: 'cyan' },
-	{ value: '#0EA5E9', key: 'sky' },
-	{ value: '#3B82F6', key: 'blue' },
-	{ value: '#6366F1', key: 'indigo' },
-	{ value: '#8B5CF6', key: 'violet' },
-	{ value: '#A855F7', key: 'purple' },
-	{ value: '#D946EF', key: 'fuchsia' },
-	{ value: '#EC4899', key: 'pink' },
-	{ value: '#F43F5E', key: 'rose' },
-	{ value: '#64748B', key: 'slate' },
-	{ value: '#6B7280', key: 'gray' },
-	{ value: '#71717A', key: 'zinc' },
-] as const
-
-/** Color given to categories created on the fly (quick create, AI import): the palette's green. */
-export const DEFAULT_CATEGORY_COLOR: string = CATEGORY_COLORS[5].value
+export { CATEGORY_COLORS, DEFAULT_CATEGORY_COLOR } from '@/lib/category-color'
 
 const HEX_RE = /^#[0-9a-f]{6}$/i
 

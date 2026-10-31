@@ -186,6 +186,59 @@ describe('CreditCardFormModal', () => {
 		expect(digitsInput).toHaveValue('1234')
 	})
 
+	it('rejects fewer than 4 last digits (the API requires exactly 4 or none)', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
+		await user.type(screen.getByPlaceholderText('1234'), '123')
+		await user.click(screen.getByText('Create'))
+
+		expect(await screen.findByText('Enter all 4 digits or leave it empty')).toBeInTheDocument()
+		expect(mockOnSubmit).not.toHaveBeenCalled()
+	})
+
+	it('rejects a one-character name or bank (the API requires 2 to 100)', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'A')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), ' B ')
+		await user.click(screen.getByText('Create'))
+
+		expect(await screen.findAllByText('Use between 2 and 100 characters')).toHaveLength(2)
+		expect(mockOnSubmit).not.toHaveBeenCalled()
+	})
+
+	it('rejects a negative initial debt', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
+		const debtInput = screen.getByRole('textbox', { name: 'Initial Debt DOP' })
+		await user.clear(debtInput)
+		await user.type(debtInput, '-50')
+		await user.click(screen.getByText('Create'))
+
+		expect(await screen.findByRole('alert')).toBeInTheDocument()
+		expect(mockOnSubmit).not.toHaveBeenCalled()
+	})
+
+	it('submits without last digits when the field is left empty', async () => {
+		const user = userEvent.setup()
+		renderModal()
+
+		await user.type(screen.getByPlaceholderText('My Credit Card'), 'Test Card')
+		await user.type(screen.getByPlaceholderText('Banco Popular'), 'Test Bank')
+		await user.click(screen.getByText('Create'))
+
+		await waitFor(() =>
+			expect(mockOnSubmit).toHaveBeenCalledWith(expect.objectContaining({ last_four_digits: undefined })),
+		)
+	})
+
 	it('cut day field has correct constraints', () => {
 		renderModal()
 

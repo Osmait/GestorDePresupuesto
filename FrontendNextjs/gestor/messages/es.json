@@ -560,7 +560,9 @@
     "saveError": "No se pudo guardar la categoría. Inténtalo de nuevo.",
     "totalDop": "Total (DOP)",
     "emptyTitle": "Aún no tienes categorías",
-    "emptyDescription": "Crea categorías para clasificar tus ingresos y gastos."
+    "emptyDescription": "Crea categorías para clasificar tus ingresos y gastos.",
+    "suggestedNameFallback": "Nueva categoría",
+    "aiSuggestedSuffix": "IA"
   },
   "budgets": {
     "title": "Presupuestos",
@@ -1507,11 +1509,12 @@
       "errors": {
         "nameRequired": "El nombre de la tarjeta es obligatorio",
         "bankRequired": "El banco es obligatorio",
-        "digitsOnly": "Solo se permiten dígitos",
         "dayMin": "Mínimo {min}",
         "dayMax": "Máximo {max}",
         "saveFailed": "No se pudo guardar la tarjeta. Inténtalo de nuevo.",
-        "limitRequired": "Ingresa un límite de crédito mayor que 0 para cada moneda."
+        "limitRequired": "Ingresa un límite de crédito mayor que 0 para cada moneda.",
+        "textLength": "Usa entre {min} y {max} caracteres",
+        "lastFourDigits": "Escribe los 4 dígitos o déjalo vacío"
       }
     },
     "payment": {
@@ -1551,7 +1554,8 @@
       "accountDebit": "Débito de la cuenta",
       "rate": "Tasa",
       "interest": "Intereses",
-      "notes": "Notas"
+      "notes": "Notas",
+      "currencyFilter": "Filtrar por moneda"
     }
   },
   "investments": {
@@ -1808,7 +1812,7 @@
       "security": "Seguridad",
       "notifications": "Notificaciones",
       "data": "Datos y Privacidad",
-      "apikeys": "API Keys"
+      "apikeys": "Claves API"
     },
     "actions": {
       "edit": "Editar",
@@ -2008,5 +2012,140 @@
     "close": "Cerrar búsqueda",
     "inputLabel": "Buscar transacciones, cuentas y más",
     "resultsLabel": "Resultados de búsqueda"
+  },
+  "landing": {
+    "nav": {
+      "architecture": "Arquitectura",
+      "patterns": "Patrones",
+      "techStack": "Tecnologías",
+      "highlights": "Destacados",
+      "github": "GitHub",
+      "liveDemo": "Demo en vivo",
+      "switchToLight": "Cambiar a modo claro",
+      "switchToDark": "Cambiar a modo oscuro",
+      "logoAlt": "Logo de SBFinance"
+    },
+    "hero": {
+      "badge": "Proyecto de portafolio técnico",
+      "tagline": "Aplicación full-stack de finanzas personales",
+      "description": "Un sistema de gestión financiera listo para producción que demuestra Clean Architecture, los principios SOLID y patrones modernos de desarrollo full-stack. Hecho con Next.js 16, Go y PostgreSQL.",
+      "badges": {
+        "cleanArchitecture": "Clean Architecture",
+        "solid": "Principios SOLID",
+        "repository": "Patrón Repository",
+        "dependencyInjection": "Inyección de dependencias"
+      },
+      "tryDemo": "Probar la demo",
+      "viewSource": "Ver el código fuente",
+      "scroll": "Desliza para explorar la arquitectura"
+    },
+    "architecture": {
+      "badge": "Arquitectura del sistema",
+      "title": "Clean Architecture",
+      "description": "El backend sigue los principios de Clean Architecture con una separación clara de responsabilidades. Las dependencias apuntan hacia adentro y el dominio queda independiente de los frameworks.",
+      "layers": {
+        "frameworks": {
+          "name": "Frameworks y drivers",
+          "description": "Interfaces externas (HTTP, base de datos, logger)"
+        },
+        "adapters": {
+          "name": "Adaptadores de interfaz",
+          "description": "Convierten los datos entre capas"
+        },
+        "application": {
+          "name": "Capa de aplicación",
+          "description": "Lógica de negocio y casos de uso"
+        },
+        "domain": {
+          "name": "Capa de dominio",
+          "description": "Entidades y reglas centrales del negocio"
+        }
+      },
+      "dependencyRule": "Las dependencias siempre apuntan hacia adentro → el dominio nunca depende de las capas externas"
+    },
+    "patterns": {
+      "badge": "Patrones de diseño",
+      "title": "Patrones implementados",
+      "description": "Patrones de diseño estándar de la industria que aseguran mantenibilidad, facilidad de prueba y código limpio.",
+      "items": {
+        "repository": {
+          "name": "Patrón Repository",
+          "description": "Abstrae el acceso a datos detrás de interfaces, lo que facilita probar con mocks y cambiar de base de datos."
+        },
+        "dependencyInjection": {
+          "name": "Inyección de dependencias",
+          "description": "Los servicios reciben sus dependencias por el constructor, con bajo acoplamiento y fáciles de probar."
+        },
+        "dto": {
+          "name": "Patrón DTO",
+          "description": "Objetos de petición y respuesta separados de las entidades del dominio para controlar el contrato de la API."
+        },
+        "factory": {
+          "name": "Patrón Factory",
+          "description": "Funciones constructoras crean las entidades del dominio correctamente inicializadas."
+        }
+      }
+    },
+    "techStack": {
+      "badge": "Stack tecnológico",
+      "title": "Tecnologías utilizadas",
+      "description": "Un stack moderno y listo para producción, optimizado para el rendimiento, la experiencia de desarrollo y la escalabilidad.",
+      "frontend": "Frontend",
+      "backend": "Backend",
+      "items": {
+        "nextjs": "App Router y Server Components",
+        "react": "Funciones concurrentes y hooks",
+        "typescript": "Tipado completo",
+        "tanstackQuery": "Estado del servidor y caché",
+        "tailwind": "Estilos utility-first",
+        "shadcn": "Componentes de Radix UI",
+        "go": "Backend de alto rendimiento",
+        "gin": "Framework web HTTP",
+        "postgres": "Base de datos relacional",
+        "jwt": "Autenticación segura",
+        "docker": "Contenedores"
+      }
+    },
+    "highlights": {
+      "badge": "Aspectos técnicos",
+      "title": "Implementaciones clave",
+      "description": "Funciones técnicas y decisiones de ingeniería que hacen este proyecto apto para producción.",
+      "items": {
+        "jwt": {
+          "title": "Autenticación JWT",
+          "description": "Autenticación sin estado con tokens, contraseñas con bcrypt y expiración configurable."
+        },
+        "migrations": {
+          "title": "Migraciones de base de datos",
+          "description": "Migraciones versionadas con golang-migrate, sobre PostgreSQL en producción y en las pruebas (testcontainers)."
+        },
+        "workers": {
+          "title": "Procesos en segundo plano",
+          "description": "Tareas programadas para las transacciones recurrentes, con apagado ordenado."
+        },
+        "cache": {
+          "title": "Caché en memoria",
+          "description": "Capa de caché de transacciones con un TTL de 5 minutos para lecturas más rápidas."
+        },
+        "logging": {
+          "title": "Logs estructurados",
+          "description": "Zerolog para logs en JSON con niveles configurables e IDs de correlación."
+        },
+        "i18n": {
+          "title": "Internacionalización",
+          "description": "Soporte completo de idiomas (ES/EN) con next-intl y traducciones tipadas."
+        }
+      }
+    },
+    "repository": {
+      "terminal": "terminal",
+      "title": "Código abierto",
+      "description": "Explora el código, aprende de la implementación o contribuye al proyecto.",
+      "clone": "Clona el repositorio",
+      "view": "Ver el repositorio"
+    },
+    "footer": {
+      "credits": "© {year} {name}. Desarrollado por {developer}."
+    }
   }
 }

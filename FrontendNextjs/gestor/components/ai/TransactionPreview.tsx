@@ -13,6 +13,7 @@ import { DatePicker } from '@/components/ui/date-picker'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectSeparator, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { useUniqueCategoryName } from '@/hooks/useUniqueCategoryName'
 import { calendarDateParts, calendarDateToNoonUTC, getAppTodayDate, parseCalendarDate } from '@/lib/app-time'
 import { formatLocalDate, useAppLocale } from '@/lib/i18n/date-locale'
 import { moneyInputToNumber, toMoneyInputText } from '@/lib/money-input'
@@ -33,24 +34,6 @@ interface TransactionPreviewProps {
 	onCreateCategory?: () => void
 	onApplyCategorySuggestion?: (transactionId: string) => void
 	onCreateCategoryFromSuggestion?: (transactionId: string, categoryName: string) => void
-}
-
-function buildUniqueCategoryName(baseName: string, existingNames: string[]): string {
-	const normalizedExisting = new Set(existingNames.map((name) => name.trim().toLowerCase()))
-	const cleanBase = baseName.trim() || 'Nueva categoría'
-
-	if (!normalizedExisting.has(cleanBase.toLowerCase())) {
-		return cleanBase
-	}
-
-	let candidate = `${cleanBase} - IA`
-	let suffix = 2
-	while (normalizedExisting.has(candidate.toLowerCase())) {
-		candidate = `${cleanBase} - IA ${suffix}`
-		suffix++
-	}
-
-	return candidate
 }
 
 type ChipTone = 'destructive' | 'warning' | 'success' | 'muted'
@@ -94,6 +77,7 @@ function TransactionPreviewView({
 }: TransactionPreviewProps) {
 	const t = useTranslations('ai.preview')
 	const tCommon = useTranslations('ai.common')
+	const uniqueCategoryName = useUniqueCategoryName()
 	const tForms = useTranslations('forms')
 	const locale = useAppLocale()
 	const idPrefix = useId()
@@ -204,7 +188,7 @@ function TransactionPreviewView({
 						const duplicateInfo = potentialDuplicatesByTransactionId?.[transaction.id]
 						const categorySuggestion = categorySuggestionsByTransactionId?.[transaction.id]
 						const createSuggestedName = categorySuggestion
-							? buildUniqueCategoryName(
+							? uniqueCategoryName(
 									categorySuggestion.new_category_name || categorySuggestion.category_name,
 									categories.map((category) => category.name),
 								)

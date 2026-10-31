@@ -149,6 +149,15 @@ describe('TransactionsList', () => {
 		expect(within(dialog).queryByText('bill')).not.toBeInTheDocument()
 	})
 
+	it('keeps the details modal within the viewport and scrollable', async () => {
+		const user = userEvent.setup()
+		render(<TransactionsList />)
+
+		await user.click(screen.getByRole('button', { name: 'open-t2' }))
+		const dialog = await screen.findByRole('dialog')
+		expect(dialog).toHaveClass('max-h-[90dvh]', 'overflow-y-auto')
+	})
+
 	it('shows income with a plus sign', async () => {
 		const user = userEvent.setup()
 		render(<TransactionsList />)

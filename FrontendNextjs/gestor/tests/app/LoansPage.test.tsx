@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
-import { fireEvent, screen } from '@testing-library/react'
+import { fireEvent, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import LoansPage from '@/app/app/loans/page'
@@ -27,12 +27,23 @@ afterEach(() => {
 
 const mockCreate = vi.fn()
 const mockFindAll = vi.fn()
+const mockFindById = vi.fn()
+const mockRegisterPayment = vi.fn()
+let searchParams = new URLSearchParams()
+
+vi.mock('next/navigation', () => ({
+	useRouter: () => ({ push: vi.fn(), replace: vi.fn(), prefetch: vi.fn(), back: vi.fn(), refresh: vi.fn() }),
+	usePathname: () => '/app/loans',
+	useSearchParams: () => searchParams,
+}))
 
 vi.mock('@/lib/repositoryConfig', () => ({
 	getLoanRepository: () => ({
 		findAll: () => mockFindAll(),
 		getSummary: () => Promise.resolve(null),
+		findById: (...args: unknown[]) => mockFindById(...args),
 		create: (...args: unknown[]) => mockCreate(...args),
+		registerPayment: (...args: unknown[]) => mockRegisterPayment(...args),
 	}),
 }))
 
@@ -61,7 +72,7 @@ vi.mock('@/hooks/queries/useAccountsQuery', () => ({
 
 function renderPage() {
 	return renderWithIntl(
-		<QueryClientProvider client={new QueryClient()}>
+		<QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
 			<LoansPage />
 		</QueryClientProvider>,
 	)
@@ -83,6 +94,7 @@ async function openCreateDialog(user: ReturnType<typeof userEvent.setup>) {
 describe('LoansPage', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		searchParams = new URLSearchParams()
 		mockFindAll.mockResolvedValue([])
 	})
 
@@ -108,6 +120,7 @@ describe('LoansPage', () => {
 describe('LoansPage create dialog', () => {
 	beforeEach(() => {
 		vi.clearAllMocks()
+		searchParams = new URLSearchParams()
 		mockFindAll.mockResolvedValue([])
 	})
 
@@ -151,5 +164,76 @@ describe('LoansPage create dialog', () => {
 		expect(await screen.findByText('Use at most 2 decimal places')).toBeInTheDocument()
 		expect(principal).toHaveAttribute('aria-invalid', 'true')
 		expect(mockCreate).not.toHaveBeenCalled()
+	})
+})
+
+const loan = {
+	id: 'l1',
+	borrower_name: 'Ana',
+	borrower_contact: '',
+	principal_amount: 1000,
+	currency: 'DOP',
+	interest_mode: 'none',
+	annual_rate: 0,
+	term_months: 2,
+	start_date: '2026-10-01',
+	source_account_id: 'acc1',
+	notes: '',
+	total_interest: 0,
+	total_amount: 1000,
+	paid_principal: 100,
+	paid_interest: 0,
+	pending_amount: 900,
+	status: 'active',
+	created_at: '',
+	updated_at: '',
+}
+
+function payment(id: string, amount: number) {
+	return {
+		id,
+		destination_account_id: 'acc1',
+		amount,
+		principal_component: amount,
+		interest_component: 0,
+		payment_date: '2026-10-15',
+		notes: '',
+		created_at: '',
+	}
+}
+
+describe('LoansPage details', () => {
+	beforeEach(() => {
+		vi.clearAllMocks()
+		searchParams = new URLSearchParams('selected=l1&open=details')
+		mockFindAll.mockResolvedValue([loan])
+	})
+
+	it('lists each payment once after registering one with the details loaded', async () => {
+		// GET /loan/:id returns every payment, the new one included.
+		mockFindById
+			.mockResolvedValueOnce({ loan, installments: [], payments: [payment('p1', 100)] })
+			.mockResolvedValue({ loan, installments: [], payments: [payment('p2', 250), payment('p1', 100)] })
+		mockRegisterPayment.mockResolvedValue(payment('p2', 250))
+		// The row action sits behind the open details dialog.
+		const user = userEvent.setup({ pointerEventsCheck: 0 })
+		renderPage()
+
+		const details = await screen.findByRole('dialog', { name: 'Loan details' })
+		const paymentsTable = () => within(details).getAllByRole('table').at(-1) as HTMLElement
+		expect(within(paymentsTable()).getAllByRole('row')).toHaveLength(2) // header + p1
+
+		const [registerButton] = screen.getAllByRole('button', { name: 'Register payment', hidden: true })
+		await user.click(registerButton)
+		const paymentDialog = await screen.findByRole('dialog', { name: 'Register payment' })
+		const amount = paymentDialog.querySelector<HTMLInputElement>('input[inputmode="decimal"]')
+		if (!amount) throw new Error('amount field not found')
+		await user.type(amount, '250')
+		await user.click(within(paymentDialog).getByRole('button', { name: 'Confirm payment' }))
+
+		await waitFor(() =>
+			expect(mockRegisterPayment).toHaveBeenCalledWith('l1', expect.objectContaining({ amount: 250 })),
+		)
+		await waitFor(() => expect(within(paymentsTable()).getAllByRole('row')).toHaveLength(3)) // header + p2 + p1
 	})
 })

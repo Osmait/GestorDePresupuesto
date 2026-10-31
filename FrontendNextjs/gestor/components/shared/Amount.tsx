@@ -1,11 +1,16 @@
 'use client'
 
 import { ArrowDownRight, ArrowUpRight } from 'lucide-react'
-import { useReducedMotion } from 'motion/react'
-import { AnimatedCounter } from '@/components/ui/animated-counter'
+import { lazy, Suspense } from 'react'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { useAppLocale } from '@/lib/i18n/date-locale'
 import { cn, DEFAULT_CURRENCY } from '@/lib/utils'
+
+// react-countup is only fetched by amounts that animate (most are static).
+const AnimatedCounter = lazy(() =>
+	import('@/components/ui/animated-counter').then((module) => ({ default: module.AnimatedCounter })),
+)
 
 export type AmountTone = 'auto' | 'positive' | 'negative' | 'warning' | 'neutral'
 
@@ -65,7 +70,8 @@ export function Amount({
 }: AmountProps) {
 	const formatCurrency = useFormatCurrency()
 	const locale = useAppLocale()
-	const reduceMotion = useReducedMotion()
+	// Static until the client confirms motion is welcome (the server cannot know).
+	const reduceMotion = useMediaQuery('(prefers-reduced-motion: reduce)', true)
 	// Work in cents so a tiny negative (-0.004) prints and colors as a plain zero, never "-RD$0.00".
 	const cents = Number.isFinite(value) ? Math.round(value * 100) : 0
 	const shown = cents === 0 ? 0 : value
@@ -73,6 +79,7 @@ export function Amount({
 	const signDisplay = signed ? 'exceptZero' : 'auto'
 	const direction = cents
 	const Arrow = direction > 0 ? ArrowUpRight : direction < 0 ? ArrowDownRight : null
+	const formatted = formatCurrency(shown, currency, { signDisplay })
 
 	return (
 		<span
@@ -81,14 +88,16 @@ export function Amount({
 		>
 			{icon && Arrow ? <Arrow className='h-[1em] w-[1em] shrink-0' aria-hidden='true' /> : null}
 			{animate && !reduceMotion ? (
-				<AnimatedCounter
-					value={shown}
-					currency={currency || DEFAULT_CURRENCY}
-					locale={locale}
-					signDisplay={signDisplay}
-				/>
+				<Suspense fallback={formatted}>
+					<AnimatedCounter
+						value={shown}
+						currency={currency || DEFAULT_CURRENCY}
+						locale={locale}
+						signDisplay={signDisplay}
+					/>
+				</Suspense>
 			) : (
-				formatCurrency(shown, currency, { signDisplay })
+				formatted
 			)}
 		</span>
 	)

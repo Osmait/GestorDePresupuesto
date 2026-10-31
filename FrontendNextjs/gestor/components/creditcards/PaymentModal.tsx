@@ -15,6 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch'
 import { useExchangeRateQuery } from '@/hooks/queries/useExchangeRateQuery'
 import { useFormatCurrency } from '@/hooks/useFormatCurrency'
+import { useFormatNumber } from '@/hooks/useFormatNumber'
 import { getInsufficientFundsMessage, getSafeErrorDetail } from '@/lib/api-error'
 import { useAppLocale } from '@/lib/i18n/date-locale'
 import { moneyInputToNumber, moneyMessages, moneySchema, parseMoneyInput } from '@/lib/money-input'
@@ -67,6 +68,7 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 	const tForms = useTranslations('forms')
 	const locale = useAppLocale()
 	const formatCurrency = useFormatCurrency()
+	const formatNumber = useFormatNumber()
 	const paymentSchema = useMemo(() => createPaymentSchema(t, tForms), [t, tForms])
 	const [loading, setLoading] = useState(false)
 	const [submitError, setSubmitError] = useState<{ detail: string | null } | null>(null)
@@ -321,13 +323,19 @@ export function PaymentModal({ open, onClose, onSubmit, card }: PaymentModalProp
 									<FormLabel>{t('exchangeRate', { from: watchedValues.currency, to: sourceCurrency })}</FormLabel>
 									<FormControl>
 										<MoneyInput
-											placeholder={recommendedRate ? recommendedRate.toFixed(4) : t('enterRate')}
+											placeholder={
+												recommendedRate
+													? formatNumber(recommendedRate, { minimumFractionDigits: 4, maximumFractionDigits: 4 })
+													: t('enterRate')
+											}
 											{...field}
 										/>
 									</FormControl>
 									{recommendedRate ? (
 										<p className='text-xs text-muted-foreground'>
-											{t('recommendedRate', { rate: recommendedRate.toFixed(4) })}
+											{t('recommendedRate', {
+												rate: formatNumber(recommendedRate, { minimumFractionDigits: 4, maximumFractionDigits: 4 }),
+											})}
 										</p>
 									) : (
 										<p className='text-xs text-muted-foreground'>{t('noRecommendedRate')}</p>

@@ -127,3 +127,40 @@ export function formatPercent(value: number, options: FormatPercentOptions = {})
 		signDisplay: options.signDisplay ?? 'auto',
 	}).format(rounded / 100)
 }
+
+export interface FormatNumberOptions {
+	/** App locale (`es` | `en`). Defaults to Spanish. */
+	locale?: string | null
+	/** Decimals always printed. Default 0. */
+	minimumFractionDigits?: number
+	/** Decimals printed at most. Default 2. */
+	maximumFractionDigits?: number
+}
+
+/**
+ * Formats a plain number (exchange rates, counts) with the app locale. Client components
+ * use `useFormatNumber()`. Don't print numbers with `toFixed()`: it has no grouping.
+ *
+ * @example formatNumber(58.123456, { minimumFractionDigits: 2, maximumFractionDigits: 2 }) // "58.12"
+ * @example formatNumber(1234.5, { locale: 'en' }) // "1,234.5"
+ */
+export function formatNumber(value: number, options: FormatNumberOptions = {}): string {
+	const maximumFractionDigits = options.maximumFractionDigits ?? 2
+	const minimumFractionDigits = Math.min(options.minimumFractionDigits ?? 0, maximumFractionDigits)
+	return new Intl.NumberFormat(toIntlLocale(options.locale), { minimumFractionDigits, maximumFractionDigits }).format(
+		Number.isFinite(value) ? value : 0,
+	)
+}
+
+/** A file size with the app locale: "820 byte", "12.3 kB", "1.5 MB". */
+export function formatFileSize(bytes: number, locale?: string | null): string {
+	const size = Number.isFinite(bytes) && bytes > 0 ? bytes : 0
+	const [value, unit] =
+		size >= 1024 * 1024 ? [size / (1024 * 1024), 'megabyte'] : size >= 1024 ? [size / 1024, 'kilobyte'] : [size, 'byte']
+	return new Intl.NumberFormat(toIntlLocale(locale), {
+		style: 'unit',
+		unit,
+		unitDisplay: 'short',
+		maximumFractionDigits: unit === 'byte' ? 0 : 1,
+	}).format(value)
+}

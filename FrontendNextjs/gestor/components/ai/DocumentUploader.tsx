@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import { useCallback, useState } from 'react'
 import { FileRejection, useDropzone } from 'react-dropzone'
 import { Button } from '@/components/ui/button'
-import { cn } from '@/lib/utils'
+import { useAppLocale } from '@/lib/i18n/date-locale'
+import { cn, formatFileSize } from '@/lib/utils'
 
 interface DocumentUploaderProps {
 	onFilesSelected: (files: File[]) => void
@@ -29,6 +30,7 @@ export function DocumentUploader({
 	disabled = false,
 }: DocumentUploaderProps) {
 	const t = useTranslations('ai.uploader')
+	const locale = useAppLocale()
 	const [files, setFiles] = useState<File[]>([])
 	const [error, setError] = useState<string | null>(null)
 
@@ -132,7 +134,7 @@ export function DocumentUploader({
 									<FileText className='h-4 w-4 shrink-0 text-muted-foreground' aria-hidden='true' />
 									<div className='min-w-0'>
 										<p className='truncate text-sm font-medium'>{file.name}</p>
-										<p className='text-xs text-muted-foreground tabular-nums'>{(file.size / 1024).toFixed(1)} KB</p>
+										<p className='text-xs text-muted-foreground tabular-nums'>{formatFileSize(file.size, locale)}</p>
 									</div>
 								</div>
 								<Button

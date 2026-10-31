@@ -42,6 +42,21 @@ describe('CategoryRepository', () => {
 			expect(result).toEqual(mockCategories)
 		})
 
+		it('maps CSS color names (seeded sign-up categories) to palette hex colors', async () => {
+			mockFetch.mockResolvedValue({
+				ok: true,
+				json: () =>
+					Promise.resolve([
+						{ id: '1', name: 'Salario', icon: '💰', color: 'green' },
+						{ id: '2', name: 'Transporte', icon: '🚌', color: 'blue' },
+					]),
+			})
+
+			const result = await repo.findAll()
+
+			expect(result.map((category) => category.color)).toEqual(['#22C55E', '#3B82F6'])
+		})
+
 		it('returns empty array on error', async () => {
 			mockFetch.mockRejectedValue(new Error('Network error'))
 

@@ -1,6 +1,7 @@
 import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { getAppMonthRangeStrings } from '@/lib/app-time'
 import { getBudgetRepository, getTransactionRepository } from '@/lib/repositoryConfig'
+import { nonFinancialMutation } from './invalidateFinancialData'
 
 export const BUDGET_KEYS = {
 	all: ['budgets'] as const,
@@ -67,6 +68,8 @@ export function useCreateBudgetMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
+		// A limit change moves no money: budgets and analytics only.
+		...nonFinancialMutation,
 		mutationFn: async (data: { categoryId: string; amount: number }) => {
 			const repo = await getBudgetRepository()
 			return repo.create(data.categoryId, data.amount)
@@ -80,6 +83,8 @@ export function useDeleteBudgetMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
+		// A limit change moves no money: budgets and analytics only.
+		...nonFinancialMutation,
 		mutationFn: async (id: string) => {
 			const repo = await getBudgetRepository()
 			return repo.delete(id)
@@ -93,6 +98,8 @@ export function useUpdateBudgetMutation() {
 	const queryClient = useQueryClient()
 
 	return useMutation({
+		// A limit change moves no money: budgets and analytics only.
+		...nonFinancialMutation,
 		mutationFn: async (data: {
 			id: string // Add ID for update
 			categoryId: string

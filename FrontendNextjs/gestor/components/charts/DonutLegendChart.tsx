@@ -2,6 +2,7 @@
 
 import { ResponsivePie } from '@nivo/pie'
 import { useMemo } from 'react'
+import { readableCategoryColor } from '@/lib/category-color'
 import { CHART_TOOLTIP_CLASS, useChartTheme } from './chart-theme'
 
 export interface DonutDatum {
@@ -19,11 +20,18 @@ interface DonutLegendChartProps {
 
 /** Small donut with a vertical legend on the right (the former Recharts Pie + Legend). */
 export default function DonutLegendChart({ data, formatValue, ariaLabel }: DonutLegendChartProps) {
-	const { theme } = useChartTheme(12)
-	// Ids must be unique (two categories may share a name, e.g. "No category").
+	const { theme, isDark } = useChartTheme(12)
+	// Ids must be unique (two categories may share a name, e.g. "No category"). Colors are the
+	// user's, adjusted (if needed) to stand out from the card in the current theme.
 	const slices = useMemo(
-		() => data.map((datum, index) => ({ id: `${index}`, label: datum.name, value: datum.value, color: datum.color })),
-		[data],
+		() =>
+			data.map((datum, index) => ({
+				id: `${index}`,
+				label: datum.name,
+				value: datum.value,
+				color: readableCategoryColor(datum.color, isDark ? 'dark' : 'light'),
+			})),
+		[data, isDark],
 	)
 	const summary = data.map((datum) => `${datum.name}: ${formatValue(datum.value)}`).join(', ')
 
