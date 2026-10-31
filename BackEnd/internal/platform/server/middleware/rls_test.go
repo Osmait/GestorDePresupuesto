@@ -72,7 +72,7 @@ func TestRLSMiddleware_SetsTransactionForAuthenticatedUser(t *testing.T) {
 	// set_config called with userID and isAdmin="false" — two Go args ($1, $2).
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config`).
-		WithArgs(userID, "false").
+		WithArgs(userID, "false", "15000", "30000").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 
@@ -104,7 +104,7 @@ func TestRLSMiddleware_AdminUserGetsSentinelValue(t *testing.T) {
 	// No more fragile "__admin__" sentinel in app.current_user_id.
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config`).
-		WithArgs(userID, "true").
+		WithArgs(userID, "true", "15000", "30000").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectCommit()
 
@@ -132,7 +132,7 @@ func TestRLSMiddleware_RollsBackOnHandlerError(t *testing.T) {
 
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config`).
-		WithArgs(userID, "false").
+		WithArgs(userID, "false", "15000", "30000").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 	mock.ExpectRollback() // Rollback, NOT Commit
 

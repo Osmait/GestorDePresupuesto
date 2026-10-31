@@ -41,6 +41,8 @@ var (
 	testDB     *sql.DB
 	testEngine *gin.Engine
 	testCfg    *config.Config
+	// testConnStr opens extra pools on the test database.
+	testConnStr string
 )
 
 const testJWTSecret = "api-integration-test-secret-key-long-enough-32chars"
@@ -86,6 +88,7 @@ func TestMain(m *testing.M) {
 
 	connStr := fmt.Sprintf("postgres://apitest:apitest@%s:%s/apitestdb?sslmode=disable", host, mappedPort.Port())
 
+	testConnStr = connStr
 	testDB, err = sql.Open("postgres", connStr)
 	if err != nil {
 		log.Fatalf("failed to open test database: %v", err)

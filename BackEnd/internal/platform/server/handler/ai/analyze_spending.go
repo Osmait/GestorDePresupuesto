@@ -1,11 +1,13 @@
 package ai
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	domain "github.com/osmait/gestorDePresupuesto/internal/domain/ai"
+	"github.com/osmait/gestorDePresupuesto/internal/domain/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/ai"
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
@@ -70,12 +72,19 @@ func (h *Handler) AnalyzeSpending(c *gin.Context) {
 		}
 	}
 
-	transactions, err := h.transactionRepository.FindByUserAndDateRange(
-		c.Request.Context(),
-		userID,
-		dateFrom,
-		dateTo.AddDate(0, 0, 1),
-	)
+	// Read in a short transaction of its own: the provider call below must
+	// not hold a pooled connection (see routes.AIProviderRoutes).
+	var transactions []*transaction.Transaction
+	err = h.inTx(c, func(ctx context.Context) error {
+		var findErr error
+		transactions, findErr = h.transactionRepository.FindByUserAndDateRange(
+			ctx,
+			userID,
+			dateFrom,
+			dateTo.AddDate(0, 0, 1),
+		)
+		return findErr
+	})
 	if err != nil {
 		log.Error().Err(err).Msg("Failed to fetch transactions for analysis")
 		_ = c.Error(apperrors.NewInternalError("Failed to fetch transactions", err))

@@ -1,11 +1,30 @@
 package errors
 
 import (
+	"context"
 	stderrors "errors"
 	"net/http"
 
 	"github.com/lib/pq"
 )
+
+// IsDatabaseTimeout reports whether err (anywhere in its chain) is a query
+// cancelled by statement_timeout (57014 query_canceled), a session ended by
+// idle_in_transaction_session_timeout (25P03), or an expired request
+// deadline. Those are transient overload conditions: 503, not 500.
+func IsDatabaseTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	if stderrors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+	var pqErr *pq.Error
+	if stderrors.As(err, &pqErr) {
+		return pqErr.Code == "57014" || pqErr.Code == "25P03"
+	}
+	return false
+}
 
 // FromPostgresError maps a PostgreSQL data/constraint error (anywhere in
 // err's chain) to a client error with a stable code and a generic message.

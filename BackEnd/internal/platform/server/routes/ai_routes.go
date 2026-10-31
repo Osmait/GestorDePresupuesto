@@ -1,37 +1,34 @@
 package routes
 
 import (
-	"database/sql"
-
 	aiHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/ai"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
-	categoryRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/category"
-	transactionRepo "github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/transaction"
-	aiService "github.com/osmait/gestorDePresupuesto/internal/services/ai"
-	transactionService "github.com/osmait/gestorDePresupuesto/internal/services/transaction"
 
 	"github.com/gin-gonic/gin"
 )
 
-func AIRoutes(
-	r *gin.Engine,
-	aiService *aiService.Service,
-	categoryRepo categoryRepo.CategoryRepoInterface,
-	transactionRepo transactionRepo.TransactionRepositoryInterface,
-	transactionService *transactionService.TransactionService,
-	db *sql.DB,
-	aiCache *aiService.AICacheService,
-	flags *middleware.FeatureFlags,
-) {
-	handler := aiHandler.NewHandler(aiService, categoryRepo, transactionRepo, transactionService, db, aiCache, flags)
+// AIProviderRoutes registers the AI routes that call the AI provider
+// (extraction, reconciliation preview, spending analysis). A provider call
+// can take minutes with retries, so these routes must be registered BEFORE
+// RLSMiddleware: they do their database reads and writes in short
+// transactions of their own (txhelper.WithUserTx) and hold no pooled
+// connection while waiting for the provider. maxConcurrent caps provider
+// calls in flight across all users (AI_MAX_CONCURRENT_CALLS); beyond it they
+// fail fast with 503.
+func AIProviderRoutes(r gin.IRoutes, handler *aiHandler.Handler, flags *middleware.FeatureFlags, maxConcurrent int) {
+	limit := middleware.ConcurrencyLimit("ai_provider", maxConcurrent)
+	r.POST("/ai/extract/transactions", flags.Require("ai_extraction"), limit, handler.ExtractTransactions)
+	r.POST("/ai/reconcile/preview", flags.Require("ai_reconciliation"), limit, handler.ReconciliationPreview)
+	r.POST("/ai/analyze/spending", flags.Require("ai_extraction"), limit, handler.AnalyzeSpending)
+}
 
+// AIRoutes registers the AI routes that only use the database; they run
+// under RLSMiddleware like any other route.
+func AIRoutes(r *gin.Engine, handler *aiHandler.Handler, flags *middleware.FeatureFlags) {
 	ai := r.Group("/ai")
 	{
-		ai.POST("/extract/transactions", flags.Require("ai_extraction"), handler.ExtractTransactions)
-		ai.POST("/reconcile/preview", flags.Require("ai_reconciliation"), handler.ReconciliationPreview)
 		ai.GET("/reconcile/:session_id", flags.Require("ai_reconciliation"), handler.GetReconciliationSession)
 		ai.POST("/reconcile/:session_id/apply", flags.Require("ai_reconciliation"), handler.ApplyReconciliationSession)
-		ai.POST("/analyze/spending", flags.Require("ai_extraction"), handler.AnalyzeSpending)
 		ai.POST("/goals/savings-plan", flags.Require("ai_savings_plan"), handler.SavingsPlan)
 		ai.POST("/goals", flags.Require("ai_savings_goals_crud"), handler.CreateSavingsGoal)
 		ai.GET("/goals", flags.Require("ai_savings_goals_crud"), handler.ListSavingsGoals)

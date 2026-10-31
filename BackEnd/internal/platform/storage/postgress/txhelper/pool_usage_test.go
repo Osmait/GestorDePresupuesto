@@ -19,6 +19,7 @@ var directPoolCall = regexp.MustCompile(`\b(?:db|[A-Za-z_]+\.db)\.(ExecContext|Q
 // one runs where no request transaction is held by the same goroutine.
 var allowedPoolCalls = map[string]string{
 	"internal/platform/storage/postgress/txhelper/txhelper.go":                "InTx opens a transaction only when ctx carries none",
+	"internal/platform/storage/postgress/txhelper/rls.go":                     "WithUserTx opens a transaction only when ctx carries none",
 	"internal/platform/server/middleware/rls.go":                              "acquires the request's own (single) connection",
 	"internal/platform/storage/postgress/recurring_transaction/repository.go": "scheduler transactions; the HTTP trigger is registered before RLSMiddleware",
 	"internal/platform/mcp/tools.go":                                          "MCP tools open their only transaction (routes are outside RLSMiddleware)",

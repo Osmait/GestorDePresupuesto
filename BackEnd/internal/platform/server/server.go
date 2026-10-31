@@ -19,6 +19,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/platform/i18n"
 	mcpPkg "github.com/osmait/gestorDePresupuesto/internal/platform/mcp"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/observability"
+	aiHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/ai"
 	notificationHandler "github.com/osmait/gestorDePresupuesto/internal/platform/server/handler/notification"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/middleware"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/server/routes"
@@ -396,7 +397,18 @@ func (s *Server) registerRoutes() {
 		PerDay:      1000,
 		MaxInFlight: 3,
 	}))
-	s.Engine.Use(middleware.RLSMiddlewareWithTimeout(s.db, s.config.Database.TxAcquireTimeout))
+
+	// AI routes that call the provider: after auth, the body limit and the
+	// quotas above, but BEFORE RLSMiddleware, so a provider call (up to
+	// minutes with retries) holds no pooled connection. Their handlers read
+	// and write in short transactions of their own (txhelper.WithUserTx).
+	aiH := aiHandler.NewHandler(s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache, s.featureFlags)
+	routes.AIProviderRoutes(s.Engine, aiH, s.featureFlags, s.config.AI.MaxConcurrentCalls)
+
+	s.Engine.Use(middleware.RLSMiddlewareWithConfig(s.db, middleware.RLSConfig{
+		AcquireTimeout: s.config.Database.TxAcquireTimeout,
+		RequestTimeout: s.config.Database.RequestTimeout,
+	}))
 
 	// Notification management endpoints — these DO query the DB and need RLS.
 	s.Engine.POST("/notifications/test", notificationH.SendTestNotification)
@@ -422,7 +434,7 @@ func (s *Server) registerRoutes() {
 	routes.CreditCardRoutes(s.Engine, s.creditCardService, s.featureFlags)
 	routes.LoanRoutes(s.Engine, s.loanService, s.featureFlags)
 	routes.PasskeyRoutes(s.Engine, s.passkeyService, s.featureFlags)
-	routes.AIRoutes(s.Engine, s.aiService, s.categoryRepo, s.transactionRepo, s.servicesTransaction, s.db, s.aiCache, s.featureFlags)
+	routes.AIRoutes(s.Engine, aiH, s.featureFlags)
 	routes.APIKeyRoutes(s.Engine, s.apiKeyService)
 }
 

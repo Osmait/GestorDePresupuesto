@@ -26,8 +26,37 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 	return RLSMiddlewareWithTimeout(db, DefaultTxAcquireTimeout)
 }
 
-// RLSMiddlewareWithTimeout pins every authenticated request to a single
-// *sql.Tx, sets two transaction-scoped PostgreSQL settings via set_config(),
+// RLSConfig configures RLSMiddlewareWithConfig.
+type RLSConfig struct {
+	// AcquireTimeout bounds the wait for a pooled connection
+	// (DB_TX_ACQUIRE_TIMEOUT); <= 0 disables the bound.
+	AcquireTimeout time.Duration
+	// RequestTimeout is a deadline on the whole request (and so on its
+	// transaction), DB_REQUEST_TIMEOUT; <= 0 disables it. Without it a
+	// request lives until the client gives up (the frontend proxy waits up
+	// to 5 minutes) while holding a pooled connection.
+	RequestTimeout time.Duration
+}
+
+// IsAdminRequest reports whether the authenticated user of c is an admin.
+func IsAdminRequest(c *gin.Context) bool {
+	if userVal, exists := c.Get("User"); exists {
+		if userModel, ok := userVal.(*dto.UserResponse); ok && userModel.Role == "ADMIN" {
+			return true
+		}
+	}
+	return false
+}
+
+// RLSMiddlewareWithTimeout is RLSMiddlewareWithConfig without a request
+// deadline.
+func RLSMiddlewareWithTimeout(db *sql.DB, acquireTimeout time.Duration) gin.HandlerFunc {
+	return RLSMiddlewareWithConfig(db, RLSConfig{AcquireTimeout: acquireTimeout})
+}
+
+// RLSMiddlewareWithConfig pins every authenticated request to a single
+// *sql.Tx, sets transaction-scoped PostgreSQL settings via set_config()
+// (txhelper.SetRLSContext),
 // and stores the *sql.Tx both in the Gin context under "db_tx" and in
 // c.Request's context (txhelper.WithTx), so repositories resolve it through
 // txhelper.FromContext regardless of whether they receive the *gin.Context
@@ -36,6 +65,12 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 // Settings applied per request:
 //   - app.current_user_id  — the authenticated user's ID
 //   - app.is_admin         — "true" for ADMIN role, "false" otherwise
+//   - statement_timeout and idle_in_transaction_session_timeout
+//     (txhelper.SessionLimits), so a runaway query or a stuck handler cannot
+//     pin a pooled connection
+//
+// Request deadline: cfg.RequestTimeout bounds the request context; when it
+// expires the transaction is rolled back and its connection released.
 //
 // Connection budget: the request holds exactly ONE pooled connection for its
 // whole lifetime. Every query reachable from a handler must run on the
@@ -71,7 +106,8 @@ func RLSMiddleware(db *sql.DB) gin.HandlerFunc {
 // (e.g. the recurring-transaction processor), must be registered before this
 // middleware so they do not hold a pooled connection while waiting for
 // another one.
-func RLSMiddlewareWithTimeout(db *sql.DB, acquireTimeout time.Duration) gin.HandlerFunc {
+func RLSMiddlewareWithConfig(db *sql.DB, cfg RLSConfig) gin.HandlerFunc {
+	acquireTimeout := cfg.AcquireTimeout
 	return func(c *gin.Context) {
 		userID := c.GetString("X-User-Id")
 		if userID == "" {
@@ -79,14 +115,14 @@ func RLSMiddlewareWithTimeout(db *sql.DB, acquireTimeout time.Duration) gin.Hand
 			return
 		}
 
-		isAdmin := "false"
-		if userVal, exists := c.Get("User"); exists {
-			if userModel, ok := userVal.(*dto.UserResponse); ok && userModel.Role == "ADMIN" {
-				isAdmin = "true"
-			}
-		}
+		isAdmin := IsAdminRequest(c)
 
 		reqCtx := c.Request.Context()
+		if cfg.RequestTimeout > 0 {
+			var cancel context.CancelFunc
+			reqCtx, cancel = context.WithTimeout(reqCtx, cfg.RequestTimeout)
+			defer cancel()
+		}
 		conn, err := acquireConn(reqCtx, db, acquireTimeout)
 		if err != nil {
 			stats := db.Stats()
@@ -132,15 +168,9 @@ func RLSMiddlewareWithTimeout(db *sql.DB, acquireTimeout time.Duration) gin.Hand
 			hooks.Run()
 		}()
 
-		// set_config(name, value, is_local=true) is the parameterized equivalent of
-		// SET LOCAL. PostgreSQL does not support $1 placeholders in SET commands.
-		// is_local=true makes both settings transaction-scoped so they are
-		// automatically cleared when the connection returns to the pool.
-		_, err = tx.ExecContext(reqCtx,
-			"SELECT set_config('app.current_user_id', $1, true),"+
-				"       set_config('app.is_admin', $2, true)",
-			userID, isAdmin)
-		if err != nil {
+		// Transaction-scoped (SET LOCAL) settings: cleared automatically when
+		// the connection returns to the pool.
+		if err := txhelper.SetRLSContext(reqCtx, tx, userID, isAdmin); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "could not set rls context"})
 			c.Abort()
 			return

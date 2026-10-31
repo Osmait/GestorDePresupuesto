@@ -2,15 +2,51 @@ package middleware
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 const flagQuery = `SELECT COALESCE\(g.enabled, o.enabled, f.default_enabled\)`
+
+// requestTxContext returns a context carrying a (mocked) request
+// transaction, as route gates see it under RLSMiddleware.
+func requestTxContext(t *testing.T, mock sqlmock.Sqlmock, db interface {
+	Begin() (*sql.Tx, error)
+}) context.Context {
+	t.Helper()
+	mock.ExpectBegin()
+	tx, err := db.Begin()
+	require.NoError(t, err)
+	return txhelper.WithTx(context.Background(), tx)
+}
+
+// Routes registered before RLSMiddleware (the AI provider routes) have no
+// request transaction: the lookup opens a short one scoped to the user, so
+// per-user overrides stay visible under row level security.
+func TestFeatureFlags_WithoutRequestTxUsesAShortUserTx(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	require.NoError(t, err)
+	defer func() { _ = db.Close() }()
+
+	flags := NewFeatureFlags(db, 0)
+	mock.ExpectBegin()
+	mock.ExpectExec(`SELECT set_config`).WithArgs("u1", "false", "15000", "30000").
+		WillReturnResult(sqlmock.NewResult(0, 0))
+	mock.ExpectQuery(flagQuery).WithArgs("u1", "ai_extraction").
+		WillReturnRows(sqlmock.NewRows([]string{"enabled"}).AddRow(true))
+	mock.ExpectCommit()
+
+	enabled, err := flags.Enabled(context.Background(), "u1", "ai_extraction")
+	require.NoError(t, err)
+	assert.True(t, enabled)
+	assert.NoError(t, mock.ExpectationsWereMet())
+}
 
 func TestFeatureFlags_CachesAndInvalidates(t *testing.T) {
 	db, mock, err := sqlmock.New()
@@ -20,7 +56,7 @@ func TestFeatureFlags_CachesAndInvalidates(t *testing.T) {
 	now := time.Unix(1_700_000_000, 0)
 	flags := NewFeatureFlags(db, 30*time.Second)
 	flags.now = func() time.Time { return now }
-	ctx := context.Background()
+	ctx := requestTxContext(t, mock, db)
 
 	// First evaluation hits the database.
 	mock.ExpectQuery(flagQuery).WithArgs("u1", "module_loans").
@@ -74,10 +110,11 @@ func TestFeatureFlags_ZeroTTLDisablesCache(t *testing.T) {
 	defer func() { _ = db.Close() }()
 
 	flags := NewFeatureFlags(db, 0)
+	ctx := requestTxContext(t, mock, db)
 	for i := 0; i < 2; i++ {
 		mock.ExpectQuery(flagQuery).WithArgs("u1", "module_loans").
 			WillReturnRows(sqlmock.NewRows([]string{"enabled"}).AddRow(true))
-		enabled, err := flags.Enabled(context.Background(), "u1", "module_loans")
+		enabled, err := flags.Enabled(ctx, "u1", "module_loans")
 		require.NoError(t, err)
 		assert.True(t, enabled)
 	}
