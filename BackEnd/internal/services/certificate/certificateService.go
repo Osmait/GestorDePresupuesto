@@ -597,6 +597,13 @@ func (s *CertificateService) processPendingPayments(ctx context.Context, userId 
 			if nextPaymentDate.After(now) {
 				break
 			}
+			// Defensive: a date that does not advance would record payments
+			// forever inside the request.
+			if !nextPaymentDate.After(startDate) {
+				log.Error().Str("certificate_id", cert.Id).Time("from", startDate).Int("cut_day", cert.CutDay).
+					Msg("certificate next payment date does not advance; stopping")
+				break
+			}
 
 			if s.afterMaturity(nextPaymentDate, cert.MaturityDate) {
 				_ = s.repository.UpdateStatus(ctx, cert.Id, userId, certificate.StatusMatured)
@@ -710,10 +717,16 @@ func (s *CertificateService) CalculateNextPaymentDate(cert *certificate.Certific
 // clamped to the month's last day, at 12:00 UTC: the payment and its interest
 // transaction land on the cut day in the app time zone (at 00:00 UTC they
 // were the previous local evening).
+// calculateNextPaymentDate returns the first cut date strictly after the
+// calendar day of from. The cut day is clamped to the length of each month
+// (a cut day of 31 falls on Sep 30 and Feb 28), and the comparison uses the
+// clamped day: comparing with the raw cut day returned from itself for a
+// payment on the clamped day (Sep 30 with cut day 31), so the payment loop
+// never advanced.
 func (s *CertificateService) calculateNextPaymentDate(from time.Time, cutDay int) time.Time {
 	year, month, fromDay := s.calendarDay(from).Date()
 
-	if fromDay >= cutDay {
+	if fromDay >= clampDay(year, month, cutDay) {
 		month++
 		if month > 12 {
 			month = 1
@@ -721,12 +734,15 @@ func (s *CertificateService) calculateNextPaymentDate(from time.Time, cutDay int
 		}
 	}
 
-	day := cutDay
-	if daysInMonth := apptime.DaysIn(year, month); day > daysInMonth {
-		day = daysInMonth
-	}
+	return apptime.NoonUTC(year, month, clampDay(year, month, cutDay))
+}
 
-	return apptime.NoonUTC(year, month, day)
+// clampDay is cutDay, or the last day of the month when the month is shorter.
+func clampDay(year int, month time.Month, cutDay int) int {
+	if daysInMonth := apptime.DaysIn(year, month); cutDay > daysInMonth {
+		return daysInMonth
+	}
+	return cutDay
 }
 
 func (s *CertificateService) GetProjectedPayment(cert *certificate.Certificate, capital money.Amount, calculator *PaymentCalculator) *dto.ProjectedPaymentResponse {
