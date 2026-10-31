@@ -271,6 +271,10 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 			Authenticator: mcp.AuthServiceAuthenticator{Service: svcs.authService},
 			Storage:       oauthStorage,
 			AppURL:        cfg.MCP.AppURL,
+			// The consent page warns about other redirect hosts; with the
+			// enforcement flag, registration rejects them.
+			TrustedRedirectHosts:     cfg.MCP.TrustedRedirectHosts,
+			EnforceRedirectAllowlist: cfg.MCP.EnforceRedirectAllowlist,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OAuth server: %w", err)

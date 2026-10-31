@@ -203,6 +203,15 @@ Limited requests get `429` with `Retry-After`. Login lockouts (above) also answe
 | `MIDDLEWARE_ENABLE_AUTHENTICATION` | `true` | Enable authentication middleware |
 | `MIDDLEWARE_ENABLE_VALIDATION` | `true` | Enable validation middleware |
 
+### MCP OAuth (Claude connector)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TRUSTED_REDIRECT_HOSTS` | | Extra OAuth redirect hosts (comma-separated host names) trusted on top of `claude.ai`, `claude.com` and loopback (`localhost`, `127.0.0.1`, `[::1]`). The consent page shows a warning for a client whose redirect URI goes anywhere else (or to a trusted host over plain `http`, or to a native-app scheme) |
+| `MCP_ENFORCE_REDIRECT_ALLOWLIST` | `false` | When `true`, dynamic client registration (`POST /oauth/register`) rejects any redirect URI outside those hosts with `400 invalid_redirect_uri`. Already registered clients keep working (with the warning) |
+
+The consent page shows the access level the client asked for. For a full-access request the user can pick **read-only** instead; the code and every refreshed token then carry `mcp:read` (refreshes keep the granted scope). Claude's default request is unchanged and stays full access.
+
 ## Configuration Sections
 
 ### Server Configuration

@@ -333,6 +333,13 @@ type MCPConfig struct {
 	BaseURL       string `json:"base_url"`
 	// AppURL is the web app linked from the OAuth login page (MCP_APP_URL).
 	AppURL string `json:"app_url"`
+	// TrustedRedirectHosts are OAuth redirect hosts trusted on top of
+	// claude.ai, claude.com and loopback (MCP_TRUSTED_REDIRECT_HOSTS): the
+	// consent page warns about any other host.
+	TrustedRedirectHosts []string `json:"trusted_redirect_hosts"`
+	// EnforceRedirectAllowlist makes dynamic client registration reject
+	// redirect URIs outside those hosts (MCP_ENFORCE_REDIRECT_ALLOWLIST).
+	EnforceRedirectAllowlist bool `json:"enforce_redirect_allowlist"`
 }
 
 // WebAuthnConfig holds passkey / WebAuthn relying party configuration.
@@ -596,11 +603,13 @@ func LoadConfig() (*Config, error) {
 		},
 
 		MCP: MCPConfig{
-			Enabled:       getEnvBool("MCP_ENABLED", false),
-			ServerName:    getEnvString("MCP_SERVER_NAME", "Gestor de Presupuesto"),
-			ServerVersion: getEnvString("MCP_SERVER_VERSION", "1.0.0"),
-			BaseURL:       getEnvString("MCP_BASE_URL", ""),
-			AppURL:        getEnvString("MCP_APP_URL", "https://presupuesto.saulburgos.com"),
+			Enabled:                  getEnvBool("MCP_ENABLED", false),
+			ServerName:               getEnvString("MCP_SERVER_NAME", "Gestor de Presupuesto"),
+			ServerVersion:            getEnvString("MCP_SERVER_VERSION", "1.0.0"),
+			BaseURL:                  getEnvString("MCP_BASE_URL", ""),
+			AppURL:                   getEnvString("MCP_APP_URL", "https://presupuesto.saulburgos.com"),
+			TrustedRedirectHosts:     getEnvStringSlice("MCP_TRUSTED_REDIRECT_HOSTS", nil),
+			EnforceRedirectAllowlist: getEnvBool("MCP_ENFORCE_REDIRECT_ALLOWLIST", false),
 		},
 
 		WebAuthn: WebAuthnConfig{

@@ -64,6 +64,13 @@ type OAuthConfig struct {
 	AppURL string
 	// AuthorizationCodeExpiry defaults to 10 minutes.
 	AuthorizationCodeExpiry time.Duration
+	// TrustedRedirectHosts are redirect hosts trusted on top of claude.ai,
+	// claude.com and loopback (MCP_TRUSTED_REDIRECT_HOSTS). The consent page
+	// warns about any other host.
+	TrustedRedirectHosts []string
+	// EnforceRedirectAllowlist makes dynamic client registration reject
+	// redirect URIs outside the trusted hosts (MCP_ENFORCE_REDIRECT_ALLOWLIST).
+	EnforceRedirectAllowlist bool
 }
 
 // OAuthProvider is the MCP OAuth 2.1 authorization server.
@@ -76,6 +83,10 @@ type OAuthProvider struct {
 	server    *oauth2.Server
 	storage   oauth2.Storage
 	authorize *authorizeHandler
+	// redirects is the redirect host allowlist; enforced on registration
+	// when enforceRedirects is set.
+	redirects        *redirectAllowlist
+	enforceRedirects bool
 }
 
 // NewOAuthProvider builds the provider.
@@ -108,6 +119,7 @@ func NewOAuthProvider(cfg OAuthConfig) (*OAuthProvider, error) {
 		return nil, fmt.Errorf("oauth: %w", err)
 	}
 
+	redirects := newRedirectAllowlist(cfg.TrustedRedirectHosts)
 	return &OAuthProvider{
 		server:  srv,
 		storage: storage,
@@ -117,7 +129,10 @@ func NewOAuthProvider(cfg OAuthConfig) (*OAuthProvider, error) {
 			codeExpiry: codeExpiry,
 			appURL:     appURL,
 			now:        time.Now,
+			redirects:  redirects,
 		},
+		redirects:        redirects,
+		enforceRedirects: cfg.EnforceRedirectAllowlist,
 	}, nil
 }
 
@@ -218,8 +233,15 @@ func hashPresentedClientSecret(r *http.Request, hasher clientSecretHasher) {
 	}
 }
 
-// RegistrationHandler serves dynamic client registration (omniskill).
-func (p *OAuthProvider) RegistrationHandler() http.Handler { return p.server.RegistrationHandler() }
+// RegistrationHandler serves dynamic client registration (omniskill). With
+// EnforceRedirectAllowlist, registrations with a redirect URI outside the
+// trusted hosts are rejected (invalid_redirect_uri).
+func (p *OAuthProvider) RegistrationHandler() http.Handler {
+	if p.enforceRedirects {
+		return enforceRedirectAllowlist(p.server.RegistrationHandler(), p.redirects)
+	}
+	return p.server.RegistrationHandler()
+}
 
 // MetadataHandler serves the authorization server metadata (omniskill).
 func (p *OAuthProvider) MetadataHandler() http.Handler { return p.server.MetadataHandler() }
