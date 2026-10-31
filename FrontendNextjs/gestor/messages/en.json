@@ -2012,5 +2012,140 @@
     "close": "Close search",
     "inputLabel": "Search transactions, accounts and more",
     "resultsLabel": "Search results"
+  },
+  "landing": {
+    "nav": {
+      "architecture": "Architecture",
+      "patterns": "Patterns",
+      "techStack": "Tech stack",
+      "highlights": "Highlights",
+      "github": "GitHub",
+      "liveDemo": "Live Demo",
+      "switchToLight": "Switch to light mode",
+      "switchToDark": "Switch to dark mode",
+      "logoAlt": "SBFinance logo"
+    },
+    "hero": {
+      "badge": "Technical Portfolio Project",
+      "tagline": "Full-Stack Personal Finance Application",
+      "description": "A production-ready financial management system demonstrating Clean Architecture, SOLID principles, and modern full-stack development patterns. Built with Next.js 16, Go, and PostgreSQL.",
+      "badges": {
+        "cleanArchitecture": "Clean Architecture",
+        "solid": "SOLID Principles",
+        "repository": "Repository Pattern",
+        "dependencyInjection": "Dependency Injection"
+      },
+      "tryDemo": "Try Live Demo",
+      "viewSource": "View Source Code",
+      "scroll": "Scroll to explore architecture"
+    },
+    "architecture": {
+      "badge": "System Architecture",
+      "title": "Clean Architecture",
+      "description": "The backend follows Clean Architecture principles with clear separation of concerns. Dependencies point inward, keeping the core domain independent of frameworks.",
+      "layers": {
+        "frameworks": {
+          "name": "Framework & Drivers",
+          "description": "External interfaces (HTTP, Database, Logger)"
+        },
+        "adapters": {
+          "name": "Interface Adapters",
+          "description": "Convert data between layers"
+        },
+        "application": {
+          "name": "Application Layer",
+          "description": "Business logic and use cases"
+        },
+        "domain": {
+          "name": "Domain Layer",
+          "description": "Core business entities and rules"
+        }
+      },
+      "dependencyRule": "Dependencies always point inward → Domain never depends on outer layers"
+    },
+    "patterns": {
+      "badge": "Design Patterns",
+      "title": "Patterns Implemented",
+      "description": "Industry-standard design patterns ensuring maintainability, testability, and clean code.",
+      "items": {
+        "repository": {
+          "name": "Repository Pattern",
+          "description": "Abstract data access behind interfaces, enabling easy testing with mocks and database swapping."
+        },
+        "dependencyInjection": {
+          "name": "Dependency Injection",
+          "description": "Services receive dependencies via constructors, promoting loose coupling and testability."
+        },
+        "dto": {
+          "name": "DTO Pattern",
+          "description": "Separate request/response objects from domain entities to control API contracts."
+        },
+        "factory": {
+          "name": "Factory Pattern",
+          "description": "Constructor functions create domain entities with proper initialization."
+        }
+      }
+    },
+    "techStack": {
+      "badge": "Tech Stack",
+      "title": "Technologies Used",
+      "description": "A modern, production-ready stack optimized for performance, developer experience, and scalability.",
+      "frontend": "Frontend",
+      "backend": "Backend",
+      "items": {
+        "nextjs": "App Router & Server Components",
+        "react": "Concurrent Features & Hooks",
+        "typescript": "Full Type Safety",
+        "tanstackQuery": "Server State & Caching",
+        "tailwind": "Utility-First Styling",
+        "shadcn": "Radix UI Components",
+        "go": "High-Performance Backend",
+        "gin": "HTTP Web Framework",
+        "postgres": "Relational Database",
+        "jwt": "Secure Authentication",
+        "docker": "Containerization"
+      }
+    },
+    "highlights": {
+      "badge": "Technical Highlights",
+      "title": "Key Implementations",
+      "description": "Notable technical features and engineering decisions that make this project production-ready.",
+      "items": {
+        "jwt": {
+          "title": "JWT Authentication",
+          "description": "Stateless token-based auth with bcrypt password hashing and configurable expiration."
+        },
+        "migrations": {
+          "title": "Database Migrations",
+          "description": "Version-controlled migrations with golang-migrate, on PostgreSQL in production and in tests (testcontainers)."
+        },
+        "workers": {
+          "title": "Background Workers",
+          "description": "Scheduled jobs for recurring transactions with graceful shutdown handling."
+        },
+        "cache": {
+          "title": "In-Memory Cache",
+          "description": "Transaction caching layer with 5-minute TTL for improved read performance."
+        },
+        "logging": {
+          "title": "Structured Logging",
+          "description": "Zerolog for JSON-formatted logs with configurable levels and correlation IDs."
+        },
+        "i18n": {
+          "title": "Internationalization",
+          "description": "Full i18n support (ES/EN) using next-intl with type-safe translations."
+        }
+      }
+    },
+    "repository": {
+      "terminal": "terminal",
+      "title": "Open Source",
+      "description": "Explore the code, learn from the implementation, or contribute to the project.",
+      "clone": "Clone the repository",
+      "view": "View Repository"
+    },
+    "footer": {
+      "credits": "© {year} {name}. Built by {developer}."
+    }
   }
 }
