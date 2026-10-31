@@ -431,7 +431,7 @@ struct AddTransactionView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, Spacing.md.rawValue)
-            .foregroundStyle(active ? .white : Color.app.textTertiary)
+            .foregroundStyle(active ? Color.app.onStatus : Color.app.textSecondary)
             .background(active ? color : .clear)
             .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
         }

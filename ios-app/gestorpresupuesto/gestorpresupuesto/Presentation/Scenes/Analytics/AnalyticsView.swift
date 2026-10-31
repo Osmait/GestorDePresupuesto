@@ -40,14 +40,14 @@ struct AnalyticsView: View {
 
                                         Chart(viewModel.categoryExpenses) { expense in
                                             SectorMark(angle: .value(expense.label, expense.totalAmount))
-                                                .foregroundStyle(Color.fromHex(expense.color) ?? .gray)
+                                                .foregroundStyle(Color.fromHex(expense.color) ?? Color.app.textSecondary)
                                         }
                                         .frame(height: 200)
 
                                         ForEach(viewModel.categoryExpenses) { expense in
                                             HStack {
                                                 Circle()
-                                                    .fill(Color.fromHex(expense.color) ?? .gray)
+                                                    .fill(Color.fromHex(expense.color) ?? Color.app.textSecondary)
                                                     .frame(width: 10, height: 10)
                                                 Text(expense.label)
                                                     .font(.app(.caption))

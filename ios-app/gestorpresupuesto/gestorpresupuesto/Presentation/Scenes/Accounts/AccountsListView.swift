@@ -150,7 +150,7 @@ struct AccountsListView: View {
     private func accountCard(_ account: AccountResponse, index: Int) -> some View {
         let isCard = account.accountInfo.isCreditCard
         let isPositive = account.currentBalance >= 0
-        let iconInfo = isCard ? ("creditcard.fill", Color.blue) : Self.accountIcon(for: account, index: index)
+        let iconInfo = isCard ? (icon: "creditcard.fill", color: Color.app.textSecondary) : Self.accountIcon(for: account, index: index)
 
         return HStack(spacing: Spacing.md.rawValue) {
             // Icon
@@ -202,26 +202,28 @@ struct AccountsListView: View {
 
     // MARK: - Icon Helper
 
+    /// The icon tells accounts apart; color stays neutral (hue only carries
+    /// meaning in this app).
     static func accountIcon(for account: AccountResponse, index: Int) -> (icon: String, color: Color) {
         let name = account.accountInfo.name.lowercased()
 
         if name.contains("ahorro") || name.contains("saving") {
-            return ("leaf.fill", .green)
+            return ("leaf.fill", Color.app.textSecondary)
         } else if name.contains("inversion") || name.contains("invest") {
-            return ("chart.line.uptrend.xyaxis", .purple)
+            return ("chart.line.uptrend.xyaxis", Color.app.textSecondary)
         } else if name.contains("gasto") || name.contains("expense") {
-            return ("dollarsign.square.fill", .orange)
+            return ("dollarsign.square.fill", Color.app.textSecondary)
         } else if name.contains("credit") || name.contains("tarjeta") {
-            return ("creditcard.fill", .blue)
+            return ("creditcard.fill", Color.app.textSecondary)
         } else if name.contains("principal") || name.contains("main") {
-            return ("building.columns.fill", .indigo)
+            return ("building.columns.fill", Color.app.textSecondary)
         }
 
         let icons: [(String, Color)] = [
-            ("building.columns.fill", .indigo),
-            ("banknote.fill", .teal),
-            ("wallet.bifold.fill", .mint),
-            ("chart.bar.fill", .cyan)
+            ("building.columns.fill", Color.app.textSecondary),
+            ("banknote.fill", Color.app.textSecondary),
+            ("wallet.bifold.fill", Color.app.textSecondary),
+            ("chart.bar.fill", Color.app.textSecondary)
         ]
         return icons[index % icons.count]
     }

@@ -149,7 +149,7 @@ struct TransactionFilterView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, Spacing.sm.rawValue)
-            .foregroundStyle(isSelected ? .white : Color.app.textSecondary)
+            .foregroundStyle(isSelected ? Color.app.onStatus : Color.app.textSecondary)
             .background(isSelected ? color : Color.app.surfaceSecondary)
             .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
         }
@@ -216,7 +216,7 @@ struct TransactionFilterView: View {
                                         .frame(width: 36, height: 36)
                                     Image(systemName: "building.columns")
                                         .font(.footnote)
-                                        .foregroundStyle(isSelected ? .white : Color.app.textSecondary)
+                                        .foregroundStyle(isSelected ? Color.app.onAccent : Color.app.textSecondary)
                                 }
 
                                 VStack(alignment: .leading, spacing: 1) {

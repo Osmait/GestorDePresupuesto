@@ -279,7 +279,7 @@ struct DocumentTypeSelector: View {
                         .padding(.horizontal, .md)
                         .padding(.vertical, .sm)
                         .background(selectedType == type ? Color.app.accent : Color.app.surfaceSecondary)
-                        .foregroundStyle(selectedType == type ? .white : Color.app.textSecondary)
+                        .foregroundStyle(selectedType == type ? Color.app.onAccent : Color.app.textSecondary)
                         .cornerRadius(.md)
                     }
                     .buttonStyle(PlainButtonStyle())
@@ -430,7 +430,7 @@ struct ExtractedTransactionCard: View {
                         HStack(spacing: .xs) {
                             if isSaving {
                                 ProgressView()
-                                    .tint(.white)
+                                    .tint(Color.app.onAccent)
                             } else {
                                 Image(systemName: "square.and.arrow.down")
                                 Text("Guardar")

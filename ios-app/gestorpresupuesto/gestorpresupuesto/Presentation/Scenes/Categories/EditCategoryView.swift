@@ -90,7 +90,7 @@ struct EditCategoryView: View {
         VStack(spacing: Spacing.md.rawValue) {
             ZStack {
                 Circle()
-                    .fill((Color.fromHex(selectedColor) ?? .blue).opacity(0.15))
+                    .fill((Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.15))
                     .frame(width: 80, height: 80)
 
                 Text(selectedIcon)
@@ -136,13 +136,13 @@ struct EditCategoryView: View {
                             .background(
                                 RoundedRectangle(cornerRadius: Radius.md.rawValue)
                                     .fill(selectedIcon == icon
-                                        ? (Color.fromHex(selectedColor) ?? .blue).opacity(0.2)
+                                        ? (Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.2)
                                         : Color.app.surfaceSecondary)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: Radius.md.rawValue)
                                     .stroke(selectedIcon == icon
-                                        ? (Color.fromHex(selectedColor) ?? .blue).opacity(0.5)
+                                        ? (Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.5)
                                         : Color.clear, lineWidth: 2)
                             )
                     }
@@ -168,7 +168,7 @@ struct EditCategoryView: View {
                         HapticManager.shared.selection()
                     } label: {
                         Circle()
-                            .fill(Color.fromHex(hex) ?? .gray)
+                            .fill(Color.fromHex(hex) ?? Color.app.textSecondary)
                             .frame(width: 36, height: 36)
                             .overlay {
                                 if selectedColor == hex {

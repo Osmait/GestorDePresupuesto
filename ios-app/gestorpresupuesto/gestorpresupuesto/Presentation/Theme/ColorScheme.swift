@@ -24,15 +24,15 @@ struct AppColors {
         static let onAccent = Color(hex: "FAFAFA")
 
         static let textPrimary = Color(hex: "09090B")
-        static let textSecondary = Color(hex: "71717A")
-        static let textTertiary = Color(hex: "8E8E96")
+        static let textSecondary = Color(hex: "66666F")
+        static let textTertiary = Color(hex: "6B6B74")
 
         static let border = Color(hex: "E4E4E7")
         static let borderLight = Color(hex: "F4F4F5")
 
         static let success = Color(hex: "157F3C")
         static let successLight = Color(hex: "DCFCE7")
-        static let warning = Color(hex: "B3530A")
+        static let warning = Color(hex: "A34A08")
         static let warningLight = Color(hex: "FFEDD5")
         static let error = Color(hex: "C71E1E")
         static let errorLight = Color(hex: "FEE2E2")
@@ -62,13 +62,13 @@ struct AppColors {
         static let onAccent = Color(hex: "1A1B1E")
 
         static let textPrimary = Color(hex: "F9FAFB")
-        static let textSecondary = Color(hex: "858B99")
-        static let textTertiary = Color(hex: "6B7080")
+        static let textSecondary = Color(hex: "9CA1AD")
+        static let textTertiary = Color(hex: "8C92A0")
 
         static let border = Color(hex: "27292F")
         static let borderLight = Color(hex: "323540")
 
-        static let success = Color(hex: "24C25E")
+        static let success = Color(hex: "4ADE80")
         static let successLight = Color(hex: "14532D")
         static let warning = Color(hex: "DB7706")
         static let warningLight = Color(hex: "431407")
@@ -110,13 +110,14 @@ struct AppColors {
     var error: Color { Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(Dark.error) : UIColor(Light.error) }) }
     var info: Color { Color(UIColor { $0.userInterfaceStyle == .dark ? UIColor(Dark.info) : UIColor(Light.info) }) }
 
-    private var isDark: Bool { UITraitCollection.current.userInterfaceStyle == .dark }
-    var gradientPrimary: [Color] { isDark ? Dark.gradientPrimary : Light.gradientPrimary }
-    var gradientSuccess: [Color] { isDark ? Dark.gradientSuccess : Light.gradientSuccess }
-    var gradientError: [Color] { isDark ? Dark.gradientError : Light.gradientError }
-    var gradientWarning: [Color] { isDark ? Dark.gradientWarning : Light.gradientWarning }
-    var gradientIncome: [Color] { isDark ? Dark.gradientIncome : Light.gradientIncome }
-    var gradientExpense: [Color] { isDark ? Dark.gradientExpense : Light.gradientExpense }
+    // Flat "gradients" built from the dynamic tokens, so they follow the
+    // appearance the view renders in (UITraitCollection.current does not).
+    var gradientPrimary: [Color] { [accent, accent] }
+    var gradientSuccess: [Color] { [success, success] }
+    var gradientError: [Color] { [error, error] }
+    var gradientWarning: [Color] { [warning, warning] }
+    var gradientIncome: [Color] { [success, success] }
+    var gradientExpense: [Color] { [error, error] }
 
     init() {}
 }

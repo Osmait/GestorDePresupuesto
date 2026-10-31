@@ -406,7 +406,7 @@ struct DayOfMonthPicker: View {
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, Spacing.sm)
                             .background(dayOfMonth == day ? Color.app.accent : Color.app.surfaceSecondary)
-                            .foregroundStyle(dayOfMonth == day ? .white : Color.app.textSecondary)
+                            .foregroundStyle(dayOfMonth == day ? Color.app.onAccent : Color.app.textSecondary)
                             .cornerRadius(Radius.sm)
                     }
                     .buttonStyle(PlainButtonStyle())

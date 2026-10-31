@@ -147,7 +147,7 @@ struct InvestmentsListView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(isSelected ? Color.app.accent : Color.app.surface)
-                .foregroundStyle(isSelected ? .white : Color.app.textSecondary)
+                .foregroundStyle(isSelected ? Color.app.onAccent : Color.app.textSecondary)
                 .clipShape(Capsule())
         }
     }
