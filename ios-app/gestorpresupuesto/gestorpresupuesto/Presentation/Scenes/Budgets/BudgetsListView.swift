@@ -54,9 +54,7 @@ struct BudgetsListView: View {
         .notificationToolbar()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                IconButton("plus") {
-                    showingAddBudget = true
-                }
+                Button("Nuevo presupuesto", systemImage: "plus") { showingAddBudget = true }
             }
         }
         .sheet(isPresented: $showingAddBudget) {

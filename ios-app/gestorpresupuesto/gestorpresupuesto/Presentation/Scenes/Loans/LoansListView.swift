@@ -76,9 +76,7 @@ struct LoansListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showAddLoan = true } label: {
-                        Image(systemName: "plus")
-                    }
+                    Button("Nuevo préstamo", systemImage: "plus") { showAddLoan = true }
                 }
             }
             .sheet(isPresented: $showAddLoan) {

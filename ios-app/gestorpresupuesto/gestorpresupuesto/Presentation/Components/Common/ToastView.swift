@@ -35,6 +35,7 @@ enum ToastType {
 }
 
 struct ToastView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let type: ToastType
     let message: String
     let onDismiss: () -> Void
@@ -75,7 +76,7 @@ struct ToastView: View {
                 .stroke(type.color.opacity(0.3), lineWidth: 1)
         )
         .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
-        .offset(y: offset)
+        .offset(y: reduceMotion ? 0 : offset)
         .opacity(opacity)
         .onAppear {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -110,6 +111,7 @@ struct ToastView: View {
 }
 
 struct ToastModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var isPresented: Bool
     let type: ToastType
     let message: String
@@ -123,7 +125,7 @@ struct ToastModifier: ViewModifier {
                     }
                     .padding(.horizontal)
                     .padding(.bottom, 16)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .bottom).combined(with: .opacity))
                 }
             }
     }

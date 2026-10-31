@@ -154,6 +154,7 @@ struct TransactionFilterView: View {
             .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
         }
         .buttonStyle(.plain)
+        .chipAccessibility(selected: isSelected)
     }
 
     // MARK: - Category
@@ -190,6 +191,7 @@ struct TransactionFilterView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .chipAccessibility(selected: isSelected)
                     }
                 }
             }
@@ -249,6 +251,7 @@ struct TransactionFilterView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .chipAccessibility(selected: isSelected)
                     }
                 }
             }
@@ -353,6 +356,7 @@ struct TransactionFilterView: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .chipAccessibility(selected: isSelected)
     }
 
     private func emptyLabel(_ text: String) -> some View {

@@ -46,12 +46,14 @@ struct AnimatedNumberText: View, Animatable {
 
 struct PulseModifier: ViewModifier {
     @State private var isPulsing = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     func body(content: Content) -> some View {
         content
             .scaleEffect(isPulsing ? 1.05 : 1.0)
             .opacity(isPulsing ? 0.8 : 1.0)
             .onAppear {
+                guard !reduceMotion else { return }
                 withAnimation(.easeInOut(duration: 1.2).repeatForever(autoreverses: true)) {
                     isPulsing = true
                 }

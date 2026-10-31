@@ -69,9 +69,7 @@ struct RecurringTransactionsListView: View {
         .notificationToolbar()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                IconButton("plus") {
-                    showingAddRecurring = true
-                }
+                Button("Nueva recurrente", systemImage: "plus") { showingAddRecurring = true }
             }
         }
         .sheet(isPresented: $showingAddRecurring) {
@@ -190,7 +188,8 @@ struct RecurringTransactionRow: View {
                 }
             }
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+        // The rows live in a ScrollView, where swipe actions never fire.
+        .contextMenu {
             Button(role: .destructive, action: onDelete) {
                 Label("Eliminar", systemImage: "trash")
             }
@@ -384,6 +383,7 @@ struct TypeChip: View {
             )
         }
         .buttonStyle(PlainButtonStyle())
+        .chipAccessibility(selected: isSelected)
     }
 }
 
@@ -410,6 +410,7 @@ struct DayOfMonthPicker: View {
                             .cornerRadius(Radius.sm)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .chipAccessibility(selected: dayOfMonth == day)
                 }
             }
 

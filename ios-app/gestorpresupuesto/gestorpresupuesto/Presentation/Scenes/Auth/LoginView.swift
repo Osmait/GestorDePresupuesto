@@ -2,6 +2,7 @@ import SwiftUI
 import Combine
 
 struct LoginView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var viewModel: AuthViewModel
     @State private var email = ""
     @State private var password = ""
@@ -56,9 +57,9 @@ struct LoginView: View {
                 .font(.largeTitle)
                 .foregroundStyle(Color.app.onAccent)
         }
-        .scaleEffect(animationPhase == .initial ? 0.5 : 1.0)
+        .scaleEffect(animationPhase == .initial && !reduceMotion ? 0.5 : 1.0)
         .opacity(animationPhase == .initial ? 0 : 1)
-        .animation(.spring(response: 0.6, dampingFraction: 0.7), value: animationPhase)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.6, dampingFraction: 0.7), value: animationPhase)
     }
 
     private var titleView: some View {
@@ -73,7 +74,7 @@ struct LoginView: View {
         }
         .opacity(animationPhase == .initial || animationPhase == .logoAppearing ? 0 : 1)
         .offset(y: animationPhase == .initial || animationPhase == .logoAppearing ? -20 : 0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: animationPhase)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: animationPhase)
     }
 
     private var cardView: some View {
@@ -127,7 +128,7 @@ struct LoginView: View {
         .shake(trigger: shakeTrigger)
         .opacity(animationPhase == .initial || animationPhase == .logoAppearing || animationPhase == .titleAppearing ? 0 : 1)
         .offset(y: animationPhase == .initial || animationPhase == .logoAppearing || animationPhase == .titleAppearing ? 50 : 0)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animationPhase)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animationPhase)
     }
 
     private func startEntranceAnimation() {

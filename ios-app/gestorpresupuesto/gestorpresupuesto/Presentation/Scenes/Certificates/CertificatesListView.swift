@@ -65,9 +65,7 @@ struct CertificatesListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showAddCertificate = true } label: {
-                        Image(systemName: "plus")
-                    }
+                    Button("Nuevo certificado", systemImage: "plus") { showAddCertificate = true }
                 }
             }
             .sheet(isPresented: $showAddCertificate) {

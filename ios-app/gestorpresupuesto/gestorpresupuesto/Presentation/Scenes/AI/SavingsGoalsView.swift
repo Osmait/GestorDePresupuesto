@@ -87,9 +87,7 @@ struct SavingsGoalsView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showAddGoal = true } label: {
-                        Image(systemName: "plus")
-                    }
+                    Button("Nueva meta", systemImage: "plus") { showAddGoal = true }
                 }
             }
             .sheet(isPresented: $showAddGoal) {

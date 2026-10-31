@@ -52,9 +52,7 @@ struct CreditCardsListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showAddCard = true } label: {
-                        Image(systemName: "plus")
-                    }
+                    Button("Nueva tarjeta", systemImage: "plus") { showAddCard = true }
                 }
             }
             .sheet(isPresented: $showAddCard) {

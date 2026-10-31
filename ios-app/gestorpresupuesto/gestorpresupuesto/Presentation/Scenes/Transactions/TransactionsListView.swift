@@ -88,28 +88,27 @@ struct TransactionsListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: Spacing.sm.rawValue) {
-                        Button { showingFilters = true } label: {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                                .foregroundStyle(Color.app.textSecondary)
-                        }
-
-                        Menu {
-                            Button {
-                                showingAddTransaction = true
-                            } label: {
-                                Label("Agregar manual", systemImage: "square.and.pencil")
-                            }
-                            Button {
-                                showingDocumentScanner = true
-                            } label: {
-                                Label("Escanear documento", systemImage: "doc.text.viewfinder")
-                            }
+                    Button { showingFilters = true } label: {
+                        Label("Filtros", systemImage: viewModel.hasActiveFilters
+                              ? "line.3.horizontal.decrease.circle.fill"
+                              : "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityValue(viewModel.hasActiveFilters ? "Activos" : "")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            showingAddTransaction = true
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.title2)
-                                .foregroundStyle(Color.app.accent)
+                            Label("Agregar manual", systemImage: "square.and.pencil")
                         }
+                        Button {
+                            showingDocumentScanner = true
+                        } label: {
+                            Label("Escanear documento", systemImage: "doc.text.viewfinder")
+                        }
+                    } label: {
+                        Label("Agregar movimiento", systemImage: "plus")
                     }
                 }
             }
@@ -436,6 +435,7 @@ struct AddTransactionView: View {
             .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
         }
         .buttonStyle(.plain)
+        .chipAccessibility(selected: active)
     }
 
     // MARK: - Amount

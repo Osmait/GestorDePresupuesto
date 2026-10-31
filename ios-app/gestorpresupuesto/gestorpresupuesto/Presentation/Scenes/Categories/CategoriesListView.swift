@@ -41,10 +41,11 @@ struct CategoriesListView: View {
 
                                 LazyVGrid(columns: columns, spacing: Spacing.sm.rawValue) {
                                     ForEach(viewModel.categories) { category in
-                                        categoryCard(category)
-                                            .onTapGesture {
-                                                editingCategory = category
-                                            }
+                                        Button { editingCategory = category } label: {
+                                            categoryCard(category)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityHint("Editar categoría")
                                             .contextMenu {
                                                 Button {
                                                     editingCategory = category
@@ -74,16 +75,7 @@ struct CategoriesListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showingAddCategory = true } label: {
-                        ZStack {
-                            Circle()
-                                .fill(Color.app.accent.opacity(0.15))
-                                .frame(width: 32, height: 32)
-                            Image(systemName: "plus")
-                                .font(.system(.footnote, weight: .bold))
-                                .foregroundStyle(Color.app.accent)
-                        }
-                    }
+                    Button("Nueva categoría", systemImage: "plus") { showingAddCategory = true }
                 }
             }
             .sheet(isPresented: $showingAddCategory) {
@@ -328,6 +320,7 @@ struct AddCategoryView: View {
                                     Image(systemName: "checkmark")
                                         .font(.system(.footnote, weight: .bold))
                                         .foregroundStyle(.white)
+                                        .shadow(color: .black.opacity(0.35), radius: 1)
                                 }
                             }
                             .overlay(
@@ -335,8 +328,12 @@ struct AddCategoryView: View {
                                     .stroke(selectedColor == hex ? Color.app.textPrimary.opacity(0.4) : .clear, lineWidth: 2)
                                     .padding(-2)
                             )
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(CategoryColorName.name(for: hex))
+                    .accessibilityAddTraits(selectedColor == hex ? .isSelected : [])
                 }
             }
         }

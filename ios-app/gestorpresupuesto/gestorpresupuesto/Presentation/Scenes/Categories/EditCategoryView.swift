@@ -175,6 +175,7 @@ struct EditCategoryView: View {
                                     Image(systemName: "checkmark")
                                         .font(.system(.footnote, weight: .bold))
                                         .foregroundStyle(.white)
+                                        .shadow(color: .black.opacity(0.35), radius: 1)
                                 }
                             }
                             .overlay(
@@ -182,8 +183,12 @@ struct EditCategoryView: View {
                                     .stroke(selectedColor == hex ? Color.app.textPrimary.opacity(0.4) : .clear, lineWidth: 2)
                                     .padding(-2)
                             )
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(CategoryColorName.name(for: hex))
+                    .accessibilityAddTraits(selectedColor == hex ? .isSelected : [])
                 }
             }
         }

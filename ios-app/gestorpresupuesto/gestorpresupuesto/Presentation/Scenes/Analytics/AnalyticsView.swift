@@ -43,6 +43,8 @@ struct AnalyticsView: View {
                                                 .foregroundStyle(Color.fromHex(expense.color) ?? Color.app.textSecondary)
                                         }
                                         .frame(height: 200)
+                                        // The list below reads the same amounts.
+                                        .accessibilityHidden(true)
 
                                         ForEach(viewModel.categoryExpenses) { expense in
                                             HStack {

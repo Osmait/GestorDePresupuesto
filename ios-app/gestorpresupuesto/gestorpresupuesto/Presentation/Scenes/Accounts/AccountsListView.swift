@@ -83,16 +83,7 @@ struct AccountsListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showingAddAccount = true } label: {
-                        ZStack {
-                            Circle()
-                                .fill(Color.app.accent.opacity(0.15))
-                                .frame(width: 32, height: 32)
-                            Image(systemName: "plus")
-                                .font(.system(.footnote, weight: .bold))
-                                .foregroundStyle(Color.app.accent)
-                        }
-                    }
+                    Button("Nueva cuenta", systemImage: "plus") { showingAddAccount = true }
                 }
             }
             .sheet(isPresented: $showingAddAccount) {

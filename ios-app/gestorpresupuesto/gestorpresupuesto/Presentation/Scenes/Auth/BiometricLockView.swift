@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct BiometricLockView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @ObservedObject var viewModel: AuthViewModel
     @State private var animationPhase: AnimationPhase = .initial
     @State private var isAuthenticating = false
@@ -52,9 +53,9 @@ struct BiometricLockView: View {
                 .font(.largeTitle)
                 .foregroundStyle(Color.app.onAccent)
         }
-        .scaleEffect(animationPhase == .initial ? 0.5 : 1.0)
+        .scaleEffect(animationPhase == .initial && !reduceMotion ? 0.5 : 1.0)
         .opacity(animationPhase == .initial ? 0 : 1)
-        .animation(.spring(response: 0.6, dampingFraction: 0.7), value: animationPhase)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.6, dampingFraction: 0.7), value: animationPhase)
     }
 
     private var greetingView: some View {
@@ -75,7 +76,7 @@ struct BiometricLockView: View {
         }
         .opacity(animationPhase == .initial || animationPhase == .logoAppearing ? 0 : 1)
         .offset(y: animationPhase == .initial || animationPhase == .logoAppearing ? -20 : 0)
-        .animation(.spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: animationPhase)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.5, dampingFraction: 0.8).delay(0.1), value: animationPhase)
     }
 
     private var unlockCard: some View {
@@ -108,7 +109,7 @@ struct BiometricLockView: View {
         }
         .opacity(animationPhase == .initial || animationPhase == .logoAppearing || animationPhase == .contentAppearing ? 0 : 1)
         .offset(y: animationPhase == .initial || animationPhase == .logoAppearing || animationPhase == .contentAppearing ? 50 : 0)
-        .animation(.spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animationPhase)
+        .animation(reduceMotion ? .easeOut(duration: 0.2) : .spring(response: 0.6, dampingFraction: 0.8).delay(0.2), value: animationPhase)
     }
 
     private func startEntranceAnimation() {

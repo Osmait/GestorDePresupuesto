@@ -114,7 +114,7 @@ struct InvestmentsListView: View {
                             Label("Fondear Broker", systemImage: "arrow.right.circle")
                         }
                     } label: {
-                        Image(systemName: "plus")
+                        Label("Agregar", systemImage: "plus")
                     }
                 }
             }
@@ -150,6 +150,8 @@ struct InvestmentsListView: View {
                 .foregroundStyle(isSelected ? Color.app.onAccent : Color.app.textSecondary)
                 .clipShape(Capsule())
         }
+        .buttonStyle(.plain)
+        .chipAccessibility(selected: isSelected)
     }
 
     private func investmentRow(_ investment: Investment) -> some View {

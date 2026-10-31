@@ -250,8 +250,11 @@ struct ScannedImageThumbnail: View {
                     .font(.title3)
                     .foregroundStyle(Color.app.onStatus)
                     .background(Circle().fill(Color.app.error))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .offset(x: 6, y: -6)
+            .accessibilityLabel("Quitar foto")
+            .offset(x: 16, y: -16)
         }
     }
 }
@@ -283,6 +286,7 @@ struct DocumentTypeSelector: View {
                         .cornerRadius(.md)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .chipAccessibility(selected: selectedType == type)
                 }
             }
         }

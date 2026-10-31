@@ -45,6 +45,8 @@ struct PatrimonySection: View {
                     }
                 }
                 .frame(height: 160)
+                // The legend below reads each part.
+                .accessibilityHidden(true)
 
                 HStack(spacing: Spacing.lg.rawValue) {
                     legendItem("Cuentas", color: Color.app.accent, value: accountsTotal)

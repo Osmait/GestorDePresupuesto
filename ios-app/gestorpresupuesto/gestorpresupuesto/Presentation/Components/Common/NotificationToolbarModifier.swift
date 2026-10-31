@@ -25,8 +25,18 @@ struct NotificationToolbarModifier: ViewModifier {
                             }
                         }
                     }
+                    .accessibilityLabel("Notificaciones")
+                    .accessibilityValue(unreadDescription)
                 }
             }
+    }
+
+    private var unreadDescription: String {
+        switch notificationManager.unreadCount {
+        case 0: return ""
+        case 1: return "1 sin leer"
+        default: return "\(notificationManager.unreadCount) sin leer"
+        }
     }
 }
 

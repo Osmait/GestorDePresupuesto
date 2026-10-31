@@ -3,6 +3,7 @@ import SwiftUI
 struct NotificationCenterView: View {
     @EnvironmentObject private var notificationManager: NotificationManager
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmDeleteAll = false
 
     var body: some View {
         NavigationStack {
@@ -27,7 +28,7 @@ struct NotificationCenterView: View {
                         }
 
                         Button(role: .destructive) {
-                            notificationManager.deleteAll()
+                            confirmDeleteAll = true
                         } label: {
                             Label("Eliminar todas", systemImage: "trash")
                         }
@@ -40,9 +41,14 @@ struct NotificationCenterView: View {
                             Label("Enviar prueba", systemImage: "paperplane")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Label("Más opciones", systemImage: "ellipsis.circle")
                     }
                 }
+            }
+            .confirmationDialog("¿Eliminar todas las notificaciones?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
+                Button("Eliminar todas", role: .destructive) { notificationManager.deleteAll() }
+            } message: {
+                Text("Esta acción no se puede deshacer.")
             }
         }
     }
@@ -76,6 +82,8 @@ struct NotificationCenterView: View {
                 List {
                     ForEach(notificationManager.notifications) { notification in
                         NotificationRow(notification: notification)
+                            .accessibilityAddTraits(notification.isRead ? [] : .isButton)
+                            .accessibilityHint(notification.isRead ? "" : "Marcar como leída")
                             .onTapGesture {
                                 if !notification.isRead {
                                     notificationManager.markAsRead(notification.id)

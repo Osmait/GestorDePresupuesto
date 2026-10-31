@@ -79,6 +79,7 @@ struct CertificateSimulationView: View {
                                             }
                                         }
                                         .frame(height: 200)
+                                        .accessibilityLabel("Interés neto por mes")
                                     }
                                 }
                             }
