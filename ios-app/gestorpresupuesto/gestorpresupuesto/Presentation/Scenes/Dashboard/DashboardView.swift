@@ -88,7 +88,7 @@ extension DashboardView {
     private var monthOverview: some View {
         BalanceHeader(
             totalBalance: viewModel.totalBalance,
-            accountsCount: viewModel.accounts.count
+            accountsCount: viewModel.accountsCount
         )
 
         HStack(spacing: .md) {
@@ -127,11 +127,14 @@ extension DashboardView {
 
     @ViewBuilder
     private var patrimony: some View {
-        if viewModel.investmentsTotal + viewModel.certificatesTotal > 0 {
+        if viewModel.patrimonyTotal != viewModel.totalBalance {
             PatrimonySection(
+                total: viewModel.patrimonyTotal,
                 accountsTotal: viewModel.totalBalance,
-                investmentsTotal: viewModel.investmentsTotal,
-                certificatesTotal: viewModel.certificatesTotal
+                investmentsTotal: viewModel.investmentsTotal + viewModel.brokerCashTotal,
+                certificatesTotal: viewModel.certificatesTotal,
+                loansReceivableTotal: viewModel.loansReceivableTotal,
+                creditCardDebt: viewModel.creditCardDebt
             )
         }
     }
@@ -328,7 +331,7 @@ struct TransactionLine: View {
             Spacer(minLength: .sm)
 
             AmountText(
-                value: transaction.isIncome ? abs(transaction.amount) : -abs(transaction.amount),
+                value: transaction.signedAmount,
                 currency: transaction.currency ?? "DOP",
                 tone: .auto,
                 signed: true

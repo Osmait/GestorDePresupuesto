@@ -6,8 +6,14 @@ struct AccountsListView: View {
     @State private var showDeleteConfirmation = false
     @State private var accountToDelete: AccountResponse?
 
+    /// Bank accounts in DOP; cards are debt and USD is shown apart.
     private var totalBalance: Double {
-        viewModel.accounts.reduce(0) { $0 + $1.currentBalance }
+        viewModel.accounts.bankAccounts.filter { $0.currency != "USD" }.reduce(0) { $0 + $1.currentBalance }
+    }
+
+    private var totalBalanceUSD: Double? {
+        let usd = viewModel.accounts.bankAccounts.filter { $0.currency == "USD" }
+        return usd.isEmpty ? nil : usd.reduce(0) { $0 + $1.currentBalance }
     }
 
     var body: some View {
@@ -38,7 +44,7 @@ struct AccountsListView: View {
 
                                 // Account list
                                 VStack(spacing: Spacing.sm.rawValue) {
-                                    ForEach(Array(viewModel.accounts.enumerated()), id: \.element.accountInfo.id) { index, account in
+                                    ForEach(Array(viewModel.accounts.bankAccounts.enumerated()), id: \.element.accountInfo.id) { index, account in
                                         accountCard(account, index: index)
                                             .contextMenu {
                                                 Button(role: .destructive) {
@@ -48,6 +54,19 @@ struct AccountsListView: View {
                                                     Label("Eliminar", systemImage: "trash")
                                                 }
                                             }
+                                    }
+                                }
+
+                                // Cards are managed in "Tarjetas de crédito"; here only their debt.
+                                if !viewModel.accounts.cardAccounts.isEmpty {
+                                    SectionTitle("Tarjetas de crédito")
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .padding(.top, Spacing.lg.rawValue)
+                                        .padding(.bottom, Spacing.sm.rawValue)
+                                    VStack(spacing: Spacing.sm.rawValue) {
+                                        ForEach(Array(viewModel.accounts.cardAccounts.enumerated()), id: \.element.accountInfo.id) { index, account in
+                                            accountCard(account, index: index)
+                                        }
                                     }
                                 }
                             }
@@ -107,10 +126,17 @@ struct AccountsListView: View {
                 .foregroundStyle(Color.app.textPrimary)
                 .minimumScaleFactor(0.6)
 
+            if let usd = totalBalanceUSD {
+                Text("+ \(usd.currencyFormatted(currency: "USD"))")
+                    .font(.app(.subheadline))
+                    .foregroundStyle(Color.app.textSecondary)
+            }
+
             HStack(spacing: 4) {
                 Image(systemName: totalBalance >= 0 ? "arrow.up.right" : "arrow.down.right")
                     .font(.caption2)
-                Text("\(viewModel.accounts.count) cuenta\(viewModel.accounts.count == 1 ? "" : "s")")
+                let count = viewModel.accounts.bankAccounts.count
+                Text("\(count) cuenta\(count == 1 ? "" : "s")")
                     .font(.app(.caption))
             }
             .foregroundStyle(totalBalance >= 0 ? Color.app.success : Color.app.error)
@@ -122,8 +148,9 @@ struct AccountsListView: View {
     // MARK: - Account Card
 
     private func accountCard(_ account: AccountResponse, index: Int) -> some View {
+        let isCard = account.accountInfo.isCreditCard
         let isPositive = account.currentBalance >= 0
-        let iconInfo = Self.accountIcon(for: account, index: index)
+        let iconInfo = isCard ? ("creditcard.fill", Color.blue) : Self.accountIcon(for: account, index: index)
 
         return HStack(spacing: Spacing.md.rawValue) {
             // Icon
@@ -152,11 +179,12 @@ struct AccountsListView: View {
 
             // Balance
             VStack(alignment: .trailing, spacing: 2) {
-                Text(account.currentBalance.currencyFormatted)
+                // A card's balance is negative while it has debt; show the debt as a positive amount.
+                Text((isCard ? abs(account.currentBalance) : account.currentBalance).currencyFormatted(currency: account.currency))
                     .font(.app(.subheadline))
                     .fontWeight(.bold)
-                    .foregroundStyle(isPositive ? Color.app.textPrimary : Color.app.error)
-                Text("Balance actual")
+                    .foregroundStyle(isPositive || isCard ? Color.app.textPrimary : Color.app.error)
+                Text(isCard ? (isPositive ? "Sin deuda" : "Deuda") : "Balance actual")
                     .font(.caption2)
                     .foregroundStyle(Color.app.textTertiary)
             }

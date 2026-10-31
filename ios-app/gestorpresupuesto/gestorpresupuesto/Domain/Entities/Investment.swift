@@ -51,6 +51,12 @@ struct Investment: Codable, Identifiable, Equatable {
         case userId = "user_id"
     }
 
+    /// The currency prices and values are in (positions without one are USD).
+    var currency: String {
+        let code = settlementCurrency?.trimmingCharacters(in: .whitespaces).uppercased() ?? ""
+        return code.isEmpty ? "USD" : code
+    }
+
     var totalCost: Double {
         quantity * purchasePrice
     }

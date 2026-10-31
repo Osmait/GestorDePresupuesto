@@ -40,7 +40,7 @@ struct SearchView: View {
                                             Text(transaction.amount.currencyFormatted)
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.semibold)
-                                                .foregroundStyle(transaction.isIncome ? Color.app.success : Color.app.error)
+                                                .foregroundStyle(transaction.isInflow ? Color.app.success : Color.app.error)
                                         }
                                         .padding(.vertical, 4)
                                     }

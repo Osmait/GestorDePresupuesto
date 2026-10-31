@@ -23,12 +23,19 @@ struct CertificateDetailView: View {
                             }
 
                             LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.md.rawValue) {
-                                infoCell("Capital", certificate.effectiveCapital.currencyFormatted)
+                                infoCell("Capital", certificate.effectiveCapital.currencyFormatted(currency: certificate.currency))
                                 infoCell("Tasa", "\(String(format: "%.2f", certificate.currentInterestRate))%")
                                 infoCell("Impuesto", "\(String(format: "%.2f", certificate.currentTaxRate))%")
                                 infoCell("Día de corte", "\(certificate.cutDay)")
                                 infoCell("Tipo", certificate.interestType.displayName)
                                 infoCell("Moneda", certificate.currency)
+                            }
+
+                            if let payoutError = certificate.payoutError, !payoutError.isEmpty {
+                                Label("No se pudo pagar el interés: \(payoutError)", systemImage: "exclamationmark.triangle.fill")
+                                    .font(.app(.caption))
+                                    .foregroundStyle(Color.app.warning)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
 
                             if certificate.reinvestInterest {
@@ -101,7 +108,7 @@ struct CertificateDetailView: View {
                                     SurfaceCard {
                                         HStack {
                                             VStack(alignment: .leading, spacing: 2) {
-                                                Text(payment.paymentDate)
+                                                Text(payment.paymentDate.calendarDayFormatted)
                                                     .font(.app(.caption))
                                                 Text("\(payment.periodStart) - \(payment.periodEnd)")
                                                     .font(.caption2)

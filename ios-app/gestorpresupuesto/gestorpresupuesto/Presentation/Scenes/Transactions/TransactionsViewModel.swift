@@ -19,16 +19,22 @@ class TransactionsViewModel: BaseViewModel {
     @Published var categories: [Category] = []
     @Published var accounts: [AccountResponse] = []
 
+    /// Backend totals over every filtered transaction (all pages, in DOP;
+    /// only incomes and expenses, like the web).
+    @Published var summary: TransactionSummary?
+
     var totalIncome: Double {
-        transactions.filter { $0.isIncome }.reduce(0) { $0 + abs($1.amount) }
+        summary?.totalIncome ?? transactions.filter { $0.isIncome }.reduce(0) { $0 + abs($1.amount) }
     }
 
     var totalExpenses: Double {
-        transactions.filter { !$0.isIncome }.reduce(0) { $0 + abs($1.amount) }
+        // Card payments, loans and adjustments move money between the user's own
+        // accounts: only expenses count, like in the backend summary.
+        summary?.totalExpenses ?? transactions.filter { ["bill", "expense"].contains($0.typeTransaction) }.reduce(0) { $0 + abs($1.amount) }
     }
 
     var netAmount: Double {
-        totalIncome - totalExpenses
+        summary?.netAmount ?? totalIncome - totalExpenses
     }
 
     var hasActiveFilters: Bool {
@@ -77,10 +83,12 @@ class TransactionsViewModel: BaseViewModel {
 
         var filter = buildFilter()
         filter.page = currentPage
+        filter.includeSummary = currentPage == 1
 
         do {
             let response = try await transactionRepository.getAll(filter: filter)
             transactions.append(contentsOf: response.data)
+            if let summary = response.summary { self.summary = summary }
             hasMorePages = response.pagination.hasNextPage
             currentPage = response.pagination.currentPage + 1
         } catch {
@@ -92,6 +100,7 @@ class TransactionsViewModel: BaseViewModel {
         currentPage = 1
         hasMorePages = true
         transactions = []
+        summary = nil
         await loadTransactions()
     }
 
@@ -99,6 +108,7 @@ class TransactionsViewModel: BaseViewModel {
         currentPage = 1
         hasMorePages = true
         transactions = []
+        summary = nil
         await loadTransactions()
     }
 

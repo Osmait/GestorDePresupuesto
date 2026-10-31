@@ -97,6 +97,35 @@ struct TransactionsViewModelTests {
         #expect(vm.totalExpenses == 800)
     }
 
+    @Test @MainActor func totals_skipCardPaymentsAndAdjustments() {
+        let (vm, _, _, _) = makeSUT()
+        vm.transactions = [
+            .fixture(id: "1", amount: 1000, typeTransaction: "income"),
+            .fixture(id: "2", amount: 400, typeTransaction: "bill"),
+            .fixture(id: "3", amount: 5000, typeTransaction: "card_payment"),
+            .fixture(id: "4", amount: 5000, typeTransaction: "card_payment_received"),
+            .fixture(id: "5", amount: 200, typeTransaction: "adjustment_out"),
+        ]
+        #expect(vm.totalIncome == 1000)
+        #expect(vm.totalExpenses == 400)
+    }
+
+    @Test @MainActor func totals_preferBackendSummary() async {
+        let (vm, txnRepo, _, _) = makeSUT()
+        txnRepo.getAllResult = .success(PaginatedTransactionResponse(
+            data: [.fixture(id: "1", amount: 10, typeTransaction: "bill")],
+            pagination: PaginationMeta(currentPage: 1, perPage: 20, totalPages: 3, totalRecords: 60,
+                                       hasNextPage: true, hasPrevPage: false, nextPage: 2, prevPage: nil),
+            summary: .fixture(totalIncome: 9000, totalExpenses: 2500)
+        ))
+
+        await vm.loadTransactions()
+
+        #expect(vm.totalIncome == 9000)
+        #expect(vm.totalExpenses == 2500)
+        #expect(vm.netAmount == 6500)
+    }
+
     @Test @MainActor func netAmount_calculatesCorrectly() {
         let (vm, _, _, _) = makeSUT()
         vm.transactions = [

@@ -120,7 +120,7 @@ struct CreditCardsListView: View {
                             .font(.app(.caption))
                             .foregroundStyle(Color.app.textSecondary)
                         Spacer()
-                        Text(balance.currentBalance.currencyFormatted)
+                        Text(balance.currentBalance.currencyFormatted(currency: balance.currency))
                             .font(.app(.subheadline))
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.app.textPrimary)

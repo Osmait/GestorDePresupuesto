@@ -15,11 +15,18 @@ class DashboardViewModel: BaseViewModel {
     @Published var savingsRate: Double = 0
     @Published var investmentsTotal: Double = 0
     @Published var certificatesTotal: Double = 0
+    @Published var creditCardDebt: Double = 0
+    @Published var brokerCashTotal: Double = 0
+    @Published var loansReceivableTotal: Double = 0
+    @Published var accountsCount = 0
+    /// The backend's net worth (it subtracts card debt and adds broker cash
+    /// and loans receivable); nil on an older backend.
+    @Published var netWorth: Double?
     @Published var monthlyPlanSummary: MonthlyPlanSummary?
     @Published var nextBill: MonthlyPlanItem?
 
     var patrimonyTotal: Double {
-        totalBalance + investmentsTotal + certificatesTotal
+        netWorth ?? totalBalance + investmentsTotal + certificatesTotal
     }
 
     private let accountRepository: AccountRepository
@@ -76,6 +83,11 @@ class DashboardViewModel: BaseViewModel {
                 : 0
             investmentsTotal = summary.investmentsTotal
             certificatesTotal = summary.certificatesTotal
+            creditCardDebt = summary.creditCardDebt ?? 0
+            brokerCashTotal = summary.brokerCashTotal ?? 0
+            loansReceivableTotal = summary.loansReceivableTotal ?? 0
+            netWorth = summary.netWorth
+            accountsCount = summary.accountsCount
             categoryExpenses = summary.categoryExpenses
             monthlySummary = summary.monthlySummary
 
@@ -101,7 +113,9 @@ class DashboardViewModel: BaseViewModel {
         do {
             accounts = try await accountRepository.getAll()
             categoryExpenses = try await analyticsRepository.getCategoryExpenses(dateFrom: nil, dateTo: nil)
-            totalBalance = accounts.reduce(0) { $0 + $1.currentBalance }
+            let bankAccounts = accounts.bankAccounts
+            totalBalance = bankAccounts.reduce(0) { $0 + $1.currentBalance }
+            accountsCount = bankAccounts.count
         } catch {
             showError(error.localizedDescription)
         }

@@ -149,7 +149,11 @@ class ReconciliationViewModel: BaseViewModel {
 
         do {
             let response = try await aiRepository.reconcileApply(sessionId: sessionId, request: request)
-            showSuccess("Conciliación aplicada: \(response.data.created) creados, \(response.data.linked) vinculados")
+            let result = response.data
+            var parts = ["\(result.created) creados", "\(result.linked) vinculados"]
+            if let skipped = result.skipped, skipped > 0 { parts.append("\(skipped) ya aplicados") }
+            if result.failed > 0 { parts.append("\(result.failed) con error") }
+            showSuccess("Conciliación aplicada: " + parts.joined(separator: ", "))
         } catch {
             showError(error.localizedDescription)
         }

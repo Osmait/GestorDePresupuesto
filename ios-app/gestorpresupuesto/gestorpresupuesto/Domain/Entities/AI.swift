@@ -320,9 +320,11 @@ struct AIReconciliationApplyData: Codable {
     let created: Int
     let ignored: Int
     let failed: Int
+    /// Items that already had an action (a repeated apply).
+    var skipped: Int? = nil
 
     enum CodingKeys: String, CodingKey {
-        case linked, created, ignored, failed
+        case linked, created, ignored, failed, skipped
         case sessionId = "session_id"
     }
 }

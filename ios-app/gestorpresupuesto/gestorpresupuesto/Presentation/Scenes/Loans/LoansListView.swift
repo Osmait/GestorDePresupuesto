@@ -40,6 +40,15 @@ struct LoansListView: View {
                                         icon: "percent",
                                         colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
                                     )
+                                    // Defaulted loans are written off: not in "Pendiente".
+                                    if let defaulted = summary.defaultedPending, defaulted > 0 {
+                                        StatCard(
+                                            title: "Incobrable",
+                                            value: defaulted.currencyFormatted,
+                                            icon: "exclamationmark.triangle.fill",
+                                            colors: [Color.app.error, Color.app.error.opacity(0.7)]
+                                        )
+                                    }
                                 }
                             }
 
@@ -109,7 +118,7 @@ struct LoansListView: View {
                         .font(.caption2)
                         .foregroundStyle(Color.app.textTertiary)
                     Spacer()
-                    Text(loan.pendingAmount.currencyFormatted)
+                    Text(loan.pendingAmount.currencyFormatted(currency: loan.currency))
                         .font(.app(.subheadline))
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.app.textPrimary)

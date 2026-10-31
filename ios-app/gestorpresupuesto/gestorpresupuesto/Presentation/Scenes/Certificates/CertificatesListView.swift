@@ -96,6 +96,11 @@ struct CertificatesListView: View {
                         Text("\(cert.interestType.displayName) - \(String(format: "%.2f", cert.currentInterestRate))%")
                             .font(.app(.caption))
                             .foregroundStyle(Color.app.textSecondary)
+                        if cert.payoutError?.isEmpty == false {
+                            Label("Interés pendiente de pago", systemImage: "exclamationmark.triangle.fill")
+                                .font(.app(.caption))
+                                .foregroundStyle(Color.app.warning)
+                        }
                     }
                     Spacer()
                     StatusBadge.forCertificateStatus(cert.status)
@@ -106,7 +111,7 @@ struct CertificatesListView: View {
                         Text("Capital")
                             .font(.caption2)
                             .foregroundStyle(Color.app.textTertiary)
-                        Text(cert.effectiveCapital.currencyFormatted)
+                        Text(cert.effectiveCapital.currencyFormatted(currency: cert.currency))
                             .font(.app(.subheadline))
                             .fontWeight(.semibold)
                     }

@@ -474,3 +474,16 @@ extension MonthlyPlanSummary {
         )
     }
 }
+
+// MARK: - Transaction Summary Fixtures
+
+extension TransactionSummary {
+    static func fixture(totalIncome: Double = 0, totalExpenses: Double = 0) -> TransactionSummary {
+        TransactionSummary(
+            totalIncome: totalIncome, totalExpenses: totalExpenses, netAmount: totalIncome - totalExpenses,
+            incomeDOP: nil, incomeUSD: nil, expensesDOP: nil, expensesUSD: nil, usdToDopRate: nil,
+            incomeCount: 0, expenseCount: 0, averageIncome: 0, averageExpense: 0,
+            largestIncome: 0, largestExpense: 0, filteredRecords: nil, categoryBreakdown: nil
+        )
+    }
+}

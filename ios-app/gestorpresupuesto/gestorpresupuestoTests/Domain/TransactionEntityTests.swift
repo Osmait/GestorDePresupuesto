@@ -82,4 +82,52 @@ struct TransactionEntityTests {
         #expect(items.contains { $0.name == "amount_min" })
         #expect(items.contains { $0.name == "amount_max" })
     }
+
+    // MARK: - Ledger types written by the backend
+
+    @Test func isInflow_followsBalanceEffect() {
+        for type in ["income", "loan_collection", "loan_cancellation_refund", "adjustment_in", "card_payment_received"] {
+            #expect(Transaction.fixture(typeTransaction: type).isInflow, "\(type)")
+        }
+        for type in ["bill", "card_payment", "adjustment_out", "loan_disbursement", "investment_funding"] {
+            #expect(!Transaction.fixture(typeTransaction: type).isInflow, "\(type)")
+        }
+    }
+
+    @Test func signedAmount_cardPaymentReceivedIsPositive() {
+        #expect(Transaction.fixture(amount: 5000, typeTransaction: "card_payment_received").signedAmount == 5000)
+        #expect(Transaction.fixture(amount: 5000, typeTransaction: "card_payment").signedAmount == -5000)
+    }
+
+    @Test func editableAndDeletable_matchBackendRules() {
+        #expect(Transaction.fixture(typeTransaction: "bill").isEditable)
+        #expect(!Transaction.fixture(typeTransaction: "card_payment").isEditable)
+        #expect(Transaction.fixture(typeTransaction: "adjustment_in").isDeletable)
+        #expect(!Transaction.fixture(typeTransaction: "adjustment_in").isEditable)
+        #expect(!Transaction.fixture(typeTransaction: "card_payment_received").isDeletable)
+        #expect(!Transaction.fixture(typeTransaction: "loan_collection").isDeletable)
+    }
+
+    @Test func newTypes_parse() {
+        #expect(Transaction.fixture(typeTransaction: "card_payment_received").transactionType == .cardPaymentReceived)
+        #expect(Transaction.fixture(typeTransaction: "adjustment_out").transactionType == .adjustmentOut)
+    }
+
+    @Test func filter_includeSummary() {
+        var filter = TransactionFilter()
+        #expect(!filter.toQueryItems().contains { $0.name == "include_summary" })
+        filter.includeSummary = true
+        #expect(filter.toQueryItems().contains { $0.name == "include_summary" && $0.value == "true" })
+    }
+
+    @Test func paginatedResponse_decodesSummary() throws {
+        let json = """
+        {"data": [], "pagination": {"current_page": 1, "per_page": 20, "total_pages": 0, "total_records": 0,
+          "has_next_page": false, "has_prev_page": false},
+         "summary": {"total_income": 100, "total_expenses": 40, "net_amount": 60, "income_count": 1,
+          "expense_count": 1, "average_income": 100, "average_expense": 40, "largest_income": 100, "largest_expense": 40}}
+        """
+        let response = try JSONDecoder().decode(PaginatedTransactionResponse.self, from: Data(json.utf8))
+        #expect(response.summary?.totalExpenses == 40)
+    }
 }

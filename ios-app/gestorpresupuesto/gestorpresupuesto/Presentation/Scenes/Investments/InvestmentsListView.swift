@@ -22,14 +22,14 @@ struct InvestmentsListView: View {
                                 VStack(spacing: Spacing.md.rawValue) {
                                     StatCard(
                                         title: "Valor Total",
-                                        value: viewModel.totalPortfolioValue.currencyFormatted,
+                                        value: viewModel.formattedPortfolioValue,
                                         icon: "chart.pie.fill",
                                         colors: [Color.app.accent, Color.app.accent.opacity(0.7)]
                                     )
 
                                     StatCard(
                                         title: "Ganancia/Pérdida",
-                                        value: viewModel.totalGainLoss.currencyFormatted,
+                                        value: viewModel.formattedGainLoss,
                                         icon: viewModel.totalGainLoss >= 0 ? "arrow.up.right" : "arrow.down.right",
                                         colors: viewModel.totalGainLoss >= 0
                                             ? [Color.app.success, Color.app.success.opacity(0.7)]
@@ -51,7 +51,7 @@ struct InvestmentsListView: View {
                                                 Text(balance.currency)
                                                     .font(.app(.caption))
                                                 Spacer()
-                                                Text(balance.available.currencyFormatted)
+                                                Text(balance.available.currencyFormatted(currency: balance.currency))
                                                     .font(.app(.subheadline))
                                                     .fontWeight(.semibold)
                                             }
@@ -170,7 +170,7 @@ struct InvestmentsListView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(investment.totalValue.currencyFormatted)
+                    Text(investment.totalValue.currencyFormatted(currency: investment.currency))
                         .font(.app(.subheadline))
                         .fontWeight(.semibold)
                     GainLossIndicator(value: investment.gainLoss, percent: investment.gainLossPercent)

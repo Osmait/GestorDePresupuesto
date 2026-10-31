@@ -133,8 +133,13 @@ struct LoanSummary: Codable {
     let totalInterestEarned: Double
     let overdueLoans: Int
     let activeLoans: Int
+    /// Pending amount of defaulted loans (written off), in DOP like the totals.
+    var defaultedPending: Double? = nil
+    var defaultedLoans: Int? = nil
 
     enum CodingKeys: String, CodingKey {
+        case defaultedPending = "defaulted_pending"
+        case defaultedLoans = "defaulted_loans"
         case totalPrincipal = "total_principal"
         case totalPending = "total_pending"
         case totalCollected = "total_collected"

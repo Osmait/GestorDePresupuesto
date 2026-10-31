@@ -17,3 +17,16 @@ struct StringExtensionTests {
         #expect(!"\n\t".isNotBlank)
     }
 }
+
+@Suite("Calendar day formatting")
+struct CalendarDayFormattingTests {
+
+    @Test func noonUTCKeepsTheDay() {
+        #expect("2026-10-31T12:00:00Z".calendarDayFormatted == "2026-10-31".calendarDayFormatted)
+        #expect("2026-10-31".calendarDayFormatted.contains("31"))
+    }
+
+    @Test func notADateIsReturnedAsIs() {
+        #expect("pendiente".calendarDayFormatted == "pendiente")
+    }
+}

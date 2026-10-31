@@ -148,3 +148,32 @@ extension String {
         !self.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 }
+
+// MARK: - Calendar days from the API
+
+extension String {
+    private static let calendarDayParser: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateFormat = "yyyy-MM-dd"
+        return f
+    }()
+
+    private static let calendarDayFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "es_DO")
+        f.timeZone = TimeZone(identifier: "UTC")
+        f.dateStyle = .medium
+        return f
+    }()
+
+    /// A calendar day sent as "2026-10-31" or "2026-10-31T12:00:00Z" (the API
+    /// sends days at 12:00 UTC), formatted for display; the string itself if
+    /// it is not a date.
+    var calendarDayFormatted: String {
+        guard count >= 10, let date = Self.calendarDayParser.date(from: String(prefix(10))) else { return self }
+        return Self.calendarDayFormatter.string(from: date)
+    }
+}
