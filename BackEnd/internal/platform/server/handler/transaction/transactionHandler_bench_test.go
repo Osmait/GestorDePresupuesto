@@ -48,8 +48,11 @@ func (f *fakeTxRepo) FindAllOfAllAccounts(context.Context, string) ([]*domain.Tr
 func (f *fakeTxRepo) BalanceByAccountAndCurrency(context.Context, string, string, string) (money.Amount, error) {
 	return money.Zero, nil
 }
-func (f *fakeTxRepo) Delete(context.Context, string, string) error              { return nil }
-func (f *fakeTxRepo) TypeOf(context.Context, string, string) (string, error)    { return "bill", nil }
+func (f *fakeTxRepo) Delete(context.Context, string, string) error           { return nil }
+func (f *fakeTxRepo) TypeOf(context.Context, string, string) (string, error) { return "bill", nil }
+func (f *fakeTxRepo) AccountAndCurrencyOf(context.Context, string, string) (string, string, error) {
+	return "", "DOP", nil
+}
 func (f *fakeTxRepo) Update(context.Context, string, *domain.Transaction) error { return nil }
 func (f *fakeTxRepo) FindAllOfAllAccountsWithFilters(_ context.Context, _ string, fl *dto.TransactionFilter) ([]*domain.Transaction, error) {
 	if fl.Limit > 0 && fl.Limit < len(f.page) {

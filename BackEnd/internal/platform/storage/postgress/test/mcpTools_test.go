@@ -140,6 +140,60 @@ func TestMCPTools(t *testing.T) {
 		assert.Contains(t, text, "invalid date")
 	})
 
+	t.Run("update_transaction keeps the currency when it is omitted", func(t *testing.T) {
+		f := newMCPFixture(t)
+		card, err := f.cards.CreateCreditCard(context.Background(), &creditcardDto.CreateCreditCardRequest{
+			Name: "Visa", Bank: "BHD", CutDay: 5, DueDay: 20,
+			Balances: []creditcardDto.CreateBalanceRequest{
+				{Currency: "DOP", CreditLimit: money.FromInt(50_000)},
+				{Currency: "USD", CreditLimit: money.FromInt(1_000)},
+			},
+		}, f.userId)
+		require.NoError(t, err)
+		f.mustCall(t, "create_transaction", map[string]any{
+			"name": "Amazon", "amount": 100, "type": "bill", "currency": "USD",
+			"account_id": card.Id, "category_id": f.foodCat, "date": "2026-10-15",
+		}, nil)
+		var id, currency string
+		require.NoError(t, f.db.QueryRow(`SELECT id, currency FROM transactions WHERE account_id = $1 AND transaction_name = 'Amazon'`, card.Id).Scan(&id, &currency))
+		require.Equal(t, "USD", currency)
+
+		// A US$100 charge on a DOP card must not become RD$100.
+		f.mustCall(t, "update_transaction", map[string]any{
+			"id": id, "name": "Amazon order", "amount": 100, "type": "bill",
+			"account_id": card.Id, "category_id": f.foodCat, "date": "2026-10-15",
+		}, nil)
+		require.NoError(t, f.db.QueryRow(`SELECT currency FROM transactions WHERE id = $1`, id).Scan(&currency))
+		assert.Equal(t, "USD", currency)
+
+		// An explicit currency still wins.
+		f.mustCall(t, "update_transaction", map[string]any{
+			"id": id, "name": "Amazon order", "amount": 100, "type": "bill", "currency": "DOP",
+			"account_id": card.Id, "category_id": f.foodCat, "date": "2026-10-15",
+		}, nil)
+		require.NoError(t, f.db.QueryRow(`SELECT currency FROM transactions WHERE id = $1`, id).Scan(&currency))
+		assert.Equal(t, "DOP", currency)
+
+		// Moved to another account without a currency: that account's currency.
+		f.mustCall(t, "update_transaction", map[string]any{
+			"id": id, "name": "Amazon order", "amount": 100, "type": "bill", "currency": "USD",
+			"account_id": card.Id, "category_id": f.foodCat, "date": "2026-10-15",
+		}, nil)
+		f.mustCall(t, "update_transaction", map[string]any{
+			"id": id, "name": "Amazon order", "amount": 100, "type": "bill",
+			"account_id": f.bankId, "category_id": f.foodCat, "date": "2026-10-15",
+		}, nil)
+		require.NoError(t, f.db.QueryRow(`SELECT currency FROM transactions WHERE id = $1`, id).Scan(&currency))
+		assert.Equal(t, "DOP", currency)
+
+		// Another user's (or an unknown) transaction is not found.
+		text, isErr := f.call(t, "update_transaction", map[string]any{
+			"id": newID(), "name": "x", "amount": 1, "type": "bill", "account_id": f.bankId, "category_id": f.foodCat,
+		})
+		assert.True(t, isErr)
+		assert.Contains(t, text, "failed to update transaction")
+	})
+
 	t.Run("list_transactions pages and searches", func(t *testing.T) {
 		f := newMCPFixture(t)
 		for i, name := range []string{"Netflix", "Colmado", "Super Bravo", "Colmado Hnos", "Farmacia"} {
