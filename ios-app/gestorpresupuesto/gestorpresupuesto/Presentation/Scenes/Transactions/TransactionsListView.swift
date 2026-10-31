@@ -114,14 +114,17 @@ struct TransactionsListView: View {
             }
             .sheet(isPresented: $showingAddTransaction) {
                 AddTransactionView(viewModel: viewModel, isPresented: $showingAddTransaction)
+                    .formSheet()
             }
             .sheet(isPresented: $showingFilters) {
                 TransactionFilterView(viewModel: viewModel, isPresented: $showingFilters)
+                    .formSheet()
             }
             .sheet(isPresented: $showingDocumentScanner) {
                 NavigationStack { DocumentScannerView() }
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
+                    .formSheet()
             }
             .task {
                 await viewModel.loadInitialData()

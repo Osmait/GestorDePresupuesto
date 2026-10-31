@@ -59,6 +59,7 @@ struct BudgetsListView: View {
         }
         .sheet(isPresented: $showingAddBudget) {
             AddBudgetView(viewModel: viewModel, isPresented: $showingAddBudget)
+                .formSheet()
         }
         .task {
             if viewModel.budgets.isEmpty {

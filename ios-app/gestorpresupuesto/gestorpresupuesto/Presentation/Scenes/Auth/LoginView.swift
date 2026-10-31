@@ -40,6 +40,7 @@ struct LoginView: View {
             }
             .sheet(isPresented: $showingRegister) {
                 RegisterView(viewModel: viewModel, isPresented: $showingRegister)
+                    .formSheet()
             }
             .onAppear {
                 startEntranceAnimation()

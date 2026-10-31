@@ -138,6 +138,7 @@ struct CertificateDetailView: View {
         }
         .sheet(isPresented: $showSimulation) {
             CertificateSimulationView(certificate: certificate, viewModel: viewModel)
+                .formSheet()
         }
         .task {
             await viewModel.loadCertificateDetail(certificate.id)

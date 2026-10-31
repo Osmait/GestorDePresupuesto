@@ -144,6 +144,7 @@ struct LoanDetailView: View {
         }
         .sheet(isPresented: $showPaymentSheet) {
             RegisterLoanPaymentView(loan: loan, viewModel: viewModel)
+                .formSheet()
         }
         .task {
             await viewModel.loadLoanDetails(loan.id)

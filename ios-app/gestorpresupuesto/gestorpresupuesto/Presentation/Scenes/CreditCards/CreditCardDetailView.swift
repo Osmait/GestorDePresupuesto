@@ -134,6 +134,7 @@ struct CreditCardDetailView: View {
         }
         .sheet(isPresented: $showPaymentSheet) {
             CreditCardPaymentView(card: card, viewModel: viewModel)
+                .formSheet()
         }
         .task {
             await viewModel.loadPayments(cardId: card.id)

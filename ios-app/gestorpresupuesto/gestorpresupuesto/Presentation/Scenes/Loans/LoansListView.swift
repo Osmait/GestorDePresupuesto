@@ -81,6 +81,7 @@ struct LoansListView: View {
             }
             .sheet(isPresented: $showAddLoan) {
                 AddLoanView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadLoans() }
             .task { await viewModel.loadLoans() }

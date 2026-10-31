@@ -34,10 +34,8 @@ struct CategoriesListView: View {
                                     .padding(.bottom, Spacing.lg.rawValue)
 
                                 // Grid
-                                let columns = [
-                                    GridItem(.flexible(), spacing: Spacing.sm.rawValue),
-                                    GridItem(.flexible(), spacing: Spacing.sm.rawValue)
-                                ]
+                                // Two columns on iPhone, more as the width allows (iPad).
+                                let columns = [GridItem(.adaptive(minimum: 160), spacing: Spacing.sm.rawValue)]
 
                                 LazyVGrid(columns: columns, spacing: Spacing.sm.rawValue) {
                                     ForEach(viewModel.categories) { category in
@@ -80,9 +78,11 @@ struct CategoriesListView: View {
             }
             .sheet(isPresented: $showingAddCategory) {
                 AddCategoryView(viewModel: viewModel, isPresented: $showingAddCategory)
+                    .formSheet()
             }
             .sheet(item: $editingCategory) { category in
                 EditCategoryView(viewModel: viewModel, category: category)
+                    .formSheet()
             }
             .task {
                 if viewModel.categories.isEmpty {

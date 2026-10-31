@@ -92,6 +92,7 @@ struct SavingsGoalsView: View {
             }
             .sheet(isPresented: $showAddGoal) {
                 AddSavingsGoalView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadGoals() }
             .task { await viewModel.loadGoals() }

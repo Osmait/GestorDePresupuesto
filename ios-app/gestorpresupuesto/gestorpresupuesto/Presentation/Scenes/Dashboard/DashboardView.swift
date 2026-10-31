@@ -47,6 +47,7 @@ struct DashboardView: View {
         }
         .sheet(isPresented: $showSearch) {
             SearchView()
+                .formSheet()
         }
         .task {
             if viewModel.accounts.isEmpty {

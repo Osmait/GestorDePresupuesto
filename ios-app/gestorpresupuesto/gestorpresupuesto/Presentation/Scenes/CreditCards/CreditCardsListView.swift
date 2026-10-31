@@ -57,6 +57,7 @@ struct CreditCardsListView: View {
             }
             .sheet(isPresented: $showAddCard) {
                 AddCreditCardView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadCreditCards() }
             .task { await viewModel.loadCreditCards() }

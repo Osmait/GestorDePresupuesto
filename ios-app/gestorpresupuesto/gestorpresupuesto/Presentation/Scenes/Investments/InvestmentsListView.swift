@@ -120,9 +120,11 @@ struct InvestmentsListView: View {
             }
             .sheet(isPresented: $showAddInvestment) {
                 AddInvestmentView(viewModel: viewModel)
+                    .formSheet()
             }
             .sheet(isPresented: $showFundBroker) {
                 FundBrokerView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadInvestments() }
             .task { await viewModel.loadInvestments() }

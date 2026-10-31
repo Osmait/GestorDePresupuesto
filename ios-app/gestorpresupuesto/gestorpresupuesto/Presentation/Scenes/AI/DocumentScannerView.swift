@@ -119,6 +119,7 @@ struct DocumentScannerView: View {
                     viewModel.addScannedImage(image)
                 }
             }
+                .formSheet()
         }
         .fileImporter(
             isPresented: $showFilePicker,

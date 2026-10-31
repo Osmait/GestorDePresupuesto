@@ -74,6 +74,7 @@ struct RecurringTransactionsListView: View {
         }
         .sheet(isPresented: $showingAddRecurring) {
             AddRecurringTransactionView(viewModel: viewModel, isPresented: $showingAddRecurring)
+                .formSheet()
         }
         .task {
             if viewModel.recurringTransactions.isEmpty {

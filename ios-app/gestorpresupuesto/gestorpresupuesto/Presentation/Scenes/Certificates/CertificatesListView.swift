@@ -70,6 +70,7 @@ struct CertificatesListView: View {
             }
             .sheet(isPresented: $showAddCertificate) {
                 AddCertificateView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadCertificates() }
             .task { await viewModel.loadCertificates() }

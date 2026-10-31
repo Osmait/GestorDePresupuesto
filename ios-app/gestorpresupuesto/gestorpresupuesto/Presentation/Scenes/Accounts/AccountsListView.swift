@@ -88,6 +88,7 @@ struct AccountsListView: View {
             }
             .sheet(isPresented: $showingAddAccount) {
                 AddAccountView(viewModel: viewModel, isPresented: $showingAddAccount)
+                    .formSheet()
             }
             .task {
                 if viewModel.accounts.isEmpty {
