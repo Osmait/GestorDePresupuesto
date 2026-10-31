@@ -159,10 +159,15 @@ func Run() error {
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
 
 	// Start server
-	if err := app.Server.Run(app.Ctx); err != nil {
-		return fmt.Errorf("server failed: %w", err)
-	}
+	runErr := app.Server.Run(app.Ctx)
 
+	// Asynchronous notifications still in flight write to the database:
+	// let them finish (each is bounded) before the deferred db.Close.
+	app.services.notificationService.Wait()
+
+	if runErr != nil {
+		return fmt.Errorf("server failed: %w", runErr)
+	}
 	logger.Info("Application shutdown completed")
 	return nil
 }
