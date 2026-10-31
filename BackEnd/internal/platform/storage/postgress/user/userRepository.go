@@ -139,6 +139,25 @@ func (u *UserRepository) DeleteDemoUsersOlderThan(ctx context.Context, olderThan
 	})
 }
 
+// RevokeUserSessions revokes every refresh token of the user and deletes their
+// MCP OAuth tokens and pending authorization codes, including those whose
+// subject is still oldEmail (the OAuth subject of a grant is the email typed
+// on the consent page). Run after an admin changed the user's email.
+func (u *UserRepository) RevokeUserSessions(ctx context.Context, userID, oldEmail string) error {
+	return txhelper.InTx(ctx, u.db, func(q txhelper.Querier) error {
+		if _, err := q.ExecContext(ctx, `UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL`, userID); err != nil {
+			return fmt.Errorf("revoke refresh tokens: %w", err)
+		}
+		if _, err := q.ExecContext(ctx, `DELETE FROM mcp_oauth_tokens WHERE user_id = $1 OR (subject = $2 AND $2 <> '')`, userID, oldEmail); err != nil {
+			return fmt.Errorf("revoke mcp oauth tokens: %w", err)
+		}
+		if _, err := q.ExecContext(ctx, `DELETE FROM mcp_oauth_authorization_codes WHERE subject = $1 AND $1 <> ''`, oldEmail); err != nil {
+			return fmt.Errorf("revoke mcp oauth codes: %w", err)
+		}
+		return nil
+	})
+}
+
 func (u *UserRepository) Save(ctx context.Context, user *domainUser.User) error {
 	_, err := txhelper.FromContext(ctx, u.db).ExecContext(ctx, "INSERT INTO users (id, name , last_name,email, password,token, confirmed, is_demo, ip_address, role) VALUES ($1,$2,$3,$4,$5,$6, $7, $8, $9, $10)", user.Id, user.Name, user.LastName, user.Email, user.Password, user.Token, user.Confirmed, user.IsDemo, user.IpAddress, user.Role)
 	return err

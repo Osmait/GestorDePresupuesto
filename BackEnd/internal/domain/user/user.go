@@ -2,6 +2,12 @@ package user
 
 import "time"
 
+// The roles a user can have.
+const (
+	RoleUser  = "USER"
+	RoleAdmin = "ADMIN"
+)
+
 type User struct {
 	CreatedAt time.Time  `json:"created_at"`
 	DeletedAt *time.Time `json:"deleted_at,omitempty"`
@@ -24,7 +30,7 @@ func NewUser(id, name, lastName, email, password string) *User {
 		LastName:  lastName,
 		Password:  password,
 		Email:     email,
-		Role:      "USER",
+		Role:      RoleUser,
 		Confirmed: false,
 	}
 }
