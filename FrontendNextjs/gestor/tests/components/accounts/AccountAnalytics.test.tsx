@@ -2,7 +2,7 @@ import { fireEvent, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import { AccountAnalytics } from '@/components/accounts/AccountAnalytics'
 import { renderWithIntl } from '@/tests/utils/intl'
-import type { Transaction } from '@/types/transaction'
+import { type Transaction, TypeTransaction } from '@/types/transaction'
 
 vi.mock('next/dynamic', () => ({ default: () => () => null }))
 vi.mock('@/components/charts/chart-theme', () => ({
@@ -17,7 +17,7 @@ function tx(overrides: Partial<Transaction>): Transaction {
 		name: 'Compra',
 		description: '',
 		amount: 0,
-		type_transation: 'bill',
+		type_transation: TypeTransaction.BILL,
 		account_id: 'card-1',
 		category_id: '',
 		budget_id: '',
@@ -29,9 +29,9 @@ function tx(overrides: Partial<Transaction>): Transaction {
 
 // A credit card with DOP and USD movements: the totals are per currency, never added together.
 const transactions = [
-	tx({ amount: 1000, type_transation: 'bill', currency: 'DOP' }),
-	tx({ amount: 250, type_transation: 'income', currency: 'DOP' }),
-	tx({ amount: 40, type_transation: 'bill', currency: 'USD' }),
+	tx({ amount: 1000, type_transation: TypeTransaction.BILL, currency: 'DOP' }),
+	tx({ amount: 250, type_transation: TypeTransaction.INCOME, currency: 'DOP' }),
+	tx({ amount: 40, type_transation: TypeTransaction.BILL, currency: 'USD' }),
 ]
 
 function statValue(label: string) {
