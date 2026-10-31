@@ -153,7 +153,7 @@ func Run() error {
 	scheduler := worker.NewTransactionScheduler(app.services.recurringService)
 	scheduler.Start(ctx)
 
-	demoCleanupWorker := worker.NewDemoCleanupWorker(app.services.userService, 24*time.Hour)
+	demoCleanupWorker := worker.NewDemoCleanupWorker(app.services.userService, worker.DefaultDemoCleanupInitialDelay, worker.DefaultDemoCleanupInterval)
 	demoCleanupWorker.Start(ctx)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
