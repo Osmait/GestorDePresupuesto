@@ -400,7 +400,10 @@ struct AddTransactionView: View {
                 }
             }
             .task {
-                await viewModel.loadInitialData()
+                // The list screen already loaded them when it appeared.
+                if viewModel.categories.isEmpty || viewModel.accounts.isEmpty {
+                    await viewModel.loadInitialData()
+                }
             }
         }
     }

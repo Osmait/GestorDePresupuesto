@@ -170,27 +170,25 @@ enum FilterPeriod: String, CaseIterable {
     case all = "Todo"
 
     var dateRange: (from: String?, to: String?) {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-        let calendar = Calendar.current
+        let calendar = AppCalendar.calendar
         let now = Date()
 
         switch self {
         case .today:
-            let today = formatter.string(from: now)
+            let today = AppCalendar.dayString(now)
             return (today, today)
         case .thisWeek:
             let startOfWeek = calendar.date(from: calendar.dateComponents([.yearForWeekOfYear, .weekOfYear], from: now)) ?? now
             let endOfWeek = calendar.date(byAdding: .day, value: 6, to: startOfWeek) ?? now
-            return (formatter.string(from: startOfWeek), formatter.string(from: endOfWeek))
+            return (AppCalendar.dayString(startOfWeek), AppCalendar.dayString(endOfWeek))
         case .thisMonth:
             let startOfMonth = calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now
             let endOfMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfMonth) ?? now
-            return (formatter.string(from: startOfMonth), formatter.string(from: endOfMonth))
+            return (AppCalendar.dayString(startOfMonth), AppCalendar.dayString(endOfMonth))
         case .lastMonth:
             let startOfLastMonth = calendar.date(byAdding: .month, value: -1, to: calendar.date(from: calendar.dateComponents([.year, .month], from: now)) ?? now) ?? now
             let endOfLastMonth = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: startOfLastMonth) ?? now
-            return (formatter.string(from: startOfLastMonth), formatter.string(from: endOfLastMonth))
+            return (AppCalendar.dayString(startOfLastMonth), AppCalendar.dayString(endOfLastMonth))
         case .all:
             return (nil, nil)
         }

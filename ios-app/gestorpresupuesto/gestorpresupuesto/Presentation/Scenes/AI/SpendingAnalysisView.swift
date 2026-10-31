@@ -156,12 +156,9 @@ class SpendingAnalysisViewModel: BaseViewModel {
         isLoading = true
         error = nil
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-
         let request = AnalyzeSpendingRequest(
-            dateFrom: formatter.string(from: dateFrom),
-            dateTo: formatter.string(from: dateTo),
+            dateFrom: AppCalendar.dayString(dateFrom),
+            dateTo: AppCalendar.dayString(dateTo),
             language: "es"
         )
 

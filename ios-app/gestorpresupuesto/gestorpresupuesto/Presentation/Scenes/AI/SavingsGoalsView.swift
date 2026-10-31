@@ -108,6 +108,8 @@ struct SavingsGoalsView: View {
 
     private static let inputFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -178,13 +180,11 @@ struct AddSavingsGoalView: View {
 
     private func save() async {
         guard let amount = Double(targetAmount) else { return }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
 
         let request = AICreateSavingsGoalRequest(
             name: name,
             targetAmount: amount,
-            targetDate: hasTargetDate ? formatter.string(from: targetDate) : nil,
+            targetDate: hasTargetDate ? AppCalendar.dayString(targetDate) : nil,
             accountId: nil,
             currentSaved: nil
         )

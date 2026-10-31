@@ -19,13 +19,10 @@ class AnalyticsViewModel: BaseViewModel {
         defer { isLoading = false }
         error = nil
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-
         do {
             async let expensesTask = analyticsRepository.getCategoryExpenses(
-                dateFrom: formatter.string(from: dateFrom),
-                dateTo: formatter.string(from: dateTo)
+                dateFrom: AppCalendar.dayString(dateFrom),
+                dateTo: AppCalendar.dayString(dateTo)
             )
             async let summaryTask = analyticsRepository.getMonthlySummary()
 
