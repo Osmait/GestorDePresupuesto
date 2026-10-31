@@ -277,6 +277,9 @@ func (s *InvestmentService) GetFundingBalances(ctx context.Context, userID strin
 // quoteMaxAge is how long a refreshed quote is kept before fetching it again.
 const quoteMaxAge = 5 * time.Minute
 
+// quoteWait bounds how long loading the investments waits for quotes.
+const quoteWait = 2 * time.Second
+
 // positionsToRefresh returns the positions whose current price is refreshed
 // from a market quote: USD positions whose price is unset or older than
 // quoteMaxAge. Quotes are USD prices, so a DOP position is never refreshed:
@@ -317,12 +320,17 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 		return investments, nil
 	}
 
+	// Wait at most quoteWait for the quotes. Cached quotes (and cached
+	// failures) answer at once; a lookup still in flight when the wait ends
+	// keeps running in the quote service (bounded, deduplicated per symbol)
+	// and fills its cache, so the next load gets it. Every goroutine here
+	// returns by the deadline.
+	waitCtx, cancel := context.WithTimeout(ctx, quoteWait)
+	defer cancel()
 	results := make(chan quoteUpdate, len(stale))
 	for _, inv := range stale {
 		go func(i *investment.Investment) {
-			// WithoutCancel: a quote may outlive the 2s wait below, but its client
-			// span stays in the request trace.
-			price, _, _, err := s.quoteService.GetQuoteContext(context.WithoutCancel(ctx), i.Symbol)
+			price, _, _, err := s.quoteService.GetQuoteContext(waitCtx, i.Symbol)
 			if err != nil || !price.IsPositive() {
 				price = money.Zero
 			}
@@ -330,20 +338,10 @@ func (s *InvestmentService) FindAll(ctx context.Context, userId string) ([]*inve
 		}(inv)
 	}
 
-	// Wait at most 2 seconds for the quotes; slower ones are skipped (the
-	// buffered channel lets their goroutines finish without blocking).
-	timeout := time.NewTimer(2 * time.Second)
-	defer timeout.Stop()
 	var updates []quoteUpdate
-collect:
 	for range stale {
-		select {
-		case u := <-results:
-			if u.price.IsPositive() {
-				updates = append(updates, u)
-			}
-		case <-timeout.C:
-			break collect
+		if u := <-results; u.price.IsPositive() {
+			updates = append(updates, u)
 		}
 	}
 
