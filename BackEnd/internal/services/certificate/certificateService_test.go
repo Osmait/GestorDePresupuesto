@@ -86,6 +86,23 @@ func (m *MockCertificateRepository) FindLastPayment(ctx context.Context, certifi
 	return args.Get(0).(*certificate.CertificatePayment), args.Error(1)
 }
 
+// FindLastPayments answers from the FindLastPayment expectations, one per id
+// (sql.ErrNoRows meaning no payment), so tests set those up as before.
+func (m *MockCertificateRepository) FindLastPayments(ctx context.Context, certificateIds []string, userId string) (map[string]*certificate.CertificatePayment, error) {
+	payments := make(map[string]*certificate.CertificatePayment)
+	for _, id := range certificateIds {
+		p, err := m.FindLastPayment(ctx, id, userId)
+		if errors.Is(err, sql.ErrNoRows) {
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		payments[id] = p
+	}
+	return payments, nil
+}
+
 func (m *MockCertificateRepository) FindAllPayments(ctx context.Context, userId string) ([]*certificate.CertificatePayment, error) {
 	args := m.Called(ctx, userId)
 	if args.Get(0) == nil {

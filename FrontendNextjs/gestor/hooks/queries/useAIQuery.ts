@@ -2,6 +2,7 @@
 
 import { useMutation } from '@tanstack/react-query'
 import { aiRepository } from '@/app/repository/aiRepository'
+import { readOnlyMutation } from '@/components/common/react-query-provider'
 import {
 	AICreateSavingsGoalRequest,
 	AIError,
@@ -26,6 +27,7 @@ import {
 
 export function useExtractTransactionsMutation() {
 	return useMutation<AIExtractResponse | AIError, Error, AIExtractRequest>({
+		...readOnlyMutation,
 		mutationFn: (request: AIExtractRequest) => aiRepository.extractTransactions(request),
 	})
 }
@@ -55,18 +57,21 @@ export function useExtractFromFile() {
 
 export function useAnalyzeSpendingMutation() {
 	return useMutation<SpendingAnalysisResponse | AIError, Error, SpendingAnalysisRequest>({
+		...readOnlyMutation,
 		mutationFn: (request: SpendingAnalysisRequest) => aiRepository.analyzeSpending(request),
 	})
 }
 
 export function useSuggestCategoryMutation() {
 	return useMutation<AISuggestCategoryResponse | AIError, Error, AISuggestCategoryRequest>({
+		...readOnlyMutation,
 		mutationFn: (request: AISuggestCategoryRequest) => aiRepository.suggestCategory(request),
 	})
 }
 
 export function useReconciliationPreviewMutation() {
 	return useMutation<AIReconciliationPreviewResponse | AIError, Error, AIReconciliationPreviewRequest>({
+		...readOnlyMutation,
 		mutationFn: (request: AIReconciliationPreviewRequest) => aiRepository.reconciliationPreview(request),
 	})
 }
@@ -83,6 +88,7 @@ export function useReconciliationApplyMutation() {
 
 export function useSavingsPlanMutation() {
 	return useMutation<AISavingsPlanResponse | AIError, Error, AISavingsPlanRequest>({
+		...readOnlyMutation,
 		mutationFn: (request: AISavingsPlanRequest) => aiRepository.savingsPlan(request),
 	})
 }
@@ -95,6 +101,7 @@ export function useCreateSavingsGoalMutation() {
 
 export function useListSavingsGoalsMutation() {
 	return useMutation<AISavingsGoalListResponse | AIError, Error, void>({
+		...readOnlyMutation,
 		mutationFn: () => aiRepository.listSavingsGoals(),
 	})
 }
@@ -113,6 +120,7 @@ export function useDeleteSavingsGoalMutation() {
 
 export function useSavingsGoalProgressMutation() {
 	return useMutation<AISavingsGoalProgressResponse | AIError, Error, string>({
+		...readOnlyMutation,
 		mutationFn: (goalId: string) => aiRepository.getSavingsGoalProgress(goalId),
 	})
 }

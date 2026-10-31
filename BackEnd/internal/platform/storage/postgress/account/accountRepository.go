@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 
+	"github.com/lib/pq"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/likepattern"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/account"
@@ -95,6 +96,46 @@ func (repo *AccountRepository) BalanceByCurrency(ctx context.Context, id string,
 		return money.Zero, err
 	}
 	return total, nil
+}
+
+// BalancesByCurrency is BalanceByCurrency for several accounts in one query,
+// as account id -> currency -> net total. An account or currency without
+// transactions is absent from the map: read it as zero, as BalanceByCurrency
+// returns.
+func (repo *AccountRepository) BalancesByCurrency(ctx context.Context, ids []string, userId string) (map[string]map[string]money.Amount, error) {
+	balances := make(map[string]map[string]money.Amount)
+	if len(ids) == 0 {
+		return balances, nil
+	}
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx,
+		`SELECT account_id, currency, SUM(balance) FROM account_balances
+		 WHERE user_id = $1 AND account_id = ANY($2::varchar[])
+		 GROUP BY account_id, currency`, userId, pq.Array(ids))
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		err = rows.Close()
+		if err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	for rows.Next() {
+		var accountId, currency string
+		var total money.Amount
+		if err = rows.Scan(&accountId, &currency, &total); err != nil {
+			return nil, err
+		}
+		if balances[accountId] == nil {
+			balances[accountId] = make(map[string]money.Amount)
+		}
+		balances[accountId][currency] = total
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return balances, nil
 }
 
 // Balances returns Balance for every account of userId that has transactions.

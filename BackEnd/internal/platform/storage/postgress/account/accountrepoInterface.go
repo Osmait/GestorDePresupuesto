@@ -15,6 +15,9 @@ type AccountRepositoryInterface interface {
 	Delete(ctx context.Context, id string, userId string) error
 	Balance(ctx context.Context, id string, userId string) (money.Amount, error)
 	BalanceByCurrency(ctx context.Context, id string, userId string, currency string) (money.Amount, error)
+	// BalancesByCurrency is BalanceByCurrency for several accounts in one
+	// query: account id -> currency -> total, absent meaning zero.
+	BalancesByCurrency(ctx context.Context, ids []string, userId string) (map[string]map[string]money.Amount, error)
 	Balances(ctx context.Context, userId string) (map[string]money.Amount, error)
 	Update(ctx context.Context, id string, name string, bank string, userId string) error
 	FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error)

@@ -475,13 +475,23 @@ func (s *LoanService) GetSummary(ctx context.Context, userId string) (*dto.LoanS
 
 	summary := summarizeLoans(loans, s.summaryRate(ctx))
 
-	now := time.Now()
+	var activeIds []string
 	for _, item := range loans {
-		if item.Status != loan.LoanStatusActive {
-			continue
+		if item.Status == loan.LoanStatusActive {
+			activeIds = append(activeIds, item.Id)
 		}
-		installments, _ := s.repository.FindInstallmentsByLoan(ctx, item.Id, userId)
-		for _, installment := range installments {
+	}
+	if len(activeIds) == 0 {
+		return summary, nil
+	}
+	installmentsByLoan, err := s.repository.FindInstallmentsByLoans(ctx, activeIds, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	for _, id := range activeIds {
+		for _, installment := range installmentsByLoan[id] {
 			if installment.Status != loan.InstallmentStatusPaid && isOverdue(installment.DueDate, now, s.loc) {
 				summary.OverdueLoans++
 				break

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"time"
 
+	"github.com/lib/pq"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/category"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/creditcard"
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
@@ -168,6 +169,39 @@ func (r *CreditCardRepository) FindBalancesByCard(ctx context.Context, cardId st
 		if err = rows.Scan(&balance.Id, &balance.CardId, &balance.Currency, &balance.CurrentBalance,
 			&balance.CreditLimit, &balance.CreatedAt, &balance.UpdatedAt); err == nil {
 			balances = append(balances, balance)
+		}
+	}
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+	return balances, nil
+}
+
+// FindBalancesByCards is FindBalancesByCard for several cards in one query,
+// keyed by card id; each card's balances are ordered by currency and a card
+// without balances is absent from the map.
+func (r *CreditCardRepository) FindBalancesByCards(ctx context.Context, cardIds []string, userId string) (map[string][]*creditcard.CardBalance, error) {
+	balances := make(map[string][]*creditcard.CardBalance)
+	if len(cardIds) == 0 {
+		return balances, nil
+	}
+	query := `SELECT id, card_id, currency, current_balance, credit_limit, created_at, updated_at
+		FROM card_balances WHERE card_id = ANY($1::varchar[]) AND ` + ownedCardClause("card_id", "$2") + ` ORDER BY card_id, currency`
+	rows, err := txhelper.FromContext(ctx, r.db).QueryContext(ctx, query, pq.Array(cardIds), userId)
+	if err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err = rows.Close(); err != nil {
+			log.Error().Err(err).Msg("failed to close database rows")
+		}
+	}()
+
+	for rows.Next() {
+		balance := &creditcard.CardBalance{}
+		if err = rows.Scan(&balance.Id, &balance.CardId, &balance.Currency, &balance.CurrentBalance,
+			&balance.CreditLimit, &balance.CreatedAt, &balance.UpdatedAt); err == nil {
+			balances[balance.CardId] = append(balances[balance.CardId], balance)
 		}
 	}
 	if err = rows.Err(); err != nil {

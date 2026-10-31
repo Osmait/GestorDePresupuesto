@@ -153,16 +153,21 @@ func Run() error {
 	scheduler := worker.NewTransactionScheduler(app.services.recurringService)
 	scheduler.Start(ctx)
 
-	demoCleanupWorker := worker.NewDemoCleanupWorker(app.services.userService, 24*time.Hour)
+	demoCleanupWorker := worker.NewDemoCleanupWorker(app.services.userService, worker.DefaultDemoCleanupInitialDelay, worker.DefaultDemoCleanupInterval)
 	demoCleanupWorker.Start(ctx)
 
 	logger.Infof("Server starting on %s:%d", cfg.Server.Host, cfg.Server.Port)
 
 	// Start server
-	if err := app.Server.Run(app.Ctx); err != nil {
-		return fmt.Errorf("server failed: %w", err)
-	}
+	runErr := app.Server.Run(app.Ctx)
 
+	// Asynchronous notifications still in flight write to the database:
+	// let them finish (each is bounded) before the deferred db.Close.
+	app.services.notificationService.Wait()
+
+	if runErr != nil {
+		return fmt.Errorf("server failed: %w", runErr)
+	}
 	logger.Info("Application shutdown completed")
 	return nil
 }
@@ -184,12 +189,30 @@ type App struct {
 // port, seed data or start background workers, so tests (e.g. the e2e suite)
 // can serve app.Server.Engine through httptest and exercise the same
 // middleware chain (auth, RLS transactions, rate limiting, CORS) as production.
-func NewApp(ctx context.Context, cfg *config.Config, db *sql.DB) (*App, error) {
-	return NewAppWithTelemetry(ctx, cfg, db, telemetry.Disabled())
+func NewApp(ctx context.Context, cfg *config.Config, db *sql.DB, opts ...AppOption) (*App, error) {
+	return NewAppWithTelemetry(ctx, cfg, db, telemetry.Disabled(), opts...)
+}
+
+// AppOption customizes NewApp (tests).
+type AppOption func(*appOptions)
+
+type appOptions struct {
+	aiProvider aiService.AIProvider
+}
+
+// WithAIProvider makes the AI service use p instead of the configured
+// provider (Gemini), e.g. a fake in end-to-end tests.
+func WithAIProvider(p aiService.AIProvider) AppOption {
+	return func(o *appOptions) { o.aiProvider = p }
 }
 
 // NewAppWithTelemetry is NewApp with the HTTP server instrumented by tel.
-func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, tel *telemetry.Telemetry) (*App, error) {
+func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, tel *telemetry.Telemetry, opts ...AppOption) (*App, error) {
+	var options appOptions
+	for _, opt := range opts {
+		opt(&options)
+	}
+
 	// The app time zone: calendar days and months (filters, budgets,
 	// analytics, "today") are cut in it; instants are stored as they are.
 	appLocation, err := time.LoadLocation(cfg.Server.Timezone)
@@ -197,9 +220,17 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 		return nil, fmt.Errorf("invalid APP_TIMEZONE %q: %w", cfg.Server.Timezone, err)
 	}
 
+	// Timeouts applied to every per-user transaction (request, AI, MCP,
+	// scheduler).
+	txhelper.ConfigureSessionLimits(txhelper.SessionLimits{
+		StatementTimeout: cfg.Database.StatementTimeout,
+		IdleInTxTimeout:  cfg.Database.IdleInTxTimeout,
+		AcquireTimeout:   cfg.Database.TxAcquireTimeout,
+	})
+
 	repos := initializeRepositories(db, appLocation)
 
-	svcs, err := initializeServices(repos, cfg, appLocation)
+	svcs, err := initializeServices(repos, cfg, appLocation, options.aiProvider)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize services: %w", err)
 	}
@@ -435,14 +466,14 @@ type services struct {
 }
 
 // initializeServices creates all service instances
-func initializeServices(repos *repositories, cfg *config.Config, appLocation *time.Location) (*services, error) {
+func initializeServices(repos *repositories, cfg *config.Config, appLocation *time.Location, aiProvider aiService.AIProvider) (*services, error) {
 	// Services
 	quoteService := quote.NewQuoteService()
 
 	notificationService := notification.NewNotificationService(repos.notificationRepository)
 
 	// Initialize AI Service first (needed for cache)
-	aiSvc := initializeAIService(cfg)
+	aiSvc := initializeAIService(cfg, aiProvider)
 
 	// Create AI cache service
 	transactionCache := cache.NewInMemoryCache(5*time.Minute, 10*time.Minute)
@@ -535,19 +566,23 @@ func warnOnTimezoneMismatch(ctx context.Context, db *sql.DB, timezone string) {
 	}
 }
 
-// initializeAIService creates the AI service instance
-func initializeAIService(cfg *config.Config) *aiService.Service {
-	// Check if AI is configured
-	if cfg.AI.GeminiAPIKey == "" {
-		log.Info().Msg("AI service not configured (missing GEMINI_API_KEY)")
-		return nil
-	}
+// initializeAIService creates the AI service instance (on provider when
+// given, else on Gemini when GEMINI_API_KEY is set).
+func initializeAIService(cfg *config.Config, provider aiService.AIProvider) *aiService.Service {
+	if provider == nil {
+		// Check if AI is configured
+		if cfg.AI.GeminiAPIKey == "" {
+			log.Info().Msg("AI service not configured (missing GEMINI_API_KEY)")
+			return nil
+		}
 
-	// Create Gemini provider
-	provider, err := gemini.NewProvider(cfg.AI.GeminiAPIKey, cfg.AI.Model)
-	if err != nil {
-		log.Error().Err(err).Msg("Failed to create Gemini provider")
-		return nil
+		// Create Gemini provider
+		var err error
+		provider, err = gemini.NewProvider(cfg.AI.GeminiAPIKey, cfg.AI.Model)
+		if err != nil {
+			log.Error().Err(err).Msg("Failed to create Gemini provider")
+			return nil
+		}
 	}
 
 	// Create AI service config

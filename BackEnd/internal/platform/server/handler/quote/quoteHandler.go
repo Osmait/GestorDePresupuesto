@@ -29,7 +29,7 @@ func (h *QuoteHandler) GetQuote(ctx *gin.Context) {
 		switch {
 		case errors.Is(err, quote.ErrInvalidSymbol):
 			ctx.JSON(http.StatusBadRequest, gin.H{"error": "invalid symbol"})
-		case err.Error() == "quote not found":
+		case errors.Is(err, quote.ErrQuoteUnavailable):
 			ctx.JSON(http.StatusNotFound, gin.H{"error": "quote not found"})
 		default:
 			// Upstream details stay in the logs.

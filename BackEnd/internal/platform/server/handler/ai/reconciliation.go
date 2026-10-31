@@ -17,10 +17,16 @@ import (
 	apperrors "github.com/osmait/gestorDePresupuesto/internal/platform/errors"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/ownership"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
+	"github.com/osmait/gestorDePresupuesto/internal/services/ai/tasks"
 	"github.com/rs/zerolog/log"
 	"github.com/segmentio/ksuid"
 )
 
+// ReconciliationPreview extracts the statement with the AI provider and
+// matches it against the account. It runs outside the request transaction
+// (see routes.AIProviderRoutes): ownership and categories are read in one
+// short transaction, the provider is called with no connection held, and the
+// matching plus the session insert run in a second transaction.
 func (h *Handler) ReconciliationPreview(c *gin.Context) {
 	userID := c.GetString("X-User-Id")
 
@@ -30,18 +36,54 @@ func (h *Handler) ReconciliationPreview(c *gin.Context) {
 		return
 	}
 
-	if err := h.verifyAccountOwnership(c.Request.Context(), userID, req.AccountID); err != nil {
-		_ = c.Error(err)
-		return
-	}
-
-	transactions, err := h.extractTransactionsFromDocuments(c.Request.Context(), userID, req.AccountID, req.AccountCurrency, req.DocumentType, req.Language, req.Files)
+	files, err := decodeDocumentFiles(req.Files)
 	if err != nil {
 		_ = c.Error(err)
 		return
 	}
 
-	duplicates := h.detectPotentialDuplicates(c.Request.Context(), userID, transactions)
+	var categoryData []tasks.CategoryData
+	if err := h.inTx(c, func(ctx context.Context) error {
+		if err := h.verifyAccountOwnership(ctx, userID, req.AccountID); err != nil {
+			return err
+		}
+		var loadErr error
+		categoryData, loadErr = h.loadCategoryData(ctx, userID)
+		return loadErr
+	}); err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	transactions, err := h.extractTransactionsFromDocuments(c.Request.Context(), userID, req.AccountID, req.AccountCurrency, req.DocumentType, req.Language, categoryData, files)
+	if err != nil {
+		_ = c.Error(err)
+		return
+	}
+
+	var preview dto.ReconciliationPreviewData
+	if err := h.inTx(c, func(ctx context.Context) error {
+		var buildErr error
+		preview, buildErr = h.buildReconciliationPreview(ctx, userID, req.AccountID, req.DocumentType, transactions)
+		return buildErr
+	}); err != nil {
+		_ = c.Error(apperrors.NewInternalError("Failed to persist reconciliation session", err))
+		return
+	}
+
+	c.JSON(http.StatusOK, dto.ReconciliationPreviewResponse{Success: true, Data: preview})
+}
+
+// buildReconciliationPreview classifies the extracted transactions against
+// the existing ones and stores the session.
+func (h *Handler) buildReconciliationPreview(
+	ctx context.Context,
+	userID string,
+	accountID string,
+	documentType string,
+	transactions []*transaction.Transaction,
+) (dto.ReconciliationPreviewData, error) {
+	duplicates := h.detectPotentialDuplicates(ctx, userID, transactions)
 	duplicateByID := make(map[string]dto.PotentialDuplicate, len(duplicates))
 	for _, item := range duplicates {
 		duplicateByID[item.ExtractedTransactionID] = item
@@ -86,29 +128,25 @@ func (h *Handler) ReconciliationPreview(c *gin.Context) {
 	}
 
 	sessionID, err := h.saveReconciliationSession(
-		c.Request.Context(),
+		ctx,
 		userID,
-		req.AccountID,
-		req.DocumentType,
+		accountID,
+		documentType,
 		exactMatches,
 		similarMatches,
 		unmatched,
 	)
 	if err != nil {
-		_ = c.Error(apperrors.NewInternalError("Failed to persist reconciliation session", err))
-		return
+		return dto.ReconciliationPreviewData{}, err
 	}
 
-	c.JSON(http.StatusOK, dto.ReconciliationPreviewResponse{
-		Success: true,
-		Data: dto.ReconciliationPreviewData{
-			SessionID:      sessionID,
-			ExtractedCount: len(transactions),
-			ExactMatches:   exactMatches,
-			SimilarMatches: similarMatches,
-			Unmatched:      unmatched,
-		},
-	})
+	return dto.ReconciliationPreviewData{
+		SessionID:      sessionID,
+		ExtractedCount: len(transactions),
+		ExactMatches:   exactMatches,
+		SimilarMatches: similarMatches,
+		Unmatched:      unmatched,
+	}, nil
 }
 
 func (h *Handler) GetReconciliationSession(c *gin.Context) {

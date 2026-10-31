@@ -352,18 +352,13 @@ func (s TransactionService) FindAllOfAllAccountsWithFilters(
 			}
 		}
 
-		// Get all transactions for summary calculation (without pagination)
-		allTransactionsFilter := *filter
-		allTransactionsFilter.Limit = 0 // Remove pagination for summary
-		allTransactionsFilter.Offset = 0
-
-		allTransactions, err := s.transactionRepository.FindAllOfAllAccountsWithFilters(ctx, userId, &allTransactionsFilter)
+		// Aggregated in SQL over every matching row (pagination ignored)
+		// instead of loading them all.
+		groups, err := s.transactionRepository.SummarizeWithFilters(ctx, userId, filter)
 		if err != nil {
 			return nil, err
 		}
-
-		allTransactionResponses := s.convertToResponseList(allTransactions)
-		summary := dto.CalculateSummary(allTransactionResponses, totalCount, usdToDop)
+		summary := dto.CalculateSummaryFromGroups(groups, totalCount, usdToDop)
 
 		response := dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,
@@ -417,18 +412,12 @@ func (s TransactionService) FindAllWithFilters(
 			}
 		}
 
-		// Get all transactions for summary calculation (without pagination)
-		allTransactionsFilter := *filter
-		allTransactionsFilter.Limit = 0 // Remove pagination for summary
-		allTransactionsFilter.Offset = 0
-
-		allTransactions, err := s.transactionRepository.FindAllWithFilters(ctx, userId, &allTransactionsFilter)
+		// Aggregated in SQL (filter.AccountId scopes it to the account).
+		groups, err := s.transactionRepository.SummarizeWithFilters(ctx, userId, filter)
 		if err != nil {
 			return nil, err
 		}
-
-		allTransactionResponses := s.convertToResponseList(allTransactions)
-		summary := dto.CalculateSummary(allTransactionResponses, totalCount, usdToDop)
+		summary := dto.CalculateSummaryFromGroups(groups, totalCount, usdToDop)
 
 		return dto.NewPaginatedTransactionResponseWithSummary(
 			transactionResponseList,

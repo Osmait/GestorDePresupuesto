@@ -423,6 +423,61 @@ func (repo *TransactionRepository) FindAllWithFilters(ctx context.Context, userI
 	return repo.scanTransactions(rows)
 }
 
+// SummarizeWithFilters aggregates the transactions matching filter (same
+// WHERE as the list and the count, pagination ignored) by type, currency and
+// category, so the summary never loads every matching row into memory.
+func (repo *TransactionRepository) SummarizeWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]dto.SummaryGroup, error) {
+	query, args, err := repo.buildTransactionQueryMode(userId, filter, queryModeSummary)
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to summarize transactions: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("failed to close database rows")
+		}
+	}()
+
+	var groups []dto.SummaryGroup
+	for rows.Next() {
+		var g dto.SummaryGroup
+		if err := rows.Scan(&g.TypeTransation, &g.Currency, &g.CategoryId, &g.Total, &g.Count, &g.Max); err != nil {
+			return nil, fmt.Errorf("failed to scan transaction summary row: %w", err)
+		}
+		groups = append(groups, g)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("error iterating over transaction summary rows: %w", err)
+	}
+	return groups, nil
+}
+
+// FindCategorizedHistory returns up to limit of userId's most recent
+// transactions that have a category, created at or after since.
+func (repo *TransactionRepository) FindCategorizedHistory(ctx context.Context, userId string, since time.Time, limit int) ([]*transaction.Transaction, error) {
+	query := `SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at
+		FROM transactions
+		WHERE user_id = $1 AND created_at >= $2 AND category_id IS NOT NULL AND category_id <> ''
+		ORDER BY created_at DESC, id DESC
+		LIMIT $3`
+
+	rows, err := txhelper.FromContext(ctx, repo.db).QueryContext(ctx, query, userId, since, limit)
+	if err != nil {
+		return nil, fmt.Errorf("failed to query transaction history: %w", err)
+	}
+	defer func() {
+		if closeErr := rows.Close(); closeErr != nil {
+			log.Error().Err(closeErr).Msg("failed to close database rows")
+		}
+	}()
+
+	return repo.scanTransactions(rows)
+}
+
 // CountWithFilters counts transactions with applied filters
 func (repo *TransactionRepository) CountWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) (int64, error) {
 	query, args, err := repo.buildTransactionQuery(userId, filter, true)
@@ -455,9 +510,27 @@ var transactionSortColumns = map[string]string{
 // user id: every transaction query must be scoped to its owner.
 var errMissingUserScope = errors.New("transaction query requires a user id")
 
+type queryMode int
+
+const (
+	queryModeList queryMode = iota
+	queryModeCount
+	queryModeSummary
+)
+
 // buildTransactionQuery constructs the SQL query with filters, sorting, and
 // pagination. The query is always scoped to userId.
 func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *dto.TransactionFilter, isCount bool) (string, []interface{}, error) {
+	if isCount {
+		return repo.buildTransactionQueryMode(userId, filter, queryModeCount)
+	}
+	return repo.buildTransactionQueryMode(userId, filter, queryModeList)
+}
+
+// buildTransactionQueryMode builds the list, count or summary query; all
+// three share the same WHERE clause.
+func (repo *TransactionRepository) buildTransactionQueryMode(userId string, filter *dto.TransactionFilter, mode queryMode) (string, []interface{}, error) {
+	isCount := mode != queryModeList
 	if userId == "" {
 		return "", nil, errMissingUserScope
 	}
@@ -470,9 +543,13 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 	argIndex := 1
 
 	// SELECT clause
-	if isCount {
+	switch mode {
+	case queryModeSummary:
+		queryBuilder.WriteString("SELECT type_transation, COALESCE(currency, 'DOP'), COALESCE(category_id, ''), " +
+			"COALESCE(SUM(amount), 0), COUNT(*), COALESCE(MAX(amount), 0) FROM transactions")
+	case queryModeCount:
 		queryBuilder.WriteString("SELECT COUNT(*) FROM transactions")
-	} else {
+	default:
 		queryBuilder.WriteString("SELECT id, transaction_name, transaction_description, amount, type_transation, account_id, category_id, budget_id, COALESCE(currency, 'DOP'), created_at FROM transactions")
 	}
 
@@ -564,7 +641,10 @@ func (repo *TransactionRepository) buildTransactionQuery(userId string, filter *
 		queryBuilder.WriteString(strings.Join(whereConditions, " AND "))
 	}
 
-	// For count queries, we don't need ORDER BY, LIMIT, or OFFSET
+	// For count and summary queries, we don't need ORDER BY, LIMIT, or OFFSET
+	if mode == queryModeSummary {
+		queryBuilder.WriteString(" GROUP BY 1, 2, 3")
+	}
 	if isCount {
 		return queryBuilder.String(), args, nil
 	}

@@ -5,7 +5,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"log"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +16,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/platform/asyncctx"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 	"github.com/r3labs/sse/v2"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -32,6 +32,12 @@ const (
 	// beyond it new ones are dropped (and logged) instead of piling up
 	// goroutines and pooled connections under a burst.
 	maxAsyncSends = 64
+
+	// streamBufferSize is the event queue of one user's stream. Events are
+	// published with TryPublish: when a stream is this far behind, a live
+	// push is dropped (it is persisted and shows up in the history) instead
+	// of blocking the publisher.
+	streamBufferSize = 16
 )
 
 // ErrInvalidCursor is returned for a history cursor this server did not issue.
@@ -45,9 +51,19 @@ type HistoryPage struct {
 }
 
 // NotificationService handles real-time user notifications via SSE (Server-Sent Events).
+//
+// Stream lifecycle: a user's stream (a goroutine plus a small event queue)
+// exists only while at least one of their SSE connections is open. Subscribe
+// creates it and the release function it returns removes it with the last
+// subscriber. Publishing to a user without a stream is a no-op: the
+// notification is still persisted and shows up in the history.
 type NotificationService struct {
 	server *sse.Server
 	repo   notification.NotificationRepository
+
+	streamsMu sync.Mutex
+	// subscribers counts the open connections of each user's stream.
+	subscribers map[string]int
 
 	asyncSlots chan struct{}
 	asyncWG    sync.WaitGroup
@@ -57,10 +73,13 @@ type NotificationService struct {
 func NewNotificationService(repo notification.NotificationRepository) *NotificationService {
 	server := sse.New()
 	server.AutoReplay = false // We don't want to replay old notifications for now
+	server.AutoStream = false // streams are created by Subscribe only
+	server.BufferSize = streamBufferSize
 	return &NotificationService{
-		server:     server,
-		repo:       repo,
-		asyncSlots: make(chan struct{}, maxAsyncSends),
+		server:      server,
+		repo:        repo,
+		subscribers: make(map[string]int),
+		asyncSlots:  make(chan struct{}, maxAsyncSends),
 	}
 }
 
@@ -69,14 +88,45 @@ func (s *NotificationService) GetServer() *sse.Server {
 	return s.server
 }
 
-// CreateStream initializes a new notification stream for a client ID.
-func (s *NotificationService) CreateStream(id string) {
-	s.server.CreateStream(id)
+// Subscribe registers one SSE connection of userID, creating the user's
+// stream if needed. The caller must call release once the connection has
+// been served; the stream is removed with its last subscriber. The stream
+// cannot disappear between Subscribe and release, so serving it never races
+// its removal.
+func (s *NotificationService) Subscribe(userID string) (release func()) {
+	s.streamsMu.Lock()
+	s.subscribers[userID]++
+	if !s.server.StreamExists(userID) {
+		s.server.CreateStream(userID)
+	}
+	s.streamsMu.Unlock()
+
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			s.streamsMu.Lock()
+			defer s.streamsMu.Unlock()
+			s.subscribers[userID]--
+			if s.subscribers[userID] <= 0 {
+				delete(s.subscribers, userID)
+				s.server.RemoveStream(userID)
+			}
+		})
+	}
 }
 
-// Publish sends a generic event to a specific stream.
-func (s *NotificationService) Publish(streamID string, event string, data string) {
-	s.server.Publish(streamID, &sse.Event{
+// ActiveStreams reports how many user streams exist (tests, diagnostics).
+func (s *NotificationService) ActiveStreams() int {
+	s.streamsMu.Lock()
+	defer s.streamsMu.Unlock()
+	return len(s.subscribers)
+}
+
+// Publish sends an event to a user's stream. It never blocks and never
+// creates a stream: without an open connection, or when the stream is too
+// far behind, the live push is dropped and false is returned.
+func (s *NotificationService) Publish(streamID string, event string, data string) bool {
+	return s.server.TryPublish(streamID, &sse.Event{
 		Event: []byte(event),
 		Data:  []byte(data),
 	})
@@ -115,20 +165,14 @@ func (s *NotificationService) SendToUser(ctx context.Context, userID string, mes
 	}
 
 	if err := s.repo.Save(ctx, notif); err != nil {
-		log.Printf("Error saving notification to DB: %v", err)
 		// We continue to send SSE even if DB fails
+		log.Ctx(ctx).Error().Err(err).Str("user_id", userID).Msg("failed to save notification")
 	} else {
-		log.Printf("Notification saved to DB: %s", notif.ID)
+		log.Ctx(ctx).Debug().Str("notification_id", notif.ID.String()).Msg("notification saved")
 	}
 
-	// 2. Send via SSE
-	if !s.server.StreamExists(userID) {
-		s.server.CreateStream(userID)
-	}
-	s.server.Publish(userID, &sse.Event{
-		Event: []byte("message"),
-		Data:  []byte(messageJSON),
-	})
+	// 2. Send via SSE (a no-op when the user has no open stream)
+	s.Publish(userID, "message", messageJSON)
 }
 
 // SendToUserAsync is SendToUser without blocking the caller, for
@@ -152,7 +196,7 @@ func (s *NotificationService) SendToUserAsync(ctx context.Context, userID string
 		select {
 		case s.asyncSlots <- struct{}{}:
 		default:
-			log.Printf("notification dropped: %d asynchronous notifications already in flight", maxAsyncSends)
+			log.Ctx(detached).Warn().Int("in_flight", maxAsyncSends).Msg("notification dropped: too many asynchronous notifications in flight")
 			return
 		}
 		s.asyncWG.Add(1)

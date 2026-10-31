@@ -40,6 +40,11 @@ func (m *MockAccountRepository) BalanceByCurrency(ctx context.Context, id string
 	return args.Get(0).(money.Amount), args.Error(1)
 }
 
+func (m *MockAccountRepository) BalancesByCurrency(ctx context.Context, ids []string, userId string) (map[string]map[string]money.Amount, error) {
+	args := m.Called(ctx, ids, userId)
+	return args.Get(0).(map[string]map[string]money.Amount), args.Error(1)
+}
+
 func (m *MockAccountRepository) Balances(ctx context.Context, userId string) (map[string]money.Amount, error) {
 	args := m.Called(ctx, userId)
 	return args.Get(0).(map[string]money.Amount), args.Error(1)
@@ -120,4 +125,54 @@ func TestFindAll(t *testing.T) {
 
 	mockRepo.AssertExpectations(t)
 	assert.NoError(t, err, "FindAll should not return an error")
+}
+
+// A credit card's balance in the list is its ledger in its primary currency,
+// read for every card in one BalancesByCurrency call; a card without
+// transactions in that currency shows its initial balance.
+func TestFindAll_CardBalancesInOneLookup(t *testing.T) {
+	mockRepo := &MockAccountRepository{}
+
+	bank := utils.GetNewRandomAccount()
+	usdCard := account.NewCreditCardAccount("card-usd", "Visa", "Bank")
+	usdCard.Currency = "usd"
+	dopCard := account.NewCreditCardAccount("card-dop", "Master", "Bank")
+	emptyCard := account.NewCreditCardAccount("card-empty", "Amex", "Bank")
+	accounts := []*account.Account{bank, usdCard, dopCard, emptyCard}
+
+	mockRepo.On("FindAll", mock.Anything, "user-1").Return(accounts, nil)
+	mockRepo.On("Balances", mock.Anything, "user-1").Return(map[string]money.Amount{
+		bank.Id: money.FromInt(250), usdCard.Id: money.FromInt(-999), dopCard.Id: money.FromInt(-999),
+	}, nil)
+	mockRepo.On("BalancesByCurrency", mock.Anything, []string{usdCard.Id, dopCard.Id, emptyCard.Id}, "user-1").
+		Return(map[string]map[string]money.Amount{
+			usdCard.Id: {"USD": money.FromInt(-40), "DOP": money.FromInt(-7)},
+			dopCard.Id: {"DOP": money.FromInt(-300)},
+		}, nil).Once()
+
+	got, err := NewAccountService(mockRepo).FindAll(context.Background(), "user-1")
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+
+	balances := map[string]string{}
+	for _, r := range got {
+		balances[r.AccountInfo.Id] = r.CurrentBalance.StringFixed(2)
+	}
+	assert.Equal(t, map[string]string{
+		bank.Id:      bank.InitialBalance.Add(money.FromInt(250)).StringFixed(2),
+		usdCard.Id:   "-40.00",
+		dopCard.Id:   "-300.00",
+		emptyCard.Id: "0.00",
+	}, balances)
+}
+
+// Without credit cards there is nothing to look up per currency.
+func TestFindAll_NoCardsSkipsCurrencyLookup(t *testing.T) {
+	mockRepo := &MockAccountRepository{}
+	mockRepo.On("FindAll", mock.Anything, "user-1").Return([]*account.Account{utils.GetNewRandomAccount()}, nil)
+	mockRepo.On("Balances", mock.Anything, "user-1").Return(map[string]money.Amount{}, nil)
+
+	_, err := NewAccountService(mockRepo).FindAll(context.Background(), "user-1")
+	assert.NoError(t, err)
+	mockRepo.AssertNotCalled(t, "BalancesByCurrency", mock.Anything, mock.Anything, mock.Anything)
 }

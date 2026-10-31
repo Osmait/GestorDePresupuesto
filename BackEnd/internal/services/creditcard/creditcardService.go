@@ -45,6 +45,10 @@ type AccountRepositoryInterface interface {
 	FindByIdAndUserId(ctx context.Context, id string, userId string) (*account.Account, error)
 	Delete(ctx context.Context, id string, userId string) error
 	BalanceByCurrency(ctx context.Context, id string, userId string, currency string) (money.Amount, error)
+	// FindAll and BalancesByCurrency read the accounts and ledger balances of
+	// all the cards in one query each (card lists and summary).
+	FindAll(ctx context.Context, userId string) ([]*account.Account, error)
+	BalancesByCurrency(ctx context.Context, ids []string, userId string) (map[string]map[string]money.Amount, error)
 	// FindByIdAndUserIdForUpdate locks the paying account for the request
 	// transaction; Balance feeds the overdraft check (see package funds).
 	FindByIdAndUserIdForUpdate(ctx context.Context, id string, userId string) (*account.Account, error)
@@ -164,26 +168,57 @@ func (s *CreditCardService) FindCardById(ctx context.Context, accountId string, 
 		return nil, err
 	}
 
-	return s.buildCardResponse(ctx, card, acc, balances, userId), nil
+	ledgers, err := s.accountRepo.BalancesByCurrency(ctx, []string{accountId}, userId)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.buildCardResponse(card, acc, balances, ledgers[accountId]), nil
 }
 
 func (s *CreditCardService) FindAllCards(ctx context.Context, userId string) ([]*dto.CreditCardResponse, error) {
+	return s.allCardResponses(ctx, userId)
+}
+
+// allCardResponses builds the response of every card of userId, newest first
+// (nil when there are none), with one query each for the cards, their
+// accounts, their currencies and their ledger balances, however many cards
+// there are. A card whose account is not found is left out.
+func (s *CreditCardService) allCardResponses(ctx context.Context, userId string) ([]*dto.CreditCardResponse, error) {
 	cards, err := s.cardRepo.FindAllCards(ctx, userId)
+	if err != nil || len(cards) == 0 {
+		return nil, err
+	}
+
+	accounts, err := s.accountRepo.FindAll(ctx, userId)
+	if err != nil {
+		return nil, err
+	}
+	accountsById := make(map[string]*account.Account, len(accounts))
+	for _, acc := range accounts {
+		accountsById[acc.Id] = acc
+	}
+
+	cardIds := make([]string, 0, len(cards))
+	for _, card := range cards {
+		cardIds = append(cardIds, card.AccountId)
+	}
+	balances, err := s.cardRepo.FindBalancesByCards(ctx, cardIds, userId)
+	if err != nil {
+		return nil, err
+	}
+	ledgers, err := s.accountRepo.BalancesByCurrency(ctx, cardIds, userId)
 	if err != nil {
 		return nil, err
 	}
 
 	var responses []*dto.CreditCardResponse
 	for _, card := range cards {
-		acc, err := s.accountRepo.FindByIdAndUserId(ctx, card.AccountId, userId)
-		if err != nil {
+		acc, ok := accountsById[card.AccountId]
+		if !ok {
 			continue
 		}
-		balances, err := s.cardRepo.FindBalancesByCard(ctx, card.AccountId, userId)
-		if err != nil {
-			continue
-		}
-		responses = append(responses, s.buildCardResponse(ctx, card, acc, balances, userId))
+		responses = append(responses, s.buildCardResponse(card, acc, balances[card.AccountId], ledgers[card.AccountId]))
 	}
 	return responses, nil
 }
@@ -561,7 +596,7 @@ func (s *CreditCardService) FindPaymentsByCard(ctx context.Context, cardId strin
 }
 
 func (s *CreditCardService) GetSummary(ctx context.Context, userId string) (*dto.CreditCardSummaryResponse, error) {
-	cards, err := s.cardRepo.FindAllCards(ctx, userId)
+	cards, err := s.allCardResponses(ctx, userId)
 	if err != nil {
 		return nil, err
 	}
@@ -575,17 +610,7 @@ func (s *CreditCardService) GetSummary(ctx context.Context, userId string) (*dto
 
 	currencyCardCount := make(map[string]int)
 
-	for _, card := range cards {
-		acc, err := s.accountRepo.FindByIdAndUserId(ctx, card.AccountId, userId)
-		if err != nil {
-			continue
-		}
-		balances, err := s.cardRepo.FindBalancesByCard(ctx, card.AccountId, userId)
-		if err != nil {
-			continue
-		}
-
-		cardResp := s.buildCardResponse(ctx, card, acc, balances, userId)
+	for _, cardResp := range cards {
 		summary.ByCard = append(summary.ByCard, cardResp)
 		summary.TotalCards++
 
@@ -608,14 +633,14 @@ func (s *CreditCardService) GetSummary(ctx context.Context, userId string) (*dto
 	return summary, nil
 }
 
-func (s *CreditCardService) buildCardResponse(ctx context.Context, card *creditcard.CreditCard, acc *account.Account, balances []*creditcard.CardBalance, userId string) *dto.CreditCardResponse {
+// buildCardResponse builds the response of card. ledger is the card
+// account's ledger balance per currency (AccountRepository.BalancesByCurrency):
+// the card's balance in a currency, zero when absent.
+func (s *CreditCardService) buildCardResponse(card *creditcard.CreditCard, acc *account.Account, balances []*creditcard.CardBalance, ledger map[string]money.Amount) *dto.CreditCardResponse {
 	var balanceResponses []*dto.BalanceResponse
 	for _, b := range balances {
-		// The card's balance in this currency is the ledger of its account.
-		ledgerBalance, _ := s.accountRepo.BalanceByCurrency(ctx, card.AccountId, userId, b.Currency)
-
 		balanceCopy := *b
-		balanceCopy.CurrentBalance = ledgerBalance
+		balanceCopy.CurrentBalance = ledger[b.Currency]
 		balanceResponses = append(balanceResponses, dto.NewBalanceResponse(&balanceCopy))
 	}
 

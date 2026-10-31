@@ -19,7 +19,7 @@ import (
 func expectRLSBegin(mock sqlmock.Sqlmock, userID string) {
 	mock.ExpectBegin()
 	mock.ExpectExec(`SELECT set_config`).
-		WithArgs(userID, "false").
+		WithArgs(userID, "false", "15000", "30000").
 		WillReturnResult(sqlmock.NewResult(0, 0))
 }
 

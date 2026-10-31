@@ -84,6 +84,16 @@ type DatabaseConfig struct {
 	// 503 instead of queueing indefinitely. 0 disables the bound.
 	TxAcquireTimeout time.Duration `json:"tx_acquire_timeout"`
 	SSLMode          string        `json:"ssl_mode"`
+	// StatementTimeout is the transaction-local statement_timeout of every
+	// per-user transaction (DB_STATEMENT_TIMEOUT). 0 disables it.
+	StatementTimeout time.Duration `json:"statement_timeout"`
+	// IdleInTxTimeout is the transaction-local
+	// idle_in_transaction_session_timeout (DB_IDLE_IN_TX_TIMEOUT). 0
+	// disables it.
+	IdleInTxTimeout time.Duration `json:"idle_in_tx_timeout"`
+	// RequestTimeout is the deadline of an authenticated request holding the
+	// RLS transaction (DB_REQUEST_TIMEOUT). 0 disables it.
+	RequestTimeout time.Duration `json:"request_timeout"`
 }
 
 // CacheConfig holds the TTLs of the small in-process caches that keep
@@ -288,6 +298,10 @@ type AIConfig struct {
 	RequestsPerMinute int `json:"requests_per_minute"`
 	RequestsPerDay    int `json:"requests_per_day"`
 	MaxInFlight       int `json:"max_in_flight"`
+	// MaxConcurrentCalls caps provider calls in flight across all users
+	// (AI_MAX_CONCURRENT_CALLS); beyond it requests fail fast with 503.
+	// <= 0 disables the cap.
+	MaxConcurrentCalls int `json:"max_concurrent_calls"`
 }
 
 // MCPConfig holds Model Context Protocol server configuration
@@ -376,6 +390,12 @@ func LoadConfig() (*Config, error) {
 			// RLS transaction; this bounds the wait for it.
 			TxAcquireTimeout: getEnvDuration("DB_TX_ACQUIRE_TIMEOUT", 5*time.Second),
 			SSLMode:          getEnvString("DB_SSL_MODE", "disable"),
+			// Bound how long a request can hold its pooled connection. The
+			// AI routes that call the provider run outside the request
+			// transaction, so these can stay short.
+			StatementTimeout: getEnvDuration("DB_STATEMENT_TIMEOUT", 15*time.Second),
+			IdleInTxTimeout:  getEnvDuration("DB_IDLE_IN_TX_TIMEOUT", 30*time.Second),
+			RequestTimeout:   getEnvDuration("DB_REQUEST_TIMEOUT", 60*time.Second),
 		},
 
 		Cache: CacheConfig{
@@ -547,6 +567,8 @@ func LoadConfig() (*Config, error) {
 			RequestsPerMinute: getEnvInt("AI_REQUESTS_PER_MINUTE", 10),
 			RequestsPerDay:    getEnvInt("AI_REQUESTS_PER_DAY", 200),
 			MaxInFlight:       getEnvInt("AI_MAX_IN_FLIGHT", 2),
+
+			MaxConcurrentCalls: getEnvInt("AI_MAX_CONCURRENT_CALLS", 4),
 		},
 
 		MCP: MCPConfig{

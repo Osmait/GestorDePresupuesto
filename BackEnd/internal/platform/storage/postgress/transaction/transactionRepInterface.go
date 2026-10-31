@@ -33,5 +33,12 @@ type TransactionRepositoryInterface interface {
 	FindAllOfAllAccountsWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)
 	FindAllWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)
 	CountWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) (int64, error)
+	// SummarizeWithFilters aggregates every transaction matching filter
+	// (pagination ignored) by type, currency and category in SQL.
+	SummarizeWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]dto.SummaryGroup, error)
+	// FindCategorizedHistory returns up to limit of the user's most recent
+	// categorized transactions created at or after since (category
+	// suggestions).
+	FindCategorizedHistory(ctx context.Context, userId string, since time.Time, limit int) ([]*transaction.Transaction, error)
 	FindByUserAndDateRange(ctx context.Context, userId string, dateFrom time.Time, dateToExclusive time.Time) ([]*transaction.Transaction, error)
 }

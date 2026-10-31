@@ -29,9 +29,7 @@ func (r *NotificationRepository) Save(ctx context.Context, n notification.Notifi
 	ownTx := txhelper.FromContext(ctx, r.db) == txhelper.Querier(r.db)
 	err := txhelper.InTx(ctx, r.db, func(q txhelper.Querier) error {
 		if ownTx {
-			if _, err := q.ExecContext(ctx,
-				`SELECT set_config('app.current_user_id', $1, true), set_config('app.is_admin', 'false', true)`,
-				n.UserID); err != nil {
+			if err := txhelper.SetRLSContext(ctx, q, n.UserID, false); err != nil {
 				return err
 			}
 		}

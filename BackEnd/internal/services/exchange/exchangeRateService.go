@@ -11,6 +11,7 @@ import (
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/money"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/telemetry"
+	"github.com/rs/zerolog/log"
 	"golang.org/x/sync/singleflight"
 )
 
@@ -28,6 +29,7 @@ type ExchangeRateService struct {
 	cachedRate    money.Amount
 	lastFetch     time.Time
 	lastFailure   time.Time
+	lastErr       error
 	cacheDuration time.Duration
 	retryAfter    time.Duration
 	fetchTimeout  time.Duration
@@ -91,15 +93,40 @@ func (s *ExchangeRateService) cached() (rate money.Amount, at time.Time, fresh, 
 	return s.cachedRate, s.lastFetch, fresh, true
 }
 
-func (s *ExchangeRateService) recordFailure() {
+func (s *ExchangeRateService) recordFailure(err error) {
 	s.mu.Lock()
 	s.lastFailure = time.Now()
+	s.lastErr = err
 	s.mu.Unlock()
 }
 
+// recentFailure returns the last upstream error when it happened less than
+// retryAfter ago.
+func (s *ExchangeRateService) recentFailure() error {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+	if s.lastErr != nil && time.Since(s.lastFailure) < s.retryAfter {
+		return s.lastErr
+	}
+	return nil
+}
+
+// ErrRateUnavailable is returned while the upstream API is failing and no
+// rate was ever fetched; callers fall back as they do for any rate error.
+var ErrRateUnavailable = errors.New("exchange rate unavailable")
+
 func (s *ExchangeRateService) GetUSDtoDOP(ctx context.Context) (*ExchangeRateResponse, error) {
-	if rate, at, fresh, ok := s.cached(); ok && fresh {
+	rate, at, fresh, ok := s.cached()
+	if ok && fresh {
 		return &ExchangeRateResponse{USDToDOP: rate, LastUpdated: at}, nil
+	}
+	// Negative cache before the first success too: while upstream is down
+	// after a restart, fail fast for retryAfter instead of making every
+	// request (budgets, analytics, summaries) wait up to fetchTimeout.
+	if !ok {
+		if err := s.recentFailure(); err != nil {
+			return nil, fmt.Errorf("%w: %w", ErrRateUnavailable, err)
+		}
 	}
 
 	ch := s.group.DoChan("usd_dop", func() (any, error) {
@@ -112,7 +139,8 @@ func (s *ExchangeRateService) GetUSDtoDOP(ctx context.Context) (*ExchangeRateRes
 		defer cancel()
 		resp, err := s.fetchRate(fetchCtx)
 		if err != nil {
-			s.recordFailure()
+			s.recordFailure(err)
+			log.Ctx(ctx).Warn().Err(err).Msg("exchange rate fetch failed")
 		}
 		return resp, err
 	})

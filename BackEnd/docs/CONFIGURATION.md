@@ -61,6 +61,10 @@ The application uses a comprehensive configuration system that supports:
 | `DB_CONN_MAX_IDLE_TIME` | `5m` | Connection maximum idle time |
 | `DB_TX_ACQUIRE_TIMEOUT` | `5s` | How long an authenticated request waits for a pooled connection to open its RLS transaction. When the pool stays exhausted that long the request fails fast with `503` + `Retry-After: 1` instead of queueing indefinitely. `0` disables the bound. |
 | `DB_SSL_MODE` | `disable` | SSL mode: `disable`, `require`, `verify-ca`, `verify-full` |
+| `DB_STATEMENT_TIMEOUT` | `15s` | `statement_timeout` set locally in every per-user transaction (requests, AI routes, MCP tools, recurring scheduler). A query past it is cancelled and the request fails with `503`. `0` disables it. |
+| `DB_IDLE_IN_TX_TIMEOUT` | `30s` | `idle_in_transaction_session_timeout` set locally in the same transactions, so a stuck handler cannot pin a connection. `0` disables it. |
+| `DB_REQUEST_TIMEOUT` | `60s` | Deadline of an authenticated request that holds the RLS transaction; on expiry the transaction is rolled back and the connection released. `0` disables it. |
+| `AI_MAX_CONCURRENT_CALLS` | `4` | AI provider calls in flight across all users (extraction, reconciliation preview, spending analysis). Beyond it requests fail fast with `503` + `Retry-After`. Those routes run outside the request transaction and only hold a connection for their short reads/writes. `<= 0` disables the cap. |
 
 > **One connection per request.** `RLSMiddleware` opens the request transaction on one pooled connection; every query a handler, service or middleware runs afterwards must use it (`txhelper.FromContext` / `txhelper.InTx`). Querying the plain `*sql.DB` inside a request needs a second connection and deadlocks the whole pool under load. Handlers that manage their own transactions (e.g. `POST /recurring-transactions/process`) are registered before `RLSMiddleware`.
 

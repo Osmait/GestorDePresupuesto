@@ -44,8 +44,15 @@ func (s *TransactionScheduler) Start(ctx context.Context) {
 	}()
 }
 
+// schedulerRunTimeout bounds one scheduler run (the first one runs before
+// the server starts listening): a stuck database must not hang startup or
+// pile up runs.
+const schedulerRunTimeout = 5 * time.Minute
+
 func (s *TransactionScheduler) runJob(ctx context.Context) {
 	log.Debug().Msg("Running scheduled transaction check")
+	ctx, cancel := context.WithTimeout(ctx, schedulerRunTimeout)
+	defer cancel()
 	if err := instrumentedRun(ctx, "transaction_scheduler", s.service.ProcessDueTransactions); err != nil {
 		log.Error().Err(err).Msg("Error running scheduled transaction check")
 	}

@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"time"
@@ -21,6 +22,27 @@ func ClearConnDeadlines(w http.ResponseWriter) {
 	}
 	if err := rc.SetReadDeadline(time.Time{}); err != nil && !errors.Is(err, http.ErrNotSupported) {
 		log.Warn().Err(err).Msg("streaming: could not clear read deadline")
+	}
+}
+
+// EndOnShutdown is a route middleware for long-lived streaming endpoints: the
+// request context is cancelled when shutdown is cancelled (the server starts
+// shutting down), so the stream handler returns and http.Server.Shutdown
+// does not wait for the client to disconnect.
+func EndOnShutdown(shutdown context.Context) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		if shutdown == nil {
+			c.Next()
+			return
+		}
+		ctx, cancel := context.WithCancel(c.Request.Context())
+		stop := context.AfterFunc(shutdown, cancel)
+		defer func() {
+			stop()
+			cancel()
+		}()
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
 	}
 }
 

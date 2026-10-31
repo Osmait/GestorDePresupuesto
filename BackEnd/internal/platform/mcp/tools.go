@@ -12,6 +12,7 @@ import (
 	"github.com/osmait/gestorDePresupuesto/internal/platform/apptime"
 	dto "github.com/osmait/gestorDePresupuesto/internal/platform/dto/transaction"
 	"github.com/osmait/gestorDePresupuesto/internal/platform/mcp/mcpcontext"
+	"github.com/osmait/gestorDePresupuesto/internal/platform/storage/postgress/txhelper"
 )
 
 // registerTools registers all MCP tools on the server.
@@ -153,7 +154,8 @@ func (s *MCPServer) withRLSTx(ctx context.Context, userID string) (context.Conte
 		return ctx, nil, nil, fmt.Errorf("begin tx: %w", err)
 	}
 
-	if _, err := tx.ExecContext(ctx, "SELECT set_config('app.current_user_id', $1, true)", userID); err != nil {
+	// RLS identity plus the statement / idle-in-transaction limits.
+	if err := txhelper.SetRLSContext(ctx, tx, userID, false); err != nil {
 		_ = tx.Rollback()
 		return ctx, nil, nil, fmt.Errorf("set rls config: %w", err)
 	}

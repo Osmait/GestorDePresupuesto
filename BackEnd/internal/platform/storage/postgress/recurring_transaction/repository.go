@@ -181,12 +181,7 @@ func (r *RecurringTransactionRepository) BeginTx(ctx context.Context) (*sql.Tx, 
 // (see migrations 000037/000039) so the scheduler works with or without the
 // BYPASSRLS role attribute and the audit log records the owning user.
 func (r *RecurringTransactionRepository) SetRLSContext(ctx context.Context, tx *sql.Tx, userID string, isAdmin bool) error {
-	admin := "false"
-	if isAdmin {
-		admin = "true"
-	}
-	_, err := tx.ExecContext(ctx, `SELECT set_config('app.current_user_id', $1, true), set_config('app.is_admin', $2, true)`, userID, admin)
-	return err
+	return txhelper.SetRLSContext(ctx, tx, userID, isAdmin)
 }
 
 // DueRule is a claimed recurring transaction plus the currency of its account.
