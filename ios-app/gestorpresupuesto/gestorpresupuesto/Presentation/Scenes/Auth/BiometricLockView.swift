@@ -49,7 +49,7 @@ struct BiometricLockView: View {
                 .frame(width: 80, height: 80)
 
             Image(systemName: "lock.fill")
-                .font(.system(size: 36))
+                .font(.largeTitle)
                 .foregroundStyle(Color.app.onAccent)
         }
         .scaleEffect(animationPhase == .initial ? 0.5 : 1.0)
@@ -86,7 +86,7 @@ struct BiometricLockView: View {
                 } label: {
                     HStack(spacing: 12) {
                         Image(systemName: biometricIconName)
-                            .font(.system(size: 22))
+                            .font(.title2)
                         Text(biometricLabel)
                             .font(.app(.headline))
                     }

@@ -12,11 +12,11 @@ struct NotificationToolbarModifier: ViewModifier {
                     } label: {
                         ZStack(alignment: .topTrailing) {
                             Image(systemName: "bell.fill")
-                                .font(.system(size: 15))
+                                .font(.subheadline)
 
                             if notificationManager.unreadCount > 0 {
                                 Text(notificationManager.unreadCount > 9 ? "9+" : "\(notificationManager.unreadCount)")
-                                    .font(.system(size: 8, weight: .bold))
+                                    .font(.system(.caption2, weight: .bold))
                                     .foregroundStyle(Color.app.onStatus)
                                     .padding(.horizontal, 3)
                                     .frame(minWidth: 14, minHeight: 14)

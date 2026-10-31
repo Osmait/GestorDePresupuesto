@@ -11,7 +11,7 @@ struct ErrorBanner: View {
     var body: some View {
         HStack(spacing: .sm) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 18, weight: .medium))
+                .font(.system(.body, weight: .medium))
                 .foregroundStyle(Color.app.onStatus)
 
             Text(message)

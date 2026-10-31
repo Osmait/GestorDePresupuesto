@@ -161,7 +161,7 @@ struct RecurringTransactionRow: View {
                         .frame(width: 44, height: 44)
 
                     Image(systemName: transaction.isIncome ? "arrow.down" : "arrow.up")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(.body, weight: .semibold))
                         .foregroundStyle(color)
                 }
 
@@ -369,7 +369,7 @@ struct TypeChip: View {
         Button(action: action) {
             HStack(spacing: .xs) {
                 Image(systemName: icon)
-                    .font(.system(size: 14))
+                    .font(.footnote)
                 Text(title)
                     .font(.app(.subheadline))
             }

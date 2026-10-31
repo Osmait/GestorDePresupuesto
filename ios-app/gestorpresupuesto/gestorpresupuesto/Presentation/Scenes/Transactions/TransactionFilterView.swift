@@ -172,7 +172,7 @@ struct TransactionFilterView: View {
                         } label: {
                             HStack(spacing: Spacing.xs.rawValue) {
                                 Text(category.icon)
-                                    .font(.system(size: 14))
+                                    .font(.footnote)
                                 Text(category.name)
                                     .font(.caption)
                                     .fontWeight(.medium)
@@ -215,7 +215,7 @@ struct TransactionFilterView: View {
                                         .fill(isSelected ? Color.app.accent : Color.app.surfaceSecondary)
                                         .frame(width: 36, height: 36)
                                     Image(systemName: "building.columns")
-                                        .font(.system(size: 14))
+                                        .font(.footnote)
                                         .foregroundStyle(isSelected ? .white : Color.app.textSecondary)
                                 }
 
@@ -234,7 +234,7 @@ struct TransactionFilterView: View {
                                 if isSelected {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundStyle(Color.app.accent)
-                                        .font(.system(size: 20))
+                                        .font(.title3)
                                 }
                             }
                             .padding(.horizontal, Spacing.md.rawValue)

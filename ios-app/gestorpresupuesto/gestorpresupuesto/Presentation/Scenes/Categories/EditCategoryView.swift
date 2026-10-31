@@ -94,7 +94,8 @@ struct EditCategoryView: View {
                     .frame(width: 80, height: 80)
 
                 Text(selectedIcon)
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
+                    .imageScale(.large)
             }
 
             Text(name.isEmpty ? "Mi Categoría" : name)
@@ -172,7 +173,7 @@ struct EditCategoryView: View {
                             .overlay {
                                 if selectedColor == hex {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(.system(.footnote, weight: .bold))
                                         .foregroundStyle(.white)
                                 }
                             }

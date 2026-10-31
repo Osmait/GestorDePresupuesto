@@ -107,7 +107,7 @@ struct TransactionsListView: View {
                             }
                         } label: {
                             Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 24))
+                                .font(.title2)
                                 .foregroundStyle(Color.app.accent)
                         }
                     }
@@ -424,7 +424,7 @@ struct AddTransactionView: View {
         Button(action: action) {
             HStack(spacing: Spacing.xs.rawValue) {
                 Image(systemName: icon)
-                    .font(.system(size: 18))
+                    .font(.body)
                 Text(title)
                     .font(.app(.subheadline))
                     .fontWeight(.semibold)
@@ -452,7 +452,7 @@ struct AddTransactionView: View {
                     .foregroundStyle(Color.app.textTertiary)
 
                 TextField("0.00", text: $amount)
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .font(.appAmount)
                     .foregroundStyle(isIncome ? Color.app.success : Color.app.textPrimary)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)

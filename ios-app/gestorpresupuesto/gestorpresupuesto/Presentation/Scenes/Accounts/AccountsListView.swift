@@ -89,7 +89,7 @@ struct AccountsListView: View {
                                 .fill(Color.app.accent.opacity(0.15))
                                 .frame(width: 32, height: 32)
                             Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(.footnote, weight: .bold))
                                 .foregroundStyle(Color.app.accent)
                         }
                     }
@@ -122,7 +122,7 @@ struct AccountsListView: View {
                 .foregroundStyle(Color.app.textTertiary)
 
             Text(totalBalance.currencyFormatted)
-                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .font(.appAmount)
                 .foregroundStyle(Color.app.textPrimary)
                 .minimumScaleFactor(0.6)
 
@@ -159,7 +159,7 @@ struct AccountsListView: View {
                     .fill(iconInfo.color.opacity(0.15))
                     .frame(width: 44, height: 44)
                 Image(systemName: iconInfo.icon)
-                    .font(.system(size: 18))
+                    .font(.body)
                     .foregroundStyle(iconInfo.color)
             }
 

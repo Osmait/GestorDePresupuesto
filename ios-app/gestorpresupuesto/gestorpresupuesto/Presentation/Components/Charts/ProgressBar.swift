@@ -240,7 +240,7 @@ struct BudgetProgressCard: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("Gastado")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundStyle(Color.app.textTertiary)
                     Text(budget.spent.currencyFormatted)
                         .font(.app(.caption))
@@ -252,7 +252,7 @@ struct BudgetProgressCard: View {
 
                 VStack(alignment: .trailing, spacing: 2) {
                     Text(budget.isOverBudget ? "Excedido" : "Disponible")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundStyle(Color.app.textTertiary)
                     Text(budget.remaining.currencyFormatted)
                         .font(.app(.caption))

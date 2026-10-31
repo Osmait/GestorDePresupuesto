@@ -107,7 +107,8 @@ struct NotificationCenterView: View {
     private var emptyState: some View {
         VStack(spacing: Spacing.lg.rawValue) {
             Image(systemName: "bell.slash")
-                .font(.system(size: 48))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(Color.app.textTertiary)
 
             Text("Sin notificaciones")
@@ -131,7 +132,7 @@ private struct NotificationRow: View {
         HStack(alignment: .top, spacing: CGFloat.md) {
             // Type icon
             Image(systemName: notification.notificationType.icon)
-                .font(.system(size: 18))
+                .font(.body)
                 .foregroundStyle(notification.notificationType.toastType.color)
                 .frame(width: 32, height: 32)
                 .background(

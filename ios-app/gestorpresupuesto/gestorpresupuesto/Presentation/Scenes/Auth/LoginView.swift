@@ -53,7 +53,7 @@ struct LoginView: View {
                 .frame(width: 80, height: 80)
 
             Image(systemName: "wallet.fill")
-                .font(.system(size: 36))
+                .font(.largeTitle)
                 .foregroundStyle(Color.app.onAccent)
         }
         .scaleEffect(animationPhase == .initial ? 0.5 : 1.0)

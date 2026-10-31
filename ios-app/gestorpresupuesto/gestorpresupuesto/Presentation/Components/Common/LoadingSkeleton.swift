@@ -109,7 +109,8 @@ struct EmptyStateView: View {
                     .frame(width: 100, height: 100)
 
                 Image(systemName: icon)
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
+                    .imageScale(.large)
                     .foregroundStyle(Color.app.accent)
             }
 

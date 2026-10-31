@@ -82,7 +82,7 @@ struct PatrimonySection: View {
                     .foregroundStyle(Color.app.textSecondary)
             }
             Text(value.currencyFormatted)
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(.caption2, weight: .semibold))
                 .foregroundStyle(Color.app.textPrimary)
         }
     }

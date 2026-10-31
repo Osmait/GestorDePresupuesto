@@ -159,7 +159,7 @@ struct BalanceHeader: View {
                 .fontWeight(.medium)
                 .foregroundStyle(Color.app.textSecondary)
             AmountText(value: totalBalance, tone: totalBalance < 0 ? .negative : .neutral)
-                .font(.system(size: 36, weight: .semibold))
+                .font(.appAmount)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
             Text(accountsCount == 1 ? "En 1 cuenta" : "En \(accountsCount) cuentas")

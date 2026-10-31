@@ -19,14 +19,14 @@ struct CreditCardVisual: View {
 
             if !card.lastFourDigits.isEmpty {
                 Text("•••• •••• •••• \(card.lastFourDigits)")
-                    .font(.system(size: 20, weight: .medium, design: .monospaced))
+                    .font(.system(.title3, design: .monospaced, weight: .medium))
                     .foregroundStyle(.white)
             }
 
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text("TITULAR")
-                        .font(.system(size: 8))
+                        .font(.caption2)
                         .foregroundStyle(.white.opacity(0.6))
                     Text(card.name)
                         .font(.app(.caption))
@@ -36,7 +36,7 @@ struct CreditCardVisual: View {
                 Spacer()
                 VStack(alignment: .trailing, spacing: 2) {
                     Text("VENCE")
-                        .font(.system(size: 8))
+                        .font(.caption2)
                         .foregroundStyle(.white.opacity(0.6))
                     Text("Día \(card.dueDay)")
                         .font(.app(.caption))

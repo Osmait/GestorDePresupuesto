@@ -154,7 +154,8 @@ struct EmptyScannerState: View {
                     .frame(width: 120, height: 120)
 
                 Image(systemName: "doc.text.viewfinder")
-                    .font(.system(size: 50))
+                    .font(.largeTitle)
+                    .imageScale(.large)
                     .foregroundStyle(Color.app.accent)
             }
 
@@ -246,7 +247,7 @@ struct ScannedImageThumbnail: View {
                 onRemove()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20))
+                    .font(.title3)
                     .foregroundStyle(Color.app.onStatus)
                     .background(Circle().fill(Color.app.error))
             }
@@ -271,7 +272,7 @@ struct DocumentTypeSelector: View {
                     } label: {
                         HStack(spacing: .xs) {
                             Image(systemName: type.icon)
-                                .font(.system(size: 14))
+                                .font(.footnote)
                             Text(type.displayName)
                                 .font(.app(.caption))
                         }

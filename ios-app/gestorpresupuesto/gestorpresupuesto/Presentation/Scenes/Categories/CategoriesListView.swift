@@ -80,7 +80,7 @@ struct CategoriesListView: View {
                                 .fill(Color.app.accent.opacity(0.15))
                                 .frame(width: 32, height: 32)
                             Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .bold))
+                                .font(.system(.footnote, weight: .bold))
                                 .foregroundStyle(Color.app.accent)
                         }
                     }
@@ -116,7 +116,7 @@ struct CategoriesListView: View {
                 .foregroundStyle(Color.app.textTertiary)
 
             Text("\(viewModel.categories.count)")
-                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .font(.appAmount)
                 .foregroundStyle(Color.app.textPrimary)
 
             Text("categoría\(viewModel.categories.count == 1 ? "" : "s") creada\(viewModel.categories.count == 1 ? "" : "s")")
@@ -137,7 +137,7 @@ struct CategoriesListView: View {
                     .frame(width: 56, height: 56)
 
                 Text(category.icon)
-                    .font(.system(size: 28))
+                    .font(.title)
             }
 
             Text(category.name)
@@ -247,7 +247,8 @@ struct AddCategoryView: View {
                     .frame(width: 80, height: 80)
 
                 Text(selectedIcon)
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
+                    .imageScale(.large)
             }
 
             Text(name.isEmpty ? "Mi Categoría" : name)
@@ -325,7 +326,7 @@ struct AddCategoryView: View {
                             .overlay {
                                 if selectedColor == hex {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(.system(.footnote, weight: .bold))
                                         .foregroundStyle(.white)
                                 }
                             }

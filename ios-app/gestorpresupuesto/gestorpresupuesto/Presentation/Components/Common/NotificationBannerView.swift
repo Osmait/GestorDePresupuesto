@@ -15,7 +15,7 @@ struct NotificationBannerView: View {
         Button(action: onTap) {
             HStack(spacing: .sm) {
                 Image(systemName: type.icon)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(.title3, weight: .medium))
                     .foregroundStyle(type.toastType.color)
 
                 VStack(alignment: .leading, spacing: 2) {
