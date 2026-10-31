@@ -347,8 +347,10 @@ func TestStorage_Tokens(t *testing.T) {
 			go func(i int) {
 				defer wg.Done()
 				got, err := s.GetTokenByRefresh(tok.RefreshToken)
-				if err == nil && got.Subject != userID {
-					err = errors.New("wrong subject")
+				if err == nil {
+					if subject, _ := splitSubject(got.Subject); subject != userID {
+						err = errors.New("wrong subject")
+					}
 				}
 				results[i] = err
 			}(i)
@@ -410,6 +412,64 @@ func TestStorage_Tokens(t *testing.T) {
 	})
 }
 
+// A grant keeps the session start of the consent-page login across refreshes
+// (omniskill copies only the subject of the consumed token), its refresh
+// tokens never outlive start + max age, and refreshing past it fails.
+func TestStorage_MaxSessionAge(t *testing.T) {
+	t.Parallel()
+	const maxAge = 30 * 24 * time.Hour
+	s := New(testDB, WithMaxSessionAge(maxAge))
+	c := newClient(t, s, "")
+	userID, email := newUser(t)
+
+	// The authorization code exchange starts the session.
+	tok := newToken(t, s, c.ClientID, email, time.Now().Add(time.Hour), time.Now().Add(90*24*time.Hour))
+	var started, refreshExpires time.Time
+	require.NoError(t, testDB.QueryRow(`SELECT session_started_at, refresh_expires_at FROM mcp_oauth_tokens WHERE access_token_hash = $1`,
+		HashSecret(tok.AccessToken)).Scan(&started, &refreshExpires))
+	assert.WithinDuration(t, time.Now(), started, time.Minute)
+	assert.WithinDuration(t, started.Add(maxAge), refreshExpires, time.Second, "refresh expiry capped at the end of the session")
+
+	// The refresh omniskill performs, 29 days later: consume, then store the
+	// new token with the consumed token's subject.
+	_, err := testDB.Exec(`UPDATE mcp_oauth_tokens SET session_started_at = now() - interval '29 days' WHERE access_token_hash = $1`,
+		HashSecret(tok.AccessToken))
+	require.NoError(t, err)
+	old, err := s.GetTokenByRefresh(tok.RefreshToken)
+	require.NoError(t, err)
+	subject, carried := splitSubject(old.Subject)
+	assert.Equal(t, userID, subject)
+	refreshed := newToken(t, s, old.ClientID, old.Subject, time.Now().Add(time.Hour), time.Now().Add(90*24*time.Hour))
+	var storedSubject string
+	var refreshedStart time.Time
+	require.NoError(t, testDB.QueryRow(`SELECT subject, session_started_at, refresh_expires_at FROM mcp_oauth_tokens WHERE access_token_hash = $1`,
+		HashSecret(refreshed.AccessToken)).Scan(&storedSubject, &refreshedStart, &refreshExpires))
+	assert.Equal(t, userID, storedSubject, "the session marker is not stored in the subject")
+	assert.True(t, refreshedStart.Equal(carried), "session start %s, want %s", refreshedStart, carried)
+	assert.WithinDuration(t, time.Now().Add(24*time.Hour), refreshExpires, time.Minute, "one day of session left")
+	gotUser, err := s.UserIDForAccessToken(refreshed.AccessToken)
+	require.NoError(t, err)
+	assert.Equal(t, userID, gotUser)
+
+	// Past the session: the refresh token is consumed and refused.
+	_, err = testDB.Exec(`UPDATE mcp_oauth_tokens SET session_started_at = now() - interval '31 days' WHERE access_token_hash = $1`,
+		HashSecret(refreshed.AccessToken))
+	require.NoError(t, err)
+	_, err = s.GetTokenByRefresh(refreshed.RefreshToken)
+	assert.ErrorIs(t, err, oauth2.ErrTokenExpired)
+	_, err = s.GetTokenByRefresh(refreshed.RefreshToken)
+	assert.ErrorIs(t, err, oauth2.ErrTokenNotFound, "consumed")
+
+	// Without the option there is no cap.
+	uncapped := New(testDB)
+	tok = newToken(t, uncapped, c.ClientID, email, time.Now().Add(time.Hour), time.Now().Add(90*24*time.Hour))
+	_, err = testDB.Exec(`UPDATE mcp_oauth_tokens SET session_started_at = now() - interval '365 days' WHERE access_token_hash = $1`,
+		HashSecret(tok.AccessToken))
+	require.NoError(t, err)
+	_, err = uncapped.GetTokenByRefresh(tok.RefreshToken)
+	require.NoError(t, err)
+}
+
 // TestStorage_ExpiryCleanup is deliberately not parallel: it purges by time,
 // so it runs while no other test of this package is creating rows.
 func TestStorage_ExpiryCleanup(t *testing.T) {
@@ -434,7 +494,8 @@ func TestStorage_ExpiryCleanup(t *testing.T) {
 	assert.Zero(t, countRows(t, `SELECT COUNT(*) FROM mcp_oauth_tokens WHERE access_token_hash = $1`, HashSecret(deadToken.AccessToken)))
 	got, err := later.GetTokenByRefresh(refreshable.RefreshToken)
 	require.NoError(t, err)
-	assert.Equal(t, userID, got.Subject, "a refresh hands over the stored user id, not the email")
+	subject, _ := splitSubject(got.Subject)
+	assert.Equal(t, userID, subject, "a refresh hands over the stored user id, not the email")
 
 	// Writes purge on their own too.
 	stale := newCode(t, s, c.ClientID, email, now.Add(time.Minute))

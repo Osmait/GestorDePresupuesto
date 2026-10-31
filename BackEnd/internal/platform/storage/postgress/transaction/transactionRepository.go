@@ -321,6 +321,16 @@ func (repo *TransactionRepository) TypeOf(ctx context.Context, id string, userId
 	return t, nil
 }
 
+func (repo *TransactionRepository) AccountAndCurrencyOf(ctx context.Context, id string, userId string) (string, string, error) {
+	var accountId, currency string
+	err := txhelper.FromContext(ctx, repo.db).QueryRowContext(ctx,
+		"SELECT account_id, COALESCE(currency, 'DOP') FROM transactions WHERE id = $1 AND user_id = $2", id, userId).Scan(&accountId, &currency)
+	if err != nil {
+		return "", "", ownership.NotFoundIfNoRows(err)
+	}
+	return accountId, currency, nil
+}
+
 func (repo *TransactionRepository) Delete(ctx context.Context, id string, userId string) error {
 	result, err := txhelper.FromContext(ctx, repo.db).ExecContext(ctx, "DELETE FROM transactions WHERE id = $1 AND user_id = $2", id, userId)
 	if err != nil {

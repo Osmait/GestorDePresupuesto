@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"net"
+	"net/http"
 	"net/url"
 	"os"
 	"regexp"
@@ -68,16 +69,23 @@ type ServerConfig struct {
 
 // DatabaseConfig holds database-related configuration
 type DatabaseConfig struct {
-	User            string        `json:"user" validate:"required"`
-	Password        string        `json:"-"` // Don't include password in JSON output
-	Host            string        `json:"host" validate:"required"`
-	Name            string        `json:"name" validate:"required"`
-	Port            uint          `json:"port" validate:"required,min=1,max=65535"`
-	Type            DatabaseType  `json:"type" validate:"required,oneof=postgres sqlite"`
-	MaxOpenConns    int           `json:"max_open_conns" validate:"min=1"`
-	MaxIdleConns    int           `json:"max_idle_conns" validate:"min=1"`
-	ConnMaxLifetime time.Duration `json:"conn_max_lifetime"`
-	ConnMaxIdleTime time.Duration `json:"conn_max_idle_time"`
+	User     string `json:"user" validate:"required"`
+	Password string `json:"-"` // Don't include password in JSON output
+	// MigrationUser / MigrationPassword (DB_MIGRATION_USER,
+	// DB_MIGRATION_PASSWORD) are optional credentials used only to run the
+	// migrations, e.g. the table owner, while the application connects as a
+	// role subject to row level security (docs/SECURITY.md). Same host,
+	// database and SSL mode. Empty: the migrations use User/Password.
+	MigrationUser     string        `json:"migration_user,omitempty"`
+	MigrationPassword string        `json:"-"`
+	Host              string        `json:"host" validate:"required"`
+	Name              string        `json:"name" validate:"required"`
+	Port              uint          `json:"port" validate:"required,min=1,max=65535"`
+	Type              DatabaseType  `json:"type" validate:"required,oneof=postgres sqlite"`
+	MaxOpenConns      int           `json:"max_open_conns" validate:"min=1"`
+	MaxIdleConns      int           `json:"max_idle_conns" validate:"min=1"`
+	ConnMaxLifetime   time.Duration `json:"conn_max_lifetime"`
+	ConnMaxIdleTime   time.Duration `json:"conn_max_idle_time"`
 	// TxAcquireTimeout bounds how long an authenticated request waits for a
 	// pooled connection to open its RLS transaction (DB_TX_ACQUIRE_TIMEOUT).
 	// When the pool stays exhausted that long the request fails fast with
@@ -122,6 +130,12 @@ type JWTConfig struct {
 	// session of the user. It absorbs legitimate parallel refreshes (two tabs,
 	// app + widget). Reuse after the window is treated as token theft.
 	RefreshReuseGrace time.Duration `json:"refresh_reuse_grace"`
+	// RefreshSessionMaxAge is the absolute lifetime of a refresh session
+	// (REFRESH_SESSION_MAX_AGE, default 30 days): rotated refresh tokens
+	// inherit the session start and are not rotated past it, so the user
+	// signs in again. It also caps the MCP OAuth (Claude connector) grants.
+	// 0 disables the cap.
+	RefreshSessionMaxAge time.Duration `json:"refresh_session_max_age"`
 }
 
 // SecurityConfig holds security-related configuration
@@ -133,10 +147,18 @@ type SecurityConfig struct {
 	PasswordRequireSymbol bool          `json:"password_require_symbol"`
 	MaxLoginAttempts      int           `json:"max_login_attempts" validate:"min=1,max=100"`
 	AccountLockTime       time.Duration `json:"account_lock_time" validate:"required"`
-	SessionTimeout        time.Duration `json:"session_timeout"`
-	EnableTLS             bool          `json:"enable_tls"`
-	TLSCertFile           string        `json:"tls_cert_file"`
-	TLSKeyFile            string        `json:"tls_key_file"`
+	// Per-account (email) lockout across all client IPs: after
+	// LoginAccountMaxFailures failed passwords within LoginAccountWindow the
+	// email is locked for LoginAccountLockTime, doubling on each consecutive
+	// lockout up to LoginAccountMaxLockTime. A successful login resets it.
+	LoginAccountMaxFailures int           `json:"login_account_max_failures"`
+	LoginAccountWindow      time.Duration `json:"login_account_window"`
+	LoginAccountLockTime    time.Duration `json:"login_account_lock_time"`
+	LoginAccountMaxLockTime time.Duration `json:"login_account_max_lock_time"`
+	SessionTimeout          time.Duration `json:"session_timeout"`
+	EnableTLS               bool          `json:"enable_tls"`
+	TLSCertFile             string        `json:"tls_cert_file"`
+	TLSKeyFile              string        `json:"tls_key_file"`
 }
 
 // RateLimitConfig holds rate limiting configuration
@@ -150,12 +172,18 @@ type RateLimitConfig struct {
 	Endpoints   []EndpointRateLimitConfig `json:"endpoints"`
 }
 
-// EndpointRateLimitConfig holds rate limiting configuration for a specific endpoint
+// EndpointRateLimitConfig holds rate limiting configuration for a specific
+// endpoint. Path is exact, or a prefix when it ends in "*".
 type EndpointRateLimitConfig struct {
 	Path     string        `json:"path" validate:"required"`
 	Requests int           `json:"requests" validate:"min=1"`
 	Window   time.Duration `json:"window" validate:"required"`
-	Burst    int           `json:"burst" validate:"min=1"`
+	Burst    int           `json:"burst"`
+	// Methods restricts the limit to these HTTP methods (all when empty).
+	Methods []string `json:"methods,omitempty"`
+	// Bucket shares one quota between every endpoint with the same bucket
+	// (per client key); empty means the endpoint's own quota.
+	Bucket string `json:"bucket,omitempty"`
 }
 
 // CORSConfig holds CORS configuration
@@ -312,6 +340,13 @@ type MCPConfig struct {
 	BaseURL       string `json:"base_url"`
 	// AppURL is the web app linked from the OAuth login page (MCP_APP_URL).
 	AppURL string `json:"app_url"`
+	// TrustedRedirectHosts are OAuth redirect hosts trusted on top of
+	// claude.ai, claude.com and loopback (MCP_TRUSTED_REDIRECT_HOSTS): the
+	// consent page warns about any other host.
+	TrustedRedirectHosts []string `json:"trusted_redirect_hosts"`
+	// EnforceRedirectAllowlist makes dynamic client registration reject
+	// redirect URIs outside those hosts (MCP_ENFORCE_REDIRECT_ALLOWLIST).
+	EnforceRedirectAllowlist bool `json:"enforce_redirect_allowlist"`
 }
 
 // WebAuthnConfig holds passkey / WebAuthn relying party configuration.
@@ -376,16 +411,18 @@ func LoadConfig() (*Config, error) {
 		},
 
 		Database: DatabaseConfig{
-			User:            getEnvString("DB_USER", "osmait"),
-			Password:        getEnvString("DB_PASSWORD", "admin123"),
-			Host:            getEnvString("DB_HOST", "localhost"),
-			Name:            getEnvString("DB_NAME", "my_store"),
-			Port:            uint(getEnvInt("DB_PORT", 5432)),
-			Type:            DatabaseType(getEnvString("DB_TYPE", "postgres")),
-			MaxOpenConns:    getEnvInt("DB_MAX_OPEN_CONNS", 25),
-			MaxIdleConns:    getEnvInt("DB_MAX_IDLE_CONNS", 25),
-			ConnMaxLifetime: getDuration(getEnvString("DB_CONN_MAX_LIFETIME", "5m")),
-			ConnMaxIdleTime: getDuration(getEnvString("DB_CONN_MAX_IDLE_TIME", "5m")),
+			User:              getEnvString("DB_USER", "osmait"),
+			Password:          getEnvString("DB_PASSWORD", "admin123"),
+			MigrationUser:     getEnvString("DB_MIGRATION_USER", ""),
+			MigrationPassword: getEnvString("DB_MIGRATION_PASSWORD", ""),
+			Host:              getEnvString("DB_HOST", "localhost"),
+			Name:              getEnvString("DB_NAME", "my_store"),
+			Port:              uint(getEnvInt("DB_PORT", 5432)),
+			Type:              DatabaseType(getEnvString("DB_TYPE", "postgres")),
+			MaxOpenConns:      getEnvInt("DB_MAX_OPEN_CONNS", 25),
+			MaxIdleConns:      getEnvInt("DB_MAX_IDLE_CONNS", 25),
+			ConnMaxLifetime:   getDuration(getEnvString("DB_CONN_MAX_LIFETIME", "5m")),
+			ConnMaxIdleTime:   getDuration(getEnvString("DB_CONN_MAX_IDLE_TIME", "5m")),
 			// Each authenticated request holds exactly one connection for its
 			// RLS transaction; this bounds the wait for it.
 			TxAcquireTimeout: getEnvDuration("DB_TX_ACQUIRE_TIMEOUT", 5*time.Second),
@@ -413,20 +450,26 @@ func LoadConfig() (*Config, error) {
 			Audience:          getEnvString("JWT_AUDIENCE", "gestor-de-presupuesto-api"),
 			Algorithm:         getEnvString("JWT_ALGORITHM", "HS256"),
 			RefreshReuseGrace: getDuration(getEnvString("JWT_REFRESH_REUSE_GRACE", "30s")),
+			// 720h = 30 days.
+			RefreshSessionMaxAge: getEnvDuration("REFRESH_SESSION_MAX_AGE", 720*time.Hour),
 		},
 
 		Security: SecurityConfig{
-			PasswordMinLength:     getEnvInt("PASSWORD_MIN_LENGTH", 8),
-			PasswordRequireUpper:  getEnvBool("PASSWORD_REQUIRE_UPPER", true),
-			PasswordRequireLower:  getEnvBool("PASSWORD_REQUIRE_LOWER", true),
-			PasswordRequireDigit:  getEnvBool("PASSWORD_REQUIRE_DIGIT", true),
-			PasswordRequireSymbol: getEnvBool("PASSWORD_REQUIRE_SYMBOL", false),
-			MaxLoginAttempts:      getEnvInt("MAX_LOGIN_ATTEMPTS", 5),
-			AccountLockTime:       getDuration(getEnvString("ACCOUNT_LOCK_TIME", "15m")),
-			SessionTimeout:        getDuration(getEnvString("SESSION_TIMEOUT", "30m")),
-			EnableTLS:             getEnvBool("ENABLE_TLS", false),
-			TLSCertFile:           getEnvString("TLS_CERT_FILE", ""),
-			TLSKeyFile:            getEnvString("TLS_KEY_FILE", ""),
+			PasswordMinLength:       getEnvInt("PASSWORD_MIN_LENGTH", 8),
+			PasswordRequireUpper:    getEnvBool("PASSWORD_REQUIRE_UPPER", true),
+			PasswordRequireLower:    getEnvBool("PASSWORD_REQUIRE_LOWER", true),
+			PasswordRequireDigit:    getEnvBool("PASSWORD_REQUIRE_DIGIT", true),
+			PasswordRequireSymbol:   getEnvBool("PASSWORD_REQUIRE_SYMBOL", false),
+			MaxLoginAttempts:        getEnvInt("MAX_LOGIN_ATTEMPTS", 5),
+			AccountLockTime:         getDuration(getEnvString("ACCOUNT_LOCK_TIME", "15m")),
+			LoginAccountMaxFailures: getEnvInt("LOGIN_ACCOUNT_MAX_FAILURES", 10),
+			LoginAccountWindow:      getEnvDuration("LOGIN_ACCOUNT_WINDOW", 15*time.Minute),
+			LoginAccountLockTime:    getEnvDuration("LOGIN_ACCOUNT_LOCK_TIME", 15*time.Minute),
+			LoginAccountMaxLockTime: getEnvDuration("LOGIN_ACCOUNT_MAX_LOCK_TIME", 4*time.Hour),
+			SessionTimeout:          getDuration(getEnvString("SESSION_TIMEOUT", "30m")),
+			EnableTLS:               getEnvBool("ENABLE_TLS", false),
+			TLSCertFile:             getEnvString("TLS_CERT_FILE", ""),
+			TLSKeyFile:              getEnvString("TLS_KEY_FILE", ""),
 		},
 
 		RateLimit: RateLimitConfig{
@@ -436,14 +479,11 @@ func LoadConfig() (*Config, error) {
 			Burst:       getEnvInt("RATE_LIMIT_BURST", 50),
 			IPWhitelist: getEnvStringSlice("RATE_LIMIT_IP_WHITELIST", []string{"127.0.0.1", "::1"}),
 			UserBased:   getEnvBool("RATE_LIMIT_USER_BASED", false),
-			Endpoints: []EndpointRateLimitConfig{
-				{
-					Path:     "/auth/demo",  // Strict limit for demo user creation
-					Requests: 5,             // Only 5 requests
-					Window:   1 * time.Hour, // Per hour
-					Burst:    1,             // No burst allowed
-				},
-			},
+			Endpoints: authRateLimits(
+				getEnvInt("RATE_LIMIT_LOGIN_PER_MINUTE", 10),
+				getEnvInt("RATE_LIMIT_REGISTER_PER_MINUTE", 5),
+				getEnvInt("RATE_LIMIT_PASSKEY_PER_MINUTE", 20),
+			),
 		},
 
 		CORS: CORSConfig{
@@ -572,11 +612,13 @@ func LoadConfig() (*Config, error) {
 		},
 
 		MCP: MCPConfig{
-			Enabled:       getEnvBool("MCP_ENABLED", false),
-			ServerName:    getEnvString("MCP_SERVER_NAME", "Gestor de Presupuesto"),
-			ServerVersion: getEnvString("MCP_SERVER_VERSION", "1.0.0"),
-			BaseURL:       getEnvString("MCP_BASE_URL", ""),
-			AppURL:        getEnvString("MCP_APP_URL", "https://presupuesto.saulburgos.com"),
+			Enabled:                  getEnvBool("MCP_ENABLED", false),
+			ServerName:               getEnvString("MCP_SERVER_NAME", "Gestor de Presupuesto"),
+			ServerVersion:            getEnvString("MCP_SERVER_VERSION", "1.0.0"),
+			BaseURL:                  getEnvString("MCP_BASE_URL", ""),
+			AppURL:                   getEnvString("MCP_APP_URL", "https://presupuesto.saulburgos.com"),
+			TrustedRedirectHosts:     getEnvStringSlice("MCP_TRUSTED_REDIRECT_HOSTS", nil),
+			EnforceRedirectAllowlist: getEnvBool("MCP_ENFORCE_REDIRECT_ALLOWLIST", false),
 		},
 
 		WebAuthn: WebAuthnConfig{
@@ -725,6 +767,43 @@ func (c *Config) validateSecurity() error {
 	}
 
 	return nil
+}
+
+// authRateLimits are the per-IP limits of the unauthenticated auth endpoints,
+// stricter than the global limit: password logins (the REST logins and the
+// MCP OAuth login page share one quota), registration (bcrypt on every call),
+// passkey login ceremonies and demo user creation. A limit <= 0 drops that
+// endpoint's entry (it then falls under the global limit).
+func authRateLimits(loginPerMinute, registerPerMinute, passkeyPerMinute int) []EndpointRateLimitConfig {
+	limits := []EndpointRateLimitConfig{
+		{
+			Path:     "/auth/demo",  // Strict limit for demo user creation
+			Requests: 5,             // Only 5 requests
+			Window:   1 * time.Hour, // Per hour
+			Burst:    1,             // No burst allowed
+		},
+	}
+	if loginPerMinute > 0 {
+		for _, e := range []EndpointRateLimitConfig{
+			{Path: "/auth/login"},
+			{Path: "/login"},
+			{Path: "/oauth/authorize", Methods: []string{http.MethodPost}},
+		} {
+			e.Requests, e.Window, e.Bucket = loginPerMinute, time.Minute, "password-login"
+			limits = append(limits, e)
+		}
+	}
+	if registerPerMinute > 0 {
+		limits = append(limits, EndpointRateLimitConfig{
+			Path: "/user", Methods: []string{http.MethodPost}, Requests: registerPerMinute, Window: time.Minute,
+		})
+	}
+	if passkeyPerMinute > 0 {
+		limits = append(limits, EndpointRateLimitConfig{
+			Path: "/auth/passkey/login/*", Requests: passkeyPerMinute, Window: time.Minute,
+		})
+	}
+	return limits
 }
 
 // validateRateLimit validates rate limiting configuration
@@ -1025,6 +1104,18 @@ func (c *Config) GetPostgresUrl() string {
 		RawQuery: "sslmode=" + url.QueryEscape(c.Database.SSLMode) + "&binary_parameters=yes",
 	}
 	return u.String()
+}
+
+// GetMigrationPostgresUrl is the connection string the migrations run with:
+// GetPostgresUrl with DB_MIGRATION_USER / DB_MIGRATION_PASSWORD when set.
+func (c *Config) GetMigrationPostgresUrl() string {
+	if c.Database.MigrationUser == "" {
+		return c.GetPostgresUrl()
+	}
+	migrator := *c
+	migrator.Database.User = c.Database.MigrationUser
+	migrator.Database.Password = c.Database.MigrationPassword
+	return migrator.GetPostgresUrl()
 }
 
 // GetSQLiteUrl returns the SQLite connection string

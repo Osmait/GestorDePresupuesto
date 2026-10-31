@@ -155,11 +155,33 @@ var validSymbol = regexp.MustCompile(`^[A-Z0-9][A-Z0-9.\-]{0,14}$`)
 // ErrInvalidSymbol is returned for a symbol that is not a ticker.
 var ErrInvalidSymbol = errors.New("invalid symbol")
 
+// AssetClass tells the quote service which market a symbol belongs to, so a
+// coin whose ticker is also an equity ticker is priced as the coin.
+type AssetClass string
+
+const (
+	// AssetAny tries the equity upstreams first (Nasdaq stocks, Nasdaq
+	// ETFs), then Binance.
+	AssetAny AssetClass = ""
+	// AssetCrypto tries Binance first, then the equity upstreams.
+	AssetCrypto AssetClass = "crypto"
+)
+
+// cryptoKeyPrefix marks a crypto lookup in the cache and singleflight keys
+// (":" is not a ticker character, so it cannot collide with a symbol).
+const cryptoKeyPrefix = "crypto:"
+
 // GetQuoteContext returns the quote of symbol, from the cache when it is
 // fresh (or a recent failure). Otherwise it joins (or starts) the shared
 // upstream lookup and waits for it until ctx ends; the lookup itself keeps
 // running, bounded by quoteFetchTimeout, and fills the cache for later calls.
 func (s *QuoteService) GetQuoteContext(ctx context.Context, symbol string) (money.Amount, string, string, error) {
+	return s.GetAssetQuote(ctx, symbol, AssetAny)
+}
+
+// GetAssetQuote is GetQuoteContext for a symbol of a known asset class
+// (AssetCrypto asks Binance first).
+func (s *QuoteService) GetAssetQuote(ctx context.Context, symbol string, class AssetClass) (money.Amount, string, string, error) {
 	// Clean symbol
 	symbol = strings.ToUpper(strings.TrimSpace(symbol))
 	// The symbol goes into the upstream URLs: only ticker characters, so it
@@ -167,6 +189,11 @@ func (s *QuoteService) GetQuoteContext(ctx context.Context, symbol string) (mone
 	if !validSymbol.MatchString(symbol) {
 		return money.Zero, "", "", ErrInvalidSymbol
 	}
+	key := symbol
+	if class == AssetCrypto {
+		key = cryptoKeyPrefix + symbol
+	}
+	symbol = key
 	if s.cache == nil { // zero value (tests constructing QuoteService{})
 		return s.fetchDirect(ctx, symbol)
 	}
@@ -215,25 +242,62 @@ func (s *QuoteService) fetchDirect(ctx context.Context, symbol string) (money.Am
 }
 
 // fetchUpstream tries the upstreams in turn: Nasdaq stocks, Nasdaq ETFs,
-// then Binance.
-func (s *QuoteService) fetchUpstream(ctx context.Context, symbol string) (Quote, error) {
-	price, currency, name, err := s.fetchAll(ctx, symbol)
+// then Binance; Binance first for a crypto key (cryptoKeyPrefix).
+func (s *QuoteService) fetchUpstream(ctx context.Context, key string) (Quote, error) {
+	var (
+		price          money.Amount
+		currency, name string
+		err            error
+	)
+	if symbol, ok := strings.CutPrefix(key, cryptoKeyPrefix); ok {
+		price, currency, name, err = s.fetchCryptoFirst(ctx, symbol)
+	} else {
+		price, currency, name, err = s.fetchAll(ctx, key)
+	}
 	if err != nil {
 		return Quote{}, err
 	}
 	return Quote{Price: price, Currency: currency, Name: name}, nil
 }
 
-func (s *QuoteService) fetchAll(ctx context.Context, symbol string) (money.Amount, string, string, error) {
+// binancePair maps a coin symbol to its Binance USDT pair: BTC-USD and BTC
+// become BTCUSDT; a symbol already quoted in a stablecoin is kept.
+func binancePair(symbol string) string {
+	pair := strings.ReplaceAll(symbol, "-USD", "USDT")
+	for _, quoted := range []string{"USDT", "USDC", "FDUSD"} {
+		if strings.HasSuffix(pair, quoted) && pair != quoted {
+			return pair
+		}
+	}
+	return pair + "USDT"
+}
 
-	// Try Nasdaq first (Stocks)
+// fetchCryptoFirst prices a coin on Binance and only falls back to the
+// equity upstreams when Binance has no pair for it.
+func (s *QuoteService) fetchCryptoFirst(ctx context.Context, symbol string) (money.Amount, string, string, error) {
+	price, currency, name, err := s.fetchBinance(ctx, binancePair(symbol))
+	if err == nil {
+		return price, currency, name, nil
+	}
+	if price, currency, name, equityErr := s.fetchEquity(ctx, symbol); equityErr == nil {
+		return price, currency, name, nil
+	}
+	return money.Zero, "", "", fmt.Errorf("%w: %s", ErrQuoteUnavailable, err)
+}
+
+// fetchEquity tries Nasdaq stocks, then Nasdaq ETFs.
+func (s *QuoteService) fetchEquity(ctx context.Context, symbol string) (money.Amount, string, string, error) {
 	price, currency, name, err := s.fetchNasdaq(ctx, symbol, "stocks")
 	if err == nil {
 		return price, currency, name, nil
 	}
+	return s.fetchNasdaq(ctx, symbol, "etf")
+}
 
-	// Try Nasdaq second (ETF)
-	price, currency, name, err = s.fetchNasdaq(ctx, symbol, "etf")
+func (s *QuoteService) fetchAll(ctx context.Context, symbol string) (money.Amount, string, string, error) {
+
+	// Try Nasdaq (stocks, then ETFs) first
+	price, currency, name, err := s.fetchEquity(ctx, symbol)
 	if err == nil {
 		return price, currency, name, nil
 	}

@@ -64,6 +64,10 @@ func (m *MockTransaction) TypeOf(context.Context, string, string) (string, error
 	return "bill", nil
 }
 
+func (m *MockTransaction) AccountAndCurrencyOf(context.Context, string, string) (string, string, error) {
+	return "", "DOP", nil
+}
+
 func (m *MockTransaction) Delete(ctx context.Context, id string, userId string) error {
 	args := m.Called(ctx, id, userId)
 	return args.Error(0)

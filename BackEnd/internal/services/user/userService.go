@@ -3,6 +3,7 @@ package user
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/osmait/gestorDePresupuesto/internal/domain/user"
@@ -40,7 +41,7 @@ func (u *UserService) CreateUser(ctx context.Context, userRequest *dto.UserReque
 // CreateUserWithRole creates a user with the given role (USER or ADMIN). Only
 // for the admin-only POST /users; an empty role means USER.
 func (u *UserService) CreateUserWithRole(ctx context.Context, userRequest *dto.UserRequest, role string) error {
-	if role != "" && role != "USER" && role != "ADMIN" {
+	if role != "" && !validRole(role) {
 		return apperrors.NewValidationError("INVALID_ROLE", "role must be USER or ADMIN")
 	}
 	return u.createUser(ctx, userRequest, role)
@@ -327,9 +328,33 @@ func (u *UserService) UpdateUser(ctx context.Context, id string, userRequest *dt
 	})
 }
 
-// BatchUpdateUsers updates multiple users in a single operation.
+// sessionRevoker is implemented by the PostgreSQL user repository.
+type sessionRevoker interface {
+	// RevokeUserSessions revokes the user's refresh tokens and MCP OAuth
+	// tokens and codes (also those still keyed by oldEmail).
+	RevokeUserSessions(ctx context.Context, userID, oldEmail string) error
+}
+
+// validRole reports whether role is one of the roles the app knows.
+func validRole(role string) bool {
+	return role == user.RoleUser || role == user.RoleAdmin
+}
+
+// BatchUpdateUsers updates multiple users in a single operation (admin PUT
+// /users). Only the known roles are accepted (a validation error, 400,
+// otherwise, before anything is written). An empty email keeps the current
+// one; changing the email checks it is free and revokes the user's refresh
+// tokens and MCP OAuth tokens: the email was the OAuth subject of the grant.
 func (u *UserService) BatchUpdateUsers(ctx context.Context, updates []dto.UserResponse) error {
 	return apperrors.SafeCall(ctx, "BatchUpdateUsers", func() error {
+		for _, update := range updates {
+			if !validRole(update.Role) {
+				return apperrors.NewValidationError("INVALID_ROLE", "role must be USER or ADMIN").
+					WithContext(ctx).
+					WithOperation("BatchUpdateUsers").
+					WithDetails(map[string]interface{}{"id": update.Id, "role": update.Role})
+			}
+		}
 		for _, update := range updates {
 			// Find existing user
 			existingUser, err := u.userRepository.FindUserById(ctx, update.Id)
@@ -337,15 +362,41 @@ func (u *UserService) BatchUpdateUsers(ctx context.Context, updates []dto.UserRe
 				return apperrors.WrapDatabaseError(ctx, err, fmt.Sprintf("FindUserById for batch update: %s", update.Id))
 			}
 
+			oldEmail := existingUser.Email
+			email := strings.TrimSpace(update.Email)
+			if email == "" {
+				email = oldEmail
+			}
+			emailChanged := email != oldEmail
+			if emailChanged {
+				duplicate, err := u.userRepository.FindUserByEmail(ctx, email)
+				if err != nil && !errorhttp.IsErrNotFound(err) {
+					return apperrors.WrapDatabaseError(ctx, err, "FindUserByEmail for batch update")
+				}
+				if duplicate != nil && duplicate.Id != existingUser.Id {
+					return apperrors.NewConflictError("user", "email already exists").
+						WithContext(ctx).
+						WithOperation("BatchUpdateUsers").
+						WithDetails(map[string]interface{}{"email": email})
+				}
+			}
+
 			// Update fields
 			existingUser.Name = update.Name
 			existingUser.LastName = update.LastName
-			existingUser.Email = update.Email
+			existingUser.Email = email
 			existingUser.Role = update.Role
 
 			// Save change
 			if err := u.userRepository.Update(ctx, existingUser); err != nil {
 				return apperrors.WrapDatabaseError(ctx, err, fmt.Sprintf("Update user in batch: %s", update.Id))
+			}
+			if emailChanged {
+				if revoker, ok := u.userRepository.(sessionRevoker); ok {
+					if err := revoker.RevokeUserSessions(ctx, existingUser.Id, oldEmail); err != nil {
+						return apperrors.WrapDatabaseError(ctx, err, fmt.Sprintf("Revoke sessions in batch: %s", update.Id))
+					}
+				}
 			}
 			// Role changes must reach the auth middleware promptly.
 			u.invalidateAuthUser(ctx, update.Id)

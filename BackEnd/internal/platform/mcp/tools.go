@@ -77,7 +77,7 @@ func (s *MCPServer) registerTools() {
 			mcp.WithString("account_id", mcp.Required(), mcp.Description("Account ID")),
 			mcp.WithString("category_id", mcp.Required(), mcp.Description("Category ID")),
 			mcp.WithString("description", mcp.Description("Optional description")),
-			mcp.WithString("currency", mcp.Description("Currency code (DOP or USD). Defaults to the account's currency")),
+			mcp.WithString("currency", mcp.Description("Currency code (DOP or USD). Omit it to keep the transaction's current currency (or, when account_id changes, to use that account's currency)")),
 			mcp.WithString("date", mcp.Description("Transaction date, YYYY-MM-DD or RFC3339. Pass the current date to keep it (list_transactions shows it)")),
 		),
 		s.handleUpdateTransaction,
@@ -462,6 +462,19 @@ func (s *MCPServer) handleUpdateTransaction(ctx context.Context, req mcp.CallToo
 	)
 	updated.UserId = userID
 	updated.Currency = req.GetString("currency", "")
+	if updated.Currency == "" {
+		// Omitted: keep the transaction's own currency while it stays on the
+		// same account. Resolving it from the account would turn a US$100
+		// charge on a DOP card into RD$100. Moved to another account, the
+		// currency is that account's (as before).
+		currentAccount, currentCurrency, curErr := s.services.Transaction.TransactionAccountAndCurrency(txCtx, id, userID)
+		if curErr != nil {
+			return mcp.NewToolResultError(fmt.Sprintf("failed to update transaction: %s", curErr)), nil
+		}
+		if currentAccount == accountID {
+			updated.Currency = currentCurrency
+		}
+	}
 	if dateStr := req.GetString("date", ""); dateStr != "" {
 		parsed, perr := parseTransactionDate(dateStr)
 		if perr != nil {

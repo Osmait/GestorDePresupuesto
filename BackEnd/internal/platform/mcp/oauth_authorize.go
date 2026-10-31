@@ -40,10 +40,13 @@ type authorizeHandler struct {
 	codeExpiry time.Duration
 	appURL     string
 	now        func() time.Time
+	// redirects tells which redirect hosts are known (the page warns about
+	// the others). nil trusts only the defaults.
+	redirects *redirectAllowlist
 }
 
 // authorizeRequest holds the OAuth parameters carried from the GET query to
-// the form's hidden fields.
+// the form's hidden fields, plus the access level picked on the page.
 type authorizeRequest struct {
 	ClientID            string
 	RedirectURI         string
@@ -51,6 +54,9 @@ type authorizeRequest struct {
 	Scope               string
 	CodeChallenge       string
 	CodeChallengeMethod string
+	// Access is the access level the user picked (accessRead downgrades the
+	// requested scope to read-only); empty means as requested.
+	Access string
 }
 
 func readAuthorizeRequest(v url.Values) authorizeRequest {
@@ -61,7 +67,17 @@ func readAuthorizeRequest(v url.Values) authorizeRequest {
 		Scope:               v.Get("scope"),
 		CodeChallenge:       v.Get("code_challenge"),
 		CodeChallengeMethod: v.Get("code_challenge_method"),
+		Access:              v.Get("access"),
 	}
+}
+
+// redirectTrusted reports whether the redirect URI goes to a known host.
+func (h *authorizeHandler) redirectTrusted(redirectURI string) bool {
+	allow := h.redirects
+	if allow == nil {
+		allow = newRedirectAllowlist(nil)
+	}
+	return allow.trusted(redirectURI)
 }
 
 func (h *authorizeHandler) serve(w http.ResponseWriter, r *http.Request, clientIP string) {
@@ -190,11 +206,13 @@ func (h *authorizeHandler) handlePost(w http.ResponseWriter, r *http.Request, lo
 		return
 	}
 	now := h.now()
+	// The user may have narrowed the grant to read-only on the page.
+	scope := grantedScope(req.Scope, req.Access)
 	if err := h.storage.CreateAuthorizationCode(&oauth2.AuthorizationCode{
 		Code:                code,
 		ClientID:            req.ClientID,
 		RedirectURI:         req.RedirectURI,
-		Scope:               req.Scope,
+		Scope:               scope,
 		CodeChallenge:       req.CodeChallenge,
 		CodeChallengeMethod: req.CodeChallengeMethod,
 		Subject:             email,
@@ -206,7 +224,9 @@ func (h *authorizeHandler) handlePost(w http.ResponseWriter, r *http.Request, lo
 		return
 	}
 
-	log.Info().Str("client_id", req.ClientID).Msg("oauth authorize: authorization code issued")
+	log.Info().Str("client_id", req.ClientID).Bool("read_only", isReadOnlyScope(scope)).
+		Bool("trusted_redirect", h.redirectTrusted(req.RedirectURI)).
+		Msg("oauth authorize: authorization code issued")
 	redirectWithParams(w, r, req.RedirectURI, url.Values{"code": {code}}, req.State)
 }
 

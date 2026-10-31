@@ -49,8 +49,8 @@ var (
 	ErrTooManyLoginAttempts = errors.New("too many failed login attempts")
 )
 
-// LoginLockedError is returned while an (email, IP) pair is locked out after
-// too many failed password attempts.
+// LoginLockedError is returned while an (email, IP) pair, or the account
+// itself, is locked out after too many failed password attempts.
 type LoginLockedError struct {
 	RetryAfter time.Duration
 }
@@ -61,6 +61,15 @@ func (e *LoginLockedError) Error() string {
 
 // Is makes errors.Is(err, ErrTooManyLoginAttempts) true.
 func (e *LoginLockedError) Is(target error) bool { return target == ErrTooManyLoginAttempts }
+
+// Colors of the seeded demo categories: the green, orange and blue of the
+// frontend category palette (FrontendNextjs/gestor/lib/category-color.ts).
+// CSS names such as "blue" (#0000FF) are nearly invisible on the dark theme.
+const (
+	seedColorGreen  = "#22C55E"
+	seedColorOrange = "#F97316"
+	seedColorBlue   = "#3B82F6"
+)
 
 // defaultRefreshReuseGrace is used when the config does not set one.
 const defaultRefreshReuseGrace = 30 * time.Second
@@ -94,6 +103,25 @@ type AuthService struct {
 	refreshTokenRepo authRepo.RefreshTokenRepositoryInterface
 	config           *config.Config
 	loginLimiter     *loginAttemptLimiter
+	accountLimiter   *accountLoginLimiter
+	// userTx runs fn in a transaction scoped to userID (txhelper.WithUserTx);
+	// nil runs fn directly (tests without a database).
+	userTx func(ctx context.Context, userID string, fn func(ctx context.Context) error) error
+}
+
+// UseUserTransactions makes the unauthenticated flows that write a user's
+// rows (demo user creation) run them through run, a transaction scoped to
+// that user (txhelper.WithUserTx), so row level security accepts the writes
+// under a database role that does not bypass it.
+func (a *AuthService) UseUserTransactions(run func(ctx context.Context, userID string, fn func(ctx context.Context) error) error) {
+	a.userTx = run
+}
+
+func (a *AuthService) inUserTx(ctx context.Context, userID string, fn func(ctx context.Context) error) error {
+	if a.userTx == nil {
+		return fn(ctx)
+	}
+	return a.userTx(ctx, userID, fn)
 }
 
 func newLoginLimiterFromConfig(cfg *config.Config) *loginAttemptLimiter {
@@ -101,6 +129,14 @@ func newLoginLimiterFromConfig(cfg *config.Config) *loginAttemptLimiter {
 		return newLoginAttemptLimiter(0, 0)
 	}
 	return newLoginAttemptLimiter(cfg.Security.MaxLoginAttempts, cfg.Security.AccountLockTime)
+}
+
+func newAccountLimiterFromConfig(cfg *config.Config) *accountLoginLimiter {
+	if cfg == nil {
+		return newAccountLoginLimiter(0, 0, 0, 0)
+	}
+	s := cfg.Security
+	return newAccountLoginLimiter(s.LoginAccountMaxFailures, s.LoginAccountWindow, s.LoginAccountLockTime, s.LoginAccountMaxLockTime)
 }
 
 // NewAuthService creates a new instance of AuthService with necessary dependencies.
@@ -120,6 +156,7 @@ func NewAuthService(
 		transactionRepo: transactionRepo,
 		config:          config,
 		loginLimiter:    newLoginLimiterFromConfig(config),
+		accountLimiter:  newAccountLimiterFromConfig(config),
 	}
 }
 
@@ -142,16 +179,19 @@ func NewAuthServiceWithRefreshTokens(
 		refreshTokenRepo: refreshTokenRepo,
 		config:           config,
 		loginLimiter:     newLoginLimiterFromConfig(config),
+		accountLimiter:   newAccountLimiterFromConfig(config),
 	}
 }
 
 // authenticate verifies email + password with constant work (one bcrypt
 // comparison whether or not the user exists), enforces the per (email, IP)
-// failed-attempt lockout, and returns ErrInvalidCredentials for both an
-// unknown email and a wrong password.
+// and per account failed-attempt lockouts, and returns ErrInvalidCredentials
+// for both an unknown email and a wrong password. It is shared by the REST
+// logins and the MCP OAuth login page.
 func (a *AuthService) authenticate(ctx context.Context, authRequest *authDomain.AuthRequest, ipAddress string) (*userDomain.User, error) {
 	key := loginAttemptKey(authRequest.Email, ipAddress)
-	if wait := a.loginLimiter.retryAfter(key); wait > 0 {
+	wait := max(a.loginLimiter.retryAfter(key), a.accountLimiter.retryAfter(authRequest.Email))
+	if wait > 0 {
 		return nil, &LoginLockedError{RetryAfter: wait}
 	}
 
@@ -173,10 +213,18 @@ func (a *AuthService) authenticate(ctx context.Context, authRequest *authDomain.
 		if lock := a.loginLimiter.recordFailure(key); lock > 0 {
 			log.Warn().Str("ip", ipAddress).Msg("login locked out after too many failed attempts")
 		}
+		if lock := a.accountLimiter.recordFailure(authRequest.Email); lock > 0 {
+			ev := log.Warn().Str("ip", ipAddress).Dur("lock", lock)
+			if found {
+				ev = ev.Str("user_id", user.Id)
+			}
+			ev.Msg("account locked out after too many failed attempts across clients")
+		}
 		return nil, ErrInvalidCredentials
 	}
 
 	a.loginLimiter.recordSuccess(key)
+	a.accountLimiter.recordSuccess(authRequest.Email)
 	log.Debug().Str("user_id", user.Id).Msg("user authenticated successfully")
 	return user, nil
 }
@@ -260,8 +308,9 @@ func (a *AuthService) RefreshTokens(ctx context.Context, refreshToken, userAgent
 
 	// Atomic rotation: revoke-old + insert-new in one transaction, guarded by
 	// a conditional UPDATE so concurrent refreshes of the same token cannot
-	// both succeed.
-	userId, err := a.refreshTokenRepo.Rotate(ctx, tokenHash, newRefreshToken, now)
+	// both succeed. The new token inherits the session start and is not
+	// issued past the absolute session lifetime.
+	userId, err := a.refreshTokenRepo.Rotate(ctx, tokenHash, newRefreshToken, now, a.refreshSessionMaxAge())
 	if errors.Is(err, authRepo.ErrTokenNotActive) {
 		return nil, a.rejectInactiveRefreshToken(ctx, tokenHash, now)
 	}
@@ -287,6 +336,14 @@ func (a *AuthService) RefreshTokens(ctx context.Context, refreshToken, userAgent
 	), nil
 }
 
+// refreshSessionMaxAge is the absolute session lifetime (0: no cap).
+func (a *AuthService) refreshSessionMaxAge() time.Duration {
+	if a.config == nil || a.config.JWT.RefreshSessionMaxAge < 0 {
+		return 0
+	}
+	return a.config.JWT.RefreshSessionMaxAge
+}
+
 func (a *AuthService) refreshReuseGrace() time.Duration {
 	if a.config.JWT.RefreshReuseGrace > 0 {
 		return a.config.JWT.RefreshReuseGrace
@@ -299,7 +356,7 @@ func (a *AuthService) refreshReuseGrace() time.Duration {
 //   - unknown token                         → ErrInvalidRefreshToken
 //   - rotated less than the grace ago       → ErrRefreshTokenRotated (no side effects)
 //   - revoked otherwise (stale reuse/theft) → revoke all user sessions, ErrTokenReuse
-//   - expired                               → ErrRefreshTokenExpired
+//   - expired, or session older than the max age → ErrRefreshTokenExpired
 func (a *AuthService) rejectInactiveRefreshToken(ctx context.Context, tokenHash string, now time.Time) error {
 	storedToken, err := a.refreshTokenRepo.FindByHash(ctx, tokenHash)
 	if err != nil {
@@ -330,6 +387,14 @@ func (a *AuthService) rejectInactiveRefreshToken(ctx context.Context, tokenHash 
 	}
 
 	if storedToken.IsExpired() {
+		return ErrRefreshTokenExpired
+	}
+	if maxAge := a.refreshSessionMaxAge(); maxAge > 0 && !storedToken.SessionStartedAt.IsZero() &&
+		!now.Before(storedToken.SessionStartedAt.Add(maxAge)) {
+		log.Info().
+			Str("user_id", storedToken.UserId).
+			Str("token_id", storedToken.Id).
+			Msg("refresh session reached its maximum age")
 		return ErrRefreshTokenExpired
 	}
 	return ErrInvalidRefreshToken
@@ -382,9 +447,29 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	user.Confirmed = true
 	user.IpAddress = ip
 
+	// The rows are written in one transaction scoped to the new user, so the
+	// row level security policies accept them even under a role that does
+	// not bypass RLS (this route runs before anyone is authenticated).
+	if err := a.inUserTx(ctx, userID, func(ctx context.Context) error { return a.seedDemoUser(ctx, user) }); err != nil {
+		return nil, err
+	}
+
+	// Logic for Token
+	token, err := utils.CreateAccessToken(user.Id, a.config.JWT)
+	if err != nil {
+		return nil, err
+	}
+
+	return token, nil
+}
+
+// seedDemoUser saves the demo user and its account, categories, budget and
+// transactions.
+func (a *AuthService) seedDemoUser(ctx context.Context, user *userDomain.User) error {
+	userID := user.Id
 	if err := a.repo.Save(ctx, user); err != nil {
 		log.Error().Err(err).Msg("failed to save demo user")
-		return nil, err
+		return err
 	}
 
 	// 2. Create Account
@@ -393,34 +478,34 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	account.UserId = userID
 	if err := a.accountRepo.Save(ctx, account); err != nil {
 		log.Error().Err(err).Msg("failed to save demo account")
-		return nil, err
+		return err
 	}
 
 	// 3. Create Categories
 	// Income
 	salaryCatID := uuid.New().String()
-	salaryCat := categoryDomain.NewCategory(salaryCatID, "Salario", "💰", "green")
+	salaryCat := categoryDomain.NewCategory(salaryCatID, "Salario", "💰", seedColorGreen)
 	salaryCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, salaryCat); err != nil {
 		log.Error().Err(err).Msg("failed to save salary category")
-		return nil, err
+		return err
 	}
 
 	// Expense
 	foodCatID := uuid.New().String()
-	foodCat := categoryDomain.NewCategory(foodCatID, "Comida", "🍔", "orange")
+	foodCat := categoryDomain.NewCategory(foodCatID, "Comida", "🍔", seedColorOrange)
 	foodCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, foodCat); err != nil {
 		log.Error().Err(err).Msg("failed to save food category")
-		return nil, err
+		return err
 	}
 
 	transportCatID := uuid.New().String()
-	transportCat := categoryDomain.NewCategory(transportCatID, "Transporte", "🚌", "blue")
+	transportCat := categoryDomain.NewCategory(transportCatID, "Transporte", "🚌", seedColorBlue)
 	transportCat.UserId = userID
 	if err := a.categoryRepo.Save(ctx, transportCat); err != nil {
 		log.Error().Err(err).Msg("failed to save transport category")
-		return nil, err
+		return err
 	}
 
 	// 4. Create Budget (Optional)
@@ -455,14 +540,7 @@ func (a *AuthService) CreateDemoUser(ctx context.Context, ip string) (*string, e
 	tx3.UserId = userID
 	tx3.CreatedAt = now.AddDate(0, 0, -5)
 	_ = a.transactionRepo.Save(ctx, tx3)
-
-	// Logic for Token
-	token, err := utils.CreateAccessToken(user.Id, a.config.JWT)
-	if err != nil {
-		return nil, err
-	}
-
-	return token, nil
+	return nil
 }
 
 // CreateDemoUserWithTokens creates a demo user and returns both tokens

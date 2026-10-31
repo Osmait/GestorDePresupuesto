@@ -80,9 +80,17 @@ export class InvestmentRepository extends BaseRepository {
 		}
 	}
 
-	async getQuote(symbol: string): Promise<{ regular_market_price: number; symbol: string; name?: string } | null> {
+	// type 'crypto' prices the symbol as a coin (Binance first), so a coin whose
+	// ticker is also a stock ticker is not quoted as the stock.
+	async getQuote(
+		symbol: string,
+		type?: string,
+	): Promise<{ regular_market_price: number; symbol: string; name?: string } | null> {
+		const query = type === 'crypto' ? '?type=crypto' : ''
 		try {
-			return await this.get<{ regular_market_price: number; symbol: string; name?: string }>(`/quotes/${symbol}`)
+			return await this.get<{ regular_market_price: number; symbol: string; name?: string }>(
+				`/quotes/${encodeURIComponent(symbol)}${query}`,
+			)
 		} catch (error) {
 			console.error('Error fetching quote:', error)
 			return null

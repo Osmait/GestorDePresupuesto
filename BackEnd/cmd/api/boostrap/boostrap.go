@@ -137,6 +137,7 @@ func Run() error {
 		return fmt.Errorf("failed to run migrations: %w", err)
 	}
 	warnOnTimezoneMismatch(ctx, db, cfg.Server.Timezone)
+	logRowLevelSecurity(ctx, db)
 
 	// Wire repositories, services and the HTTP router.
 	app, err := NewAppWithTelemetry(ctx, cfg, db, tel)
@@ -234,6 +235,11 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize services: %w", err)
 	}
+	// Demo user creation runs before anyone is authenticated: its rows are
+	// written in a transaction scoped to the new user (row level security).
+	svcs.authService.UseUserTransactions(func(ctx context.Context, userID string, fn func(ctx context.Context) error) error {
+		return txhelper.WithUserTx(ctx, db, userID, false, fn)
+	})
 
 	// Conditionally create the MCP server if enabled in config
 	var mcpServer *mcp.MCPServer
@@ -261,7 +267,7 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 		// development only) keep them in memory.
 		var oauthStorage oauth2.Storage
 		if cfg.Database.Type == config.DatabaseTypePostgres {
-			oauthStorage = mcpOAuthRepo.New(db)
+			oauthStorage = mcpOAuthRepo.New(db, mcpOAuthRepo.WithMaxSessionAge(cfg.JWT.RefreshSessionMaxAge))
 		} else {
 			log.Warn().Str("db_type", string(cfg.Database.Type)).
 				Msg("MCP OAuth state is kept in memory: Claude connections are lost on restart")
@@ -271,6 +277,10 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 			Authenticator: mcp.AuthServiceAuthenticator{Service: svcs.authService},
 			Storage:       oauthStorage,
 			AppURL:        cfg.MCP.AppURL,
+			// The consent page warns about other redirect hosts; with the
+			// enforcement flag, registration rejects them.
+			TrustedRedirectHosts:     cfg.MCP.TrustedRedirectHosts,
+			EnforceRedirectAllowlist: cfg.MCP.EnforceRedirectAllowlist,
 		})
 		if err != nil {
 			return nil, fmt.Errorf("failed to create OAuth server: %w", err)
@@ -390,7 +400,12 @@ func runMigrations(cfg *config.Config, logger *observability.Logger) error {
 		// Migrations are embedded in the binary, so this does not depend on the
 		// process working directory. A dirty migration state is returned as an
 		// error and the application refuses to start.
-		return utils.RunMigrationsFromFS(migrationsdb.Migrations, migrationsdb.MigrationsDir, cfg.GetPostgresUrl())
+		// DB_MIGRATION_USER, when set, runs them as another role (e.g. the
+		// table owner) than the application's.
+		if cfg.Database.MigrationUser != "" {
+			logger.WithField("migration_user", cfg.Database.MigrationUser).Info("Running migrations with dedicated credentials")
+		}
+		return utils.RunMigrationsFromFS(migrationsdb.Migrations, migrationsdb.MigrationsDir, cfg.GetMigrationPostgresUrl())
 	default:
 		return fmt.Errorf("unsupported database type for migrations: %s", cfg.Database.Type)
 	}
@@ -564,6 +579,32 @@ func warnOnTimezoneMismatch(ctx context.Context, db *sql.DB, timezone string) {
 			Str("db_app_timezone", dbTimezone).
 			Msg("APP_TIMEZONE differs from the database app_timezone(): budget months and the analytics rollup use the database zone")
 	}
+}
+
+// logRowLevelSecurity logs whether the row level security policies apply to
+// the database role the application connects as. A superuser or BYPASSRLS
+// role (common for the owner role a managed database hands out) turns every
+// policy into a no-op, leaving the application's own WHERE user_id filters
+// as the only isolation between users. Startup never fails on it.
+func logRowLevelSecurity(ctx context.Context, db *sql.DB) {
+	status, err := txhelper.CheckRowLevelSecurity(ctx, db)
+	if err != nil {
+		log.Warn().Err(err).Msg("could not verify row level security")
+		return
+	}
+	if status.Enforced() {
+		log.Info().Str("db_role", status.Role).Msg("row level security enforced")
+		return
+	}
+	log.Warn().
+		Str("db_role", status.Role).
+		Bool("rolsuper", status.Superuser).
+		Bool("rolbypassrls", status.BypassRLS).
+		Bool("table_owner", status.TableOwner).
+		Bool("forced", status.Forced).
+		Bool("rows_visible_to_probe", status.LeakedRows).
+		Str("docs", "BackEnd/docs/SECURITY.md#database-role-and-row-level-security").
+		Msg("row level security is bypassed by the database role")
 }
 
 // initializeAIService creates the AI service instance (on provider when

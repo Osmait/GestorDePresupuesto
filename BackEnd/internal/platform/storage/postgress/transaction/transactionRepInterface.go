@@ -29,6 +29,9 @@ type TransactionRepositoryInterface interface {
 	// TypeOf returns the type of transaction id owned by userId
 	// (ownership.ErrNotFound otherwise).
 	TypeOf(ctx context.Context, id string, userId string) (string, error)
+	// AccountAndCurrencyOf returns the account and currency of transaction
+	// id owned by userId (ownership.ErrNotFound otherwise).
+	AccountAndCurrencyOf(ctx context.Context, id string, userId string) (accountId string, currency string, err error)
 	Update(ctx context.Context, id string, transaction *transaction.Transaction) error
 	FindAllOfAllAccountsWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)
 	FindAllWithFilters(ctx context.Context, userId string, filter *dto.TransactionFilter) ([]*transaction.Transaction, error)

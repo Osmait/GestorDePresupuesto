@@ -316,3 +316,74 @@ func TestUpdateUserWithExistingEmail(t *testing.T) {
 	assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeConflict))
 	mockRepo.AssertExpectations(t)
 }
+
+func (m *MockUserRepostory) RevokeUserSessions(ctx context.Context, userID, oldEmail string) error {
+	args := m.Called(ctx, userID, oldEmail)
+	return args.Error(0)
+}
+
+// PUT /users accepts only the known roles; nothing is written otherwise.
+func TestBatchUpdateUsers_RejectsUnknownRole(t *testing.T) {
+	for _, role := range []string{"ROOT", "admin", "", "SUPERADMIN"} {
+		mockRepo := &MockUserRepostory{}
+		user1 := utils.GetNewRandomUser()
+		err := NewUserService(mockRepo).BatchUpdateUsers(context.Background(), []dto.UserResponse{
+			{Id: user1.Id, Name: user1.Name, LastName: user1.LastName, Email: user1.Email, Role: "USER"},
+			{Id: "other", Name: "x", Email: "x@example.com", Role: role},
+		})
+		assert.Error(t, err, role)
+		assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeValidation), role)
+		mockRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+		mockRepo.AssertNotCalled(t, "FindUserById", mock.Anything, mock.Anything)
+	}
+}
+
+// Changing the email through the admin revokes the user's sessions (the old
+// email was the subject of their MCP OAuth grants); a role-only change does not.
+func TestBatchUpdateUsers_EmailChangeRevokesSessions(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	user1 := utils.GetNewRandomUser()
+	oldEmail := user1.Email
+	ctx := context.Background()
+	mockRepo.On("FindUserById", ctx, user1.Id).Return(user1, nil)
+	mockRepo.On("FindUserByEmail", ctx, "new@example.com").Return(nil, errorhttp.ErrNotFound)
+	mockRepo.On("Update", ctx, mock.MatchedBy(func(u *user.User) bool {
+		return u.Email == "new@example.com" && u.Role == "ADMIN"
+	})).Return(nil)
+	mockRepo.On("RevokeUserSessions", ctx, user1.Id, oldEmail).Return(nil)
+
+	err := NewUserService(mockRepo).BatchUpdateUsers(ctx, []dto.UserResponse{
+		{Id: user1.Id, Name: user1.Name, LastName: user1.LastName, Email: " new@example.com ", Role: "ADMIN"},
+	})
+	assert.NoError(t, err)
+	mockRepo.AssertExpectations(t)
+
+	// Same email (or none): no revocation.
+	mockRepo = &MockUserRepostory{}
+	user2 := utils.GetNewRandomUser()
+	mockRepo.On("FindUserById", ctx, user2.Id).Return(user2, nil)
+	mockRepo.On("Update", ctx, mock.MatchedBy(func(u *user.User) bool { return u.Email == user2.Email })).Return(nil)
+	err = NewUserService(mockRepo).BatchUpdateUsers(ctx, []dto.UserResponse{
+		{Id: user2.Id, Name: user2.Name, Email: user2.Email, Role: "USER"},
+		{Id: user2.Id, Name: user2.Name, Email: "", Role: "USER"},
+	})
+	assert.NoError(t, err)
+	mockRepo.AssertNotCalled(t, "RevokeUserSessions", mock.Anything, mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "FindUserByEmail", mock.Anything, mock.Anything)
+}
+
+func TestBatchUpdateUsers_EmailTakenIsConflict(t *testing.T) {
+	mockRepo := &MockUserRepostory{}
+	user1 := utils.GetNewRandomUser()
+	user2 := utils.GetNewRandomUser()
+	ctx := context.Background()
+	mockRepo.On("FindUserById", ctx, user1.Id).Return(user1, nil)
+	mockRepo.On("FindUserByEmail", ctx, user2.Email).Return(user2, nil)
+
+	err := NewUserService(mockRepo).BatchUpdateUsers(ctx, []dto.UserResponse{
+		{Id: user1.Id, Name: user1.Name, Email: user2.Email, Role: "USER"},
+	})
+	assert.True(t, appErrors.IsErrorType(err, appErrors.ErrorTypeConflict))
+	mockRepo.AssertNotCalled(t, "Update", mock.Anything, mock.Anything)
+	mockRepo.AssertNotCalled(t, "RevokeUserSessions", mock.Anything, mock.Anything, mock.Anything)
+}

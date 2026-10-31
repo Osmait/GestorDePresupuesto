@@ -17,18 +17,25 @@ type RefreshToken struct {
 	ReplacedBy *string    `json:"replaced_by,omitempty"`
 	UserAgent  string     `json:"user_agent,omitempty"`
 	IpAddress  string     `json:"ip_address,omitempty"`
+	// SessionStartedAt is when the session (the login) began. Rotated tokens
+	// inherit it, so a session cannot be extended past an absolute lifetime
+	// by rotating forever.
+	SessionStartedAt time.Time `json:"session_started_at"`
 }
 
 // NewRefreshToken creates a new RefreshToken instance
+// (the first of a new session: SessionStartedAt is its creation time).
 func NewRefreshToken(id, userId, tokenHash, userAgent, ipAddress string, expiresAt time.Time) *RefreshToken {
+	now := time.Now()
 	return &RefreshToken{
-		Id:        id,
-		UserId:    userId,
-		TokenHash: tokenHash,
-		ExpiresAt: expiresAt,
-		CreatedAt: time.Now(),
-		UserAgent: userAgent,
-		IpAddress: ipAddress,
+		Id:               id,
+		UserId:           userId,
+		TokenHash:        tokenHash,
+		ExpiresAt:        expiresAt,
+		CreatedAt:        now,
+		UserAgent:        userAgent,
+		IpAddress:        ipAddress,
+		SessionStartedAt: now,
 	}
 }
 

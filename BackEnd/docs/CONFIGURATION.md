@@ -61,6 +61,8 @@ The application uses a comprehensive configuration system that supports:
 | `DB_CONN_MAX_IDLE_TIME` | `5m` | Connection maximum idle time |
 | `DB_TX_ACQUIRE_TIMEOUT` | `5s` | How long an authenticated request waits for a pooled connection to open its RLS transaction. When the pool stays exhausted that long the request fails fast with `503` + `Retry-After: 1` instead of queueing indefinitely. `0` disables the bound. |
 | `DB_SSL_MODE` | `disable` | SSL mode: `disable`, `require`, `verify-ca`, `verify-full` |
+| `DB_MIGRATION_USER` | | Optional role that runs the migrations at startup (e.g. the table owner) while `DB_USER` is a role subject to row level security. Empty: the migrations use `DB_USER`. See [SECURITY.md](SECURITY.md#database-role-and-row-level-security) |
+| `DB_MIGRATION_PASSWORD` | | Password of `DB_MIGRATION_USER` |
 | `DB_STATEMENT_TIMEOUT` | `15s` | `statement_timeout` set locally in every per-user transaction (requests, AI routes, MCP tools, recurring scheduler). A query past it is cancelled and the request fails with `503`. `0` disables it. |
 | `DB_IDLE_IN_TX_TIMEOUT` | `30s` | `idle_in_transaction_session_timeout` set locally in the same transactions, so a stuck handler cannot pin a connection. `0` disables it. |
 | `DB_REQUEST_TIMEOUT` | `60s` | Deadline of an authenticated request that holds the RLS transaction; on expiry the transaction is rolled back and the connection released. `0` disables it. |
@@ -82,6 +84,8 @@ The application uses a comprehensive configuration system that supports:
 | `JWT_SECRET` | Generated | JWT secret key (minimum 32 characters) |
 | `JWT_EXPIRATION` | `15m` | Access token lifetime (not revocable; clients use the refresh token) |
 | `JWT_REFRESH_EXPIRATION` | `168h` | JWT refresh token expiration (7 days) |
+| `JWT_REFRESH_REUSE_GRACE` | `30s` | A rotated refresh token presented again within this window gets a 401 without revoking the user's sessions (parallel refreshes); later reuse is treated as theft and revokes them all |
+| `REFRESH_SESSION_MAX_AGE` | `720h` | Absolute lifetime of a login (30 days). Rotated refresh tokens inherit the session start, never expire later than start + this, and are not rotated past it, so the user signs in again. Also caps MCP OAuth (Claude connector) grants from the consent-page login. `0` disables the cap |
 | `JWT_ISSUER` | `gestor-de-presupuesto` | JWT issuer |
 | `JWT_ALGORITHM` | `HS256` | JWT algorithm |
 
@@ -94,8 +98,12 @@ The application uses a comprehensive configuration system that supports:
 | `PASSWORD_REQUIRE_LOWER` | `true` | Require lowercase letters |
 | `PASSWORD_REQUIRE_DIGIT` | `true` | Require digits |
 | `PASSWORD_REQUIRE_SYMBOL` | `false` | Require special characters |
-| `MAX_LOGIN_ATTEMPTS` | `5` | Maximum login attempts (1-100) |
-| `ACCOUNT_LOCK_TIME` | `15m` | Account lock duration |
+| `MAX_LOGIN_ATTEMPTS` | `5` | Failed password logins per (email, client IP) before that pair is locked (1-100) |
+| `ACCOUNT_LOCK_TIME` | `15m` | Lock duration of an (email, client IP) pair |
+| `LOGIN_ACCOUNT_MAX_FAILURES` | `10` | Failed password logins per account (email) across all client IPs, within `LOGIN_ACCOUNT_WINDOW`, before the account is locked. Applies to `/auth/login`, `/login` and the MCP OAuth login page; passkey login is not affected |
+| `LOGIN_ACCOUNT_WINDOW` | `15m` | Window in which the account failures are counted |
+| `LOGIN_ACCOUNT_LOCK_TIME` | `15m` | First account lock; each consecutive lock (no successful login in between) doubles it |
+| `LOGIN_ACCOUNT_MAX_LOCK_TIME` | `4h` | Upper bound of the account lock. A successful login resets the backoff |
 | `SESSION_TIMEOUT` | `30m` | Session timeout |
 | `ENABLE_TLS` | `false` | Enable TLS/HTTPS |
 | `TLS_CERT_FILE` | | TLS certificate file |
@@ -111,6 +119,11 @@ The application uses a comprehensive configuration system that supports:
 | `RATE_LIMIT_BURST` | `50` | Burst size |
 | `RATE_LIMIT_IP_WHITELIST` | `127.0.0.1,::1` | IP whitelist (comma-separated) |
 | `RATE_LIMIT_USER_BASED` | `true` | Enable user-based rate limiting |
+| `RATE_LIMIT_LOGIN_PER_MINUTE` | `10` | Password logins per client IP per minute, one quota shared by `POST /auth/login`, `POST /login` and `POST /oauth/authorize`. `0` leaves them under the global limit |
+| `RATE_LIMIT_REGISTER_PER_MINUTE` | `5` | `POST /user` (registration, a bcrypt hash per call) per client IP per minute. `0` leaves it under the global limit |
+| `RATE_LIMIT_PASSKEY_PER_MINUTE` | `20` | `/auth/passkey/login/*` requests (two per login) per client IP per minute. `0` leaves them under the global limit |
+
+Limited requests get `429` with `Retry-After`. Login lockouts (above) also answer `429` with `Retry-After`. The per-IP limits key on the resolved client IP: behind the Next.js frontend set `PROXY_SHARED_SECRET` on both sides, otherwise every browser shares the frontend server's IP and quota.
 
 ### CORS Configuration
 
@@ -191,6 +204,15 @@ The application uses a comprehensive configuration system that supports:
 | `MIDDLEWARE_ENABLE_COMPRESSION` | `false` | Enable compression middleware |
 | `MIDDLEWARE_ENABLE_AUTHENTICATION` | `true` | Enable authentication middleware |
 | `MIDDLEWARE_ENABLE_VALIDATION` | `true` | Enable validation middleware |
+
+### MCP OAuth (Claude connector)
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `MCP_TRUSTED_REDIRECT_HOSTS` | | Extra OAuth redirect hosts (comma-separated host names) trusted on top of `claude.ai`, `claude.com` and loopback (`localhost`, `127.0.0.1`, `[::1]`). The consent page shows a warning for a client whose redirect URI goes anywhere else (or to a trusted host over plain `http`, or to a native-app scheme) |
+| `MCP_ENFORCE_REDIRECT_ALLOWLIST` | `false` | When `true`, dynamic client registration (`POST /oauth/register`) rejects any redirect URI outside those hosts with `400 invalid_redirect_uri`. Already registered clients keep working (with the warning) |
+
+The consent page shows the access level the client asked for. For a full-access request the user can pick **read-only** instead; the code and every refreshed token then carry `mcp:read` (refreshes keep the granted scope). Claude's default request is unchanged and stays full access.
 
 ## Configuration Sections
 

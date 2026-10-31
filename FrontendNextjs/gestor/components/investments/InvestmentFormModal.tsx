@@ -128,7 +128,7 @@ export function InvestmentFormModal({ isOpen, onClose, investmentToEdit }: Inves
 		if (!symbol) return
 		setFetchLoading(true)
 		try {
-			const quote = await getInvestmentRepository().getQuote(symbol)
+			const quote = await getInvestmentRepository().getQuote(symbol, form.getValues('type'))
 			if (quote) {
 				const currentName = form.getValues('name')
 				const currentPurchasePrice = form.getValues('purchase_price')

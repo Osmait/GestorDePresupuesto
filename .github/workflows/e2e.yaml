@@ -23,20 +23,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # --- Setup Backend toolchain ---
       # e2e-test/global-setup.ts starts its own PostgreSQL (testcontainers) and
       # builds + spawns the Go backend, so only the Go toolchain is needed here.
       - name: Setup Go
-        uses: actions/setup-go@v7
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: BackEnd/go.mod
           cache-dependency-path: BackEnd/go.sum
 
       # --- Setup Frontend Environment ---
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version-file: FrontendNextjs/gestor/package.json
           cache: 'npm'
@@ -71,7 +71,7 @@ jobs:
         env:
           NEXTAUTH_URL: "http://localhost:3000"
 
-      - uses: actions/upload-artifact@v7
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: failure()
         with:
           name: playwright-report

@@ -24,7 +24,12 @@ func (h *QuoteHandler) GetQuote(ctx *gin.Context) {
 		return
 	}
 
-	price, currency, name, err := h.quoteService.GetQuoteContext(ctx.Request.Context(), symbol)
+	// ?type=crypto prices the symbol as a coin (Binance first).
+	class := quote.AssetAny
+	if ctx.Query("type") == string(quote.AssetCrypto) {
+		class = quote.AssetCrypto
+	}
+	price, currency, name, err := h.quoteService.GetAssetQuote(ctx.Request.Context(), symbol, class)
 	if err != nil {
 		switch {
 		case errors.Is(err, quote.ErrInvalidSymbol):

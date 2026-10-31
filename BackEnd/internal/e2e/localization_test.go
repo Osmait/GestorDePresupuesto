@@ -33,6 +33,20 @@ func (suite *E2ETestSuite) TestDemoAccountCardPaymentAndAccountRules() {
 	demoAccountID := accounts[0].AccountInfo.ID
 	suite.Require().Len(demoAccountID, 36, "demo account id is a UUID")
 
+	// The seeded categories use the frontend palette's hex colors, not CSS
+	// names (CSS "blue" is nearly invisible on the dark theme).
+	colorRows := suite.helpers.QuerySQL(`SELECT c.color FROM categorys c JOIN account a ON a.user_id = c.user_id
+		WHERE a.id = $1 ORDER BY c.color`, demoAccountID)
+	var colors []string
+	for colorRows.Next() {
+		var color string
+		suite.Require().NoError(colorRows.Scan(&color))
+		colors = append(colors, color)
+	}
+	suite.Require().NoError(colorRows.Err())
+	suite.Require().NoError(colorRows.Close())
+	suite.Equal([]string{"#22C55E", "#3B82F6", "#F97316"}, colors)
+
 	en := map[string]string{"Accept-Language": "en-US,en;q=0.9"}
 	resp = suite.helpers.MakeRequestWithHeaders("POST", "/credit-cards", map[string]interface{}{
 		"name": "Visa", "bank": "BHD", "cut_day": 10, "due_day": 25,

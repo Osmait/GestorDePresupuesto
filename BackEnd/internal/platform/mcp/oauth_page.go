@@ -55,6 +55,14 @@ type pageCopy struct {
 	ReadItems         []string
 	WriteTitle        string
 	WriteItems        []string
+	AccessTitle       string
+	AccessFull        string
+	AccessFullHint    string
+	AccessRead        string
+	AccessReadHint    string
+	AccessReadOnly    string // the client itself asked for read-only access
+	UntrustedTitle    string
+	UntrustedFmt      string // %s = redirect host
 	Email             string
 	EmailPlaceholder  string
 	Password          string
@@ -90,6 +98,14 @@ var pageCopies = map[i18n.Locale]*pageCopy{
 		ReadItems:         []string{"Tus cuentas y saldos", "Tus transacciones y categorías", "Tus tarjetas de crédito y préstamos", "Resúmenes y análisis de tus gastos"},
 		WriteTitle:        "Podrá hacer cambios",
 		WriteItems:        []string{"Crear, editar y eliminar transacciones, cuentas y categorías", "Crear préstamos, registrar pagos y reiniciar saldos de tarjetas"},
+		AccessTitle:       "Nivel de acceso",
+		AccessFull:        "Acceso completo",
+		AccessFullHint:    "Ver tus datos y hacer cambios.",
+		AccessRead:        "Solo lectura",
+		AccessReadHint:    "Ver tus datos, sin poder cambiar nada.",
+		AccessReadOnly:    "Esta conexión pidió acceso de solo lectura: podrá ver tus datos, pero no cambiarlos.",
+		UntrustedTitle:    "Dirección de retorno desconocida",
+		UntrustedFmt:      "%s no es una dirección conocida de Claude. Autoriza solo si reconoces esta aplicación y tú iniciaste la conexión: quien controle esa dirección tendrá acceso a tu cuenta.",
 		Email:             "Correo electrónico",
 		EmailPlaceholder:  "tu@correo.com",      // ggignore: UI copy, not a credential
 		Password:          "Contraseña",         // ggignore: UI copy, not a credential
@@ -123,6 +139,14 @@ var pageCopies = map[i18n.Locale]*pageCopy{
 		ReadItems:         []string{"Your accounts and balances", "Your transactions and categories", "Your credit cards and loans", "Summaries and analysis of your spending"},
 		WriteTitle:        "It will be able to make changes",
 		WriteItems:        []string{"Create, edit and delete transactions, accounts and categories", "Create loans, record payments and reset card balances"},
+		AccessTitle:       "Access level",
+		AccessFull:        "Full access",
+		AccessFullHint:    "View your data and make changes.",
+		AccessRead:        "Read-only",
+		AccessReadHint:    "View your data without changing anything.",
+		AccessReadOnly:    "This connection asked for read-only access: it can view your data but not change it.",
+		UntrustedTitle:    "Unknown return address",
+		UntrustedFmt:      "%s is not a known Claude address. Only authorize if you recognize this application and started the connection yourself: whoever controls that address will get access to your account.",
 		Email:             "Email",
 		EmailPlaceholder:  "you@example.com", // ggignore: UI copy, not a credential
 		Password:          "Password",        // ggignore: UI copy, not a credential
@@ -188,6 +212,16 @@ type loginPageData struct {
 	AppURL       string
 	ClientName   string
 	RedirectHost string
+	// RedirectTrusted is false when the redirect host is not a known one
+	// (the page shows a warning naming RedirectTarget).
+	RedirectTrusted bool
+	RedirectTarget  string
+	// ReadOnlyRequested is true when the client asked for read-only access
+	// (no access level choice is offered then).
+	ReadOnlyRequested bool
+	// ReadSelected preselects read-only access (the user picked it before a
+	// failed attempt).
+	ReadSelected bool
 	Error        string
 	// Field the error refers to ("" = form level).
 	ErrorOnFields bool
@@ -217,6 +251,20 @@ func redirectHost(redirectURI string) string {
 	return u.Scheme
 }
 
+// redirectTarget names the redirect destination in the unknown-host warning:
+// the host for web callbacks, scheme://host for native-app callbacks (a
+// custom scheme says more than its host).
+func redirectTarget(redirectURI string) string {
+	u, err := url.Parse(redirectURI)
+	if err != nil {
+		return ""
+	}
+	if u.Scheme == "http" || u.Scheme == "https" || u.Host == "" {
+		return redirectHost(redirectURI)
+	}
+	return u.Scheme + "://" + u.Host
+}
+
 func (h *authorizeHandler) renderLogin(w http.ResponseWriter, locale i18n.Locale, status int, client *oauth2.Client, req authorizeRequest, username string, perr pageError, retryAfter time.Duration) {
 	nonce, err := newNonce()
 	if err != nil {
@@ -229,16 +277,20 @@ func (h *authorizeHandler) renderLogin(w http.ResponseWriter, locale i18n.Locale
 		name = c.UnknownClient
 	}
 	data := loginPageData{
-		T:             c,
-		Nonce:         nonce,
-		Logo:          logoDataURI,
-		AppURL:        h.appURL,
-		ClientName:    name,
-		RedirectHost:  redirectHost(req.RedirectURI),
-		Error:         c.message(perr, retryAfter),
-		ErrorOnFields: perr == pageErrInvalidCredentials || perr == pageErrMissingCredentials,
-		Username:      username,
-		Request:       req,
+		T:                 c,
+		Nonce:             nonce,
+		Logo:              logoDataURI,
+		AppURL:            h.appURL,
+		ClientName:        name,
+		RedirectHost:      redirectHost(req.RedirectURI),
+		RedirectTrusted:   h.redirectTrusted(req.RedirectURI),
+		RedirectTarget:    redirectTarget(req.RedirectURI),
+		ReadOnlyRequested: isReadOnlyScope(req.Scope),
+		ReadSelected:      req.Access == accessRead,
+		Error:             c.message(perr, retryAfter),
+		ErrorOnFields:     perr == pageErrInvalidCredentials || perr == pageErrMissingCredentials,
+		Username:          username,
+		Request:           req,
 	}
 	formAction := "'self'"
 	if src := formActionSource(req.RedirectURI); src != "" {
@@ -419,6 +471,27 @@ h1 {
   font-weight: 500;
 }
 .alert svg { flex: none; width: 16px; height: 16px; margin-top: 2px; }
+.warn {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, var(--warning) 50%, transparent);
+  background: color-mix(in srgb, var(--warning) 10%, transparent);
+}
+.warn svg { flex: none; width: 16px; height: 16px; margin-top: 2px; color: var(--warning); }
+.warn strong { display: block; color: var(--warning); font-weight: 600; }
+.warn p { overflow-wrap: anywhere; }
+.access { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; margin: 0; display: grid; gap: 8px; }
+.access legend { padding: 0 4px; font-weight: 500; }
+.opt { display: flex; align-items: flex-start; gap: 10px; min-height: 44px; padding: 6px 0; cursor: pointer; font-weight: 400; }
+.opt input { flex: none; width: 18px; height: 18px; margin: 2px 0 0; accent-color: var(--primary); }
+.opt strong { display: block; font-weight: 500; }
+.opt .hint { display: block; color: var(--muted-foreground); }
+.readonly-note { color: var(--muted-foreground); }
+.perms .write.is-off { opacity: 0.45; }
+.perms .write.is-off li span { text-decoration: line-through; }
 form { display: flex; flex-direction: column; gap: 16px; }
 .field { display: flex; flex-direction: column; gap: 6px; }
 label { font-weight: 500; }
@@ -526,6 +599,13 @@ const loginBodyTemplate = `{{define "title"}}{{.T.TitleSuffix}}{{end}}
       <p class="lead">{{.T.Lead}}{{if .RedirectHost}} {{.T.ReturnTo}} <strong>{{.RedirectHost}}</strong>.{{end}}</p>
     </div>
 
+    {{if not .RedirectTrusted}}
+    <div class="warn" id="redirect-warning">
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>
+      <p><strong>{{.T.UntrustedTitle}}</strong>{{printf .T.UntrustedFmt .RedirectTarget}}</p>
+    </div>
+    {{end}}
+
     <div class="perms">
       <div class="read">
         <h2 id="perm-read">{{.T.ReadTitle}}</h2>
@@ -534,13 +614,17 @@ const loginBodyTemplate = `{{define "title"}}{{.T.TitleSuffix}}{{end}}
           {{end}}
         </ul>
       </div>
-      <div class="write">
+      {{if .ReadOnlyRequested}}
+      <p class="readonly-note" id="access-level">{{.T.AccessReadOnly}}</p>
+      {{else}}
+      <div class="write{{if .ReadSelected}} is-off{{end}}" id="perm-write-block">
         <h2 id="perm-write">{{.T.WriteTitle}}</h2>
         <ul aria-labelledby="perm-write">
           {{range .T.WriteItems}}<li><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg><span>{{.}}</span></li>
           {{end}}
         </ul>
       </div>
+      {{end}}
     </div>
 
     {{if .Error}}
@@ -557,6 +641,20 @@ const loginBodyTemplate = `{{define "title"}}{{.T.TitleSuffix}}{{end}}
       <input type="hidden" name="scope" value="{{.Request.Scope}}">
       <input type="hidden" name="code_challenge" value="{{.Request.CodeChallenge}}">
       <input type="hidden" name="code_challenge_method" value="{{.Request.CodeChallengeMethod}}">
+
+      {{if not .ReadOnlyRequested}}
+      <fieldset class="access" id="access-level">
+        <legend>{{.T.AccessTitle}}</legend>
+        <label class="opt">
+          <input type="radio" name="access" value="full"{{if not .ReadSelected}} checked{{end}}>
+          <span><strong>{{.T.AccessFull}}</strong><span class="hint">{{.T.AccessFullHint}}</span></span>
+        </label>
+        <label class="opt">
+          <input type="radio" name="access" value="read"{{if .ReadSelected}} checked{{end}}>
+          <span><strong>{{.T.AccessRead}}</strong><span class="hint">{{.T.AccessReadHint}}</span></span>
+        </label>
+      </fieldset>
+      {{end}}
 
       <div class="field">
         <label for="username">{{.T.Email}}</label>
@@ -611,6 +709,13 @@ const loginBodyTemplate = `{{define "title"}}{{.T.TitleSuffix}}{{end}}
       var show = pw.type === "password";
       pw.type = show ? "text" : "password";
       toggle.setAttribute("aria-pressed", show ? "true" : "false");
+    });
+  }
+  var writeBlock = document.getElementById("perm-write-block");
+  var levels = form.querySelectorAll("input[name=access]");
+  for (var j = 0; j < levels.length; j++) {
+    levels[j].addEventListener("change", function (e) {
+      if (writeBlock) writeBlock.classList.toggle("is-off", e.target.value === "read");
     });
   }
   var buttons = form.querySelectorAll("button[type=submit]");

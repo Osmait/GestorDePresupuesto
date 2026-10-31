@@ -492,6 +492,12 @@ func (s *TransactionService) UpdateTransaction(ctx context.Context, id string, t
 	return nil
 }
 
+// TransactionAccountAndCurrency returns the account and currency of
+// transaction id owned by userId (ownership.ErrNotFound otherwise).
+func (s *TransactionService) TransactionAccountAndCurrency(ctx context.Context, id string, userId string) (string, string, error) {
+	return s.transactionRepository.AccountAndCurrencyOf(ctx, id, userId)
+}
+
 // DeleteTransaction removes a transaction by its ID and User ID. A card
 // payment received cannot be deleted on its own (see transaction.IsDeletable).
 func (s TransactionService) DeleteTransaction(ctx context.Context, id string, userId string) error {
