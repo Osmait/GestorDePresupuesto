@@ -18,7 +18,8 @@ enum APIError: Error, LocalizedError {
         case .decodingError(let error):
             return "Error de decodificación: \(error.localizedDescription)"
         case .serverError(let code, let message):
-            return "Error del servidor (\(code)): \(message ?? "Error desconocido")"
+            if let message, !message.isEmpty { return message }
+            return "Error del servidor (\(code))"
         case .unauthorized:
             return "No autorizado"
         case .networkError(let error):
