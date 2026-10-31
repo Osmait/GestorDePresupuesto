@@ -1507,11 +1507,12 @@
       "errors": {
         "nameRequired": "Card name is required",
         "bankRequired": "Bank is required",
-        "digitsOnly": "Only digits allowed",
         "dayMin": "Min {min}",
         "dayMax": "Max {max}",
         "saveFailed": "The card could not be saved. Please try again.",
-        "limitRequired": "Enter a credit limit greater than 0 for each currency."
+        "limitRequired": "Enter a credit limit greater than 0 for each currency.",
+        "textLength": "Use between {min} and {max} characters",
+        "lastFourDigits": "Enter all 4 digits or leave it empty"
       }
     },
     "payment": {

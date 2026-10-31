@@ -1507,11 +1507,12 @@
       "errors": {
         "nameRequired": "El nombre de la tarjeta es obligatorio",
         "bankRequired": "El banco es obligatorio",
-        "digitsOnly": "Solo se permiten dígitos",
         "dayMin": "Mínimo {min}",
         "dayMax": "Máximo {max}",
         "saveFailed": "No se pudo guardar la tarjeta. Inténtalo de nuevo.",
-        "limitRequired": "Ingresa un límite de crédito mayor que 0 para cada moneda."
+        "limitRequired": "Ingresa un límite de crédito mayor que 0 para cada moneda.",
+        "textLength": "Usa entre {min} y {max} caracteres",
+        "lastFourDigits": "Escribe los 4 dígitos o déjalo vacío"
       }
     },
     "payment": {

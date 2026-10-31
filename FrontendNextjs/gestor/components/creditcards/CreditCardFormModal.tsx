@@ -41,18 +41,28 @@ const CURRENCIES = ['DOP', 'USD', 'EUR']
 
 type Translator = (key: string, values?: Record<string, string | number>) => string
 
+/** Mirrors the API's CreateCreditCardRequest binding so mistakes are field errors, not a failed save. */
 function createCreditCardSchema(t: Translator) {
 	const day = z.coerce
 		.number<number>()
+		.int(t('errors.dayMin', { min: 1 }))
 		.min(1, t('errors.dayMin', { min: 1 }))
 		.max(28, t('errors.dayMax', { max: 28 }))
+	// name and bank: required,min=2,max=100.
+	const text = (required: string) =>
+		z
+			.string()
+			.trim()
+			.min(1, required)
+			.min(2, t('errors.textLength', { min: 2, max: 100 }))
+			.max(100, t('errors.textLength', { min: 2, max: 100 }))
 	return z.object({
-		name: z.string().min(1, t('errors.nameRequired')),
-		bank: z.string().min(1, t('errors.bankRequired')),
+		name: text(t('errors.nameRequired')),
+		bank: text(t('errors.bankRequired')),
+		// last_four_digits: omitempty,len=4.
 		lastFourDigits: z
 			.string()
-			.max(4)
-			.regex(/^\d{0,4}$/, t('errors.digitsOnly'))
+			.regex(/^(\d{4})?$/, t('errors.lastFourDigits'))
 			.optional()
 			.default(''),
 		cutDay: day,
