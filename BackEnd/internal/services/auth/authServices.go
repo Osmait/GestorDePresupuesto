@@ -269,8 +269,9 @@ func (a *AuthService) RefreshTokens(ctx context.Context, refreshToken, userAgent
 
 	// Atomic rotation: revoke-old + insert-new in one transaction, guarded by
 	// a conditional UPDATE so concurrent refreshes of the same token cannot
-	// both succeed.
-	userId, err := a.refreshTokenRepo.Rotate(ctx, tokenHash, newRefreshToken, now)
+	// both succeed. The new token inherits the session start and is not
+	// issued past the absolute session lifetime.
+	userId, err := a.refreshTokenRepo.Rotate(ctx, tokenHash, newRefreshToken, now, a.refreshSessionMaxAge())
 	if errors.Is(err, authRepo.ErrTokenNotActive) {
 		return nil, a.rejectInactiveRefreshToken(ctx, tokenHash, now)
 	}
@@ -296,6 +297,14 @@ func (a *AuthService) RefreshTokens(ctx context.Context, refreshToken, userAgent
 	), nil
 }
 
+// refreshSessionMaxAge is the absolute session lifetime (0: no cap).
+func (a *AuthService) refreshSessionMaxAge() time.Duration {
+	if a.config == nil || a.config.JWT.RefreshSessionMaxAge < 0 {
+		return 0
+	}
+	return a.config.JWT.RefreshSessionMaxAge
+}
+
 func (a *AuthService) refreshReuseGrace() time.Duration {
 	if a.config.JWT.RefreshReuseGrace > 0 {
 		return a.config.JWT.RefreshReuseGrace
@@ -308,7 +317,7 @@ func (a *AuthService) refreshReuseGrace() time.Duration {
 //   - unknown token                         → ErrInvalidRefreshToken
 //   - rotated less than the grace ago       → ErrRefreshTokenRotated (no side effects)
 //   - revoked otherwise (stale reuse/theft) → revoke all user sessions, ErrTokenReuse
-//   - expired                               → ErrRefreshTokenExpired
+//   - expired, or session older than the max age → ErrRefreshTokenExpired
 func (a *AuthService) rejectInactiveRefreshToken(ctx context.Context, tokenHash string, now time.Time) error {
 	storedToken, err := a.refreshTokenRepo.FindByHash(ctx, tokenHash)
 	if err != nil {
@@ -339,6 +348,14 @@ func (a *AuthService) rejectInactiveRefreshToken(ctx context.Context, tokenHash 
 	}
 
 	if storedToken.IsExpired() {
+		return ErrRefreshTokenExpired
+	}
+	if maxAge := a.refreshSessionMaxAge(); maxAge > 0 && !storedToken.SessionStartedAt.IsZero() &&
+		!now.Before(storedToken.SessionStartedAt.Add(maxAge)) {
+		log.Info().
+			Str("user_id", storedToken.UserId).
+			Str("token_id", storedToken.Id).
+			Msg("refresh session reached its maximum age")
 		return ErrRefreshTokenExpired
 	}
 	return ErrInvalidRefreshToken

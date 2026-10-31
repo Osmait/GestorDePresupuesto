@@ -16,6 +16,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -46,13 +47,62 @@ var ErrInvalidClient = errors.New("invalid client registration")
 type Storage struct {
 	db  *sql.DB
 	now func() time.Time
+	// maxSessionAge is the absolute lifetime of a grant (the user's login on
+	// the consent page) across refreshes; 0 disables it.
+	maxSessionAge time.Duration
 }
 
 var _ oauth2.Storage = (*Storage)(nil)
 
-// New returns a Storage backed by db (migration 000057 must be applied).
-func New(db *sql.DB) *Storage {
-	return &Storage{db: db, now: time.Now}
+// Option configures a Storage.
+type Option func(*Storage)
+
+// WithMaxSessionAge caps a grant at d after the user logged in on the consent
+// page (REFRESH_SESSION_MAX_AGE): refreshes keep the original session start,
+// refresh tokens never expire later than start + d, and refreshing past it
+// fails, so Claude has to be connected again. d <= 0 disables the cap.
+func WithMaxSessionAge(d time.Duration) Option {
+	return func(s *Storage) {
+		if d > 0 {
+			s.maxSessionAge = d
+		}
+	}
+}
+
+// New returns a Storage backed by db (migrations 000057 and 000063 must be
+// applied).
+func New(db *sql.DB, opts ...Option) *Storage {
+	s := &Storage{db: db, now: time.Now}
+	for _, opt := range opts {
+		opt(s)
+	}
+	return s
+}
+
+// sessionSubjectSep separates the user id from the session start in the
+// subject GetTokenByRefresh returns. The subject is the only field omniskill
+// copies from the consumed token into the new one (CreateToken), so it is how
+// the session start of the grant survives a refresh. User ids (ksuid, UUID)
+// and emails never contain it.
+const sessionSubjectSep = "|session_started_at="
+
+// refreshSubject is the subject handed from GetTokenByRefresh to CreateToken.
+func refreshSubject(userID string, sessionStartedAt time.Time) string {
+	return userID + sessionSubjectSep + sessionStartedAt.UTC().Format(time.RFC3339Nano)
+}
+
+// splitSubject returns the subject to store (user id or email) and the session
+// start carried by a refresh subject (zero for a new grant).
+func splitSubject(subject string) (string, time.Time) {
+	user, started, ok := strings.Cut(subject, sessionSubjectSep)
+	if !ok {
+		return subject, time.Time{}
+	}
+	at, err := time.Parse(time.RFC3339Nano, started)
+	if err != nil {
+		return user, time.Time{}
+	}
+	return user, at
 }
 
 // HashSecret returns the hex SHA-256 of a secret value, the form in which
@@ -290,8 +340,10 @@ func (s *Storage) MarkAuthorizationCodeUsed(code string) error {
 // subject is resolved to the user id so that deleting the user revokes the
 // token: on the code exchange it is the email the user just logged in with,
 // on a refresh it is the user id of the consumed token (see GetTokenByRefresh),
-// so a refreshed token never follows the email to another account. Fully
-// expired tokens are purged opportunistically.
+// so a refreshed token never follows the email to another account. A refresh
+// also carries the session start of the grant (see refreshSubject), which the
+// new token keeps; with a maximum session age its refresh token does not
+// outlive the session. Fully expired tokens are purged opportunistically.
 func (s *Storage) CreateToken(token *oauth2.TokenInfo) error {
 	if token == nil || token.AccessToken == "" {
 		return errors.New("empty access token")
@@ -304,15 +356,26 @@ func (s *Storage) CreateToken(token *oauth2.TokenInfo) error {
 		log.Warn().Err(err).Msg("failed to purge expired MCP OAuth tokens")
 	}
 
+	subject, sessionStartedAt := splitSubject(token.Subject)
+	if sessionStartedAt.IsZero() {
+		sessionStartedAt = now // a new grant (authorization code exchange)
+	}
+
 	var refreshHash any
 	var refreshExpires any
 	purgeAfter := token.ExpiresAt
 	if token.RefreshToken != "" {
 		refreshHash = HashSecret(token.RefreshToken)
-		if !token.RefreshExpiresAt.IsZero() {
-			refreshExpires = token.RefreshExpiresAt
-			if token.RefreshExpiresAt.After(purgeAfter) {
-				purgeAfter = token.RefreshExpiresAt
+		refreshExpiresAt := token.RefreshExpiresAt
+		if s.maxSessionAge > 0 {
+			if end := sessionStartedAt.Add(s.maxSessionAge); refreshExpiresAt.IsZero() || refreshExpiresAt.After(end) {
+				refreshExpiresAt = end
+			}
+		}
+		if !refreshExpiresAt.IsZero() {
+			refreshExpires = refreshExpiresAt
+			if refreshExpiresAt.After(purgeAfter) {
+				purgeAfter = refreshExpiresAt
 			}
 		}
 	}
@@ -327,13 +390,13 @@ func (s *Storage) CreateToken(token *oauth2.TokenInfo) error {
 
 	_, err := s.db.ExecContext(ctx, `INSERT INTO mcp_oauth_tokens
 		(access_token_hash, refresh_token_hash, client_id, user_id, subject, scope,
-		 token_type, expires_at, refresh_expires_at, purge_after, created_at)
+		 token_type, expires_at, refresh_expires_at, purge_after, created_at, session_started_at)
 		VALUES ($1, $2, $3,
 			(SELECT id FROM users WHERE deleted_at IS NULL
 				AND CASE WHEN strpos($4, '@') > 0 THEN email = $4 ELSE id = $4 END LIMIT 1),
-			$4, $5, $6, $7, $8, $9, $10)`,
-		HashSecret(token.AccessToken), refreshHash, token.ClientID, token.Subject, token.Scope,
-		tokenType, token.ExpiresAt, refreshExpires, purgeAfter, createdAt)
+			$4, $5, $6, $7, $8, $9, $10, $11)`,
+		HashSecret(token.AccessToken), refreshHash, token.ClientID, subject, token.Scope,
+		tokenType, token.ExpiresAt, refreshExpires, purgeAfter, createdAt, sessionStartedAt)
 	if err != nil {
 		return fmt.Errorf("insert oauth token: %w", err)
 	}
@@ -394,7 +457,9 @@ func (s *Storage) UserIDForAccessToken(accessToken string) (string, error) {
 // one new token pair at most (refresh token rotation). omniskill deletes the old
 // access token right after this call anyway; AccessToken is left empty
 // because only its hash is known. Subject is the stored user id, not the email,
-// because omniskill copies it into the new token (see CreateToken).
+// because omniskill copies it into the new token (see CreateToken), followed by
+// the session start of the grant (refreshSubject). Past the maximum session
+// age the token is consumed and ErrTokenExpired returned.
 func (s *Storage) GetTokenByRefresh(refreshToken string) (*oauth2.TokenInfo, error) {
 	ctx, cancel := s.ctx()
 	defer cancel()
@@ -402,17 +467,19 @@ func (s *Storage) GetTokenByRefresh(refreshToken string) (*oauth2.TokenInfo, err
 	t := &oauth2.TokenInfo{RefreshToken: refreshToken}
 	var refreshExpires sql.NullTime
 	var userActive bool
+	var userID string
+	var sessionStartedAt time.Time
 	err := s.db.QueryRowContext(ctx, `WITH consumed AS (
 			DELETE FROM mcp_oauth_tokens WHERE refresh_token_hash = $1
 			RETURNING client_id, user_id, subject, scope, token_type, expires_at,
-				refresh_expires_at, created_at
+				refresh_expires_at, created_at, session_started_at
 		)
 		SELECT c.client_id, COALESCE(c.user_id, c.subject), c.scope, c.token_type, c.expires_at,
-			c.refresh_expires_at, c.created_at,
+			c.refresh_expires_at, c.created_at, c.session_started_at,
 			EXISTS (SELECT 1 FROM users u WHERE u.id = c.user_id AND u.deleted_at IS NULL)
 		FROM consumed c`, HashSecret(refreshToken)).
-		Scan(&t.ClientID, &t.Subject, &t.Scope, &t.TokenType, &t.ExpiresAt,
-			&refreshExpires, &t.CreatedAt, &userActive)
+		Scan(&t.ClientID, &userID, &t.Scope, &t.TokenType, &t.ExpiresAt,
+			&refreshExpires, &t.CreatedAt, &sessionStartedAt, &userActive)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, oauth2.ErrTokenNotFound
 	}
@@ -426,6 +493,12 @@ func (s *Storage) GetTokenByRefresh(refreshToken string) (*oauth2.TokenInfo, err
 	if refreshExpires.Valid && !s.now().Before(refreshExpires.Time) {
 		return nil, oauth2.ErrTokenExpired
 	}
+	if s.maxSessionAge > 0 && !s.now().Before(sessionStartedAt.Add(s.maxSessionAge)) {
+		log.Info().Str("user_id", userID).Str("client_id", t.ClientID).
+			Msg("MCP OAuth grant reached its maximum session age")
+		return nil, oauth2.ErrTokenExpired
+	}
+	t.Subject = refreshSubject(userID, sessionStartedAt)
 	return t, nil
 }
 

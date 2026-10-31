@@ -125,7 +125,7 @@ func TestRefreshTokenRepository_RotateConditions(t *testing.T) {
 	userID, raw := seedUserWithRefreshToken(t, repo)
 
 	newTok := authDomain.NewRefreshToken(ksuid.New().String(), "", "hash-"+ksuid.New().String(), "ua", "ip", time.Now().Add(time.Hour))
-	got, err := repo.Rotate(ctx, authDomain.HashToken(raw), newTok, time.Now())
+	got, err := repo.Rotate(ctx, authDomain.HashToken(raw), newTok, time.Now(), 0)
 	require.NoError(t, err)
 	assert.Equal(t, userID, got)
 	assert.Equal(t, userID, newTok.UserId)
@@ -137,15 +137,72 @@ func TestRefreshTokenRepository_RotateConditions(t *testing.T) {
 
 	// Second rotation of the same token: not active anymore, nothing inserted.
 	again := authDomain.NewRefreshToken(ksuid.New().String(), "", "hash-"+ksuid.New().String(), "ua", "ip", time.Now().Add(time.Hour))
-	_, err = repo.Rotate(ctx, authDomain.HashToken(raw), again, time.Now())
+	_, err = repo.Rotate(ctx, authDomain.HashToken(raw), again, time.Now(), 0)
 	assert.ErrorIs(t, err, authRepo.ErrTokenNotActive)
 	missing, err := repo.FindByHash(ctx, again.TokenHash)
 	require.NoError(t, err)
 	assert.Nil(t, missing)
 
 	// Unknown and expired tokens are not active either.
-	_, err = repo.Rotate(ctx, "unknown-hash", again, time.Now())
+	_, err = repo.Rotate(ctx, "unknown-hash", again, time.Now(), 0)
 	assert.ErrorIs(t, err, authRepo.ErrTokenNotActive)
-	_, err = repo.Rotate(ctx, newTok.TokenHash, again, time.Now().Add(2*time.Hour))
+	_, err = repo.Rotate(ctx, newTok.TokenHash, again, time.Now().Add(2*time.Hour), 0)
 	assert.ErrorIs(t, err, authRepo.ErrTokenNotActive)
+}
+
+// TestRefreshRotation_AbsoluteSessionLifetime: rotated tokens inherit the
+// session start of the login, their expiry is capped at the end of the
+// session, rotation past REFRESH_SESSION_MAX_AGE is refused without revoking
+// anything, and reuse detection still applies to rotated tokens.
+func TestRefreshRotation_AbsoluteSessionLifetime(t *testing.T) {
+	db := SetUpTest()
+	repo := authRepo.NewRefreshTokenRepository(db)
+	cfg := rotationConfig(30 * time.Second)
+	cfg.JWT.RefreshSessionMaxAge = 30 * 24 * time.Hour
+	svc := authSvc.NewAuthServiceWithRefreshTokens(userRepo.NewUserRepository(db), nil, nil, nil, nil, repo, cfg)
+	ctx := context.Background()
+	userID, raw := seedUserWithRefreshToken(t, repo)
+
+	// The login happened 29.5 days ago.
+	started := time.Now().Add(-(29*24 + 12) * time.Hour).Truncate(time.Microsecond)
+	_, err := db.Exec(`UPDATE refresh_tokens SET session_started_at = $1 WHERE token_hash = $2`, started, authDomain.HashToken(raw))
+	require.NoError(t, err)
+
+	resp, err := svc.RefreshTokens(ctx, raw, "ua", "127.0.0.1")
+	require.NoError(t, err)
+	rotated, err := repo.FindByHash(ctx, authDomain.HashToken(resp.RefreshToken))
+	require.NoError(t, err)
+	require.NotNil(t, rotated)
+	assert.True(t, rotated.SessionStartedAt.Equal(started), "inherited %s, want %s", rotated.SessionStartedAt, started)
+	assert.WithinDuration(t, started.Add(30*24*time.Hour), rotated.ExpiresAt, time.Second,
+		"expiry capped at the end of the session, not now + 24h")
+
+	// Twice rotated: still the same session start.
+	resp2, err := svc.RefreshTokens(ctx, resp.RefreshToken, "ua", "127.0.0.1")
+	require.NoError(t, err)
+	rotated2, err := repo.FindByHash(ctx, authDomain.HashToken(resp2.RefreshToken))
+	require.NoError(t, err)
+	assert.True(t, rotated2.SessionStartedAt.Equal(started))
+
+	// The session is over: the live token cannot be rotated, nothing revoked.
+	_, err = db.Exec(`UPDATE refresh_tokens SET session_started_at = now() - interval '31 days' WHERE user_id = $1`, userID)
+	require.NoError(t, err)
+	_, err = svc.RefreshTokens(ctx, resp2.RefreshToken, "ua", "127.0.0.1")
+	assert.ErrorIs(t, err, authSvc.ErrRefreshTokenExpired)
+	assert.Equal(t, 1, activeTokens(t, repo, userID), "an over-age session is not treated as theft")
+
+	// Reuse detection still works: presenting the first rotated token again
+	// (outside the grace window) revokes every session.
+	_, err = db.Exec(`UPDATE refresh_tokens SET revoked_at = now() - interval '1 hour' WHERE token_hash = $1`, authDomain.HashToken(resp.RefreshToken))
+	require.NoError(t, err)
+	_, err = svc.RefreshTokens(ctx, resp.RefreshToken, "ua", "127.0.0.1")
+	assert.ErrorIs(t, err, authSvc.ErrTokenReuse)
+	assert.Equal(t, 0, activeTokens(t, repo, userID))
+
+	// A new login starts a new session.
+	fresh := authDomain.NewRefreshToken(ksuid.New().String(), userID, "hash-"+ksuid.New().String(), "ua", "ip", time.Now().Add(time.Hour))
+	require.NoError(t, repo.Save(ctx, fresh))
+	stored, err := repo.FindByHash(ctx, fresh.TokenHash)
+	require.NoError(t, err)
+	assert.WithinDuration(t, time.Now(), stored.SessionStartedAt, time.Minute)
 }

@@ -12,7 +12,8 @@ import (
 
 // ErrTokenNotActive is returned by Rotate when the presented token is not an
 // active (unrevoked, unexpired) token — either it does not exist, has
-// expired, or another request already rotated/revoked it.
+// expired, its session is older than the maximum session age, or another
+// request already rotated/revoked it.
 var ErrTokenNotActive = errors.New("refresh token is not active")
 
 // RefreshTokenRepositoryInterface defines the contract for refresh token storage
@@ -22,8 +23,12 @@ type RefreshTokenRepositoryInterface interface {
 	// (marking it replaced by newToken.Id) and inserts newToken for the same
 	// user, in a single DB transaction. The conditional UPDATE guarantees
 	// that of N concurrent rotations of the same token exactly one succeeds;
-	// the others get ErrTokenNotActive. Returns the owning user id.
-	Rotate(ctx context.Context, oldTokenHash string, newToken *authDomain.RefreshToken, now time.Time) (string, error)
+	// the others get ErrTokenNotActive. newToken inherits the session start
+	// of the old token; with maxSessionAge > 0 a token whose session started
+	// maxSessionAge or more before now is not rotated (ErrTokenNotActive) and
+	// newToken.ExpiresAt is capped at session start + maxSessionAge. Returns
+	// the owning user id.
+	Rotate(ctx context.Context, oldTokenHash string, newToken *authDomain.RefreshToken, now time.Time, maxSessionAge time.Duration) (string, error)
 	FindByHash(ctx context.Context, tokenHash string) (*authDomain.RefreshToken, error)
 	FindByUserId(ctx context.Context, userId string) ([]*authDomain.RefreshToken, error)
 	Revoke(ctx context.Context, tokenId string, replacedBy *string) error
@@ -48,8 +53,8 @@ func NewRefreshTokenRepository(db *sql.DB) *RefreshTokenRepository {
 // Save stores a new refresh token in the database
 func (r *RefreshTokenRepository) Save(ctx context.Context, token *authDomain.RefreshToken) error {
 	query := `
-		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, user_agent, ip_address)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
+		INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, user_agent, ip_address, session_started_at)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 	`
 	_, err := txhelper.FromContext(ctx, r.db).ExecContext(ctx, query,
 		token.Id,
@@ -59,12 +64,30 @@ func (r *RefreshTokenRepository) Save(ctx context.Context, token *authDomain.Ref
 		token.CreatedAt,
 		token.UserAgent,
 		token.IpAddress,
+		sessionStart(token),
 	)
 	return err
 }
 
+// sessionStart is the session start to store for t: its own, else its
+// creation time (a new session).
+func sessionStart(t *authDomain.RefreshToken) time.Time {
+	if !t.SessionStartedAt.IsZero() {
+		return t.SessionStartedAt
+	}
+	if !t.CreatedAt.IsZero() {
+		return t.CreatedAt
+	}
+	return time.Now()
+}
+
 // Rotate implements RefreshTokenRepositoryInterface.Rotate.
-func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash string, newToken *authDomain.RefreshToken, now time.Time) (string, error) {
+func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash string, newToken *authDomain.RefreshToken, now time.Time, maxSessionAge time.Duration) (string, error) {
+	// Without a cap every session start qualifies.
+	sessionNotBefore := time.Time{}
+	if maxSessionAge > 0 {
+		sessionNotBefore = now.Add(-maxSessionAge)
+	}
 	var userID string
 	// InTx joins the request transaction when there is one (never a second
 	// pooled connection inside a request); otherwise it opens its own.
@@ -73,25 +96,32 @@ func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash string
 		// blocks on this UPDATE and, once the first one commits, re-evaluates
 		// "revoked_at IS NULL" as false and matches zero rows.
 		var oldID string
+		var sessionStartedAt time.Time
 		err := tx.QueryRowContext(ctx, `
 			UPDATE refresh_tokens
 			SET revoked_at = $2, replaced_by = $3
 			WHERE token_hash = $1 AND revoked_at IS NULL AND expires_at > $2
-			RETURNING id, user_id
-		`, oldTokenHash, now, newToken.Id).Scan(&oldID, &userID)
+				AND session_started_at > $4
+			RETURNING id, user_id, session_started_at
+		`, oldTokenHash, now, newToken.Id, sessionNotBefore).Scan(&oldID, &userID, &sessionStartedAt)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrTokenNotActive
 		}
 		if err != nil {
 			return err
 		}
-
 		newToken.UserId = userID
+		newToken.SessionStartedAt = sessionStartedAt
+		if maxSessionAge > 0 {
+			if sessionEnd := sessionStartedAt.Add(maxSessionAge); newToken.ExpiresAt.After(sessionEnd) {
+				newToken.ExpiresAt = sessionEnd
+			}
+		}
 		_, err = tx.ExecContext(ctx, `
-			INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, user_agent, ip_address)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
+			INSERT INTO refresh_tokens (id, user_id, token_hash, expires_at, created_at, user_agent, ip_address, session_started_at)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
 		`, newToken.Id, newToken.UserId, newToken.TokenHash, newToken.ExpiresAt, newToken.CreatedAt,
-			newToken.UserAgent, newToken.IpAddress)
+			newToken.UserAgent, newToken.IpAddress, sessionStartedAt)
 		return err
 	})
 	if err != nil {
@@ -103,7 +133,8 @@ func (r *RefreshTokenRepository) Rotate(ctx context.Context, oldTokenHash string
 // FindByHash retrieves a refresh token by its hash
 func (r *RefreshTokenRepository) FindByHash(ctx context.Context, tokenHash string) (*authDomain.RefreshToken, error) {
 	query := `
-		SELECT id, user_id, token_hash, expires_at, created_at, revoked_at, replaced_by, user_agent, ip_address
+		SELECT id, user_id, token_hash, expires_at, created_at, revoked_at, replaced_by, user_agent, ip_address,
+			session_started_at
 		FROM refresh_tokens
 		WHERE token_hash = $1
 	`
@@ -124,6 +155,7 @@ func (r *RefreshTokenRepository) FindByHash(ctx context.Context, tokenHash strin
 		&replacedBy,
 		&userAgent,
 		&ipAddress,
+		&token.SessionStartedAt,
 	)
 	if err != nil {
 		if err == sql.ErrNoRows {

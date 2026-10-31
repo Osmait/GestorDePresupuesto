@@ -261,7 +261,7 @@ func NewAppWithTelemetry(ctx context.Context, cfg *config.Config, db *sql.DB, te
 		// development only) keep them in memory.
 		var oauthStorage oauth2.Storage
 		if cfg.Database.Type == config.DatabaseTypePostgres {
-			oauthStorage = mcpOAuthRepo.New(db)
+			oauthStorage = mcpOAuthRepo.New(db, mcpOAuthRepo.WithMaxSessionAge(cfg.JWT.RefreshSessionMaxAge))
 		} else {
 			log.Warn().Str("db_type", string(cfg.Database.Type)).
 				Msg("MCP OAuth state is kept in memory: Claude connections are lost on restart")

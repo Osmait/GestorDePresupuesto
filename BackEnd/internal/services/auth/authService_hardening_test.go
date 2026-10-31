@@ -74,7 +74,7 @@ func (f *fakeRefreshRepo) Save(_ context.Context, t *authDomain.RefreshToken) er
 	return nil
 }
 
-func (f *fakeRefreshRepo) Rotate(_ context.Context, oldHash string, n *authDomain.RefreshToken, now time.Time) (string, error) {
+func (f *fakeRefreshRepo) Rotate(_ context.Context, oldHash string, n *authDomain.RefreshToken, now time.Time, maxSessionAge time.Duration) (string, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.rotateErr != nil {
@@ -84,11 +84,18 @@ func (f *fakeRefreshRepo) Rotate(_ context.Context, oldHash string, n *authDomai
 	if !ok || old.RevokedAt != nil || !old.ExpiresAt.After(now) {
 		return "", authRepo.ErrTokenNotActive
 	}
+	if maxSessionAge > 0 && !old.SessionStartedAt.After(now.Add(-maxSessionAge)) {
+		return "", authRepo.ErrTokenNotActive
+	}
 	revokedAt := now
 	id := n.Id
 	old.RevokedAt = &revokedAt
 	old.ReplacedBy = &id
 	n.UserId = old.UserId
+	n.SessionStartedAt = old.SessionStartedAt
+	if end := old.SessionStartedAt.Add(maxSessionAge); maxSessionAge > 0 && n.ExpiresAt.After(end) {
+		n.ExpiresAt = end
+	}
 	cp := *n
 	f.tokens[n.TokenHash] = &cp
 	return old.UserId, nil
@@ -163,6 +170,8 @@ func hardeningConfig() *config.Config {
 			Issuer:            "gestor-test",
 			Audience:          "gestor-test-api",
 			RefreshReuseGrace: 30 * time.Second,
+			// The default of REFRESH_SESSION_MAX_AGE.
+			RefreshSessionMaxAge: 30 * 24 * time.Hour,
 		},
 		Security: config.SecurityConfig{
 			MaxLoginAttempts: 3,
@@ -409,7 +418,7 @@ func TestRefreshTokens_RejectionPaths(t *testing.T) {
 				raw := seedRefreshToken(t, repo, "u1", time.Now().Add(time.Hour))
 				_, err := repo.Rotate(context.Background(), authDomain.HashToken(raw),
 					authDomain.NewRefreshToken("new1", "", "h-new1", "", "", time.Now().Add(time.Hour)),
-					time.Now().Add(-5*time.Second))
+					time.Now().Add(-5*time.Second), 0)
 				require.NoError(t, err)
 				return raw
 			},
@@ -421,7 +430,7 @@ func TestRefreshTokens_RejectionPaths(t *testing.T) {
 				raw := seedRefreshToken(t, repo, "u1", time.Now().Add(time.Hour))
 				_, err := repo.Rotate(context.Background(), authDomain.HashToken(raw),
 					authDomain.NewRefreshToken("new2", "", "h-new2", "", "", time.Now().Add(time.Hour)),
-					time.Now().Add(-10*time.Minute))
+					time.Now().Add(-10*time.Minute), 0)
 				require.NoError(t, err)
 				return raw
 			},
@@ -437,6 +446,15 @@ func TestRefreshTokens_RejectionPaths(t *testing.T) {
 			},
 			wantErr:       ErrTokenReuse,
 			wantRevokeAll: true,
+		},
+		{
+			name: "session older than the maximum age: expired, sessions kept",
+			setup: func(t *testing.T, repo *fakeRefreshRepo) string {
+				raw := seedRefreshToken(t, repo, "u1", time.Now().Add(time.Hour))
+				repo.tokens[authDomain.HashToken(raw)].SessionStartedAt = time.Now().Add(-31 * 24 * time.Hour)
+				return raw
+			},
+			wantErr: ErrRefreshTokenExpired,
 		},
 	}
 
@@ -456,6 +474,37 @@ func TestRefreshTokens_RejectionPaths(t *testing.T) {
 			}
 		})
 	}
+}
+
+// A rotated token keeps the session start of the login, and is not issued
+// past the absolute session lifetime: a stolen token that keeps rotating
+// still dies REFRESH_SESSION_MAX_AGE after the login.
+func TestRefreshTokens_AbsoluteSessionLifetime(t *testing.T) {
+	repo := newFakeRefreshRepo()
+	cfg := hardeningConfig()
+	svc := NewAuthServiceWithRefreshTokens(&fakeUsers{}, nil, nil, nil, nil, repo, cfg)
+	raw := seedRefreshToken(t, repo, "u1", time.Now().Add(time.Hour))
+	started := time.Now().Add(-29 * 24 * time.Hour)
+	repo.tokens[authDomain.HashToken(raw)].SessionStartedAt = started
+
+	resp, err := svc.RefreshTokens(context.Background(), raw, "ua", "ip")
+	require.NoError(t, err)
+	rotated, err := repo.FindByHash(context.Background(), authDomain.HashToken(resp.RefreshToken))
+	require.NoError(t, err)
+	assert.True(t, rotated.SessionStartedAt.Equal(started), "the session start is inherited")
+	assert.WithinDuration(t, started.Add(30*24*time.Hour), rotated.ExpiresAt, time.Second,
+		"capped at the end of the session instead of now + 7 days")
+
+	// One day later the session is over: no further rotation, nothing revoked.
+	repo.tokens[authDomain.HashToken(resp.RefreshToken)].SessionStartedAt = time.Now().Add(-30 * 24 * time.Hour)
+	_, err = svc.RefreshTokens(context.Background(), resp.RefreshToken, "ua", "ip")
+	assert.ErrorIs(t, err, ErrRefreshTokenExpired)
+	assert.Empty(t, repo.revokeAllCalls)
+
+	// REFRESH_SESSION_MAX_AGE=0 disables the cap.
+	cfg.JWT.RefreshSessionMaxAge = 0
+	_, err = svc.RefreshTokens(context.Background(), resp.RefreshToken, "ua", "ip")
+	require.NoError(t, err)
 }
 
 func TestRefreshTokens_ConcurrentRefreshExactlyOneWins(t *testing.T) {

@@ -82,6 +82,8 @@ The application uses a comprehensive configuration system that supports:
 | `JWT_SECRET` | Generated | JWT secret key (minimum 32 characters) |
 | `JWT_EXPIRATION` | `15m` | Access token lifetime (not revocable; clients use the refresh token) |
 | `JWT_REFRESH_EXPIRATION` | `168h` | JWT refresh token expiration (7 days) |
+| `JWT_REFRESH_REUSE_GRACE` | `30s` | A rotated refresh token presented again within this window gets a 401 without revoking the user's sessions (parallel refreshes); later reuse is treated as theft and revokes them all |
+| `REFRESH_SESSION_MAX_AGE` | `720h` | Absolute lifetime of a login (30 days). Rotated refresh tokens inherit the session start, never expire later than start + this, and are not rotated past it, so the user signs in again. Also caps MCP OAuth (Claude connector) grants from the consent-page login. `0` disables the cap |
 | `JWT_ISSUER` | `gestor-de-presupuesto` | JWT issuer |
 | `JWT_ALGORITHM` | `HS256` | JWT algorithm |
 

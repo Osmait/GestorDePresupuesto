@@ -122,6 +122,12 @@ type JWTConfig struct {
 	// session of the user. It absorbs legitimate parallel refreshes (two tabs,
 	// app + widget). Reuse after the window is treated as token theft.
 	RefreshReuseGrace time.Duration `json:"refresh_reuse_grace"`
+	// RefreshSessionMaxAge is the absolute lifetime of a refresh session
+	// (REFRESH_SESSION_MAX_AGE, default 30 days): rotated refresh tokens
+	// inherit the session start and are not rotated past it, so the user
+	// signs in again. It also caps the MCP OAuth (Claude connector) grants.
+	// 0 disables the cap.
+	RefreshSessionMaxAge time.Duration `json:"refresh_session_max_age"`
 }
 
 // SecurityConfig holds security-related configuration
@@ -413,6 +419,8 @@ func LoadConfig() (*Config, error) {
 			Audience:          getEnvString("JWT_AUDIENCE", "gestor-de-presupuesto-api"),
 			Algorithm:         getEnvString("JWT_ALGORITHM", "HS256"),
 			RefreshReuseGrace: getDuration(getEnvString("JWT_REFRESH_REUSE_GRACE", "30s")),
+			// 720h = 30 days.
+			RefreshSessionMaxAge: getEnvDuration("REFRESH_SESSION_MAX_AGE", 720*time.Hour),
 		},
 
 		Security: SecurityConfig{
