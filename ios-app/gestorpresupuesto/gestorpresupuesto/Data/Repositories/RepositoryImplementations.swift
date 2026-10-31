@@ -246,8 +246,8 @@ class AnalyticsRepositoryImpl: AnalyticsRepository {
         try await apiClient.request(Endpoints.monthlySummary())
     }
 
-    func getDashboardSummary() async throws -> DashboardSummary {
-        try await apiClient.request(Endpoints.dashboardSummary())
+    func getDashboardSummary(dateFrom: String?, dateTo: String?) async throws -> DashboardSummary {
+        try await apiClient.request(Endpoints.dashboardSummary(dateFrom: dateFrom, dateTo: dateTo))
     }
 }
 

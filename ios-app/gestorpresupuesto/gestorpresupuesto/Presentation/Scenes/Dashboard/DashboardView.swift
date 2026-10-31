@@ -91,6 +91,12 @@ extension DashboardView {
             accountsCount: viewModel.accountsCount
         )
 
+        // The totals below cover this month only; say so.
+        Text("Ingresos y gastos de \(viewModel.monthTitle)")
+            .font(.app(.footnote))
+            .fontWeight(.medium)
+            .foregroundStyle(Color.app.textSecondary)
+
         HStack(spacing: .md) {
             StatCard(
                 title: "Ingresos",

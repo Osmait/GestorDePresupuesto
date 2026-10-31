@@ -149,6 +149,40 @@ extension String {
     }
 }
 
+// MARK: - App calendar
+
+/// Days and months as the backend cuts them: in Santo Domingo time.
+enum AppCalendar {
+    static let timeZone = TimeZone(identifier: "America/Santo_Domingo") ?? .current
+
+    static var calendar: Calendar {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = timeZone
+        return calendar
+    }
+
+    /// First and last day of the month containing `date`, as yyyy-MM-dd, and
+    /// its name ("octubre 2026").
+    static func monthRange(containing date: Date = Date()) -> (from: String, to: String, title: String) {
+        let calendar = calendar
+        let start = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
+        let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? date
+
+        let day = DateFormatter()
+        day.locale = Locale(identifier: "en_US_POSIX")
+        day.calendar = calendar
+        day.timeZone = timeZone
+        day.dateFormat = "yyyy-MM-dd"
+
+        let month = DateFormatter()
+        month.locale = Locale(identifier: "es_DO")
+        month.timeZone = timeZone
+        month.dateFormat = "LLLL yyyy"
+
+        return (day.string(from: start), day.string(from: end), month.string(from: start))
+    }
+}
+
 // MARK: - Calendar days from the API
 
 extension String {

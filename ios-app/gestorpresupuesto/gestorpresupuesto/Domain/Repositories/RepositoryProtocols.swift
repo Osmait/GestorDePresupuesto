@@ -51,7 +51,9 @@ protocol MonthlyPlanRepository {
 protocol AnalyticsRepository {
     func getCategoryExpenses(dateFrom: String?, dateTo: String?) async throws -> [CategoryExpense]
     func getMonthlySummary() async throws -> [MonthlySummary]
-    func getDashboardSummary() async throws -> DashboardSummary
+    /// Income and expense totals for [dateFrom, dateTo] (calendar days); the
+    /// balances and net worth are always as of now.
+    func getDashboardSummary(dateFrom: String?, dateTo: String?) async throws -> DashboardSummary
 }
 
 protocol RecurringTransactionRepository {

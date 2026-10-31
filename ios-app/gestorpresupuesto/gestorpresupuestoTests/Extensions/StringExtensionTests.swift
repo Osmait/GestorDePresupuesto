@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import gestorpresupuesto
 
@@ -28,5 +29,18 @@ struct CalendarDayFormattingTests {
 
     @Test func notADateIsReturnedAsIs() {
         #expect("pendiente".calendarDayFormatted == "pendiente")
+    }
+}
+
+@Suite("App calendar")
+struct AppCalendarTests {
+
+    @Test func monthRange_coversTheLocalMonth() {
+        // Nov 1 2026 02:00 UTC is still Oct 31 in Santo Domingo.
+        let date = Date(timeIntervalSince1970: 1_793_498_400)
+        let month = AppCalendar.monthRange(containing: date)
+        #expect(month.from == "2026-10-01")
+        #expect(month.to == "2026-10-31")
+        #expect(month.title.lowercased().contains("octubre"))
     }
 }

@@ -24,6 +24,8 @@ class DashboardViewModel: BaseViewModel {
     @Published var netWorth: Double?
     @Published var monthlyPlanSummary: MonthlyPlanSummary?
     @Published var nextBill: MonthlyPlanItem?
+    /// The month the income and expense totals cover ("octubre 2026").
+    @Published var monthTitle = AppCalendar.monthRange().title
 
     var patrimonyTotal: Double {
         netWorth ?? totalBalance + investmentsTotal + certificatesTotal
@@ -74,7 +76,10 @@ class DashboardViewModel: BaseViewModel {
 
     private func loadDashboardSummary() async {
         do {
-            let summary = try await analyticsRepository.getDashboardSummary()
+            // Income and expenses of the current month, like the web.
+            let month = AppCalendar.monthRange()
+            monthTitle = month.title
+            let summary = try await analyticsRepository.getDashboardSummary(dateFrom: month.from, dateTo: month.to)
             totalIncome = summary.totalIncome
             totalExpenses = summary.totalExpenses
             totalBalance = summary.accountsTotal

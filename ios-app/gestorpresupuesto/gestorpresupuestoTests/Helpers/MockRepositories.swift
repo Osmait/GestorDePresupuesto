@@ -235,7 +235,10 @@ final class MockAnalyticsRepository: AnalyticsRepository {
         return try getMonthlySummaryResult.get()
     }
 
-    func getDashboardSummary() async throws -> DashboardSummary {
+    var lastDashboardRange: (from: String?, to: String?)?
+
+    func getDashboardSummary(dateFrom: String?, dateTo: String?) async throws -> DashboardSummary {
+        lastDashboardRange = (dateFrom, dateTo)
         return try getDashboardSummaryResult.get()
     }
 }

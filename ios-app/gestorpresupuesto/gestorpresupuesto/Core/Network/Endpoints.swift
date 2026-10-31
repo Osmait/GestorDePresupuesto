@@ -430,8 +430,12 @@ struct Endpoints {
     }
 
     // MARK: - Dashboard Summary
-    static func dashboardSummary() -> Endpoint {
-        Endpoint(path: "/analytics/dashboard-summary", method: .GET)
+    /// Without dates the backend totals the year so far.
+    static func dashboardSummary(dateFrom: String? = nil, dateTo: String? = nil) -> Endpoint {
+        var items: [URLQueryItem] = []
+        if let dateFrom { items.append(URLQueryItem(name: "date_from", value: dateFrom)) }
+        if let dateTo { items.append(URLQueryItem(name: "date_to", value: dateTo)) }
+        return Endpoint(path: "/analytics/dashboard-summary", method: .GET, queryItems: items.isEmpty ? nil : items)
     }
 
     // MARK: - Notifications

@@ -227,7 +227,7 @@ struct LiveAPITests {
         #expect(!dashboard.accounts.isEmpty)
 
         let analytics = AnalyticsRepositoryImpl()
-        _ = try await analytics.getDashboardSummary()
+        _ = try await analytics.getDashboardSummary(dateFrom: nil, dateTo: nil)
         _ = try await analytics.getMonthlySummary()
         _ = try await analytics.getCategoryExpenses(dateFrom: nil, dateTo: nil)
 
