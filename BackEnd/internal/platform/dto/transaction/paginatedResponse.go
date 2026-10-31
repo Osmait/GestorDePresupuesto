@@ -117,12 +117,42 @@ func NewPaginatedTransactionResponseWithSummary(
 // DefaultUsdToDopRate is used when no exchange rate is available.
 var DefaultUsdToDopRate = money.FromInt(60)
 
+// SummaryGroup aggregates the filtered transactions sharing a type,
+// currency and category: their exact sum, count and largest amount.
+type SummaryGroup struct {
+	TypeTransation string
+	Currency       string
+	CategoryId     string
+	Total          money.Amount
+	Count          int
+	Max            money.Amount
+}
+
 // CalculateSummary calculates summary statistics from a list of transactions.
-//
-// USD amounts are converted exactly (amount * rate) and accumulated without
-// intermediate rounding; totals, averages and the largest values are rounded
-// half-even to cents once, at the end.
+// It is CalculateSummaryFromGroups with one group per transaction.
 func CalculateSummary(transactions []*TransactionResponse, filteredCount int64, usdToDopRate money.Amount) TransactionSummary {
+	groups := make([]SummaryGroup, 0, len(transactions))
+	for _, t := range transactions {
+		groups = append(groups, SummaryGroup{
+			TypeTransation: t.TypeTransation,
+			Currency:       t.Currency,
+			CategoryId:     t.CategoryId,
+			Total:          t.Amount,
+			Count:          1,
+			Max:            t.Amount,
+		})
+	}
+	return CalculateSummaryFromGroups(groups, filteredCount, usdToDopRate)
+}
+
+// CalculateSummaryFromGroups calculates the summary from per (type,
+// currency, category) aggregates, computed in SQL by the repository.
+//
+// USD amounts are converted exactly (amount * rate; the conversion of a sum
+// equals the sum of the conversions) and accumulated without intermediate
+// rounding; totals, averages and the largest values are rounded half-even
+// to cents once, at the end.
+func CalculateSummaryFromGroups(groups []SummaryGroup, filteredCount int64, usdToDopRate money.Amount) TransactionSummary {
 	if !usdToDopRate.IsPositive() {
 		usdToDopRate = DefaultUsdToDopRate
 	}
@@ -133,56 +163,59 @@ func CalculateSummary(transactions []*TransactionResponse, filteredCount int64, 
 		UsdToDopRate:      usdToDopRate,
 	}
 
-	if len(transactions) == 0 {
+	if len(groups) == 0 {
 		return summary
 	}
 
 	categoryTotals := make(map[string]money.Amount)
 	categoryCounts := make(map[string]int)
 
-	for _, transaction := range transactions {
-		amountAbs := transaction.Amount
-		currency := transaction.Currency
+	for _, g := range groups {
+		if g.Count <= 0 {
+			continue
+		}
+		currency := g.Currency
 		if currency == "" {
 			currency = "DOP"
 		}
 
-		amountDOP := amountAbs
+		totalDOP, maxDOP := g.Total, g.Max
 		if currency == "USD" {
-			amountDOP = amountAbs.Mul(usdToDopRate)
+			totalDOP = g.Total.Mul(usdToDopRate)
+			maxDOP = g.Max.Mul(usdToDopRate)
 		}
 
-		switch transaction.TypeTransation {
+		switch g.TypeTransation {
 		case "income":
-			summary.TotalIncome = summary.TotalIncome.Add(amountDOP)
+			summary.TotalIncome = summary.TotalIncome.Add(totalDOP)
 			if currency == "USD" {
-				summary.IncomeUSD = summary.IncomeUSD.Add(amountAbs)
+				summary.IncomeUSD = summary.IncomeUSD.Add(g.Total)
 			} else {
-				summary.IncomeDOP = summary.IncomeDOP.Add(amountAbs)
+				summary.IncomeDOP = summary.IncomeDOP.Add(g.Total)
 			}
-			summary.IncomeCount++
+			summary.IncomeCount += g.Count
 
-			if amountDOP.GreaterThan(summary.LargestIncome) {
-				summary.LargestIncome = amountDOP
+			if maxDOP.GreaterThan(summary.LargestIncome) {
+				summary.LargestIncome = maxDOP
 			}
 		case "bill", "expense":
-			summary.TotalExpenses = summary.TotalExpenses.Add(amountDOP)
+			summary.TotalExpenses = summary.TotalExpenses.Add(totalDOP)
 			if currency == "USD" {
-				summary.ExpensesUSD = summary.ExpensesUSD.Add(amountAbs)
+				summary.ExpensesUSD = summary.ExpensesUSD.Add(g.Total)
 			} else {
-				summary.ExpensesDOP = summary.ExpensesDOP.Add(amountAbs)
+				summary.ExpensesDOP = summary.ExpensesDOP.Add(g.Total)
 			}
-			summary.ExpenseCount++
+			summary.ExpenseCount += g.Count
 
-			if amountDOP.GreaterThan(summary.LargestExpense) {
-				summary.LargestExpense = amountDOP
+			if maxDOP.GreaterThan(summary.LargestExpense) {
+				summary.LargestExpense = maxDOP
 			}
 		}
 
 		// Category breakdown
-		if transaction.CategoryId != "" {
-			categoryTotals[transaction.CategoryId] = categoryTotals[transaction.CategoryId].Add(amountDOP)
-			categoryCounts[transaction.CategoryId]++
+		if g.CategoryId != "" {
+			categoryTotals[g.CategoryId] = categoryTotals[g.CategoryId].Add(totalDOP)
+			categoryCounts[g.CategoryId] += g.Count
 		}
 	}
 
