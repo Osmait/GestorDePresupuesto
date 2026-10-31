@@ -149,11 +149,12 @@ struct TransactionFilterView: View {
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, Spacing.sm.rawValue)
-            .foregroundStyle(isSelected ? .white : Color.app.textSecondary)
+            .foregroundStyle(isSelected ? Color.app.onStatus : Color.app.textSecondary)
             .background(isSelected ? color : Color.app.surfaceSecondary)
             .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
         }
         .buttonStyle(.plain)
+        .chipAccessibility(selected: isSelected)
     }
 
     // MARK: - Category
@@ -172,7 +173,7 @@ struct TransactionFilterView: View {
                         } label: {
                             HStack(spacing: Spacing.xs.rawValue) {
                                 Text(category.icon)
-                                    .font(.system(size: 14))
+                                    .font(.footnote)
                                 Text(category.name)
                                     .font(.caption)
                                     .fontWeight(.medium)
@@ -190,6 +191,7 @@ struct TransactionFilterView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .chipAccessibility(selected: isSelected)
                     }
                 }
             }
@@ -215,8 +217,8 @@ struct TransactionFilterView: View {
                                         .fill(isSelected ? Color.app.accent : Color.app.surfaceSecondary)
                                         .frame(width: 36, height: 36)
                                     Image(systemName: "building.columns")
-                                        .font(.system(size: 14))
-                                        .foregroundStyle(isSelected ? .white : Color.app.textSecondary)
+                                        .font(.footnote)
+                                        .foregroundStyle(isSelected ? Color.app.onAccent : Color.app.textSecondary)
                                 }
 
                                 VStack(alignment: .leading, spacing: 1) {
@@ -234,7 +236,7 @@ struct TransactionFilterView: View {
                                 if isSelected {
                                     Image(systemName: "checkmark.circle.fill")
                                         .foregroundStyle(Color.app.accent)
-                                        .font(.system(size: 20))
+                                        .font(.title3)
                                 }
                             }
                             .padding(.horizontal, Spacing.md.rawValue)
@@ -249,6 +251,7 @@ struct TransactionFilterView: View {
                             )
                         }
                         .buttonStyle(.plain)
+                        .chipAccessibility(selected: isSelected)
                     }
                 }
             }
@@ -353,6 +356,7 @@ struct TransactionFilterView: View {
                 .clipShape(Capsule())
         }
         .buttonStyle(.plain)
+        .chipAccessibility(selected: isSelected)
     }
 
     private func emptyLabel(_ text: String) -> some View {

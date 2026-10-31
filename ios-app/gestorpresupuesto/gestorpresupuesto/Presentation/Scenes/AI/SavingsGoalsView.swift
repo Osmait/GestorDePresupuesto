@@ -48,7 +48,7 @@ struct SavingsGoalsView: View {
                                                 Text("Ahorrado")
                                                     .font(.caption2)
                                                     .foregroundStyle(Color.app.textTertiary)
-                                                Text(goal.currentSaved.currencyFormatted)
+                                                Text(goal.currentSaved.currencyFormatted).singleLineAmount()
                                                     .font(.app(.subheadline))
                                                     .fontWeight(.semibold)
                                             }
@@ -57,7 +57,7 @@ struct SavingsGoalsView: View {
                                                 Text("Meta")
                                                     .font(.caption2)
                                                     .foregroundStyle(Color.app.textTertiary)
-                                                Text(goal.targetAmount.currencyFormatted)
+                                                Text(goal.targetAmount.currencyFormatted).singleLineAmount()
                                                     .font(.app(.subheadline))
                                             }
                                         }
@@ -87,13 +87,12 @@ struct SavingsGoalsView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showAddGoal = true } label: {
-                        Image(systemName: "plus")
-                    }
+                    Button("Nueva meta", systemImage: "plus") { showAddGoal = true }
                 }
             }
             .sheet(isPresented: $showAddGoal) {
                 AddSavingsGoalView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadGoals() }
             .task { await viewModel.loadGoals() }
@@ -109,6 +108,8 @@ struct SavingsGoalsView: View {
 
     private static let inputFormatter: DateFormatter = {
         let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.calendar = Calendar(identifier: .gregorian)
         f.dateFormat = "yyyy-MM-dd"
         return f
     }()
@@ -179,13 +180,11 @@ struct AddSavingsGoalView: View {
 
     private func save() async {
         guard let amount = Double(targetAmount) else { return }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
 
         let request = AICreateSavingsGoalRequest(
             name: name,
             targetAmount: amount,
-            targetDate: hasTargetDate ? formatter.string(from: targetDate) : nil,
+            targetDate: hasTargetDate ? AppCalendar.dayString(targetDate) : nil,
             accountId: nil,
             currentSaved: nil
         )

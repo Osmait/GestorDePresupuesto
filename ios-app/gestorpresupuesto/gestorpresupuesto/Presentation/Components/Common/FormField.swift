@@ -61,7 +61,7 @@ struct FormField: View {
 
             HStack(spacing: .sm) {
                 Image(systemName: icon)
-                    .font(.system(size: 16))
+                    .font(.callout)
                     .foregroundStyle(validationState == .focused ? Color.app.accent : Color.app.textTertiary)
                     .frame(width: 20)
 
@@ -80,14 +80,14 @@ struct FormField: View {
 
                 if validationState == .valid {
                     Image(systemName: "checkmark.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.callout)
                         .foregroundStyle(Color.app.success)
                         .transition(.scale.combined(with: .opacity))
                 }
 
                 if validationState == .invalid {
                     Image(systemName: "exclamationmark.circle.fill")
-                        .font(.system(size: 16))
+                        .font(.callout)
                         .foregroundStyle(Color.app.error)
                         .transition(.scale.combined(with: .opacity))
                 }

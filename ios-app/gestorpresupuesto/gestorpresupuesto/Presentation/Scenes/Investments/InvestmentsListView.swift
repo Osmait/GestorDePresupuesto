@@ -51,7 +51,7 @@ struct InvestmentsListView: View {
                                                 Text(balance.currency)
                                                     .font(.app(.caption))
                                                 Spacer()
-                                                Text(balance.available.currencyFormatted(currency: balance.currency))
+                                                Text(balance.available.currencyFormatted(currency: balance.currency)).singleLineAmount()
                                                     .font(.app(.subheadline))
                                                     .fontWeight(.semibold)
                                             }
@@ -114,15 +114,17 @@ struct InvestmentsListView: View {
                             Label("Fondear Broker", systemImage: "arrow.right.circle")
                         }
                     } label: {
-                        Image(systemName: "plus")
+                        Label("Agregar", systemImage: "plus")
                     }
                 }
             }
             .sheet(isPresented: $showAddInvestment) {
                 AddInvestmentView(viewModel: viewModel)
+                    .formSheet()
             }
             .sheet(isPresented: $showFundBroker) {
                 FundBrokerView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadInvestments() }
             .task { await viewModel.loadInvestments() }
@@ -147,9 +149,11 @@ struct InvestmentsListView: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
                 .background(isSelected ? Color.app.accent : Color.app.surface)
-                .foregroundStyle(isSelected ? .white : Color.app.textSecondary)
+                .foregroundStyle(isSelected ? Color.app.onAccent : Color.app.textSecondary)
                 .clipShape(Capsule())
         }
+        .buttonStyle(.plain)
+        .chipAccessibility(selected: isSelected)
     }
 
     private func investmentRow(_ investment: Investment) -> some View {
@@ -170,7 +174,7 @@ struct InvestmentsListView: View {
                 }
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
-                    Text(investment.totalValue.currencyFormatted(currency: investment.currency))
+                    Text(investment.totalValue.currencyFormatted(currency: investment.currency)).singleLineAmount()
                         .font(.app(.subheadline))
                         .fontWeight(.semibold)
                     GainLossIndicator(value: investment.gainLoss, percent: investment.gainLossPercent)

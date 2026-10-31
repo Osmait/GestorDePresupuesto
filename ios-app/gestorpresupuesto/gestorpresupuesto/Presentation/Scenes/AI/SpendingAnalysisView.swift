@@ -44,7 +44,7 @@ struct SpendingAnalysisView: View {
                                             Text("Ingresos")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(insights.summary.totalIncome.currencyFormatted)
+                                            Text(insights.summary.totalIncome.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .foregroundStyle(Color.app.success)
                                         }
@@ -53,7 +53,7 @@ struct SpendingAnalysisView: View {
                                             Text("Gastos")
                                                 .font(.caption2)
                                                 .foregroundStyle(Color.app.textTertiary)
-                                            Text(insights.summary.totalExpenses.currencyFormatted)
+                                            Text(insights.summary.totalExpenses.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .foregroundStyle(Color.app.error)
                                         }
@@ -156,12 +156,9 @@ class SpendingAnalysisViewModel: BaseViewModel {
         isLoading = true
         error = nil
 
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd"
-
         let request = AnalyzeSpendingRequest(
-            dateFrom: formatter.string(from: dateFrom),
-            dateTo: formatter.string(from: dateTo),
+            dateFrom: AppCalendar.dayString(dateFrom),
+            dateTo: AppCalendar.dayString(dateTo),
             language: "es"
         )
 

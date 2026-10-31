@@ -85,9 +85,8 @@ struct DocumentScannerView: View {
         .navigationBarTitleDisplayMode(.inline)
         .notificationToolbar()
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
+            ToolbarItem(placement: .cancellationAction) {
                 Button("Cerrar") { dismiss() }
-                    .foregroundStyle(Color.app.textSecondary)
             }
         }
         .confirmationDialog("Agregar documento", isPresented: $showSourcePicker) {
@@ -119,6 +118,7 @@ struct DocumentScannerView: View {
                     viewModel.addScannedImage(image)
                 }
             }
+                .formSheet()
         }
         .fileImporter(
             isPresented: $showFilePicker,
@@ -154,7 +154,8 @@ struct EmptyScannerState: View {
                     .frame(width: 120, height: 120)
 
                 Image(systemName: "doc.text.viewfinder")
-                    .font(.system(size: 50))
+                    .font(.largeTitle)
+                    .imageScale(.large)
                     .foregroundStyle(Color.app.accent)
             }
 
@@ -246,11 +247,14 @@ struct ScannedImageThumbnail: View {
                 onRemove()
             } label: {
                 Image(systemName: "xmark.circle.fill")
-                    .font(.system(size: 20))
+                    .font(.title3)
                     .foregroundStyle(Color.app.onStatus)
                     .background(Circle().fill(Color.app.error))
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
             }
-            .offset(x: 6, y: -6)
+            .accessibilityLabel("Quitar foto")
+            .offset(x: 16, y: -16)
         }
     }
 }
@@ -271,17 +275,18 @@ struct DocumentTypeSelector: View {
                     } label: {
                         HStack(spacing: .xs) {
                             Image(systemName: type.icon)
-                                .font(.system(size: 14))
+                                .font(.footnote)
                             Text(type.displayName)
                                 .font(.app(.caption))
                         }
                         .padding(.horizontal, .md)
                         .padding(.vertical, .sm)
                         .background(selectedType == type ? Color.app.accent : Color.app.surfaceSecondary)
-                        .foregroundStyle(selectedType == type ? .white : Color.app.textSecondary)
+                        .foregroundStyle(selectedType == type ? Color.app.onAccent : Color.app.textSecondary)
                         .cornerRadius(.md)
                     }
                     .buttonStyle(PlainButtonStyle())
+                    .chipAccessibility(selected: selectedType == type)
                 }
             }
         }
@@ -389,7 +394,7 @@ struct ExtractedTransactionCard: View {
                     Spacer()
 
                     VStack(alignment: .trailing, spacing: 2) {
-                        Text(transaction.amount.currencyFormatted)
+                        Text(transaction.amount.currencyFormatted).singleLineAmount()
                             .font(.app(.headline))
                             .foregroundStyle(transaction.typeTransaction == "income" ? Color.app.success : Color.app.error)
 
@@ -429,7 +434,7 @@ struct ExtractedTransactionCard: View {
                         HStack(spacing: .xs) {
                             if isSaving {
                                 ProgressView()
-                                    .tint(.white)
+                                    .tint(Color.app.onAccent)
                             } else {
                                 Image(systemName: "square.and.arrow.down")
                                 Text("Guardar")

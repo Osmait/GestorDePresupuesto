@@ -3,6 +3,7 @@ import SwiftUI
 struct NotificationCenterView: View {
     @EnvironmentObject private var notificationManager: NotificationManager
     @Environment(\.dismiss) private var dismiss
+    @State private var confirmDeleteAll = false
 
     var body: some View {
         NavigationStack {
@@ -27,7 +28,7 @@ struct NotificationCenterView: View {
                         }
 
                         Button(role: .destructive) {
-                            notificationManager.deleteAll()
+                            confirmDeleteAll = true
                         } label: {
                             Label("Eliminar todas", systemImage: "trash")
                         }
@@ -40,9 +41,14 @@ struct NotificationCenterView: View {
                             Label("Enviar prueba", systemImage: "paperplane")
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
+                        Label("Más opciones", systemImage: "ellipsis.circle")
                     }
                 }
+            }
+            .confirmationDialog("¿Eliminar todas las notificaciones?", isPresented: $confirmDeleteAll, titleVisibility: .visible) {
+                Button("Eliminar todas", role: .destructive) { notificationManager.deleteAll() }
+            } message: {
+                Text("Esta acción no se puede deshacer.")
             }
         }
     }
@@ -76,6 +82,8 @@ struct NotificationCenterView: View {
                 List {
                     ForEach(notificationManager.notifications) { notification in
                         NotificationRow(notification: notification)
+                            .accessibilityAddTraits(notification.isRead ? [] : .isButton)
+                            .accessibilityHint(notification.isRead ? "" : "Marcar como leída")
                             .onTapGesture {
                                 if !notification.isRead {
                                     notificationManager.markAsRead(notification.id)
@@ -107,7 +115,8 @@ struct NotificationCenterView: View {
     private var emptyState: some View {
         VStack(spacing: Spacing.lg.rawValue) {
             Image(systemName: "bell.slash")
-                .font(.system(size: 48))
+                .font(.largeTitle)
+                .imageScale(.large)
                 .foregroundStyle(Color.app.textTertiary)
 
             Text("Sin notificaciones")
@@ -131,7 +140,7 @@ private struct NotificationRow: View {
         HStack(alignment: .top, spacing: CGFloat.md) {
             // Type icon
             Image(systemName: notification.notificationType.icon)
-                .font(.system(size: 18))
+                .font(.body)
                 .foregroundStyle(notification.notificationType.toastType.color)
                 .frame(width: 32, height: 32)
                 .background(
@@ -147,7 +156,7 @@ private struct NotificationRow: View {
 
                 HStack(spacing: CGFloat.sm) {
                     if let amount = notification.amount {
-                        Text(amount.currencyFormatted)
+                        Text(amount.currencyFormatted).singleLineAmount()
                             .font(.app(.caption))
                             .foregroundStyle(Color.app.accent)
                     }

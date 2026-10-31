@@ -5,6 +5,7 @@ struct LoadingSkeleton: View {
     var cornerRadius: Radius = .sm
 
     @State private var isAnimating = false
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
         Rectangle()
@@ -31,6 +32,8 @@ struct LoadingSkeleton: View {
             )
             .clipped()
             .onAppear {
+                // A static placeholder when the user asks for less motion.
+                guard !reduceMotion else { return }
                 withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
                     isAnimating = true
                 }
@@ -109,7 +112,8 @@ struct EmptyStateView: View {
                     .frame(width: 100, height: 100)
 
                 Image(systemName: icon)
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
+                    .imageScale(.large)
                     .foregroundStyle(Color.app.accent)
             }
 

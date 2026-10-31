@@ -155,10 +155,27 @@ extension String {
 enum AppCalendar {
     static let timeZone = TimeZone(identifier: "America/Santo_Domingo") ?? .current
 
-    static var calendar: Calendar {
+    /// Gregorian, Santo Domingo time, weeks from Monday (like the backend's
+    /// this_week), whatever calendar the device uses.
+    static let calendar: Calendar = {
         var calendar = Calendar(identifier: .gregorian)
         calendar.timeZone = timeZone
+        calendar.firstWeekday = 2
         return calendar
+    }()
+
+    private static let dayFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        formatter.calendar = calendar
+        formatter.timeZone = timeZone
+        formatter.dateFormat = "yyyy-MM-dd"
+        return formatter
+    }()
+
+    /// The calendar day the API expects ("2026-10-31").
+    static func dayString(_ date: Date) -> String {
+        dayFormatter.string(from: date)
     }
 
     /// First and last day of the month containing `date`, as yyyy-MM-dd, and
@@ -168,18 +185,12 @@ enum AppCalendar {
         let start = calendar.date(from: calendar.dateComponents([.year, .month], from: date)) ?? date
         let end = calendar.date(byAdding: DateComponents(month: 1, day: -1), to: start) ?? date
 
-        let day = DateFormatter()
-        day.locale = Locale(identifier: "en_US_POSIX")
-        day.calendar = calendar
-        day.timeZone = timeZone
-        day.dateFormat = "yyyy-MM-dd"
-
         let month = DateFormatter()
         month.locale = Locale(identifier: "es_DO")
         month.timeZone = timeZone
         month.dateFormat = "LLLL yyyy"
 
-        return (day.string(from: start), day.string(from: end), month.string(from: start))
+        return (dayString(start), dayString(end), month.string(from: start))
     }
 }
 

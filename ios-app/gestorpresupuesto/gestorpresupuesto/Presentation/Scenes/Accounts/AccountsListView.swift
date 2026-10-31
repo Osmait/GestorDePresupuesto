@@ -83,20 +83,12 @@ struct AccountsListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showingAddAccount = true } label: {
-                        ZStack {
-                            Circle()
-                                .fill(Color.app.accent.opacity(0.15))
-                                .frame(width: 32, height: 32)
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Color.app.accent)
-                        }
-                    }
+                    Button("Nueva cuenta", systemImage: "plus") { showingAddAccount = true }
                 }
             }
             .sheet(isPresented: $showingAddAccount) {
                 AddAccountView(viewModel: viewModel, isPresented: $showingAddAccount)
+                    .formSheet()
             }
             .task {
                 if viewModel.accounts.isEmpty {
@@ -121,8 +113,8 @@ struct AccountsListView: View {
                 .font(.app(.caption))
                 .foregroundStyle(Color.app.textTertiary)
 
-            Text(totalBalance.currencyFormatted)
-                .font(.system(size: 36, weight: .bold, design: .rounded))
+            Text(totalBalance.currencyFormatted).singleLineAmount()
+                .font(.appAmount)
                 .foregroundStyle(Color.app.textPrimary)
                 .minimumScaleFactor(0.6)
 
@@ -150,7 +142,7 @@ struct AccountsListView: View {
     private func accountCard(_ account: AccountResponse, index: Int) -> some View {
         let isCard = account.accountInfo.isCreditCard
         let isPositive = account.currentBalance >= 0
-        let iconInfo = isCard ? ("creditcard.fill", Color.blue) : Self.accountIcon(for: account, index: index)
+        let iconInfo = isCard ? (icon: "creditcard.fill", color: Color.app.textSecondary) : Self.accountIcon(for: account, index: index)
 
         return HStack(spacing: Spacing.md.rawValue) {
             // Icon
@@ -159,7 +151,7 @@ struct AccountsListView: View {
                     .fill(iconInfo.color.opacity(0.15))
                     .frame(width: 44, height: 44)
                 Image(systemName: iconInfo.icon)
-                    .font(.system(size: 18))
+                    .font(.body)
                     .foregroundStyle(iconInfo.color)
             }
 
@@ -180,7 +172,7 @@ struct AccountsListView: View {
             // Balance
             VStack(alignment: .trailing, spacing: 2) {
                 // A card's balance is negative while it has debt; show the debt as a positive amount.
-                Text((isCard ? abs(account.currentBalance) : account.currentBalance).currencyFormatted(currency: account.currency))
+                Text((isCard ? abs(account.currentBalance) : account.currentBalance).currencyFormatted(currency: account.currency)).singleLineAmount()
                     .font(.app(.subheadline))
                     .fontWeight(.bold)
                     .foregroundStyle(isPositive || isCard ? Color.app.textPrimary : Color.app.error)
@@ -202,26 +194,28 @@ struct AccountsListView: View {
 
     // MARK: - Icon Helper
 
+    /// The icon tells accounts apart; color stays neutral (hue only carries
+    /// meaning in this app).
     static func accountIcon(for account: AccountResponse, index: Int) -> (icon: String, color: Color) {
         let name = account.accountInfo.name.lowercased()
 
         if name.contains("ahorro") || name.contains("saving") {
-            return ("leaf.fill", .green)
+            return ("leaf.fill", Color.app.textSecondary)
         } else if name.contains("inversion") || name.contains("invest") {
-            return ("chart.line.uptrend.xyaxis", .purple)
+            return ("chart.line.uptrend.xyaxis", Color.app.textSecondary)
         } else if name.contains("gasto") || name.contains("expense") {
-            return ("dollarsign.square.fill", .orange)
+            return ("dollarsign.square.fill", Color.app.textSecondary)
         } else if name.contains("credit") || name.contains("tarjeta") {
-            return ("creditcard.fill", .blue)
+            return ("creditcard.fill", Color.app.textSecondary)
         } else if name.contains("principal") || name.contains("main") {
-            return ("building.columns.fill", .indigo)
+            return ("building.columns.fill", Color.app.textSecondary)
         }
 
         let icons: [(String, Color)] = [
-            ("building.columns.fill", .indigo),
-            ("banknote.fill", .teal),
-            ("wallet.bifold.fill", .mint),
-            ("chart.bar.fill", .cyan)
+            ("building.columns.fill", Color.app.textSecondary),
+            ("banknote.fill", Color.app.textSecondary),
+            ("wallet.bifold.fill", Color.app.textSecondary),
+            ("chart.bar.fill", Color.app.textSecondary)
         ]
         return icons[index % icons.count]
     }

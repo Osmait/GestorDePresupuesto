@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct ErrorBanner: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let message: String
     let onDismiss: () -> Void
 
@@ -11,7 +12,7 @@ struct ErrorBanner: View {
     var body: some View {
         HStack(spacing: .sm) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 18, weight: .medium))
+                .font(.system(.body, weight: .medium))
                 .foregroundStyle(Color.app.onStatus)
 
             Text(message)
@@ -37,7 +38,7 @@ struct ErrorBanner: View {
         )
         .cornerRadius(Radius.md)
         .shadow(color: Color.app.error.opacity(0.3), radius: 8, x: 0, y: 4)
-        .offset(y: offset)
+        .offset(y: reduceMotion ? 0 : offset)
         .opacity(opacity)
         .onAppear {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -75,6 +76,7 @@ struct ErrorBanner: View {
 }
 
 struct ErrorBannerModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var isPresented: Bool
     let message: String
 
@@ -87,7 +89,7 @@ struct ErrorBannerModifier: ViewModifier {
                     }
                     .padding(.horizontal)
                     .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 }
             }
     }

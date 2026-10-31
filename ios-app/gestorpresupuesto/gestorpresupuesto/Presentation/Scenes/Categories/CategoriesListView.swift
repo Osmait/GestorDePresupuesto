@@ -34,17 +34,16 @@ struct CategoriesListView: View {
                                     .padding(.bottom, Spacing.lg.rawValue)
 
                                 // Grid
-                                let columns = [
-                                    GridItem(.flexible(), spacing: Spacing.sm.rawValue),
-                                    GridItem(.flexible(), spacing: Spacing.sm.rawValue)
-                                ]
+                                // Two columns on iPhone, more as the width allows (iPad).
+                                let columns = [GridItem(.adaptive(minimum: 160), spacing: Spacing.sm.rawValue)]
 
                                 LazyVGrid(columns: columns, spacing: Spacing.sm.rawValue) {
                                     ForEach(viewModel.categories) { category in
-                                        categoryCard(category)
-                                            .onTapGesture {
-                                                editingCategory = category
-                                            }
+                                        Button { editingCategory = category } label: {
+                                            categoryCard(category)
+                                        }
+                                        .buttonStyle(.plain)
+                                        .accessibilityHint("Editar categoría")
                                             .contextMenu {
                                                 Button {
                                                     editingCategory = category
@@ -74,23 +73,16 @@ struct CategoriesListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showingAddCategory = true } label: {
-                        ZStack {
-                            Circle()
-                                .fill(Color.app.accent.opacity(0.15))
-                                .frame(width: 32, height: 32)
-                            Image(systemName: "plus")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundStyle(Color.app.accent)
-                        }
-                    }
+                    Button("Nueva categoría", systemImage: "plus") { showingAddCategory = true }
                 }
             }
             .sheet(isPresented: $showingAddCategory) {
                 AddCategoryView(viewModel: viewModel, isPresented: $showingAddCategory)
+                    .formSheet()
             }
             .sheet(item: $editingCategory) { category in
                 EditCategoryView(viewModel: viewModel, category: category)
+                    .formSheet()
             }
             .task {
                 if viewModel.categories.isEmpty {
@@ -116,7 +108,7 @@ struct CategoriesListView: View {
                 .foregroundStyle(Color.app.textTertiary)
 
             Text("\(viewModel.categories.count)")
-                .font(.system(size: 36, weight: .bold, design: .rounded))
+                .font(.appAmount)
                 .foregroundStyle(Color.app.textPrimary)
 
             Text("categoría\(viewModel.categories.count == 1 ? "" : "s") creada\(viewModel.categories.count == 1 ? "" : "s")")
@@ -137,7 +129,7 @@ struct CategoriesListView: View {
                     .frame(width: 56, height: 56)
 
                 Text(category.icon)
-                    .font(.system(size: 28))
+                    .font(.title)
             }
 
             Text(category.name)
@@ -243,11 +235,12 @@ struct AddCategoryView: View {
         VStack(spacing: Spacing.md.rawValue) {
             ZStack {
                 Circle()
-                    .fill((Color.fromHex(selectedColor) ?? .blue).opacity(0.15))
+                    .fill((Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.15))
                     .frame(width: 80, height: 80)
 
                 Text(selectedIcon)
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
+                    .imageScale(.large)
             }
 
             Text(name.isEmpty ? "Mi Categoría" : name)
@@ -288,13 +281,13 @@ struct AddCategoryView: View {
                             .background(
                                 RoundedRectangle(cornerRadius: Radius.md.rawValue)
                                     .fill(selectedIcon == icon
-                                        ? (Color.fromHex(selectedColor) ?? .blue).opacity(0.2)
+                                        ? (Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.2)
                                         : Color.app.surfaceSecondary)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: Radius.md.rawValue)
                                     .stroke(selectedIcon == icon
-                                        ? (Color.fromHex(selectedColor) ?? .blue).opacity(0.5)
+                                        ? (Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.5)
                                         : Color.clear, lineWidth: 2)
                             )
                     }
@@ -320,13 +313,14 @@ struct AddCategoryView: View {
                         HapticManager.shared.selection()
                     } label: {
                         Circle()
-                            .fill(Color.fromHex(hex) ?? .gray)
+                            .fill(Color.fromHex(hex) ?? Color.app.textSecondary)
                             .frame(width: 36, height: 36)
                             .overlay {
                                 if selectedColor == hex {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(.system(.footnote, weight: .bold))
                                         .foregroundStyle(.white)
+                                        .shadow(color: .black.opacity(0.35), radius: 1)
                                 }
                             }
                             .overlay(
@@ -334,8 +328,12 @@ struct AddCategoryView: View {
                                     .stroke(selectedColor == hex ? Color.app.textPrimary.opacity(0.4) : .clear, lineWidth: 2)
                                     .padding(-2)
                             )
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(CategoryColorName.name(for: hex))
+                    .accessibilityAddTraits(selectedColor == hex ? .isSelected : [])
                 }
             }
         }

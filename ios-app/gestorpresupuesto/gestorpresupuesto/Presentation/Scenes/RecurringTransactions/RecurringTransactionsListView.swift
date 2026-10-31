@@ -69,13 +69,12 @@ struct RecurringTransactionsListView: View {
         .notificationToolbar()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                IconButton("plus") {
-                    showingAddRecurring = true
-                }
+                Button("Nueva recurrente", systemImage: "plus") { showingAddRecurring = true }
             }
         }
         .sheet(isPresented: $showingAddRecurring) {
             AddRecurringTransactionView(viewModel: viewModel, isPresented: $showingAddRecurring)
+                .formSheet()
         }
         .task {
             if viewModel.recurringTransactions.isEmpty {
@@ -161,7 +160,7 @@ struct RecurringTransactionRow: View {
                         .frame(width: 44, height: 44)
 
                     Image(systemName: transaction.isIncome ? "arrow.down" : "arrow.up")
-                        .font(.system(size: 18, weight: .semibold))
+                        .font(.system(.body, weight: .semibold))
                         .foregroundStyle(color)
                 }
 
@@ -180,7 +179,7 @@ struct RecurringTransactionRow: View {
                 Spacer()
 
                 VStack(alignment: .trailing, spacing: 2) {
-                    Text(transaction.amount.currencyFormatted)
+                    Text(transaction.amount.currencyFormatted).singleLineAmount()
                         .font(.app(.headline))
                         .foregroundStyle(color)
 
@@ -190,7 +189,8 @@ struct RecurringTransactionRow: View {
                 }
             }
         }
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+        // The rows live in a ScrollView, where swipe actions never fire.
+        .contextMenu {
             Button(role: .destructive, action: onDelete) {
                 Label("Eliminar", systemImage: "trash")
             }
@@ -221,109 +221,66 @@ struct AddRecurringTransactionView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.app.background.ignoresSafeArea()
+            Form {
+                Section {
+                    Picker("Tipo", selection: $selectedType) {
+                        Text("Gasto").tag(RecurringType.bill)
+                        Text("Ingreso").tag(RecurringType.income)
+                    }
+                    .pickerStyle(.segmented)
+                    .listRowBackground(Color.clear)
+                    .listRowInsets(EdgeInsets())
+                }
 
-                ScrollView {
-                    GlassCard(cornerRadius: .xl, padding: .lg) {
-                        VStack(spacing: .md) {
-                            Text("Nueva Transacción Recurrente")
-                                .font(.app(.title3))
-                                .foregroundStyle(Color.app.textPrimary)
+                Section {
+                    TextField("Nombre", text: $name)
+                    TextField("Descripción (opcional)", text: $description)
+                    TextField("Monto", text: $amount)
+                        .keyboardType(.decimalPad)
+                }
 
-                            VStack(spacing: .sm) {
-                                FormField(
-                                    icon: "tag",
-                                    placeholder: "Nombre",
-                                    text: $name,
-                                    validation: { value in
-                                        value.isEmpty ? "El nombre es requerido" : nil
-                                    }
-                                )
-
-                                FormField(
-                                    icon: "text.alignleft",
-                                    placeholder: "Descripción (opcional)",
-                                    text: $description
-                                )
-
-                                FormField(
-                                    icon: "dollarsign",
-                                    placeholder: "Monto",
-                                    text: $amount,
-                                    keyboardType: .decimalPad,
-                                    validation: { value in
-                                        if value.isEmpty { return "El monto es requerido" }
-                                        if let doubleValue = Double(value), doubleValue <= 0 {
-                                            return "El monto debe ser mayor a 0"
-                                        }
-                                        if Double(value) == nil { return "Ingresa un número válido" }
-                                        return nil
-                                    }
-                                )
-
-                                VStack(alignment: .leading, spacing: .xs) {
-                                    Text("Tipo")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.app.textSecondary)
-
-                                    HStack(spacing: .sm) {
-                                        TypeChip(
-                                            title: "Gasto",
-                                            icon: "arrow.up.circle.fill",
-                                            isSelected: selectedType == .bill,
-                                            color: .app.error
-                                        ) {
-                                            selectedType = .bill
-                                        }
-
-                                        TypeChip(
-                                            title: "Ingreso",
-                                            icon: "arrow.down.circle.fill",
-                                            isSelected: selectedType == .income,
-                                            color: .app.success
-                                        ) {
-                                            selectedType = .income
-                                        }
-                                    }
-                                }
-
-                                DayOfMonthPicker(dayOfMonth: $dayOfMonth)
-
-                                AccountPicker(
-                                    accounts: accountsViewModel.accounts,
-                                    selectedAccountId: $selectedAccountId
-                                )
-
-                                CategoryPicker(
-                                    categories: categoriesViewModel.categories,
-                                    selectedCategoryId: $selectedCategoryId
-                                )
-                            }
-
-                            HStack(spacing: .md) {
-                                SecondaryButton("Cancelar") {
-                                    isPresented = false
-                                }
-
-                                PrimaryButton(
-                                    "Guardar",
-                                    isLoading: isLoading
-                                ) {
-                                    Task { await saveRecurringTransaction() }
-                                }
-                                .disabled(!isValid)
-                            }
+                Section {
+                    Picker("Día del mes", selection: $dayOfMonth) {
+                        ForEach(1...31, id: \.self) { day in
+                            Text("Día \(day)").tag(day)
                         }
                     }
-                    .padding()
-                    .shake(trigger: shakeTrigger)
+                    Picker("Cuenta", selection: $selectedAccountId) {
+                        Text("Elegir").tag("")
+                        ForEach(accountsViewModel.accounts) { account in
+                            Text(account.accountInfo.name).tag(account.accountInfo.id)
+                        }
+                    }
+                    Picker("Categoría", selection: $selectedCategoryId) {
+                        Text("Elegir").tag("")
+                        ForEach(categoriesViewModel.categories) { category in
+                            Text("\(category.icon) \(category.name)").tag(category.id)
+                        }
+                    }
+                } footer: {
+                    Text("Se registra automáticamente cada mes en el día elegido.")
                 }
             }
+            .shake(trigger: shakeTrigger)
+            .navigationTitle("Nueva recurrente")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { isPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Button("Guardar") { Task { await saveRecurringTransaction() } }
+                            .disabled(!isValid)
+                    }
+                }
+            }
             .task {
-                await accountsViewModel.loadAccounts()
-                await categoriesViewModel.loadCategories()
+                async let accounts: Void = accountsViewModel.loadAccounts()
+                async let categories: Void = categoriesViewModel.loadCategories()
+                _ = await (accounts, categories)
             }
         }
     }
@@ -355,179 +312,6 @@ struct AddRecurringTransactionView: View {
         }
 
         isLoading = false
-    }
-}
-
-struct TypeChip: View {
-    let title: String
-    let icon: String
-    let isSelected: Bool
-    let color: Color
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: .xs) {
-                Image(systemName: icon)
-                    .font(.system(size: 14))
-                Text(title)
-                    .font(.app(.subheadline))
-            }
-            .padding(.horizontal, Spacing.md)
-            .padding(.vertical, Spacing.sm)
-            .background(isSelected ? color.opacity(0.2) : Color.app.surfaceSecondary)
-            .foregroundStyle(isSelected ? color : Color.app.textSecondary)
-            .cornerRadius(Radius.md)
-            .overlay(
-                RoundedRectangle(cornerRadius: Radius.md.rawValue)
-                    .stroke(isSelected ? color : Color.clear, lineWidth: 1)
-            )
-        }
-        .buttonStyle(PlainButtonStyle())
-    }
-}
-
-struct DayOfMonthPicker: View {
-    @Binding var dayOfMonth: Int
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: .xs) {
-            Text("Día del mes")
-                .font(.caption)
-                .foregroundStyle(Color.app.textSecondary)
-
-            HStack {
-                ForEach([1, 5, 10, 15, 20, 25, 28], id: \.self) { day in
-                    Button {
-                        dayOfMonth = day
-                    } label: {
-                        Text("\(day)")
-                            .font(.app(.caption))
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, Spacing.sm)
-                            .background(dayOfMonth == day ? Color.app.accent : Color.app.surfaceSecondary)
-                            .foregroundStyle(dayOfMonth == day ? .white : Color.app.textSecondary)
-                            .cornerRadius(Radius.sm)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                }
-            }
-
-            HStack(spacing: .sm) {
-                Text("Otro día:")
-                    .font(.caption)
-                    .foregroundStyle(Color.app.textSecondary)
-
-                TextField("1-31", value: $dayOfMonth, formatter: NumberFormatter())
-                    .font(.app(.body))
-                    .keyboardType(.numberPad)
-                    .multilineTextAlignment(.center)
-                    .frame(width: 60)
-                    .padding(Spacing.sm)
-                    .background(Color.app.surfaceSecondary)
-                    .cornerRadius(Radius.sm)
-            }
-        }
-    }
-}
-
-struct AccountPicker: View {
-    let accounts: [AccountResponse]
-    @Binding var selectedAccountId: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: .xs) {
-            Text("Cuenta")
-                .font(.caption)
-                .foregroundStyle(Color.app.textSecondary)
-
-            if accounts.isEmpty {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(Color.app.warning)
-                    Text("No hay cuentas disponibles")
-                        .font(.caption)
-                        .foregroundStyle(Color.app.textSecondary)
-                }
-            } else {
-                Menu {
-                    ForEach(accounts, id: \.accountInfo.id) { account in
-                        Button {
-                            selectedAccountId = account.accountInfo.id
-                        } label: {
-                            Text("\(account.accountInfo.name) - \(account.accountInfo.bank)")
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "building.columns")
-                            .foregroundStyle(selectedAccountId.isEmpty ? Color.app.textTertiary : Color.app.accent)
-                        Text(selectedAccountId.isEmpty ? "Seleccionar cuenta" : accounts.first(where: { $0.accountInfo.id == selectedAccountId })?.accountInfo.name ?? "")
-                            .foregroundStyle(selectedAccountId.isEmpty ? Color.app.textTertiary : Color.app.textPrimary)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .foregroundStyle(Color.app.textTertiary)
-                    }
-                    .padding()
-                    .background(Color.app.surfaceSecondary)
-                    .cornerRadius(Radius.md)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radius.md.rawValue)
-                            .stroke(!selectedAccountId.isEmpty ? Color.app.success : Color.app.border, lineWidth: 1)
-                    )
-                }
-            }
-        }
-    }
-}
-
-struct CategoryPicker: View {
-    let categories: [Category]
-    @Binding var selectedCategoryId: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: .xs) {
-            Text("Categoría")
-                .font(.caption)
-                .foregroundStyle(Color.app.textSecondary)
-
-            if categories.isEmpty {
-                HStack {
-                    Image(systemName: "exclamationmark.triangle")
-                        .foregroundStyle(Color.app.warning)
-                    Text("No hay categorías disponibles")
-                        .font(.caption)
-                        .foregroundStyle(Color.app.textSecondary)
-                }
-            } else {
-                Menu {
-                    ForEach(categories) { category in
-                        Button {
-                            selectedCategoryId = category.id
-                        } label: {
-                            Text("\(category.icon) \(category.name)")
-                        }
-                    }
-                } label: {
-                    HStack {
-                        Image(systemName: "folder")
-                            .foregroundStyle(selectedCategoryId.isEmpty ? Color.app.textTertiary : Color.app.accent)
-                        Text(selectedCategoryId.isEmpty ? "Seleccionar categoría" : categories.first(where: { $0.id == selectedCategoryId })?.name ?? "")
-                            .foregroundStyle(selectedCategoryId.isEmpty ? Color.app.textTertiary : Color.app.textPrimary)
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .foregroundStyle(Color.app.textTertiary)
-                    }
-                    .padding()
-                    .background(Color.app.surfaceSecondary)
-                    .cornerRadius(Radius.md)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radius.md.rawValue)
-                            .stroke(!selectedCategoryId.isEmpty ? Color.app.success : Color.app.border, lineWidth: 1)
-                    )
-                }
-            }
-        }
     }
 }
 

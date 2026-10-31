@@ -52,13 +52,12 @@ struct CreditCardsListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showAddCard = true } label: {
-                        Image(systemName: "plus")
-                    }
+                    Button("Nueva tarjeta", systemImage: "plus") { showAddCard = true }
                 }
             }
             .sheet(isPresented: $showAddCard) {
                 AddCreditCardView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadCreditCards() }
             .task { await viewModel.loadCreditCards() }
@@ -120,7 +119,7 @@ struct CreditCardsListView: View {
                             .font(.app(.caption))
                             .foregroundStyle(Color.app.textSecondary)
                         Spacer()
-                        Text(balance.currentBalance.currencyFormatted(currency: balance.currency))
+                        Text(balance.currentBalance.currencyFormatted(currency: balance.currency)).singleLineAmount()
                             .font(.app(.subheadline))
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.app.textPrimary)

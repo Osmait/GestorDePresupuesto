@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 enum AppFont {
     case largeTitle
@@ -14,36 +13,43 @@ enum AppFont {
     case caption
     case caption2
 
-    var font: Font {
+    /// The system text style each role scales with (Dynamic Type).
+    var textStyle: Font.TextStyle {
         switch self {
-        case .largeTitle: return .system(size: 34, weight: .bold)
-        case .title: return .system(size: 28, weight: .bold)
-        case .title2: return .system(size: 22, weight: .semibold)
-        case .title3: return .system(size: 20, weight: .semibold)
-        case .headline: return .system(size: 17, weight: .semibold)
-        case .body: return .system(size: 17, weight: .regular)
-        case .callout: return .system(size: 16, weight: .regular)
-        case .subheadline: return .system(size: 15, weight: .regular)
-        case .footnote: return .system(size: 13, weight: .regular)
-        case .caption: return .system(size: 12, weight: .regular)
-        case .caption2: return .system(size: 11, weight: .regular)
+        case .largeTitle: return .largeTitle
+        case .title: return .title
+        case .title2: return .title2
+        case .title3: return .title3
+        case .headline: return .headline
+        case .body: return .body
+        case .callout: return .callout
+        case .subheadline: return .subheadline
+        case .footnote: return .footnote
+        case .caption: return .caption
+        case .caption2: return .caption2
         }
     }
 
-    var uiFont: UIFont {
+    var weight: Font.Weight {
         switch self {
-        case .largeTitle: return .systemFont(ofSize: 34, weight: .bold)
-        case .title: return .systemFont(ofSize: 28, weight: .bold)
-        case .title2: return .systemFont(ofSize: 22, weight: .semibold)
-        case .title3: return .systemFont(ofSize: 20, weight: .semibold)
-        case .headline: return .systemFont(ofSize: 17, weight: .semibold)
-        case .body: return .systemFont(ofSize: 17, weight: .regular)
-        case .callout: return .systemFont(ofSize: 16, weight: .regular)
-        case .subheadline: return .systemFont(ofSize: 15, weight: .regular)
-        case .footnote: return .systemFont(ofSize: 13, weight: .regular)
-        case .caption: return .systemFont(ofSize: 12, weight: .regular)
-        case .caption2: return .systemFont(ofSize: 11, weight: .regular)
+        case .largeTitle, .title: return .bold
+        case .title2, .title3, .headline: return .semibold
+        default: return .regular
         }
+    }
+
+    /// Same sizes as before at the default text size (largeTitle 34, body 17,
+    /// caption2 11), now following the user's text size.
+    var font: Font {
+        .system(textStyle, weight: weight)
+    }
+}
+
+extension Font {
+    /// Hero amounts (balances, the amount being typed): large title size,
+    /// tabular figures so digits do not jump as they change.
+    static var appAmount: Font {
+        .system(.largeTitle, weight: .bold).monospacedDigit()
     }
 }
 

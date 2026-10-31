@@ -33,7 +33,7 @@ struct LoanDetailView: View {
                                     Text("Principal")
                                         .font(.caption2)
                                         .foregroundStyle(Color.app.textTertiary)
-                                    Text(loan.principalAmount.currencyFormatted)
+                                    Text(loan.principalAmount.currencyFormatted).singleLineAmount()
                                         .font(.app(.subheadline))
                                         .fontWeight(.semibold)
                                 }
@@ -42,7 +42,7 @@ struct LoanDetailView: View {
                                     Text("Interés")
                                         .font(.caption2)
                                         .foregroundStyle(Color.app.textTertiary)
-                                    Text(loan.totalInterest.currencyFormatted)
+                                    Text(loan.totalInterest.currencyFormatted).singleLineAmount()
                                         .font(.app(.subheadline))
                                 }
                                 Spacer()
@@ -50,7 +50,7 @@ struct LoanDetailView: View {
                                     Text("Pendiente")
                                         .font(.caption2)
                                         .foregroundStyle(Color.app.textTertiary)
-                                    Text(loan.pendingAmount.currencyFormatted)
+                                    Text(loan.pendingAmount.currencyFormatted).singleLineAmount()
                                         .font(.app(.subheadline))
                                         .fontWeight(.semibold)
                                         .foregroundStyle(Color.app.error)
@@ -79,7 +79,7 @@ struct LoanDetailView: View {
                                         }
                                         Spacer()
                                         VStack(alignment: .trailing, spacing: 2) {
-                                            Text(installment.expectedAmount.currencyFormatted)
+                                            Text(installment.expectedAmount.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.semibold)
                                             Text(installment.status.rawValue.capitalized)
@@ -118,7 +118,7 @@ struct LoanDetailView: View {
                                                 }
                                             }
                                             Spacer()
-                                            Text(payment.amount.currencyFormatted)
+                                            Text(payment.amount.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.semibold)
                                                 .foregroundStyle(Color.app.success)
@@ -144,6 +144,7 @@ struct LoanDetailView: View {
         }
         .sheet(isPresented: $showPaymentSheet) {
             RegisterLoanPaymentView(loan: loan, viewModel: viewModel)
+                .formSheet()
         }
         .task {
             await viewModel.loadLoanDetails(loan.id)

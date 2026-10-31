@@ -90,11 +90,12 @@ struct EditCategoryView: View {
         VStack(spacing: Spacing.md.rawValue) {
             ZStack {
                 Circle()
-                    .fill((Color.fromHex(selectedColor) ?? .blue).opacity(0.15))
+                    .fill((Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.15))
                     .frame(width: 80, height: 80)
 
                 Text(selectedIcon)
-                    .font(.system(size: 40))
+                    .font(.largeTitle)
+                    .imageScale(.large)
             }
 
             Text(name.isEmpty ? "Mi Categoría" : name)
@@ -135,13 +136,13 @@ struct EditCategoryView: View {
                             .background(
                                 RoundedRectangle(cornerRadius: Radius.md.rawValue)
                                     .fill(selectedIcon == icon
-                                        ? (Color.fromHex(selectedColor) ?? .blue).opacity(0.2)
+                                        ? (Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.2)
                                         : Color.app.surfaceSecondary)
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: Radius.md.rawValue)
                                     .stroke(selectedIcon == icon
-                                        ? (Color.fromHex(selectedColor) ?? .blue).opacity(0.5)
+                                        ? (Color.fromHex(selectedColor) ?? Color.app.textSecondary).opacity(0.5)
                                         : Color.clear, lineWidth: 2)
                             )
                     }
@@ -167,13 +168,14 @@ struct EditCategoryView: View {
                         HapticManager.shared.selection()
                     } label: {
                         Circle()
-                            .fill(Color.fromHex(hex) ?? .gray)
+                            .fill(Color.fromHex(hex) ?? Color.app.textSecondary)
                             .frame(width: 36, height: 36)
                             .overlay {
                                 if selectedColor == hex {
                                     Image(systemName: "checkmark")
-                                        .font(.system(size: 14, weight: .bold))
+                                        .font(.system(.footnote, weight: .bold))
                                         .foregroundStyle(.white)
+                                        .shadow(color: .black.opacity(0.35), radius: 1)
                                 }
                             }
                             .overlay(
@@ -181,8 +183,12 @@ struct EditCategoryView: View {
                                     .stroke(selectedColor == hex ? Color.app.textPrimary.opacity(0.4) : .clear, lineWidth: 2)
                                     .padding(-2)
                             )
+                            .frame(maxWidth: .infinity, minHeight: 44)
+                            .contentShape(Rectangle())
                     }
                     .buttonStyle(.plain)
+                    .accessibilityLabel(CategoryColorName.name(for: hex))
+                    .accessibilityAddTraits(selectedColor == hex ? .isSelected : [])
                 }
             }
         }

@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct NotificationBannerView: View {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     let event: NotificationEvent
     let onDismiss: () -> Void
     let onTap: () -> Void
@@ -15,7 +16,7 @@ struct NotificationBannerView: View {
         Button(action: onTap) {
             HStack(spacing: .sm) {
                 Image(systemName: type.icon)
-                    .font(.system(size: 20, weight: .medium))
+                    .font(.system(.title3, weight: .medium))
                     .foregroundStyle(type.toastType.color)
 
                 VStack(alignment: .leading, spacing: 2) {
@@ -26,7 +27,7 @@ struct NotificationBannerView: View {
                         .multilineTextAlignment(.leading)
 
                     if let amount = event.amount {
-                        Text(amount.currencyFormatted)
+                        Text(amount.currencyFormatted).singleLineAmount()
                             .font(.app(.caption))
                             .foregroundStyle(Color.app.textSecondary)
                     }
@@ -55,7 +56,7 @@ struct NotificationBannerView: View {
             .shadow(color: Color.black.opacity(0.1), radius: 10, x: 0, y: 5)
         }
         .buttonStyle(.plain)
-        .offset(y: offset)
+        .offset(y: reduceMotion ? 0 : offset)
         .opacity(opacity)
         .onAppear {
             withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -90,6 +91,7 @@ struct NotificationBannerView: View {
 }
 
 struct NotificationBannerModifier: ViewModifier {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @Binding var isPresented: Bool
     let event: NotificationEvent?
     let onTap: () -> Void
@@ -108,7 +110,7 @@ struct NotificationBannerModifier: ViewModifier {
                     )
                     .padding(.horizontal)
                     .padding(.top, 8)
-                    .transition(.move(edge: .top).combined(with: .opacity))
+                    .transition(reduceMotion ? .opacity : .move(edge: .top).combined(with: .opacity))
                 }
             }
     }

@@ -88,41 +88,43 @@ struct TransactionsListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    HStack(spacing: Spacing.sm.rawValue) {
-                        Button { showingFilters = true } label: {
-                            Image(systemName: "line.3.horizontal.decrease.circle")
-                                .foregroundStyle(Color.app.textSecondary)
-                        }
-
-                        Menu {
-                            Button {
-                                showingAddTransaction = true
-                            } label: {
-                                Label("Agregar manual", systemImage: "square.and.pencil")
-                            }
-                            Button {
-                                showingDocumentScanner = true
-                            } label: {
-                                Label("Escanear documento", systemImage: "doc.text.viewfinder")
-                            }
+                    Button { showingFilters = true } label: {
+                        Label("Filtros", systemImage: viewModel.hasActiveFilters
+                              ? "line.3.horizontal.decrease.circle.fill"
+                              : "line.3.horizontal.decrease.circle")
+                    }
+                    .accessibilityValue(viewModel.hasActiveFilters ? "Activos" : "")
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button {
+                            showingAddTransaction = true
                         } label: {
-                            Image(systemName: "plus.circle.fill")
-                                .font(.system(size: 24))
-                                .foregroundStyle(Color.app.accent)
+                            Label("Agregar manual", systemImage: "square.and.pencil")
                         }
+                        Button {
+                            showingDocumentScanner = true
+                        } label: {
+                            Label("Escanear documento", systemImage: "doc.text.viewfinder")
+                        }
+                    } label: {
+                        Label("Agregar movimiento", systemImage: "plus")
                     }
                 }
             }
             .sheet(isPresented: $showingAddTransaction) {
                 AddTransactionView(viewModel: viewModel, isPresented: $showingAddTransaction)
+                    .formSheet()
             }
             .sheet(isPresented: $showingFilters) {
                 TransactionFilterView(viewModel: viewModel, isPresented: $showingFilters)
+                    .formSheet()
             }
             .sheet(isPresented: $showingDocumentScanner) {
                 NavigationStack { DocumentScannerView() }
                     .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
+                    .formSheet()
             }
             .task {
                 await viewModel.loadInitialData()
@@ -377,30 +379,31 @@ struct AddTransactionView: View {
 
                         // Date
                         DatePickerField(title: "Fecha", date: $transactionDate)
-
-                        // Save
-                        PrimaryButton(
-                            "Guardar Transacción",
-                            icon: "checkmark",
-                            isLoading: isLoading
-                        ) {
-                            Task { await saveTransaction() }
-                        }
-                        .disabled(!isValid)
                     }
                     .padding(Spacing.lg.rawValue)
                 }
                 .shake(trigger: shakeTrigger)
             }
-            .navigationTitle("Nueva Transacción")
+            .navigationTitle("Nuevo movimiento")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancelar") { isPresented = false }
                 }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Button("Guardar") { Task { await saveTransaction() } }
+                            .disabled(!isValid)
+                    }
+                }
             }
             .task {
-                await viewModel.loadInitialData()
+                // The list screen already loaded them when it appeared.
+                if viewModel.categories.isEmpty || viewModel.accounts.isEmpty {
+                    await viewModel.loadInitialData()
+                }
             }
         }
     }
@@ -408,34 +411,11 @@ struct AddTransactionView: View {
     // MARK: - Type Toggle
 
     private var typeToggle: some View {
-        HStack(spacing: 0) {
-            typeButton(title: "Gasto", icon: "arrow.down.circle.fill", active: !isIncome, color: .app.error) {
-                withAnimation(.spring(response: 0.3)) { isIncome = false }
-            }
-            typeButton(title: "Ingreso", icon: "arrow.up.circle.fill", active: isIncome, color: .app.success) {
-                withAnimation(.spring(response: 0.3)) { isIncome = true }
-            }
+        Picker("Tipo", selection: $isIncome) {
+            Text("Gasto").tag(false)
+            Text("Ingreso").tag(true)
         }
-        .background(Color.app.surfaceSecondary)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
-    }
-
-    private func typeButton(title: String, icon: String, active: Bool, color: Color, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            HStack(spacing: Spacing.xs.rawValue) {
-                Image(systemName: icon)
-                    .font(.system(size: 18))
-                Text(title)
-                    .font(.app(.subheadline))
-                    .fontWeight(.semibold)
-            }
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, Spacing.md.rawValue)
-            .foregroundStyle(active ? .white : Color.app.textTertiary)
-            .background(active ? color : .clear)
-            .clipShape(RoundedRectangle(cornerRadius: Radius.lg.rawValue))
-        }
-        .buttonStyle(.plain)
+        .pickerStyle(.segmented)
     }
 
     // MARK: - Amount
@@ -452,7 +432,7 @@ struct AddTransactionView: View {
                     .foregroundStyle(Color.app.textTertiary)
 
                 TextField("0.00", text: $amount)
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .font(.appAmount)
                     .foregroundStyle(isIncome ? Color.app.success : Color.app.textPrimary)
                     .keyboardType(.decimalPad)
                     .multilineTextAlignment(.center)

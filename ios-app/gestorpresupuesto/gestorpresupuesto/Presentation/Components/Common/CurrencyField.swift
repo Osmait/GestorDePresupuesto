@@ -27,7 +27,7 @@ struct CurrencyField: View {
                             .fontWeight(.semibold)
                             .foregroundStyle(Color.app.accent)
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 10))
+                            .font(.caption2)
                             .foregroundStyle(Color.app.textTertiary)
                     }
                     .padding(.horizontal, Spacing.sm.rawValue)

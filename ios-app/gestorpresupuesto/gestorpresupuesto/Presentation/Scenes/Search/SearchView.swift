@@ -3,6 +3,7 @@ import Combine
 
 struct SearchView: View {
     @StateObject private var viewModel = SearchViewModel()
+    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
@@ -37,7 +38,7 @@ struct SearchView: View {
                                                     .foregroundStyle(Color.app.textTertiary)
                                             }
                                             Spacer()
-                                            Text(transaction.amount.currencyFormatted)
+                                            Text(transaction.amount.currencyFormatted).singleLineAmount()
                                                 .font(.app(.subheadline))
                                                 .fontWeight(.semibold)
                                                 .foregroundStyle(transaction.isInflow ? Color.app.success : Color.app.error)
@@ -89,7 +90,7 @@ struct SearchView: View {
                                                 .foregroundStyle(Color.app.textPrimary)
                                             Spacer()
                                             if let amount = budget.amount {
-                                                Text(amount.currencyFormatted)
+                                                Text(amount.currencyFormatted).singleLineAmount()
                                                     .font(.app(.caption))
                                                     .foregroundStyle(Color.app.textSecondary)
                                             }
@@ -107,7 +108,7 @@ struct SearchView: View {
                                                 .font(.app(.subheadline))
                                                 .foregroundStyle(Color.app.textPrimary)
                                             Spacer()
-                                            Text(loan.pendingAmount.currencyFormatted)
+                                            Text(loan.pendingAmount.currencyFormatted).singleLineAmount()
                                                 .font(.app(.caption))
                                                 .foregroundStyle(Color.app.textSecondary)
                                         }
@@ -136,7 +137,12 @@ struct SearchView: View {
                 }
             }
             .navigationTitle("Buscar")
-            .searchable(text: $viewModel.query, prompt: "Buscar...")
+            .searchable(text: $viewModel.query, prompt: "Buscar")
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cerrar") { dismiss() }
+                }
+            }
             .onChange(of: viewModel.query) { _, newValue in
                 viewModel.debouncedSearch(newValue)
             }

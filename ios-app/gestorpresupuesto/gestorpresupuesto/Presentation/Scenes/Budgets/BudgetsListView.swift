@@ -54,13 +54,12 @@ struct BudgetsListView: View {
         .notificationToolbar()
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
-                IconButton("plus") {
-                    showingAddBudget = true
-                }
+                Button("Nuevo presupuesto", systemImage: "plus") { showingAddBudget = true }
             }
         }
         .sheet(isPresented: $showingAddBudget) {
             AddBudgetView(viewModel: viewModel, isPresented: $showingAddBudget)
+                .formSheet()
         }
         .task {
             if viewModel.budgets.isEmpty {
@@ -90,7 +89,7 @@ struct BudgetRowView: View {
                             .font(.caption)
                             .foregroundStyle(Color.app.textSecondary)
 
-                        Text(budget.amount.currencyFormatted)
+                        Text(budget.amount.currencyFormatted).singleLineAmount()
                             .font(.app(.title3))
                             .fontWeight(.bold)
                             .foregroundStyle(Color.app.textPrimary)
@@ -103,7 +102,7 @@ struct BudgetRowView: View {
                             .font(.caption)
                             .foregroundStyle(Color.app.textSecondary)
 
-                        Text(budget.spent.currencyFormatted)
+                        Text(budget.spent.currencyFormatted).singleLineAmount()
                             .font(.app(.headline))
                             .foregroundStyle(budget.isOverBudget ? Color.app.error : Color.app.textPrimary)
                     }
@@ -156,91 +155,43 @@ struct AddBudgetView: View {
 
     var body: some View {
         NavigationStack {
-            ZStack {
-                Color.app.background.ignoresSafeArea()
-
-                GlassCard(cornerRadius: .xl, padding: .lg) {
-                    VStack(spacing: .md) {
-                        Text("Nuevo Presupuesto")
-                            .font(.app(.title3))
-                            .foregroundStyle(Color.app.textPrimary)
-
-                        VStack(spacing: .sm) {
-                            FormField(
-                                icon: "dollarsign",
-                                placeholder: "Monto del presupuesto",
-                                text: $amount,
-                                keyboardType: .decimalPad,
-                                validation: { value in
-                                    if value.isEmpty { return "El monto es requerido" }
-                                    if let doubleValue = Double(value), doubleValue <= 0 {
-                                        return "El monto debe ser mayor a 0"
-                                    }
-                                    if Double(value) == nil { return "Ingresa un número válido" }
-                                    return nil
-                                }
-                            )
-
-                            if categoriesViewModel.categories.isEmpty && !categoriesViewModel.isLoading {
-                                HStack {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .foregroundStyle(Color.app.warning)
-                                    Text("No hay categorías disponibles")
-                                        .font(.caption)
-                                        .foregroundStyle(Color.app.textSecondary)
-                                }
-                            } else {
-                                Menu {
-                                    ForEach(categoriesViewModel.categories) { category in
-                                        Button {
-                                            selectedCategoryId = category.id
-                                        } label: {
-                                            Text("\(category.icon) \(category.name)")
-                                        }
-                                    }
-                                } label: {
-                                    HStack {
-                                        Image(systemName: "folder")
-                                            .foregroundStyle(selectedCategoryId.isEmpty ? Color.app.textTertiary : Color.app.accent)
-                                        Text(selectedCategoryId.isEmpty ? "Seleccionar categoría" : categoriesViewModel.categories.first(where: { $0.id == selectedCategoryId })?.name ?? "")
-                                            .foregroundStyle(selectedCategoryId.isEmpty ? Color.app.textTertiary : Color.app.textPrimary)
-                                        Spacer()
-                                        Image(systemName: "chevron.down")
-                                            .foregroundStyle(Color.app.textTertiary)
-                                    }
-                                    .padding()
-                                    .background(Color.app.surfaceSecondary)
-                                    .cornerRadius(.md)
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: Radius.md.rawValue)
-                                            .stroke(!selectedCategoryId.isEmpty ? Color.app.success : Color.app.border, lineWidth: 1)
-                                    )
-                                }
-                            }
-                        }
-
-                        HStack(spacing: .md) {
-                            SecondaryButton("Cancelar") {
-                                isPresented = false
-                            }
-
-                            PrimaryButton(
-                                "Guardar",
-                                isLoading: isLoading
-                            ) {
-                                Task { await saveBudget() }
-                            }
-                            .disabled(!isValid)
+            Form {
+                Section {
+                    Picker("Categoría", selection: $selectedCategoryId) {
+                        Text("Elegir").tag("")
+                        ForEach(categoriesViewModel.categories) { category in
+                            Text("\(category.icon) \(category.name)").tag(category.id)
                         }
                     }
-                }
-                .padding()
-                .shake(trigger: shakeTrigger)
-                .task {
-                    await categoriesViewModel.loadCategories()
+                    TextField("Monto mensual", text: $amount)
+                        .keyboardType(.decimalPad)
+                } footer: {
+                    if categoriesViewModel.categories.isEmpty && !categoriesViewModel.isLoading {
+                        Text("Crea una categoría primero en Más › Categorías.")
+                    } else {
+                        Text("El límite se compara con los gastos de esa categoría en el mes.")
+                    }
                 }
             }
+            .shake(trigger: shakeTrigger)
+            .navigationTitle("Nuevo presupuesto")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancelar") { isPresented = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    if isLoading {
+                        ProgressView()
+                    } else {
+                        Button("Guardar") { Task { await saveBudget() } }
+                            .disabled(!isValid)
+                    }
+                }
+            }
+            .task {
+                await categoriesViewModel.loadCategories()
+            }
         }
     }
 

@@ -9,9 +9,9 @@ struct GainLossIndicator: View {
     var body: some View {
         HStack(spacing: 4) {
             Image(systemName: isPositive ? "arrow.up.right" : "arrow.down.right")
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(.caption2, weight: .bold))
             Text("\(String(format: "%.2f", abs(percent)))%")
-                .font(.system(size: 12, weight: .semibold))
+                .font(.system(.caption, weight: .semibold))
         }
         .foregroundStyle(isPositive ? Color.app.success : Color.app.error)
         .padding(.horizontal, 8)

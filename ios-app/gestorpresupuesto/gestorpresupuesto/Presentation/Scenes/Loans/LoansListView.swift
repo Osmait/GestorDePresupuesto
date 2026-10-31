@@ -76,13 +76,12 @@ struct LoansListView: View {
             .notificationToolbar()
             .toolbar {
                 ToolbarItem(placement: .primaryAction) {
-                    Button { showAddLoan = true } label: {
-                        Image(systemName: "plus")
-                    }
+                    Button("Nuevo préstamo", systemImage: "plus") { showAddLoan = true }
                 }
             }
             .sheet(isPresented: $showAddLoan) {
                 AddLoanView(viewModel: viewModel)
+                    .formSheet()
             }
             .refreshable { await viewModel.loadLoans() }
             .task { await viewModel.loadLoans() }
@@ -118,7 +117,7 @@ struct LoansListView: View {
                         .font(.caption2)
                         .foregroundStyle(Color.app.textTertiary)
                     Spacer()
-                    Text(loan.pendingAmount.currencyFormatted(currency: loan.currency))
+                    Text(loan.pendingAmount.currencyFormatted(currency: loan.currency)).singleLineAmount()
                         .font(.app(.subheadline))
                         .fontWeight(.semibold)
                         .foregroundStyle(Color.app.textPrimary)

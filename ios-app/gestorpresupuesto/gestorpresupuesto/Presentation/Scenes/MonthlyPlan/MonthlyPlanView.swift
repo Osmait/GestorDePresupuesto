@@ -59,6 +59,7 @@ struct MonthlyPlanView: View {
         }
         .sheet(item: $editorItem) { target in
             MonthlyPlanFormView(viewModel: viewModel, target: target)
+                .formSheet()
         }
         .task {
             if viewModel.items.isEmpty {
@@ -92,7 +93,7 @@ struct MonthlyPlanView: View {
                     }
                     .padding(.vertical, .lg)
                 }
-                .frame(width: 360)
+                .frame(minWidth: 300, idealWidth: 360, maxWidth: 380)
 
                 groupsList(withControls: false)
             }
